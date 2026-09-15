@@ -1,0 +1,582 @@
+// Fattakhov HR Agency — платформа подбора вакансий для студентов.
+//
+// Персональные данные (ФИО, e-mail, телефон) лежат в колонках *Enc:
+// AES-256-GCM, ключ вне базы. Поиск по такому полю невозможен, поэтому
+// рядом с e-mail хранится emailHash — детерминированный HMAC (слепой
+// индекс). Он позволяет найти аккаунт по почте, но не восстановить её.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Две строки подключения, и они разные по правам:
+//
+//   DATABASE_URL         рантайм — роль, умеющая только читать и писать
+//                        строки. Создать или удалить таблицу не может.
+//   DIRECT_DATABASE_URL  миграции — администратор базы. Нужен раз в
+//                        деплой, на сервере приложения не живёт.
+//
+// Разделение делает невозможным целый класс последствий: инъекция в
+// рантайме не удалит таблицу и не заведёт роль, потому что прав нет у
+// самого подключения, а не потому что это где-то проверяется в коде.
+//
+// Переменная обязательна: без неё Prisma не проходит валидацию схемы.
+// На машине разработчика в неё кладут ту же строку, что и в DATABASE_URL,
+// — там обе роли всё равно свои.
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  EMPLOYER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum LookingFor {
+  JOB
+  INTERNSHIP
+  PROJECT
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VacancyStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+  CLOSED
+}
+
+enum WorkFormat {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum EmploymentType {
+  PART_TIME
+  SHIFT
+  PROJECT
+  INTERNSHIP
+  FULL_TIME
+}
+
+enum SalaryPeriod {
+  MONTH
+  SHIFT
+  HOUR
+}
+
+enum SwipeDirection {
+  RIGHT
+  LEFT
+}
+
+enum ApplicationStatus {
+  NEW
+  VIEWED
+  INVITED
+  INTERVIEW
+  HIRED
+  REJECTED
+}
+
+enum StudentStatus {
+  ACTIVE
+  IN_PROGRESS
+  PLACED
+  PAUSED
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+// ============ УЧЁТНЫЕ ЗАПИСИ ============
+
+model Account {
+  id   String @id @default(cuid())
+  role Role
+
+  /// AES-256-GCM. Оригинал не восстанавливается без ключа приложения.
+  emailEnc  String
+  /// HMAC-SHA256 от нормализованной почты. Уникален — им и ищем аккаунт.
+  emailHash String @unique
+
+  /// bcrypt. Пуст у работодателя: он входит по коду из CRM, без пароля.
+  passwordHash String?
+
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  // Пользовательское соглашение и рассылка — отдельно от согласия на ПДн,
+  // которое лежит в анкете студента и у компании: это разные документы.
+  termsVersion       String?
+  termsAcceptedAt    DateTime?
+  marketingConsentAt DateTime?
+  // Инструкцию по кабинету видел — сама больше не открывается
+  tourSeenAt         DateTime?
+  // Почта подтверждена кодом из письма. Пока пусто, отклики студента ждут,
+  // а вакансии компании на проверку не уходят (lib/account-email.ts)
+  emailVerifiedAt    DateTime?
+  // Напоминания и сводки о сообщениях. Письма о решениях приходят всегда
+  notifyEmail        Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  student       Student?
+  employer      Employer?
+  accessCodes   AccessCode[]
+  auditLogs     AuditLog[]
+  authTokens    AuthToken[]
+  notifications NotificationLog[]
+
+  @@index([role])
+}
+
+enum AuthTokenKind {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+/// Код подтверждения почты или ссылка сброса пароля. Хранится только хеш:
+/// утечка таблицы не даёт ни войти, ни подтвердить чужую почту.
+model AuthToken {
+  id        String        @id @default(cuid())
+  accountId String
+  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind      AuthTokenKind
+  tokenHash String
+  attempts  Int           @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([accountId, kind])
+  @@index([tokenHash])
+}
+
+/// Какие необязательные письма уже ушли: напоминание не приходит дважды,
+/// а сводка — один раз на каждое новое непрочитанное сообщение.
+model NotificationLog {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  key       String
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, key])
+}
+
+/// Использованные билеты входа из CRM: второй раз по тому же билету не войти.
+model StaffTicket {
+  jti       String   @id
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Student {
+  id        String  @id @default(cuid())
+  accountId String  @unique
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  fullNameEnc String
+  phoneEnc    String?
+
+  gender    Gender @default(UNSPECIFIED)
+  birthYear Int
+
+  // Полная дата рождения — зашифрованной, как ФИО: вместе с именем она
+  // указывает на человека. Год рядом открыт — для подбора и статистики.
+  // Пусто только у анкет, заведённых до полной даты.
+  birthDateEnc String?
+
+  photoUrl   String?
+  resumeUrl  String?
+  resumeName String?
+
+  university String
+  speciality String
+  studyYear  Int
+
+  // Вуз из справочника. Пусто — студент вписал свой: справочник не обязан
+  // знать каждый колледж, а регистрация не должна на этом останавливаться.
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  // Учёбу подтвердил HR агентства (студенческий, справка). Сбрасывается,
+  // когда студент меняет вуз: подтверждали другой.
+  studyVerified   Boolean   @default(false)
+  studyVerifiedAt DateTime?
+
+  // Справка об обучении, которая ждёт проверки HR. После решения файл
+  // удаляется — остаются отметка и, при отказе, причина для студента.
+  studyDocUrl     String?
+  studyDocName    String?
+  studyDocAt      DateTime?
+  studyReviewNote String?
+
+  city         String?
+  workDays     Weekday[] @default([])
+  hoursPerWeek Int?
+  skills       String[]  @default([])
+  about        String?   @db.Text
+
+  // Портфолио. Списки — JSON: у элементов своя форма (название, описание,
+  // ссылка), а искать по ним базой не нужно. Форма проверяется в
+  // lib/portfolio.ts и при записи, и при чтении.
+  lookingFor   LookingFor[] @default([])
+  goals        String?      @db.Text
+  projects     Json         @default("[]")
+  achievements Json         @default("[]")
+  activities   Json         @default("[]")
+  hobbies      String?      @db.Text
+  links        Json         @default("[]")
+  videoUrl     String?
+
+  status StudentStatus @default(ACTIVE)
+
+  // ПДн-контур: под какой редакцией согласия, когда и откуда его дали.
+  // Без версии невозможно доказать, на что именно человек соглашался.
+  consentVersion String
+  consentAt      DateTime @default(now())
+  consentIp      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  swipes       Swipe[]
+  applications Application[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([institutionId])
+}
+
+model Employer {
+  id        String  @id @default(cuid())
+  accountId String  @unique
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  companyName String
+  contactName String
+  // Телефон контактного лица: HR-менеджер звонит, чтобы подтвердить
+  // компанию. ПДн — зашифрован, студентам не показывается.
+  phoneEnc String?
+
+  // ИНН: 10 цифр у организации, 12 у ИП. По нему HR сверяет компанию с
+  // госреестром. Уникален — вторая регистрация той же компании видна сразу.
+  // Пуст у клиентов из CRM: реквизиты там.
+  inn String? @unique
+  logoUrl     String?
+
+  // Страница компании. Заполняет сама компания после регистрации;
+  // у клиентов из CRM поля пусты, пока агентство их не заполнит.
+  industry String?
+  about    String?  @db.Text
+  culture  String?  @db.Text
+  website  String?
+  city     String?
+  socials  Json     @default("[]")
+  photos   String[] @default([])
+  videoUrl String?
+
+  // Модерация. Компания, зарегистрировавшаяся сама, не видна студентам,
+  // пока её не одобрит HR агентства. Клиенты из CRM уже проверены
+  // договором — поэтому по умолчанию «одобрено».
+  moderationStatus ModerationStatus @default(APPROVED)
+  moderationNote   String?
+  moderatedAt      DateTime?
+
+  // Согласие контактного лица на обработку ПДн при самостоятельной
+  // регистрации. У клиентов из CRM основание — договор, здесь пусто.
+  consentVersion String?
+  consentAt      DateTime?
+
+  /// Идентификатор клиента в CRM агентства — ключ синхронизации
+  crmClientId String? @unique
+
+  createdAt DateTime @default(now())
+
+  vacancies Vacancy[]
+}
+
+/// Одноразовый вход работодателя. В базе только хеш: утечка таблицы
+/// не даёт войти ни в один кабинет.
+model AccessCode {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  codeHash String @unique
+  label    String
+
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([accountId])
+}
+
+// ============ ВАКАНСИИ ============
+
+model Vacancy {
+  id String @id @default(cuid())
+
+  /// Идентификатор в CRM. Пуст у вакансии, заведённой вручную.
+  crmId String? @unique
+
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  title            String
+  summary          String   @db.Text
+  responsibilities String[] @default([])
+  requirements     String[] @default([])
+  perks            String[] @default([])
+
+  // Карточка вакансии v0.1 с доски Miro: что студент получит и с кем будет
+  // работать. У вакансий из CRM эти поля пусты, пока агентство не заполнит.
+  learnings String[] @default([])
+  team      String?  @db.Text
+  photos    String[] @default([])
+  videoUrl  String?
+
+  salaryFrom   Int?
+  salaryTo     Int?
+  salaryPeriod SalaryPeriod @default(MONTH)
+
+  city     String
+  district String?
+
+  // Точный адрес места работы: студенту важно, сколько ехать. У удалённой
+  // вакансии пуст. Офис, этаж, вход — отдельно, чтобы карта искала сам адрес.
+  address        String?
+  addressDetails String?
+
+  workFormat     WorkFormat     @default(ONSITE)
+  employmentType EmploymentType @default(PART_TIME)
+  shiftDays      Weekday[]      @default([])
+  hoursPerWeek   Int?
+
+  tags  String[] @default([])
+  isHot Boolean  @default(false)
+
+  /// Снята с публикации, а не удалена: на вакансии висят отклики
+  isActive Boolean @default(true)
+
+  // Путь вакансии из кабинета: черновик → на модерации → опубликована,
+  // отклонена или снята. Студенту видна только опубликованная — и только
+  // у одобренной компании. Вакансии из CRM приходят уже опубликованными:
+  // их проверило агентство, поэтому и значение по умолчанию такое.
+  status         VacancyStatus @default(PUBLISHED)
+  moderationNote String?
+  submittedAt    DateTime?
+  moderatedAt    DateTime?
+
+  /// Содержимое, которое агентство одобрило последним. Пока правка компании
+  /// ждёт проверки, студенты, которые уже откликнулись, видят его: иначе
+  /// непроверенный текст доходил бы до людей в обход модерации.
+  approvedContent Json?
+
+  publishedAt DateTime @default(now())
+  syncedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  swipes       Swipe[]
+  applications Application[]
+
+  @@index([isActive, publishedAt])
+  @@index([employerId])
+}
+
+// ============ РЕШЕНИЯ СТУДЕНТА ============
+
+/// Один свайп на пару «студент — вакансия». Повторный показ той же
+/// карточки означал бы, что решение не сохранилось.
+model Swipe {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  vacancyId String
+  vacancy   Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  direction SwipeDirection
+  createdAt DateTime       @default(now())
+
+  @@unique([studentId, vacancyId])
+  @@index([studentId, direction])
+  @@index([createdAt])
+}
+
+/// Отклик. Создаётся автоматически при свайпе вправо — отдельного
+/// действия «откликнуться» в продукте нет.
+model Application {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  vacancyId String
+  vacancy   Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  status       ApplicationStatus @default(NEW)
+  employerNote String?           @db.Text
+
+  statusChangedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  /// Денормализованное время последнего сообщения. Без него список
+  /// диалогов пришлось бы сортировать подзапросом по всей таблице
+  /// сообщений на каждое открытие экрана.
+  lastMessageAt DateTime?
+
+  messages Message[]
+
+  @@unique([studentId, vacancyId])
+  @@index([vacancyId, status])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+enum MessageAuthor {
+  STUDENT
+  EMPLOYER
+}
+
+/// Сообщение в переписке студента и работодателя.
+///
+/// Диалог привязан к отклику, а не к паре «человек — компания»: люди
+/// обсуждают конкретную вакансию, и переписка по бариста не должна
+/// смешиваться с перепиской по помощнику управляющего.
+model Message {
+  id String @id @default(cuid())
+
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  author MessageAuthor
+
+  /// AES-256-GCM. Личная переписка — те же персональные данные, что ФИО
+  /// и телефон, и лежать открытым текстом она не должна.
+  bodyEnc String @db.Text
+
+  /// Момент, когда сообщение прочитала противоположная сторона.
+  /// Пусто — значит непрочитано; по этому же полю считается счётчик.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([applicationId, createdAt])
+  @@index([applicationId, author, readAt])
+}
+
+// ============ СЛУЖЕБНОЕ ============
+
+model SyncRun {
+  id     String     @id @default(cuid())
+  source String     @default("crm")
+  status SyncStatus @default(RUNNING)
+
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  created     Int       @default(0)
+  updated     Int       @default(0)
+  deactivated Int       @default(0)
+  error       String?   @db.Text
+
+  @@index([startedAt])
+}
+
+/// Журнал аудита. Пишется на каждое действие с ПДн: кто, что, откуда.
+/// accountId пуст у анонимных попыток входа — их тоже нужно видеть.
+model AuditLog {
+  id String @id @default(cuid())
+
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  /// Подпись актора на момент события: аккаунт могут удалить, а запись
+  /// в журнале обязана остаться читаемой
+  actorLabel String
+
+  action   String
+  entity   String?
+  entityId String?
+
+  ip        String?
+  userAgent String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([accountId])
+}
+
+/// Учебное заведение: справочник для выбора вуза и публичная страница.
+model Institution {
+  id          String   @id @default(cuid())
+  /// Адрес страницы: /institutions/<slug>
+  slug        String   @unique
+  name        String
+  /// Как вуз называют в жизни — так он и показывается в профиле и чатах
+  shortName   String?
+  city        String
+  description String?  @db.Text
+  directions  String[] @default([])
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  students Student[]
+
+  @@index([city])
+}
+
+/// Событие пилота для метрик: шаг пути студента или компании.
+///
+/// Только идентификаторы и без внешних ключей: журнал живёт дольше анкеты,
+/// и после удаления студента событие остаётся обезличенным счётчиком, а не
+/// блокирует удаление и не тянет за собой ПДн.
+model AnalyticsEvent {
+  id            String   @id @default(cuid())
+  type          String
+  studentId     String?
+  employerId    String?
+  vacancyId     String?
+  applicationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([createdAt])
+  @@index([studentId])
+}

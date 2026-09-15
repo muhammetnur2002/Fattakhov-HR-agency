@@ -1,0 +1,128 @@
+name: CI
+
+# До этого файла прогон tsc/eslint/vitest/playwright целиком держался
+# на памяти того, кто пишет код, — один пропущенный прогон перед пушем,
+# и регресс уходит в main незамеченным. Здесь тот же набор проверок,
+# что запускается вручную при любой правке, только теперь при каждом
+# push и pull request, без исключений.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Не для прода — только чтобы NextAuth не отказал в dev-режиме.
+  # Реальный секрет прода живёт отдельно и сюда не попадает.
+  AUTH_SECRET: "ci-only-secret-do-not-reuse-in-production"
+
+jobs:
+  checks:
+    name: Типы, линт, юнит-тесты, сборка
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hr_platform_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/hr_platform_test?schema=public"
+      DATABASE_URL_TEST: "postgresql://postgres:postgres@localhost:5432/hr_platform_test?schema=public"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # Клиент Prisma — генерируемый код, в git не лежит (см. .gitignore),
+      # но нужен и типам, и сборке, и seed-скрипту ниже
+      - run: npx prisma generate
+
+      - run: npm run typecheck
+      - run: npm run lint
+
+      # Часть интеграционных тестов проверяется против реальных seed-данных
+      # (например tests/recipients.test.ts — vac_1/vac_2 из прода сида),
+      # а не только против того, что заводят себе сами — без сида упадут
+      - run: npm run db:test:reset
+
+      - run: npm test
+
+      - run: npm run build
+
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    needs: checks
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hr_platform
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/hr_platform?schema=public"
+      AUTH_URL: "http://localhost:3000"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+
+      # Playwright читает ту же базу, что и dev-сервер (см. комментарий
+      # в playwright.config.ts) — без сида нет ни demo1234-аккаунтов
+      # для входа, ни vac_1 и её воронки, на которых стоят фикстуры
+      - run: npm run db:seed
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

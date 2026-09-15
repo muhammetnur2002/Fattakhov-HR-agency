@@ -1,0 +1,16 @@
+# В образ не должно попасть ничего лишнего: и ради размера,
+# и потому что .env с ключами в образе - это утечка при первой же
+# передаче образа кому угодно.
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+.storage
+tests
+docs
+*.md
+!README.md
+.claude
+coverage

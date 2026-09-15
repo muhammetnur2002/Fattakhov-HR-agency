@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Секреты
+.env
+.env.local
+.env*.local
+
+# Загруженные пользователями файлы: фото и резюме — это ПДн,
+# им нечего делать в репозитории
+.uploads/
+
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Отладочные артефакты
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+.vercel
+
+# Резервные копии базы: содержат все данные платформы
+backups/

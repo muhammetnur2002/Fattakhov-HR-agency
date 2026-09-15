@@ -1,0 +1,954 @@
+// HR-платформа — схема данных
+// Источник правды: ТЗ раздел 5.2 (/Users/timur/Скиллы/HR-платформа/ТЗ_HR_платформа_v1.md)
+// Любое изменение здесь синхронизируется обратно в ТЗ.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ ОРГАНИЗАЦИЯ И ПОЛЬЗОВАТЕЛИ ============
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  inn       String?
+  logoUrl   String?
+  settings  Json     @default("{}") // рабочие часы, таймзона, дефолтные этапы воронки
+  createdAt DateTime @default(now())
+
+  users      User[]
+  clients    Client[]
+  candidates Candidate[]
+  vacancies  Vacancy[]
+}
+
+enum UserRole {
+  OWNER
+  HEAD
+  RECRUITER
+  ACCOUNT
+  CLIENT_ADMIN
+  CLIENT_HIRING
+  CLIENT_VIEWER
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  email        String
+  phone        String?
+  fullName     String
+  passwordHash String?
+  avatarUrl    String?
+  role         UserRole
+  position     String? // должность, отображается клиенту
+  /// Доступы сверх роли, выданные владельцем: управление командой,
+  /// разделы студенческой платформы. Коды — STAFF_GRANTS в lib/access.
+  grants       String[] @default([])
+  timezone     String   @default("Europe/Moscow")
+
+  // Заполнено только для ролей CLIENT_*
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  telegramChatId String?
+  notifyPrefs    Json    @default("{}") // { email: true, telegram: true, digest: "instant"|"daily" }
+
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  /// Секрет для одноразовых кодов. Заполнен с момента, когда человек
+  /// начал подключение, но второй фактор требуется только после
+  /// totpEnabledAt: иначе брошенное на полпути подключение заперло бы
+  /// человека снаружи.
+  totpSecret    String?
+  totpEnabledAt DateTime?
+
+  /// Момент последней смены пароля. Сессии, выпущенные раньше, считаются
+  /// недействительными: сменил пароль - вышел везде, кроме текущего места.
+  /// Без этого угнанная сессия переживает смену пароля до 30 дней.
+  passwordChangedAt DateTime?
+
+  invitesSent      Invitation[]    @relation("InviteAuthor")
+  comments         Comment[]
+  activities       ActivityLog[]
+  passwordResets   PasswordReset[]
+  recoveryCodes    RecoveryCode[]
+  sentMessages     DirectMessage[] @relation("SentMessages")
+  receivedMessages DirectMessage[] @relation("ReceivedMessages")
+
+  @@unique([organizationId, email])
+  @@index([clientId])
+}
+
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           UserRole
+  clientId       String?
+  /// Должность и доступы сотрудника агентства — переходят в учётку при приёме
+  position       String?
+  grants         String[]  @default([])
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  // Пусто у приглашения, созданного системой при первичной настройке:
+  // первого владельца звать некому, пользователей ещё нет
+  createdById    String?
+  createdBy      User?     @relation("InviteAuthor", fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId, email])
+}
+
+// ============ КЛИЕНТЫ И ДОГОВОРЫ ============
+
+model Client {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  name        String
+  legalName   String?
+  inn         String?
+  industry    String?
+  website     String?
+  logoUrl     String?
+  description String? @db.Text // «о компании» — рекрутер использует, продавая вакансию кандидату
+  city        String?
+
+  accountManagerId String? // ответственный ACCOUNT со стороны агентства
+
+  status    ClientStatus @default(LEAD)
+  createdAt DateTime     @default(now())
+  deletedAt DateTime?
+
+  users       User[]
+  agreements  Agreement[]
+  vacancies   Vacancy[]
+  invoices    Invoice[]
+  attachments Attachment[]
+
+  @@index([organizationId, status])
+}
+
+enum ClientStatus {
+  LEAD // завели, договор не подписан
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum PricingModel {
+  PERCENT_ANNUAL // % от годового дохода кандидата
+  PERCENT_MONTHLY // N окладов
+  FIXED_PER_HIRE // фикс за закрытую позицию
+  SUBSCRIPTION // абонентская плата, N вакансий в работе
+  HOURLY // почасовая
+}
+
+model Agreement {
+  id             String @id @default(cuid())
+  organizationId String
+  clientId       String
+  client         Client @relation(fields: [clientId], references: [id])
+
+  title        String // «Договор №12 от 01.08.2026»
+  pricingModel PricingModel
+
+  // Параметры зависят от модели. Валидация — в бизнес-слое, не в БД.
+  percentRate        Decimal? @db.Decimal(5, 2) // для PERCENT_*: например 18.00
+  monthsCount        Int? // для PERCENT_MONTHLY: 2 оклада
+  fixedAmount        Decimal? @db.Decimal(12, 2)
+  subscriptionAmount Decimal? @db.Decimal(12, 2)
+  subscriptionSlots  Int? // сколько вакансий одновременно
+  hourlyRate         Decimal? @db.Decimal(10, 2)
+
+  guaranteeDays     Int     @default(90) // гарантийный период замены
+  paymentTerms      String? @db.Text // «50% предоплата, 50% при выходе»
+  prepaymentPercent Int     @default(0)
+
+  startsAt DateTime
+  endsAt   DateTime?
+  status   AgreementStatus @default(PENDING)
+
+  fileUrl          String? // скан подписанного договора
+  acceptedByUserId String? // кто со стороны клиента подтвердил условия
+  acceptedAt       DateTime?
+
+  createdAt   DateTime     @default(now())
+  vacancies   Vacancy[]
+  attachments Attachment[]
+
+  @@index([clientId, status])
+}
+
+enum AgreementStatus {
+  PENDING // клиент выбрал условия, агентство не подтвердило
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+// ============ ВАКАНСИИ ============
+
+enum VacancyStatus {
+  DRAFT // черновик клиента
+  SUBMITTED // заявка отправлена, агентство не приняло
+  CLARIFYING // агентство задало вопросы
+  ESTIMATED // агентство прислало срок/условия, ждём подтверждения клиента
+  ACTIVE // в работе
+  ON_HOLD // приостановлена
+  CLOSED_SUCCESS // закрыта наймом
+  CLOSED_CANCELLED // отменена клиентом
+  CLOSED_FAILED // агентство не смогло закрыть
+}
+
+enum WorkFormat {
+  OFFICE
+  REMOTE
+  HYBRID
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  PROJECT
+  GPH // договор ГПХ
+  SELF_EMPLOYED
+}
+
+enum VacancyUrgency {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+model Vacancy {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id])
+  agreementId    String?
+  agreement      Agreement?   @relation(fields: [agreementId], references: [id])
+
+  number Int // человекочитаемый номер в рамках организации
+  title  String
+  status VacancyStatus @default(DRAFT)
+
+  // --- БРИФ ---
+  department      String?
+  hiringManagerId String? // CLIENT_HIRING — заказчик со стороны клиента
+  headcount       Int     @default(1)
+  reasonForHire   String? // рост / замена / новая функция
+
+  responsibilities String? @db.Text
+  requirements     String? @db.Text
+  niceToHave       String? @db.Text
+  conditions       String? @db.Text // что предлагает работодатель
+
+  salaryFrom     Decimal? @db.Decimal(12, 2)
+  salaryTo       Decimal? @db.Decimal(12, 2)
+  salaryCurrency String   @default("RUB")
+  salaryGross    Boolean  @default(true)
+  bonusScheme    String?
+
+  city           String?
+  workFormat     WorkFormat?
+  employmentType EmploymentType?
+  workSchedule   String? // «5/2, 9:00–18:00»
+
+  // --- ПАРАМЕТРЫ ПОДБОРА ---
+  stopFactors      String?        @db.Text // кого точно не рассматриваем
+  targetCompanies  String?        @db.Text // откуда хантить
+  interviewStages  String?        @db.Text // как выглядит процесс отбора у клиента
+  urgency          VacancyUrgency @default(NORMAL)
+  desiredStartDate DateTime?
+
+  // --- РАБОТА АГЕНТСТВА ---
+  leadRecruiterId            String?
+  recruiterIds               String[]  @default([])
+  estimatedFirstCandidatesAt DateTime? // обещанная дата первых кандидатов
+  estimatedCloseAt           DateTime?
+  agencyNotes                String?   @db.Text // внутреннее, клиенту не видно
+
+  submittedAt DateTime?
+  activatedAt DateTime?
+  closedAt    DateTime?
+  closeReason String?
+
+  isReplacementFor String? // id закрытой вакансии, если это замена по гарантии
+
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  stages       PipelineStage[]
+  applications Application[]
+  interviews   Interview[]
+  comments     Comment[]
+  attachments  Attachment[]
+
+  @@unique([organizationId, number])
+  @@index([clientId, status])
+  @@index([leadRecruiterId, status])
+}
+
+// ============ ВОРОНКА ============
+
+// Этапы настраиваются под вакансию, создаются из шаблона организации
+model PipelineStage {
+  id        String  @id @default(cuid())
+  vacancyId String
+  vacancy   Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  code            String // LONGLIST | SCREENING | PRESENTED | CLIENT_INTERVIEW | FINAL | OFFER | HIRED
+  name            String // отображаемое имя, редактируемое
+  order           Int
+  visibleToClient Boolean @default(true) // ключевое: LONGLIST и SCREENING = false
+  isTerminal      Boolean @default(false) // HIRED
+  slaHours        Int? // норматив нахождения на этапе
+
+  applications Application[]
+
+  @@unique([vacancyId, code])
+  @@index([vacancyId, order])
+}
+
+// ============ КАНДИДАТЫ ============
+
+enum CandidateSource {
+  HH
+  AVITO
+  TELEGRAM
+  LINKEDIN
+  REFERRAL
+  OWN_BASE
+  DIRECT_SEARCH
+  INBOUND
+  OTHER
+}
+
+enum ConsentStatus {
+  PENDING
+  GIVEN
+  REVOKED
+  EXPIRED
+}
+
+model Candidate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  fullName  String
+  phone     String?
+  email     String?
+  telegram  String?
+  city      String?
+  birthYear Int?
+
+  currentPosition      String?
+  currentCompany       String?
+  totalExperienceYears Decimal? @db.Decimal(4, 1)
+  skills               String[] @default([])
+  languages            Json? // [{lang:"en", level:"B2"}]
+  education            String?  @db.Text
+  summary              String?  @db.Text // внутреннее саммари рекрутера
+
+  salaryExpectation Decimal? @db.Decimal(12, 2)
+  salaryCurrency    String   @default("RUB")
+
+  source        CandidateSource @default(OTHER)
+  sourceDetails String? // ссылка на профиль hh / откуда пришёл
+
+  // ПДн-контур (BR-33, BR-34)
+  consentStatus    ConsentStatus @default(PENDING)
+  consentGivenAt   DateTime?
+  consentExpiresAt DateTime?
+  consentDocUrl    String?
+
+  // Версия текста, на который человек соглашался: если текст изменится,
+  // должно быть видно, под чем именно стоит его согласие
+  consentVersion String?
+
+  // Одноразовая ссылка на форму согласия
+  consentToken          String?   @unique
+  consentTokenExpiresAt DateTime?
+
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  applications Application[]
+  attachments  Attachment[]
+
+  @@index([organizationId, fullName])
+  @@index([organizationId, phone])
+}
+
+enum ApplicationOutcome {
+  IN_PROGRESS
+  HIRED
+  REJECTED
+  WITHDRAWN // кандидат сам отказался
+  ON_HOLD // клиент взял паузу
+}
+
+enum ClientDecision {
+  INTERVIEW
+  HOLD
+  REJECT
+  OFFER
+}
+
+enum RejectionSide {
+  CLIENT
+  CANDIDATE
+  AGENCY
+}
+
+enum RejectionReason {
+  // от клиента
+  EXPERIENCE_MISMATCH
+  SKILLS_MISMATCH
+  SALARY_TOO_HIGH
+  CULTURE_FIT
+  OVERQUALIFIED
+  LOCATION
+  FAILED_INTERVIEW
+  FAILED_TEST_TASK
+  POSITION_CLOSED
+  // от кандидата
+  ACCEPTED_OTHER_OFFER
+  SALARY_TOO_LOW
+  NOT_INTERESTED
+  COUNTEROFFER
+  CONDITIONS_MISMATCH
+  NO_CONTACT
+  NO_SHOW
+  OTHER
+}
+
+// Участие кандидата в конкретной вакансии — центральная рабочая сущность
+model Application {
+  id             String        @id @default(cuid())
+  organizationId String
+  vacancyId      String
+  vacancy        Vacancy       @relation(fields: [vacancyId], references: [id])
+  candidateId    String
+  candidate      Candidate     @relation(fields: [candidateId], references: [id])
+  stageId        String
+  stage          PipelineStage @relation(fields: [stageId], references: [id])
+
+  stageEnteredAt DateTime @default(now())
+
+  outcome          ApplicationOutcome @default(IN_PROGRESS)
+  rejectionReason  RejectionReason?
+  rejectionComment String?            @db.Text
+  rejectedBy       RejectionSide?
+
+  // Материалы представления клиенту (заполняются перед переводом в PRESENTED, BR-4)
+  presentationSummary String?   @db.Text // «почему подходит» — видно клиенту
+  presentedAt         DateTime?
+  presentedById       String?
+
+  // Решение клиента (BR-12, BR-14)
+  clientDecision        ClientDecision?
+  clientDecisionAt      DateTime?
+  clientDecisionById    String?
+  submittedOnBehalfById String? // если решение внёс сотрудник агентства со слов клиента
+
+  // Оффер
+  offerSalary    Decimal?  @db.Decimal(12, 2)
+  offerPosition  String?
+  offerSentAt    DateTime?
+  offerStartDate DateTime?
+
+  // Найм и гарантия (BR-10)
+  hiredAt           DateTime?
+  guaranteeUntil    DateTime?
+  guaranteeBrokenAt DateTime?
+
+  ownerId  String // рекрутер, ведущий этого кандидата
+  priority Int    @default(0) // сортировка в канбане
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  transitions StageTransition[]
+  comments    Comment[]
+  interviews  Interview[]
+  attachments Attachment[]
+
+  @@unique([vacancyId, candidateId]) // BR-6
+  @@index([vacancyId, stageId])
+  @@index([ownerId, outcome])
+}
+
+model StageTransition {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  fromStageId          String?
+  toStageId            String
+  fromOutcome          ApplicationOutcome?
+  toOutcome            ApplicationOutcome?
+  comment              String?             @db.Text
+  hoursInPreviousStage Decimal?            @db.Decimal(10, 2)
+
+  actorId   String
+  createdAt DateTime @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+// ============ КОММУНИКАЦИЯ ============
+
+enum CommentVisibility {
+  INTERNAL // только агентство
+  SHARED // видно клиенту
+}
+
+model Comment {
+  id             String       @id @default(cuid())
+  organizationId String
+  applicationId  String?
+  application    Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  vacancyId      String?
+  vacancy        Vacancy?     @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  body             String            @db.Text // markdown
+  visibility       CommentVisibility @default(SHARED)
+  mentionedUserIds String[]          @default([])
+
+  // тред
+  parentId String?
+  parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentThread")
+
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  editedAt  DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  readBy CommentRead[]
+
+  @@index([applicationId, createdAt])
+  @@index([vacancyId, createdAt])
+}
+
+model CommentRead {
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  readAt    DateTime @default(now())
+
+  @@id([commentId, userId])
+}
+
+/// Личная переписка между двумя людьми.
+///
+/// Отдельная сущность, а не Comment с получателем: комментарий всегда
+/// привязан к кандидату или вакансии и живёт по правилам их видимости,
+/// а личное сообщение существует само по себе. Смешав их, пришлось бы
+/// в каждом запросе объяснять, почему у половины строк нет вакансии.
+///
+/// Собственной «беседы» здесь нет намеренно: беседа — это просто пара
+/// людей, и хранить её отдельной строкой значит держать её в согласии
+/// с сообщениями вручную. Список бесед собирается запросом (см.
+/// lib/services/messages.ts).
+model DirectMessage {
+  id             String @id @default(cuid())
+  organizationId String
+
+  senderId    String
+  sender      User   @relation("SentMessages", fields: [senderId], references: [id])
+  recipientId String
+  recipient   User   @relation("ReceivedMessages", fields: [recipientId], references: [id])
+
+  body String @db.Text
+
+  /// Прочитано получателем. null — непрочитано; отдельной таблицы,
+  /// как у комментариев, не нужно: у сообщения ровно один получатель.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([senderId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+// ============ ИНТЕРВЬЮ И КАЛЕНДАРЬ ============
+
+enum InterviewStatus {
+  SLOTS_REQUESTED // нужно предложить слоты
+  SLOTS_PROPOSED // слоты предложены, ждём кандидата
+  CONFIRMED
+  RESCHEDULE_REQUESTED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InterviewFormat {
+  ONLINE
+  OFFICE
+  PHONE
+}
+
+enum InterviewType {
+  SCREENING // рекрутер × кандидат
+  CLIENT // клиент × кандидат
+  FINAL
+  TEST_TASK_REVIEW
+}
+
+model Interview {
+  id             String      @id @default(cuid())
+  organizationId String
+  applicationId  String
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  vacancyId      String
+  vacancy        Vacancy     @relation(fields: [vacancyId], references: [id])
+
+  type   InterviewType
+  status InterviewStatus @default(SLOTS_REQUESTED)
+  format InterviewFormat @default(ONLINE)
+
+  meetingUrl      String?
+  address         String?
+  durationMinutes Int     @default(60)
+
+  participantUserIds String[]  @default([]) // кто со стороны клиента/агентства
+  scheduledAt        DateTime? // подтверждённое время (UTC)
+  timezone           String    @default("Europe/Moscow")
+
+  candidateToken String?   @unique // токен публичной ссылки выбора слота
+  tokenExpiresAt DateTime?
+
+  // Токен гасится в момент выбора времени, но кнопка «добавить
+  // в календарь» на экране успеха им ещё пользуется — сохраняем
+  // последний, чтобы .ics отдавался без входа в систему
+  lastCandidateToken String? @unique
+
+  // Обратная связь после интервью
+  feedbackRating Int? // 1..5
+  feedbackNote   String?   @db.Text
+  feedbackById   String?
+  feedbackAt     DateTime?
+
+  reminder24hSentAt DateTime?
+  reminder1hSentAt  DateTime?
+
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  slots InterviewSlot[]
+
+  @@index([vacancyId, scheduledAt])
+  @@index([organizationId, scheduledAt])
+}
+
+model InterviewSlot {
+  id          String    @id @default(cuid())
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  isSelected  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([interviewId])
+}
+
+// ============ ФАЙЛЫ ============
+
+enum AttachmentKind {
+  RESUME
+  COVER_LETTER
+  TEST_TASK
+  PORTFOLIO
+  CONTRACT
+  INVOICE
+  ACT
+  CONSENT
+  OTHER
+}
+
+model Attachment {
+  id             String @id @default(cuid())
+  organizationId String
+
+  kind       AttachmentKind
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  storageKey String // ключ в S3-совместимом хранилище
+  visibility CommentVisibility @default(SHARED)
+
+  candidateId   String?
+  candidate     Candidate?   @relation(fields: [candidateId], references: [id])
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id])
+  vacancyId     String?
+  vacancy       Vacancy?     @relation(fields: [vacancyId], references: [id])
+  clientId      String?
+  client        Client?      @relation(fields: [clientId], references: [id])
+  invoiceId     String?
+  invoice       Invoice?     @relation(fields: [invoiceId], references: [id])
+  agreementId   String?
+  agreement     Agreement?   @relation(fields: [agreementId], references: [id])
+
+  uploadedById String
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  @@index([candidateId])
+  @@index([applicationId])
+}
+
+// ============ ФИНАНСЫ ============
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id             String  @id @default(cuid())
+  organizationId String
+  clientId       String
+  client         Client  @relation(fields: [clientId], references: [id])
+  agreementId    String?
+
+  number      String
+  status      InvoiceStatus @default(DRAFT)
+  amount      Decimal       @db.Decimal(12, 2)
+  vatIncluded Boolean       @default(false)
+  currency    String        @default("RUB")
+
+  description String?  @db.Text
+  vacancyIds  String[] @default([]) // за какие закрытия выставлен
+
+  issuedAt DateTime?
+  dueAt    DateTime?
+  paidAt   DateTime?
+
+  fileUrl    String?
+  actFileUrl String?
+
+  createdById String
+  createdAt   DateTime @default(now())
+
+  attachments Attachment[]
+
+  // Номер счёта — бухгалтерский идентификатор, повторяться он не имеет
+  // права. Гарантии не было нигде: номер считался запросом «сколько уже
+  // есть» и подставлялся отдельной вставкой, так что два счёта,
+  // выписанных в одну секунду, получали один номер. Проверка в коде
+  // такое не ловит по определению — гонку останавливает только база.
+  @@unique([organizationId, number])
+  @@index([clientId, status])
+}
+
+// ============ УВЕДОМЛЕНИЯ И ЛОГИ ============
+
+model Notification {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String
+
+  eventCode String // см. ТЗ раздел 9.2
+  title     String
+  body      String? @db.Text
+  linkUrl   String?
+  payload   Json?
+
+  // Ключ схлопывания (BR-30): события с одним ключом в пределах окна
+  // не рассылаются по одному, а сводятся в одно сообщение. Обычно это
+  // «вакансия + тип события»
+  groupKey String?
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  sentEmailAt     DateTime?
+  sentTelegramAt  DateTime?
+  // Внешние каналы, которых это уведомление ждёт. Пустой массив —
+  // уведомление только в интерфейсе
+  pendingChannels String[]  @default([])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, eventCode, groupKey, createdAt])
+}
+
+model ActivityLog {
+  id             String  @id @default(cuid())
+  organizationId String
+  actorId        String?
+  actor          User?   @relation(fields: [actorId], references: [id])
+
+  entityType String // "Application" | "Vacancy" | ...
+  entityId   String
+  action     String // "stage_changed" | "created" | "client_decision" | ...
+  diff       Json?
+  ip         String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+// Отдельный журнал по ПДн — требование 152-ФЗ (BR-36)
+model PersonalDataAccessLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String
+  candidateId    String
+  action         String // "view" | "export" | "download_resume" | "delete"
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([candidateId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+/// Заявка с лендинга.
+///
+/// Отдельно от Client намеренно: клиент - это компания, с которой есть
+/// или была работа, а заявка приходит от кого угодно и может оказаться
+/// спамом или ошибкой. Смешивать их значит засорять список клиентов
+/// и врать в аналитике по конверсии.
+///
+/// Организация не привязана: форма публичная, и на момент отправки
+/// человек ещё не выбрал, с кем работает. В продукте организация одна,
+/// а заявка адресована агентству в целом.
+model Lead {
+  id String @id @default(cuid())
+
+  name      String
+  company   String?
+  website   String?
+  /// Телефон, Telegram или почта - что человек оставил, то и храним:
+  /// заставлять выбирать канал на первом касании значит терять заявки.
+  contact   String
+  /// Сколько вакансий планирует закрыть. Свободная строка из набора
+  /// вариантов формы, а не число: «более 5» и «пока формируем план»
+  /// это тоже ответы.
+  vacancies String?
+  note      String?
+
+  status LeadStatus @default(NEW)
+
+  /// Доказательство согласия (юридический пакет, раздел 10).
+  ///
+  /// Хранится версия текста, а не сам текст: закон требует доказать,
+  /// под чем именно человек поставил галочку, а «под тем, что тогда
+  /// было на сайте» доказательством не является. Тексты и версии
+  /// живут в lib/legal/consent-texts.
+  consentVersion String?
+  consentAt      DateTime?
+
+  /// Согласие на рекламу - отдельное и добровольное (ст. 18 закона
+  /// о рекламе). Обязательным быть не может никогда.
+  marketingConsent   Boolean   @default(false)
+  marketingConsentAt DateTime?
+
+  /// Для разбора спама и злоупотреблений: кто и откуда отправил.
+  /// Здесь же техническое доказательство согласия: адрес и клиент,
+  /// с которых оно дано.
+  ip        String?
+  userAgent String?
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  /// Кто разобрал заявку. Без связи на User: заявку может закрыть
+  /// человек, которого потом деактивируют, а история должна остаться.
+  processedBy String?
+
+  @@index([status, createdAt])
+}
+
+enum LeadStatus {
+  NEW
+  IN_PROGRESS
+  CONVERTED
+  REJECTED
+  SPAM
+}
+
+/// Запрос на восстановление пароля.
+///
+/// Хранится хеш токена, а не сам токен. Утечка базы тогда не даёт
+/// возможности войти: по хешу ссылку не восстановить. Хеш быстрый
+/// (sha256), а не argon2, потому что токен и так случайный на 32 байта,
+/// и подбирать его бессмысленно, а искать по нему надо на каждом запросе.
+model PasswordReset {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  tokenHash String    @unique
+  expiresAt DateTime
+  /// Одноразовость: использованную ссылку нельзя открыть второй раз.
+  usedAt    DateTime?
+
+  /// Откуда просили. Нужно, чтобы разобрать перебор адресов.
+  requestedIp String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Код восстановления для входа без телефона.
+///
+/// Без них двухфакторную аутентификацию включать нельзя: потерянный
+/// или разбитый телефон запирает владельца из системы с персональными
+/// данными, и восстановить доступ будет некому.
+///
+/// Хранится хеш: утечка базы не должна давать возможности войти.
+/// Argon2, а не sha256, в отличие от ссылок восстановления: код короткий
+/// и человекочитаемый, то есть перебираемый, и медленный хеш здесь
+/// как раз к месту.
+model RecoveryCode {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  codeHash String
+  /// Одноразовость: использованный код больше не подходит.
+  usedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, usedAt])
+}

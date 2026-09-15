@@ -1,0 +1,46 @@
+# Локальная инфраструктура: PostgreSQL и Redis.
+#
+#   docker compose up -d
+#   npm run db:push && npm run db:seed
+#
+# Redis не обязателен: без него лимиты запросов считаются в памяти
+# процесса. Для одного инстанса в разработке этого достаточно.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fhr-students-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fhr_students
+      # Русские имена в базе: сортировка и регистр должны работать
+      LANG: ru_RU.utf8
+    ports:
+      - '5432:5432'
+    volumes:
+      - fhr-students-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d fhr_students']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fhr-students-redis
+    restart: unless-stopped
+    # Лимиты запросов переживать рестарт не обязаны, а fsync на каждой
+    # записи счётчика — лишняя нагрузка на диск
+    command: redis-server --save '' --appendonly no
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  fhr-students-pgdata:

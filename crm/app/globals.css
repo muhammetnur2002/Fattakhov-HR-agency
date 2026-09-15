@@ -1,0 +1,354 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ШКАЛА ТЕКСТА В КАБИНЕТЕ
+ *
+ * Пять размеров на шесть ролей. Правило одно: одна роль — один размер,
+ * одинаково в обоих кабинетах, на всех ролях пользователей и на всех
+ * ширинах экрана. Размер несёт смысл («это заголовок раздела»), и если
+ * тот же заголовок где-то крупнее, смысл ломается — читается как другой
+ * уровень вложенности.
+ *
+ *   роль                        класс                      размер
+ *   ─────────────────────────── ───────────────────────── ──────
+ *   заголовок страницы (h1)     text-2xl font-semibold     30px
+ *   заголовок раздела (h2)      text-lg font-medium        20px
+ *   число на плитке             text-4xl font-semibold     48px
+ *   текст и подзаголовок        text-sm                    16px
+ *   подпись, мета, время        text-xs                    14px
+ *
+ * Чего тут нет намеренно: text-base. Между «текстом» и «заголовком
+ * раздела» промежуточная ступень не понадобилась ни разу, а лишний
+ * размер — это лишний повод выбрать не тот.
+ *
+ * Исключения, которые не являются нарушением: счётчик в кружке 16px
+ * (там своя фиксированная фигура) и инициалы в маленьком аватаре.
+ * Это не «текст», а глиф внутри фигуры фиксированного размера.
+ *
+ * Правая колонка — не классы Tailwind по умолчанию (у text-xs изначально
+ * 12px, у text-2xl — 24px, у text-4xl — 36px): кабинет читали не с
+ * телефона на бегу, а с ноутбука или монитора весь рабочий день, и
+ * стоковая шкала для этого мелковата. Числа переопределены один раз,
+ * в .cabinet-shell ниже, — какой класс за какую роль отвечает, от
+ * этого не меняется, меняется лишь то, сколько пикселей за ним стоит.
+ * Оба кабинета собраны одним AppShell, поэтому правка одна на все роли
+ * сразу и не зависит от ширины экрана — действует и на ноутбуке,
+ * и на телефоне.
+ *
+ * Маркетинговые страницы живут по своей шкале — у витрины другая
+ * задача и свой набор кеглей (см. .marketing-shell ниже).
+ */
+.cabinet-shell {
+  --text-xs: 0.875rem;
+  --text-sm: 1rem;
+  --text-lg: 1.25rem;
+  --text-2xl: 1.875rem;
+  --text-4xl: 3rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Фирменный сланец: подложка под фактуру, чтобы до загрузки картинки
+     страница не мигала белым */
+  --color-brand-slate: var(--brand-slate);
+  --color-brand-graphite: var(--brand-graphite);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Палитра Fattakhov HR Agency.
+ *
+ * Взята из фирменных файлов, а не придумана: графит знака #323537
+ * (oklch 0.327 0.006 237) и слоистые фактуры #28313A…#374A5C, которые
+ * дают холодный тон около 245.
+ *
+ * Акцентного цвета у бренда нет — вся айдентика монохромная. Поэтому
+ * основным цветом кнопок и активных состояний служит сам графит знака,
+ * а не выдуманный синий: продукт должен читаться как продолжение
+ * фирстиля, а не как ещё один B2B-интерфейс.
+ *
+ * Единственное цветное пятно в системе — статусное: просрочка и то,
+ * что требует реакции прямо сейчас. Это не часть бренда, а сигнал
+ * безопасности, и он обязан отличаться от всего остального. Отказ
+ * и выход на работу — закрытые исходы, действие по ним уже не нужно,
+ * поэтому они серые, а не красные.
+ *
+ * Нейтрали не серые, а чуть холодные: чистый серый рядом с фирменным
+ * графитом выглядит грязным.
+ */
+:root {
+  /* Две константы бренда, одинаковые в обеих темах: это не роли
+     интерфейса, а фирменные поверхности */
+  --brand-graphite: oklch(0.3268 0.0055 237);
+  --brand-slate: oklch(0.2350 0.0210 248);
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.2200 0.0120 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2200 0.0120 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2200 0.0120 245);
+  /* Графит знака, ровно как в логотипе */
+  --primary: oklch(0.3268 0.0055 237);
+  --primary-foreground: oklch(0.9850 0.0020 245);
+  --secondary: oklch(0.9680 0.0035 245);
+  --secondary-foreground: oklch(0.3268 0.0055 237);
+  --muted: oklch(0.9680 0.0035 245);
+  --muted-foreground: oklch(0.5450 0.0130 245);
+  --accent: oklch(0.9550 0.0060 245);
+  --accent-foreground: oklch(0.3268 0.0055 237);
+  --destructive: oklch(0.5770 0.2450 27.325);
+  --border: oklch(0.9180 0.0050 245);
+  --input: oklch(0.9180 0.0050 245);
+  --ring: oklch(0.5450 0.0180 245);
+  /* Воронка: одна холодная лестница от светлого к графиту */
+  --chart-1: oklch(0.8400 0.0180 245);
+  --chart-2: oklch(0.7150 0.0250 245);
+  --chart-3: oklch(0.5900 0.0300 245);
+  --chart-4: oklch(0.4600 0.0300 246);
+  --chart-5: oklch(0.3268 0.0055 237);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.9800 0.0040 245);
+  --sidebar-foreground: oklch(0.2200 0.0120 245);
+  --sidebar-primary: oklch(0.3268 0.0055 237);
+  --sidebar-primary-foreground: oklch(0.9850 0.0020 245);
+  --sidebar-accent: oklch(0.9400 0.0070 245);
+  --sidebar-accent-foreground: oklch(0.3268 0.0055 237);
+  --sidebar-border: oklch(0.9100 0.0060 245);
+  --sidebar-ring: oklch(0.5450 0.0180 245);
+}
+
+/*
+ * Тёмная тема идёт от фирменных фактур (#28313A…#25303B), а не от
+ * чёрного: у бренда тёмное — синеватое, и чистый чёрный рядом с ним
+ * выглядит чужим.
+ *
+ * Контраст поднят на один шаг — у приглушённого текста и у границ.
+ * Основной текст не трогали: у него и так 17:1 к фону, добавлять
+ * там нечего. А приглушённым набраны должности, даты, пояснения
+ * под числами — то, что читают мельком и в неидеальном свете:
+ *
+ *   приглушённый на карточке   6.60:1 → 7.82:1
+ *   приглушённый на фоне       7.39:1 → 8.75:1
+ *
+ * Порог WCAG AA — 4.5:1, так что запас был и раньше; здесь речь
+ * не о формальном соответствии, а о том, чтобы текст не приходилось
+ * выискивать. Границы с 12% до 16%: на тёмном рёбра карточек
+ * пропадали, и список читался как сплошное полотно.
+ */
+.dark {
+  --background: oklch(0.1850 0.0130 245);
+  --foreground: oklch(0.9700 0.0030 245);
+  --card: oklch(0.2350 0.0150 245);
+  --card-foreground: oklch(0.9700 0.0030 245);
+  --popover: oklch(0.2350 0.0150 245);
+  --popover-foreground: oklch(0.9700 0.0030 245);
+  --primary: oklch(0.9300 0.0040 245);
+  --primary-foreground: oklch(0.2400 0.0140 245);
+  --secondary: oklch(0.2950 0.0160 245);
+  --secondary-foreground: oklch(0.9700 0.0030 245);
+  --muted: oklch(0.3150 0.0160 245);
+  --muted-foreground: oklch(0.7620 0.0140 245);
+  --accent: oklch(0.3200 0.0180 245);
+  --accent-foreground: oklch(0.9700 0.0030 245);
+  --destructive: oklch(0.7040 0.1910 22.216);
+  --border: oklch(0.9700 0.0030 245 / 16%);
+  --input: oklch(0.9700 0.0030 245 / 20%);
+  --ring: oklch(0.6200 0.0200 245);
+  --chart-1: oklch(0.8400 0.0180 245);
+  --chart-2: oklch(0.7150 0.0250 245);
+  --chart-3: oklch(0.5900 0.0300 245);
+  --chart-4: oklch(0.4600 0.0300 246);
+  --chart-5: oklch(0.3600 0.0220 246);
+  --sidebar: oklch(0.2150 0.0140 245);
+  --sidebar-foreground: oklch(0.9700 0.0030 245);
+  /* Было унаследованное от библиотеки фиолетовое пятно — бренду чужое */
+  --sidebar-primary: oklch(0.9300 0.0040 245);
+  --sidebar-primary-foreground: oklch(0.2400 0.0140 245);
+  --sidebar-accent: oklch(0.3200 0.0180 245);
+  --sidebar-accent-foreground: oklch(0.9700 0.0030 245);
+  --sidebar-border: oklch(0.9700 0.0030 245 / 16%);
+  --sidebar-ring: oklch(0.6200 0.0200 245);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/*
+ * Карточка на публичной странице сама и есть поверхность: лежит на
+ * фирменной фактуре и должна выглядеть физически поднятой над ней.
+ *
+ * Правило намеренно вне @layer. Слоистые стили проигрывают утилитам
+ * Tailwind, а радиус и тень карточки заданы именно утилитами;
+ * неслоённое правило выигрывает у всех слоёв разом. Обернуть карточку
+ * ещё одним контейнером с тенью тоже нельзя: вышла бы рамка в рамке.
+ */
+.public-surface > [data-slot="card"] {
+  border: 0;
+  border-radius: calc(var(--radius) * 1.8);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.55) inset,
+    0 24px 60px -20px rgb(6 10 14 / 0.75),
+    0 0 0 1px rgb(6 10 14 / 0.06);
+}
+
+/*
+ * Появление блоков и движение слоёв при прокрутке.
+ *
+ * Всё на прокруточных таймлайнах и целиком в CSS. Причина не в экономии
+ * килобайтов, а в отказоустойчивости: у любой схемы «спрятать, потом
+ * показать по событию» отказ означает невидимый текст, а для страницы,
+ * которую показывают клиентам, это не сломанная анимация, а сломанная
+ * страница.
+ *
+ * Здесь такого состояния нет по устройству. Правила спрятаны за
+ * @supports: браузер либо умеет прокруточные таймлайны и проигрывает
+ * анимацию, либо не умеет и показывает обычный блок. Третьего,
+ * в котором текст спрятан и не показан обратно, не существует.
+ *
+ * Считает это компоновщик, не трогая основной поток, что заметно
+ * на слабых телефонах.
+ */
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes parallax-drift {
+  from {
+    transform: translateY(var(--parallax-shift, 0px));
+  }
+  to {
+    transform: translateY(calc(-1 * var(--parallax-shift, 0px)));
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal,
+    .stagger > * {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      /*
+        Появление обязано закончиться задолго до середины экрана: текст,
+        который читают, должен быть полностью непрозрачным.
+
+        Диапазон приходит одной переменной целиком. Собирать его из
+        имени фазы и calc нельзя: это недопустимый CSS, правило молча
+        отбрасывается, анимация растягивается на весь проход блока,
+        и человек читает текст в полсилы.
+      */
+      animation-range: var(--reveal-range, entry 0% entry 40%);
+    }
+
+    /* Очередь в каскаде. Шаг маленький: большая задержка читается
+       как медленный интерфейс, а не как изящество */
+    .stagger > *:nth-child(2) {
+      animation-range: entry 6% entry 46%;
+    }
+    .stagger > *:nth-child(3) {
+      animation-range: entry 12% entry 52%;
+    }
+    .stagger > *:nth-child(4) {
+      animation-range: entry 18% entry 58%;
+    }
+    .stagger > *:nth-child(n + 5) {
+      animation-range: entry 24% entry 64%;
+    }
+
+    .parallax > * {
+      animation: parallax-drift linear both;
+      animation-timeline: view();
+      /* Весь проход блока через экран, иначе слой дёргается на краях */
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+/*
+ * Шрифт лендинга на телефоне — немного мельче.
+ *
+ * Переопределяет только токены размера текста (--text-*), и только
+ * внутри .marketing-shell (публичный сайт), ниже границы sm. Отступы
+ * и gap'ы задаются отдельной шкалой (--spacing-*) и здесь не трогаются
+ * вовсе — компоновка, однажды выверенная в пикселях (например,
+ * равенство высот в CostComparison или центровка точек в HowItWorks),
+ * от размера шрифта не зависит и не съезжает.
+ *
+ * Коэффициент один и тот же для всей лестницы: соотношение размеров
+ * между заголовком и подписью остаётся прежним, просто вся шкала
+ * чуть плотнее для маленького экрана.
+ */
+@media (max-width: 639px) {
+  .marketing-shell {
+    --text-xs: 0.6875rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.9375rem;
+    --text-lg: 1.0625rem;
+    --text-xl: 1.1875rem;
+    --text-2xl: 1.375rem;
+    --text-3xl: 1.6875rem;
+    --text-4xl: 2rem;
+    --text-5xl: 2.625rem;
+    --text-6xl: 3.25rem;
+    --text-7xl: 3.875rem;
+  }
+}

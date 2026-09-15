@@ -1,0 +1,61 @@
+# Состав сервера.
+#
+# Имена образов подставляются при сборке конфигурации из переменных:
+# держать их здесь строкой значит править файл при каждой выкатке.
+#
+# Секреты живут в /etc/fhr.env, он кладётся на машину отдельно
+# и доступен только root.
+
+services:
+  # Миграции накатываются до старта приложения и завершаются.
+  #
+  # Отдельным шагом, а не внутри приложения: два экземпляра
+  # приложения, стартующие одновременно, попытались бы мигрировать
+  # базу вдвоём. Здесь же шаг один и выполняется до всего остального.
+  migrate:
+    image: TOOLS_IMAGE_PLACEHOLDER
+    restart: "no"
+    env_file: /etc/fhr.env
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    image: APP_IMAGE_PLACEHOLDER
+    restart: always
+    env_file: /etc/fhr.env
+    expose:
+      - "3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Фоновые задачи: напоминания, контроль сроков, сводки.
+  worker:
+    image: TOOLS_IMAGE_PLACEHOLDER
+    restart: always
+    env_file: /etc/fhr.env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  caddy_data:
+  caddy_config:
