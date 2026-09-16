@@ -25,8 +25,13 @@ import {
  * Второе: до согласия не грузится сам файл счётчика. «Загрузить,
  * но не считать» не годится: запрос к чужому серверу уже состоялся,
  * вместе с адресом страницы и заголовками браузера.
+ *
+ * Номер счётчика — из NEXT_PUBLIC_YANDEX_METRIKA_ID (.env), а не
+ * захардкожен: заводить счётчик в Яндексе может только владелец
+ * аккаунта, а не код. Пока переменная пуста, компонент ничего не
+ * подключает и ничего не ломает — просто ждёт, когда её впишут.
  */
-const COUNTER_ID = 111569438;
+const COUNTER_ID = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID?.trim();
 
 export function YandexMetrika() {
   const choice = useSyncExternalStore(
@@ -35,7 +40,7 @@ export function YandexMetrika() {
     getServerSnapshot,
   );
 
-  if (!isAccepted(choice)) return null;
+  if (!COUNTER_ID || !isAccepted(choice)) return null;
 
   return (
     <Script id="ym-counter" strategy="afterInteractive">
@@ -46,7 +51,7 @@ export function YandexMetrika() {
           for (var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
           k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
         })(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=${COUNTER_ID}','ym');
-        ym(${COUNTER_ID},'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:"dataLayer",accurateTrackBounce:true,trackLinks:true});
+        ym(${COUNTER_ID},'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:"dataLayer",referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
       `}
     </Script>
   );
@@ -63,6 +68,7 @@ export function YandexMetrika() {
  * аналитики, и функции ym в окне просто не существует.
  */
 export function reachGoal(goal: string): void {
+  if (!COUNTER_ID) return;
   const ym = (window as unknown as { ym?: (...args: unknown[]) => void }).ym;
   if (typeof ym === "function") ym(COUNTER_ID, "reachGoal", goal);
 }
