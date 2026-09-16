@@ -113,6 +113,21 @@ export function productionConfigProblems(): string[] {
 }
 
 /**
+ * Черновик согласия — единственная проверка, которую можно осознанно
+ * отключить: тем же приёмом, что WIPE_DEV_DB=yes у setup-real.ts. Только
+ * для временной проверки самого деплоя (например, первый запуск на
+ * Vercel), пока текст ещё не заменён юристом. S3, SMTP и AUTH_SECRET
+ * этот флаг не трогает — они обязательны всегда.
+ *
+ * Молчать про снятую проверку нельзя: предупреждение остаётся в логе,
+ * чтобы включённый на «на попробовать» флаг не забыли снять перед тем,
+ * как звать настоящих кандидатов.
+ */
+function allowDraftConsent(): boolean {
+  return process.env.ALLOW_DRAFT_CONSENT === "yes";
+}
+
+/**
  * Проверка при старте. В проде бросает, в разработке молчит.
  *
  * Разработка живёт без S3 и SMTP намеренно: файлы на диске, письма
@@ -122,7 +137,18 @@ export function productionConfigProblems(): string[] {
 export function assertProductionConfig(): void {
   if (process.env.NODE_ENV !== "production") return;
 
-  const problems = productionConfigProblems();
+  let problems = productionConfigProblems();
+  if (allowDraftConsent()) {
+    const draft = draftConsentProblem();
+    if (draft) {
+      console.warn(
+        "[production-check] ALLOW_DRAFT_CONSENT=yes — платформа запущена с " +
+          "черновиком согласия кандидатов. Уберите флаг, как только текст " +
+          "заменит юрист.",
+      );
+    }
+    problems = problems.filter((p) => p !== draft);
+  }
   if (problems.length === 0) return;
 
   /*
