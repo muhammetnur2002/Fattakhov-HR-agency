@@ -4,6 +4,7 @@
   "private": true,
   "description": "Fattakhov HR Agency — платформа подбора вакансий для студентов",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
