@@ -1,4 +1,5 @@
 import { HeroOffer } from "./hero-offer";
+import { HeroVideo } from "./hero-video";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -16,13 +17,21 @@ import { Button } from "@/components/ui/button";
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-brand-slate text-white">
+      {/* Видео вместо статичной картинки на широких экранах: тот же кроп,
+          то же место. На узких и при reduced-motion — кадр постера: см.
+          комментарий в HeroVideo про пропорции и предпочтение движения. */}
+      <HeroVideo />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-speckle.jpg')] bg-cover bg-center"
+        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-speckle.jpg')] bg-cover bg-center md:hidden motion-reduce:md:block"
       />
+      {/* Плотнее, чем было у статичной картинки: собственные куб и надпись
+          в ролике иначе читаются вторым логотипом рядом с ценником и
+          спорят с ним за внимание — ролику место фоновой текстуры, а не
+          второго знака на экране. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(8,12,16,0.82)_0%,rgba(8,12,16,0.55)_46%,rgba(8,12,16,0.15)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(8,12,16,0.94)_0%,rgba(8,12,16,0.85)_46%,rgba(8,12,16,0.72)_100%)]"
       />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12 lg:py-28">

@@ -160,6 +160,7 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Всё, кроме статики и картинок
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Всё, кроме статики, картинок и видео — иначе фоновый ролик в hero
+  // (public/brand/hero-loop.mp4) уходит на /login как защищённый маршрут
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)"],
 };
