@@ -690,6 +690,9 @@ export async function createMemoryStore(): Promise<DataStore> {
       async findById(id) {
         return clone(t.employers.find((e) => e.id === id) ?? null);
       },
+      async findByInn(inn) {
+        return clone(t.employers.find((e) => e.inn === inn) ?? null);
+      },
       async list() {
         return clone(t.employers);
       },
@@ -826,6 +829,9 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async listByPhoto(url) {
         return clone(t.vacancies.filter((v) => v.photos.includes(url)));
+      },
+      async listByVideo(url) {
+        return clone(t.vacancies.filter((v) => v.videoUrl === url));
       },
       async create(input) {
         const vacancy: VacancyRecord = {

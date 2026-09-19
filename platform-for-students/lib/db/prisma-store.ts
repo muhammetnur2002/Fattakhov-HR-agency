@@ -269,6 +269,10 @@ export function createPrismaStore(): DataStore {
         const row = await prisma.employer.findUnique({ where: { id } });
         return row ? toEmployerRecord(row) : null;
       },
+      async findByInn(inn) {
+        const row = await prisma.employer.findUnique({ where: { inn } });
+        return row ? toEmployerRecord(row) : null;
+      },
       async list() {
         const rows = await prisma.employer.findMany({ orderBy: { companyName: 'asc' } });
         return rows.map(toEmployerRecord);
@@ -405,6 +409,10 @@ export function createPrismaStore(): DataStore {
       },
       async listByPhoto(url) {
         const rows = await prisma.vacancy.findMany({ where: { photos: { has: url } } });
+        return rows.map(toVacancyRecord);
+      },
+      async listByVideo(url) {
+        const rows = await prisma.vacancy.findMany({ where: { videoUrl: url } });
         return rows.map(toVacancyRecord);
       },
       async create(input) {

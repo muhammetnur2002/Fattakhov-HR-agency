@@ -228,6 +228,11 @@ export function VacancyDetail({
                 </section>
               )}
 
+              {vacancy.videoUrl && vacancy.videoUrl.startsWith('/api/files/companyVideo/') && (
+                // eslint-disable-next-line jsx-a11y/media-has-caption -- видео о вакансии без субтитров
+                <video src={vacancy.videoUrl} controls className="mt-7 w-full max-w-sm rounded-2xl border border-[var(--hairline)]" />
+              )}
+
               {vacancy.videoUrl && /^https?:\/\//i.test(vacancy.videoUrl) && (
                 <a
                   href={vacancy.videoUrl}

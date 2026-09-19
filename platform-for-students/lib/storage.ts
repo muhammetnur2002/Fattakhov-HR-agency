@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -106,6 +107,8 @@ const EXTENSION: Record<string, string> = {
   'application/pdf': 'pdf',
   'application/msword': 'doc',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
 };
 
 export interface StoredFile {
@@ -154,6 +157,33 @@ export async function storeUpload(kind: UploadKind, file: File): Promise<StoredF
     name: sanitizeDisplayName(file.name),
     size: file.size,
   };
+}
+
+/**
+ * Прямая загрузка в S3 по подписанной ссылке — для видео.
+ *
+ * Функции на Vercel режут тело запроса на 4.5 МБ: видео до 50 МБ через
+ * `storeUpload()` (обычный POST на наш сервер) попросту не доедет. Клиент
+ * поэтому льёт файл сразу в S3 по ссылке с подписью, минуя наш сервер;
+ * здесь только выдаём эту ссылку и заранее знаем итоговый публичный адрес.
+ * Без S3 (разработка) прямой загрузки нет — используется storeUpload().
+ */
+export async function presignUpload(
+  kind: UploadKind,
+  mimeType: string,
+): Promise<{ uploadUrl: string; url: string } | null> {
+  const s3 = s3Client();
+  if (!s3) return null;
+
+  const ext = EXTENSION[mimeType] ?? 'bin';
+  const stored = `${randomUUID()}.${ext}`;
+  const uploadUrl = await getSignedUrl(
+    s3.client,
+    new PutObjectCommand({ Bucket: s3.bucket, Key: `${kind}/${stored}`, ContentType: mimeType }),
+    { expiresIn: 300 },
+  );
+
+  return { uploadUrl, url: `/api/files/${kind}/${stored}` };
 }
 
 const NAME_PATTERN = /^[0-9a-f-]{36}\.[a-z0-9]{2,5}$/i;

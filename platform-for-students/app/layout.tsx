@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Aurora } from '@/components/layout/Aurora';
+import { SplashScreen } from '@/components/layout/SplashScreen';
 import { RouteCurtain } from '@/components/motion/RouteCurtain';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -15,6 +16,20 @@ export const metadata: Metadata = {
     'Подработка и стажировки для студентов: смахните вправо — отклик уходит работодателю. Проверенные компании, график под учёбу.',
   applicationName: 'Fattakhov Students',
   robots: { index: true, follow: true },
+  manifest: '/manifest.webmanifest',
+  icons: {
+    // Заданный вручную icon отключает автослияние с файловой конвенцией
+    // Next.js — apple-touch-icon из app/apple-icon.png приходится
+    // прописать здесь же, иначе тег для него просто не появится.
+    // Без media — то, что возьмёт поисковик и любой клиент, не знающий
+    // о теме: тёмный куб на прозрачном, читается на светлом фоне выдачи.
+    apple: '/apple-icon.png',
+    icon: [
+      { url: '/icons/favicon-light.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icons/favicon-light.png', media: '(prefers-color-scheme: light)', type: 'image/png' },
+      { url: '/icons/favicon-dark.png', media: '(prefers-color-scheme: dark)', type: 'image/png' },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
@@ -72,6 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <RouteCurtain>{children}</RouteCurtain>
           </ToastProvider>
           <ThemeToggle />
+          <SplashScreen />
         </ThemeProvider>
       </body>
     </html>

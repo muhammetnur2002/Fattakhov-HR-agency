@@ -516,6 +516,8 @@ export interface DataStore {
   employers: {
     findByAccountId(accountId: string): Promise<EmployerRecord | null>;
     findById(id: string): Promise<EmployerRecord | null>;
+    /** Для проверки ИНН до отправки кода регистрации — без этого письмо ушло бы впустую. */
+    findByInn(inn: string): Promise<EmployerRecord | null>;
     list(): Promise<EmployerRecord[]>;
     createWithAccount(input: NewEmployerInput): Promise<{ account: AccountRecord; employer: EmployerRecord }>;
     updateProfile(id: string, input: CompanyProfileUpdate): Promise<EmployerRecord>;
@@ -551,6 +553,8 @@ export interface DataStore {
      * вакансий, и черновик не должен прятать фото опубликованной.
      */
     listByPhoto(url: string): Promise<VacancyRecord[]>;
+    /** Вакансии с этим видео — для раздачи файла по тому же принципу, что и фото. */
+    listByVideo(url: string): Promise<VacancyRecord[]>;
     create(input: NewVacancyInput): Promise<VacancyRecord>;
     update(id: string, patch: VacancyPatch): Promise<VacancyRecord>;
     /** active — видимые студенту, total — все в базе */
