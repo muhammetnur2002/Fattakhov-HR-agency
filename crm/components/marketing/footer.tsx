@@ -116,7 +116,8 @@ export function MarketingFooter() {
             в месяц, ИНН и адрес в подвале — обычная проверка того,
             что за сайтом стоит настоящее лицо */}
         <div className="mt-10 border-t border-white/12 pt-6 text-sm leading-relaxed text-white/65">
-          {OPERATOR_NAME} · ИНН {OPERATOR_INN} · ОГРНИП {OPERATOR_OGRNIP}
+          {OPERATOR_NAME} · ИНН {OPERATOR_INN}
+          {OPERATOR_OGRNIP && <> · ОГРНИП {OPERATOR_OGRNIP}</>}
           <br />
           {OPERATOR_ADDRESS}
         </div>

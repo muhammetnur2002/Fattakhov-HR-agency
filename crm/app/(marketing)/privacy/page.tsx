@@ -40,7 +40,7 @@ export default function PrivacyPage() {
         <SectionHead
           eyebrow="Документ"
           title="Политика в отношении обработки персональных данных"
-          lead={`Оператор: ${OPERATOR_NAME}. ИНН ${OPERATOR_INN}, ОГРНИП ${OPERATOR_OGRNIP}. Адрес: ${OPERATOR_ADDRESS}.`}
+          lead={`Оператор: ${OPERATOR_NAME}. ИНН ${OPERATOR_INN}${OPERATOR_OGRNIP ? `, ОГРНИП ${OPERATOR_OGRNIP}` : ""}. Адрес: ${OPERATOR_ADDRESS}.`}
         />
 
         <div className="mt-12 space-y-10 leading-relaxed">
