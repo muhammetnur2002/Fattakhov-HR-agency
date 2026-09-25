@@ -9,6 +9,11 @@ import {
   requiresSecondFactor,
   verifySecondFactor,
 } from "@/lib/services/two-factor";
+import {
+  consumeTicketOnce,
+  crmEntrySecret,
+  verifyStudentsEntryTicket,
+} from "@/lib/students-entry";
 
 const credentialsSchema = z.object({
   email: z.email(),
@@ -40,6 +45,11 @@ class SecondFactorRequired extends CredentialsSignin {
 /** Пароль верный, код нет. Тоже отдельно: иначе форма скроет поле кода. */
 class SecondFactorInvalid extends CredentialsSignin {
   code = "second_factor_invalid";
+}
+
+/** Билет из студенческой платформы не прошёл проверку — истёк, подделан, уже погашен. */
+class StudentsEntryInvalid extends CredentialsSignin {
+  code = "students_entry_invalid";
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -86,6 +96,71 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             throw new SecondFactorInvalid();
           }
         }
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.fullName,
+          organizationId: user.organizationId,
+          role: user.role,
+          clientId: user.clientId,
+        };
+      },
+    }),
+    /**
+     * Вход из студенческой платформы билетом (см. lib/students-entry.ts),
+     * а не паролем — второй провайдер, а не ветка внутри первого: у него
+     * нет пароля кандидата на подделку, есть только подпись билета,
+     * и смешивать эти два пути проверки было бы источником ошибки.
+     *
+     * Учётная запись заводится по почте компании при первом входе —
+     * так же, как CRM заводит сотрудника при входе staff-билетом на
+     * студенческой платформе (см. signInStaff в её app/api/auth/crm).
+     */
+    Credentials({
+      id: "students-entry",
+      name: "students-entry",
+      credentials: { ticket: { type: "text" } },
+      async authorize(raw) {
+        const ticket = typeof raw?.ticket === "string" ? raw.ticket : "";
+        const secret = crmEntrySecret();
+        if (!secret) throw new StudentsEntryInvalid();
+
+        const checked = verifyStudentsEntryTicket(ticket, secret);
+        if (!checked.ok) throw new StudentsEntryInvalid();
+        if (!consumeTicketOnce(checked.ticket.jti, checked.ticket.exp)) {
+          throw new StudentsEntryInvalid();
+        }
+
+        const client = await prisma.client.findUnique({
+          where: { id: checked.ticket.crmClientId },
+        });
+        if (!client) throw new StudentsEntryInvalid();
+
+        let user = await prisma.user.findFirst({
+          where: { clientId: client.id, email: checked.ticket.email },
+        });
+        if (!user) {
+          user = await prisma.user.create({
+            data: {
+              organizationId: client.organizationId,
+              clientId: client.id,
+              email: checked.ticket.email,
+              fullName: "Представитель компании",
+              role: "CLIENT_ADMIN",
+              // Пароль здесь не заводится намеренно: входить можно только
+              // этим билетом, со студенческой платформы — второй пароль
+              // означал бы второй способ угона учётки
+              passwordHash: null,
+            },
+          });
+        }
+        if (!user.isActive) throw new StudentsEntryInvalid();
 
         await prisma.user.update({
           where: { id: user.id },

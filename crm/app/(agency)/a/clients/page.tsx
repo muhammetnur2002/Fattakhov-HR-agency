@@ -5,6 +5,8 @@ import { SearchField } from "@/components/shell/search-field";
 import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { listClients } from "@/lib/services/clients";
+import { fetchCrmLinkRequests } from "@/lib/students-service";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Клиенты" };
@@ -18,8 +20,13 @@ export default async function ClientsPage({
   authorize(actor, "client.view");
 
   const { q } = await searchParams;
-  const clients = await listClients(actor, { query: q });
   const canManage = canDo(actor, "client.manage");
+  const [clients, linkRequests] = await Promise.all([
+    listClients(actor, { query: q }),
+    // Заявки читаются, только если раздел вообще доступен: без прав на
+    // управление клиентами решать их всё равно нельзя
+    canManage ? fetchCrmLinkRequests().catch(() => []) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -33,9 +40,17 @@ export default async function ClientsPage({
           </p>
         </div>
         {canManage && (
-          <Button asChild>
-            <Link href="/a/clients/new">Новый клиент</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+              <Link href="/a/clients/link-requests" className="flex items-center gap-2">
+                Заявки на привязку
+                {linkRequests.length > 0 && <Badge>{linkRequests.length}</Badge>}
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/a/clients/new">Новый клиент</Link>
+            </Button>
+          </div>
         )}
       </div>
 

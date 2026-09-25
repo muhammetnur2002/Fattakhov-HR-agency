@@ -46,12 +46,15 @@ function SubmitButton({ label }: { label: string }) {
 export function ClientForm({
   action,
   clientId,
+  employerId,
   values = {},
   managers,
   submitLabel,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   clientId?: string;
+  /** Заявка на привязку к CRM, из которой создаётся этот клиент — см. app/(agency)/a/clients/link-requests. */
+  employerId?: string;
   values?: ClientFormValues;
   managers: AccountManagerOption[];
   submitLabel: string;
@@ -62,6 +65,7 @@ export function ClientForm({
   return (
     <form action={formAction} className="space-y-6">
       {clientId && <input type="hidden" name="clientId" value={clientId} />}
+      {employerId && <input type="hidden" name="employerId" value={employerId} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Название" htmlFor="name" required className="sm:col-span-2">
