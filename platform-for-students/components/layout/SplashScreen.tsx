@@ -44,6 +44,17 @@ export function SplashScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dismiss стабилен по построению, лишний перезапуск эффекта не нужен
   }, []);
 
+  // Атрибут autoplay не везде надёжен сам по себе (например, если видео
+  // смонтировалось до того, как вкладка стала видимой) — явный play()
+  // подстраховывает; тихий видео и так разрешён политикой автовоспроизведения,
+  // поэтому здесь нет смысла ждать жест пользователя.
+  useEffect(() => {
+    if (!visible) return;
+    videoRef.current?.play().catch(() => {
+      /* автовоспроизведение всё же отклонено — досмотрит по клику или дождётся отвала по таймауту */
+    });
+  }, [visible]);
+
   function dismiss() {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
