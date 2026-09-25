@@ -56,6 +56,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     organizationId: user.organizationId,
     role: user.role,
     clientId: user.clientId,
+    grants: user.grants,
   };
 });
 
@@ -104,4 +105,16 @@ export function authorizeOrThrow(
   subject: Subject = {},
 ): void {
   if (!canDo(actor, action, subject)) throw new AccessDeniedError(action);
+}
+
+/**
+ * Имя актора для чужих журналов аудита (студенческая платформа не хранит
+ * профили сотрудников CRM — только строку с тем, кто принял решение).
+ */
+export async function actorDisplayName(actor: Actor): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { fullName: true, email: true },
+  });
+  return user?.fullName ?? user?.email ?? actor.id;
 }

@@ -111,10 +111,13 @@ export const AGENCY_NAV: NavItem[] = [
     requires: "staff.manage",
   },
   {
-    // Вход в панель студенческой платформы без второго пароля
-    href: "/a/students",
-    label: "Студенческая платформа",
-    icon: "GraduationCap",
+    // Модерация компаний/вакансий, справки студентов, метрики пилота —
+    // читаются и решаются прямо здесь, без перехода на студенческую
+    // платформу (см. lib/students-service.ts). /a/students остаётся
+    // редиректом на этот адрес — старые ссылки не ломаются.
+    href: "/a/reviews",
+    label: "Проверки",
+    icon: "ShieldCheck",
     requires: "students.enter",
   },
   {

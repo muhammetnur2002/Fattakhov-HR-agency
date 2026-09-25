@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   MessagesSquare,
   Settings,
+  ShieldCheck,
   UserCog,
   Users,
   Wallet,
@@ -34,6 +35,7 @@ export const NAV_ICONS = {
   ChartLine,
   UserCog,
   GraduationCap,
+  ShieldCheck,
   Settings,
 } satisfies Record<string, LucideIcon>;
 
