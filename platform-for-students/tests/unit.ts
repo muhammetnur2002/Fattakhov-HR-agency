@@ -11,6 +11,8 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { verifyStaffTicket } from '../lib/security/staff-ticket';
+import { crmQueueSignature, verifyCrmQueueRequest } from '../lib/security/crm-queue-signature';
+import { buildCrmReviewItems } from '../lib/crm-review-queue';
 import { staffCan, staffHome } from '../lib/staff-permissions';
 import { ageFromIso, fullYears, parseIsoDate } from '../lib/age';
 import { companyRegistrationSchema, hasCompanyProfile, innSchema } from '../lib/company';
@@ -298,6 +300,53 @@ test('разделы сотрудника: без списка — всё, со 
   assert.equal(staffCan({ role: 'ADMIN', permissions: ['students'] }, 'moderation'), false);
   assert.equal(staffCan({ role: 'STUDENT' }, 'students'), false);
   assert.equal(staffHome(['pilot', 'students']), '/admin/students');
+});
+
+
+console.log('\nОчередь проверок для CRM');
+test('запрос CRM с верной подписью и свежей меткой принимается', () => {
+  const now = 1_790_000_000;
+  assert.equal(verifyCrmQueueRequest(String(now), crmQueueSignature(ssoSecret, now), ssoSecret, now), true);
+  assert.equal(verifyCrmQueueRequest(String(now - 200), crmQueueSignature(ssoSecret, now - 200), ssoSecret, now), true);
+});
+test('чужая подпись, старая метка, подпись билета вместо подписи очереди — отказ', () => {
+  const now = 1_790_000_000;
+  assert.equal(verifyCrmQueueRequest(String(now), crmQueueSignature('x'.repeat(40), now), ssoSecret, now), false);
+  assert.equal(verifyCrmQueueRequest(String(now - 301), crmQueueSignature(ssoSecret, now - 301), ssoSecret, now), false);
+  assert.equal(verifyCrmQueueRequest(null, null, ssoSecret, now), false);
+  const ticketLike = crypto.createHmac('sha256', ssoSecret).update(String(now)).digest('base64url');
+  assert.equal(verifyCrmQueueRequest(String(now), ticketLike, ssoSecret, now), false);
+});
+test('в очередь идут только ждущие проверки, справки — без имён студентов', () => {
+  const at = new Date('2026-09-24T09:00:00.000Z');
+  const items = buildCrmReviewItems({
+    employers: [
+      { id: 'e1', companyName: 'Кофейни «Север»', moderationStatus: 'PENDING', createdAt: at },
+      { id: 'e2', companyName: 'Уже проверенная', moderationStatus: 'APPROVED', createdAt: at },
+    ],
+    pendingVacancies: [{ id: 'v1', title: 'Бариста', employerId: 'e2', submittedAt: at, createdAt: at }],
+    students: [
+      { id: 's1', university: 'КФУ', studyYear: 3, studyVerified: false, studyDocUrl: '/api/files/study/x.pdf', studyReviewNote: null, studyDocAt: at, createdAt: at },
+      { id: 's2', university: 'КФУ', studyYear: 2, studyVerified: true, studyDocUrl: '/api/files/study/y.pdf', studyReviewNote: null, studyDocAt: at, createdAt: at },
+      { id: 's3', university: 'КНИТУ', studyYear: 1, studyVerified: false, studyDocUrl: null, studyReviewNote: null, studyDocAt: null, createdAt: at },
+    ],
+  });
+  assert.deepEqual(items, [
+    { kind: 'company', id: 'e1', title: 'Кофейни «Север»', submittedAt: '2026-09-24T09:00:00.000Z' },
+    { kind: 'vacancy', id: 'v1', title: 'Бариста · Уже проверенная', submittedAt: '2026-09-24T09:00:00.000Z' },
+    { kind: 'study', id: 's1', title: 'КФУ, 3 курс', submittedAt: '2026-09-24T09:00:00.000Z' },
+  ]);
+});
+test('справка до дозаполнения профиля — без вуза и курса, но в очереди', () => {
+  const at = new Date('2026-09-24T09:00:00.000Z');
+  const items = buildCrmReviewItems({
+    employers: [],
+    pendingVacancies: [],
+    students: [
+      { id: 's4', university: '', studyYear: 0, studyVerified: false, studyDocUrl: '/api/files/study/z.pdf', studyReviewNote: null, studyDocAt: at, createdAt: at },
+    ],
+  });
+  assert.deepEqual(items, [{ kind: 'study', id: 's4', title: 'Вуз не указан', submittedAt: '2026-09-24T09:00:00.000Z' }]);
 });
 
 console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);
