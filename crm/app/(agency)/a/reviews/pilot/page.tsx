@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ServiceUnavailable } from "../service-unavailable";
 import { StatCard, StatRow } from "@/components/shell/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { fetchPilotMetrics } from "@/lib/students-service";
+import { fetchPilotMetrics, StudentsServiceError } from "@/lib/students-service";
 
 export const metadata = { title: "Метрики пилота" };
 
@@ -15,22 +16,22 @@ export default async function PilotReviewPage() {
   authorize(actor, "students.enter");
   if (!effectiveGrants(actor).includes("students.pilot")) notFound();
 
-  const m = await fetchPilotMetrics();
+  let m;
+  try {
+    m = await fetchPilotMetrics();
+  } catch (error) {
+    if (!(error instanceof StudentsServiceError)) throw error;
+    return (
+      <div className="space-y-6">
+        <Header />
+        <ServiceUnavailable message={error.message} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/a/reviews">← Проверки</Link>
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-semibold">Метрики пилота</h1>
-        <p className="text-sm text-muted-foreground">
-          Числа со студенческой платформы: регистрации, отклики, публикации, конверсии.
-        </p>
-      </div>
+      <Header />
 
       <Card>
         <CardHeader>
@@ -98,5 +99,24 @@ export default async function PilotReviewPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function Header() {
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/a/reviews">← Проверки</Link>
+        </Button>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-semibold">Метрики пилота</h1>
+        <p className="text-sm text-muted-foreground">
+          Числа со студенческой платформы: регистрации, отклики, публикации, конверсии.
+        </p>
+      </div>
+    </>
   );
 }
