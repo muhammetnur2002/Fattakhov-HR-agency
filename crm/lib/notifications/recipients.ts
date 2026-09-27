@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import type { StaffGrant } from "@/lib/access";
 
 /**
  * Кому уходит уведомление по вакансии.
@@ -75,6 +76,28 @@ export async function agencySideRecipients(
   if (vacancy.client.accountManagerId) ids.add(vacancy.client.accountManagerId);
 
   return [...ids].filter((id) => id !== exceptUserId);
+}
+
+/**
+ * Кто видит события студенческой платформы: владелец всегда, сотрудник —
+ * если ему выдан конкретный раздел (см. StaffGrant, lib/access). Событие
+ * приходит служебным вызовом снаружи, поэтому получатели ищутся по
+ * организации целиком, а не по одной вакансии/заявке.
+ */
+export async function studentsGrantRecipients(
+  organizationId: string,
+  grant: StaffGrant,
+): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      organizationId,
+      isActive: true,
+      OR: [{ role: "OWNER" }, { grants: { has: grant } }],
+    },
+    select: { id: true },
+  });
+
+  return users.map((u) => u.id);
 }
 
 /** Кто принимает новые заявки: руководитель подбора и аккаунт-менеджеры. */

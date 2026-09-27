@@ -55,7 +55,17 @@ export interface ModerationVacancy {
     company: string;
     companyLogoUrl: string | null;
     summary: string;
+    requirements: string[];
+    perks: string[];
+    learnings: string[];
     city: string;
+    district: string | null;
+    address: string | null;
+    addressDetails: string | null;
+    workFormat: "ONSITE" | "HYBRID" | "REMOTE";
+    employmentType: "PART_TIME" | "SHIFT" | "PROJECT" | "INTERNSHIP" | "FULL_TIME";
+    tags: string[];
+    isHot: boolean;
     salaryFrom: number | null;
     salaryTo: number | null;
     salaryPeriod: "MONTH" | "SHIFT" | "HOUR";

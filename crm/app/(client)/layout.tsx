@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { CLIENT_NAV } from "@/lib/nav";
@@ -46,7 +47,7 @@ export default async function ClientLayout({
       searchHrefBase=""
     >
       {!agreementChosen && (
-        <Alert className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Alert className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <AlertTitle>Условия сотрудничества ещё не выбраны</AlertTitle>
             <AlertDescription>
@@ -56,6 +57,25 @@ export default async function ClientLayout({
           </div>
           <Button asChild size="sm">
             <Link href="/onboarding">Выбрать условия</Link>
+          </Button>
+        </Alert>
+      )}
+      {/*
+        У нас есть ещё и студенческая платформа — для подработки и разовых
+        задач, где мы не ищем сами, а даём кабинет напрямую. Не все клиенты
+        об этом знают, узнают только если сами наткнутся на пункт меню.
+      */}
+      {canDo(actor, "students.enterAsClient") && (
+        <Alert variant="default" className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <AlertTitle>У нас есть и студенческая платформа</AlertTitle>
+            <AlertDescription>
+              Нужны подработка или разовая задача — студенты откликаются
+              сами, без поиска от агентства. Тот же вход, без пароля.
+            </AlertDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/students">Открыть</Link>
           </Button>
         </Alert>
       )}

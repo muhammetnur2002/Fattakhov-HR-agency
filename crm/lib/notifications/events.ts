@@ -46,7 +46,8 @@ export type EventCategory =
   | "discussion"
   | "interviews"
   | "finance"
-  | "digest";
+  | "digest"
+  | "students";
 
 export const CATEGORY_LABELS: Record<EventCategory, string> = {
   leads: "Заявки с сайта",
@@ -56,6 +57,7 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   interviews: "Интервью",
   finance: "Счета",
   digest: "Сводки",
+  students: "Студенческая платформа",
 };
 
 export type EventDefinition = {
@@ -203,6 +205,32 @@ export const EVENTS = {
     priority: "high",
     description: "Счёт просрочен",
     category: "finance",
+  },
+
+  // --- Студенческая платформа (см. app/api/webhooks/students-event) ---
+  STUDENTS_COMPANY_PENDING: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Новая компания ждёт проверки на студенческой платформе",
+    category: "students",
+  },
+  STUDENTS_VACANCY_PENDING: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Новая вакансия ждёт проверки на студенческой платформе",
+    category: "students",
+  },
+  STUDENTS_STUDY_PENDING: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Справка студента ждёт проверки",
+    category: "students",
+  },
+  STUDENTS_CRM_LINK_REQUESTED: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Компания просит объединить профиль с клиентом в CRM",
+    category: "students",
   },
 
   // --- Сводка ---

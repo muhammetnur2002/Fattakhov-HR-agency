@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Check, X } from "lucide-react";
+import { Building2, Check, Flame, MapPin, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -35,10 +35,24 @@ const COMPANY_STATUS_LABEL: Record<string, string> = {
   REJECTED: "отклонена",
 };
 
+const WORK_FORMAT_LABEL: Record<string, string> = {
+  ONSITE: "В офисе",
+  HYBRID: "Гибрид",
+  REMOTE: "Удалённо",
+};
+
+const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
+  PART_TIME: "Подработка",
+  SHIFT: "Сменный график",
+  PROJECT: "Проект",
+  INTERNSHIP: "Стажировка",
+  FULL_TIME: "Полный день",
+};
+
 function money(from: number | null, to: number | null): string {
   if (!from && !to) return "Зарплата не указана";
-  if (from && to && from !== to) return `${from.toLocaleString("ru-RU")}–${to.toLocaleString("ru-RU")} ₸`;
-  return `${(from ?? to)!.toLocaleString("ru-RU")} ₸`;
+  if (from && to && from !== to) return `${from.toLocaleString("ru-RU")}–${to.toLocaleString("ru-RU")} ₽`;
+  return `${(from ?? to)!.toLocaleString("ru-RU")} ₽`;
 }
 
 export function ModerationBoard({
@@ -147,33 +161,96 @@ export function ModerationBoard({
         )}
       </section>
 
+      {/*
+        Форма — не копия студенческой шторки (у CRM своя библиотека
+        компонентов), но тот же вид: скруглённая карточка, полоса-подложка
+        за логотипом, зарплата акцентом, теги. Раньше здесь был обычный
+        плоский диалог — сотрудник не понимал, на что именно похожа
+        карточка, которую увидит студент.
+      */}
       <Dialog open={preview !== null} onOpenChange={(open) => !open && setPreview(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[85dvh] gap-0 overflow-y-auto rounded-3xl p-0 sm:max-w-lg">
           {preview && (
             <>
-              <DialogHeader>
-                <DialogTitle>{preview.vacancy.title}</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground">
-                {preview.vacancy.company} · {preview.vacancy.city} ·{" "}
-                {money(preview.vacancy.salaryFrom, preview.vacancy.salaryTo)}
-                {preview.vacancy.salaryPeriod === "SHIFT" && " за смену"}
-                {preview.vacancy.salaryPeriod === "HOUR" && " в час"}
-              </p>
-              <p className="whitespace-pre-line text-sm leading-relaxed">{preview.vacancy.summary}</p>
-              {preview.vacancy.photos.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto">
-                  {preview.vacancy.photos.map((url) => (
-                    // eslint-disable-next-line @next/next/no-img-element -- превью произвольного файла со стороннего сервиса
-                    <img
-                      key={url}
-                      src={studentsFileProxyUrl(url)}
-                      alt=""
-                      className="h-32 w-32 shrink-0 rounded-lg object-cover"
-                    />
+              <div className="relative overflow-hidden rounded-t-3xl bg-gradient-to-br from-primary/25 via-primary/10 to-transparent px-6 pb-5 pt-6">
+                <DialogHeader className="contents">
+                  <DialogTitle className="sr-only">{preview.vacancy.title}</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-start gap-3">
+                  <Avatar size="lg">
+                    {preview.vacancy.companyLogoUrl && (
+                      <AvatarImage src={studentsFileProxyUrl(preview.vacancy.companyLogoUrl)} alt="" />
+                    )}
+                    <AvatarFallback>
+                      <Building2 className="size-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 pt-1">
+                    <p className="truncate text-sm font-medium">{preview.vacancy.company}</p>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="size-3 shrink-0" />
+                      {preview.vacancy.city}
+                      {preview.vacancy.district ? `, ${preview.vacancy.district}` : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <h2 className="mt-4 text-xl font-semibold">{preview.vacancy.title}</h2>
+                <p className="mt-1.5 text-base font-medium text-primary">
+                  {money(preview.vacancy.salaryFrom, preview.vacancy.salaryTo)}
+                  {preview.vacancy.salaryPeriod === "SHIFT" && " за смену"}
+                  {preview.vacancy.salaryPeriod === "HOUR" && " в час"}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <Badge>{WORK_FORMAT_LABEL[preview.vacancy.workFormat] ?? preview.vacancy.workFormat}</Badge>
+                  <Badge variant="secondary">
+                    {EMPLOYMENT_TYPE_LABEL[preview.vacancy.employmentType] ?? preview.vacancy.employmentType}
+                  </Badge>
+                  {preview.vacancy.isHot && (
+                    <Badge variant="destructive">
+                      <Flame className="size-3" /> Срочно
+                    </Badge>
+                  )}
+                  {preview.vacancy.tags.map((tag) => (
+                    <Badge key={tag} variant="outline">
+                      {tag}
+                    </Badge>
                   ))}
                 </div>
-              )}
+              </div>
+
+              <div className="space-y-5 px-6 py-5">
+                {preview.vacancy.address && (
+                  <p className="rounded-xl border bg-muted/40 p-3 text-sm">
+                    <MapPin className="mr-1.5 inline size-3.5 text-muted-foreground" />
+                    {preview.vacancy.city}, {preview.vacancy.address}
+                    {preview.vacancy.addressDetails && (
+                      <span className="block text-xs text-muted-foreground">{preview.vacancy.addressDetails}</span>
+                    )}
+                  </p>
+                )}
+
+                <p className="whitespace-pre-line text-sm leading-relaxed">{preview.vacancy.summary}</p>
+
+                <PreviewSection title="Что нужно от кандидата" items={preview.vacancy.requirements} />
+                <PreviewSection title="Условия и бонусы" items={preview.vacancy.perks} />
+                <PreviewSection title="Чему научится студент" items={preview.vacancy.learnings} />
+
+                {preview.vacancy.photos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {preview.vacancy.photos.map((url) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- превью произвольного файла со стороннего сервиса
+                      <img
+                        key={url}
+                        src={studentsFileProxyUrl(url)}
+                        alt=""
+                        className="h-32 w-32 shrink-0 rounded-xl object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </DialogContent>
@@ -400,6 +477,23 @@ function DecisionBar({
         </Button>
       </div>
       {approveBlockedReason && <p className="mt-2 text-xs text-muted-foreground">{approveBlockedReason}</p>}
+    </div>
+  );
+}
+
+function PreviewSection({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2 text-sm">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
