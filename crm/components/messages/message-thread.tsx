@@ -73,34 +73,51 @@ export function MessageThread({
           Переписки пока нет. Напишите первым.
         </p>
       ) : (
-        <div className="space-y-3">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={cn("flex", m.fromMe ? "justify-end" : "justify-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%]",
-                  m.fromMe
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground",
+        <div>
+          {messages.map((m, i) => {
+            const previous = messages[i - 1];
+            const next = messages[i + 1];
+            const grouped = Boolean(previous) && isSameBurst(previous, m);
+            const showDay = !previous || dayLabel(previous.createdAt) !== dayLabel(m.createdAt);
+            const lastInBurst = !next || !isSameBurst(m, next);
+            return (
+              <div key={m.id}>
+                {showDay && (
+                  <p className="my-3 text-center text-xs text-muted-foreground first:mt-0">
+                    {dayLabel(m.createdAt)}
+                  </p>
                 )}
-              >
-                <div className="whitespace-pre-line break-words">{m.body}</div>
                 <div
                   className={cn(
-                    "mt-1 text-xs",
-                    m.fromMe
-                      ? "text-primary-foreground/70"
-                      : "text-muted-foreground",
+                    "flex",
+                    m.fromMe ? "justify-end" : "justify-start",
+                    grouped && !showDay ? "mt-0.5" : "mt-2",
                   )}
                 >
-                  {formatWhen(m.createdAt)}
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm sm:max-w-[70%]",
+                      m.fromMe
+                        ? cn("bg-primary text-primary-foreground", lastInBurst && "rounded-br-md")
+                        : cn("bg-muted text-foreground", lastInBurst && "rounded-bl-md"),
+                    )}
+                  >
+                    <div className="whitespace-pre-line break-words">{m.body}</div>
+                    {lastInBurst && (
+                      <div
+                        className={cn(
+                          "mt-1 text-right text-xs",
+                          m.fromMe ? "text-primary-foreground/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {timeOnly(m.createdAt)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -127,11 +144,22 @@ export function MessageThread({
   );
 }
 
-function formatWhen(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
+/** Сегодня / Вчера / короткая дата — разделитель дня в ленте сообщений. */
+function dayLabel(date: Date): string {
+  const now = new Date();
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(date)) / 86_400_000);
+  if (days === 0) return "Сегодня";
+  if (days === 1) return "Вчера";
+  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
+}
+
+/** Один ли это «залп» сообщений: тот же автор и меньше пяти минут разрыва. */
+function isSameBurst(previous: ThreadMessage, current: ThreadMessage): boolean {
+  if (previous.fromMe !== current.fromMe) return false;
+  return current.createdAt.getTime() - previous.createdAt.getTime() < 5 * 60_000;
+}
+
+function timeOnly(date: Date): string {
+  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(date);
 }

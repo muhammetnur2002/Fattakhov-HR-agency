@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ROLE_LABELS } from "@/lib/labels";
@@ -37,6 +38,9 @@ export function DirectConversationList({
         >
           <Card className="transition-colors hover:border-primary/40">
             <CardContent className="flex items-center gap-3 p-4">
+              <Avatar className="shrink-0">
+                <AvatarFallback>{c.user.fullName.slice(0, 1)}</AvatarFallback>
+              </Avatar>
               {c.unreadCount > 0 && (
                 <span className="size-2 shrink-0 rounded-full bg-primary" />
               )}
@@ -78,11 +82,15 @@ export function describeUser(role: UserRole, clientName: string | null): string 
   return clientName ? `${roleLabel} · ${clientName}` : `${roleLabel} · агентство`;
 }
 
-function formatWhen(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
+/** Сегодня — только время, раньше — короткая дата: как в любом мессенджере. */
+function formatWhen(value: Date): string {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  return sameDay
+    ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(date)
+    : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date);
 }
