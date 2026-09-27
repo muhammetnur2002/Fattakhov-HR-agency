@@ -6,7 +6,7 @@ import { effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { fetchCrmLinkRequests, fetchModerationQueue, fetchPendingStudyReview } from "@/lib/students-service";
 
-export const metadata = { title: "Проверки" };
+export const metadata = { title: "Студенческая платформа" };
 
 /**
  * Проверки студенческой платформы — компании, вакансии, справки студентов
@@ -52,7 +52,7 @@ export default async function ReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Проверки</h1>
+        <h1 className="text-2xl font-semibold">Студенческая платформа</h1>
         <p className="text-sm text-muted-foreground">
           Студенческая платформа — данные читаются и решения принимаются прямо здесь.
         </p>

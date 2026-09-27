@@ -39,8 +39,8 @@ export default function GlobalError({
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
-          background: "#323537",
-          color: "#f3f4f5",
+          background: "#000000",
+          color: "#f8f8f8",
           font: '15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
         }}
       >
@@ -48,7 +48,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 8px" }}>
             Платформа не отвечает
           </h1>
-          <p style={{ margin: "0 0 16px", color: "#b8bcc0" }}>
+          <p style={{ margin: "0 0 16px", color: "#8d949a" }}>
             Мы уже видим эту ошибку в своих логах. Попробуйте обновить
             страницу через минуту.
           </p>
@@ -73,9 +73,9 @@ export default function GlobalError({
               font: "inherit",
               padding: "8px 16px",
               borderRadius: 6,
-              border: "1px solid #4a4e51",
-              background: "#f3f4f5",
-              color: "#323537",
+              border: "1px solid #546e88",
+              background: "#546e88",
+              color: "#f8f8f8",
               cursor: "pointer",
             }}
           >

@@ -116,7 +116,7 @@ export const AGENCY_NAV: NavItem[] = [
     // платформу (см. lib/students-service.ts). /a/students остаётся
     // редиректом на этот адрес — старые ссылки не ломаются.
     href: "/a/reviews",
-    label: "Проверки",
+    label: "Студенческая платформа",
     icon: "ShieldCheck",
     requires: "students.enter",
   },

@@ -23,10 +23,10 @@ function errorPage(message: string, status: number): NextResponse {
 <title>Ссылка недоступна</title>
 <style>
   body { margin:0; min-height:100svh; display:flex; align-items:center; justify-content:center;
-    background:#323537; color:#f3f4f5; font:15px/1.5 -apple-system,"Segoe UI",Roboto,Arial,sans-serif; padding:24px; }
+    background:#000000; color:#f8f8f8; font:15px/1.5 -apple-system,"Segoe UI",Roboto,Arial,sans-serif; padding:24px; }
   .card { max-width:360px; text-align:center; }
   h1 { font-size:17px; font-weight:600; margin:0 0 8px; }
-  p { margin:0; color:#b8bcc0; }
+  p { margin:0; color:#8d949a; }
 </style>
 </head>
 <body>
