@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import "./globals.css";
@@ -40,6 +40,28 @@ export const metadata: Metadata = {
     template: "%s · Платформа",
   },
   description: "Подбор персонала: кабинет клиента и рабочее место рекрутера",
+  applicationName: "Fattakhov HR Agency",
+  // Ставится на экран телефона иконкой (см. app/manifest.ts) — иконки
+  // временно от студенческой платформы, свои фирменные ещё не готовы
+  manifest: "/manifest.webmanifest",
+  icons: {
+    apple: "/apple-icon.png",
+    icon: [
+      { url: "/icons/favicon-light.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/favicon-light.png", media: "(prefers-color-scheme: light)", type: "image/png" },
+      { url: "/icons/favicon-dark.png", media: "(prefers-color-scheme: dark)", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#323537" },
+  ],
+  colorScheme: "light dark",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

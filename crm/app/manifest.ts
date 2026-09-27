@@ -4,8 +4,9 @@ import type { MetadataRoute } from "next";
  * Манифест PWA — чтобы кабинет можно было поставить на экран телефона
  * иконкой, а не только открывать закладкой в браузере.
  *
- * Иконка собрана из фирменного знака на графите (`--brand-graphite`
- * из globals.css), а не сделана заново: тот же цвет, что в сайдбаре.
+ * Иконки временно те же, что у студенческой платформы (public/icons —
+ * скопированы оттуда): свои фирменные под каждый размер и purpose
+ * (maskable/monochrome) ещё не нарисованы. Заменить, когда будут готовы.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -17,15 +18,19 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#ffffff",
     theme_color: "#323537",
     icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       {
-        src: "/icons/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "/icons/icon-512.png",
+        src: "/icons/icon-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icons/icon-monochrome.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "monochrome",
       },
     ],
   };
