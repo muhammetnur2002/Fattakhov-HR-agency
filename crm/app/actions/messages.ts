@@ -48,4 +48,7 @@ export async function sendMessageAction(
 export async function markConversationReadAction(otherUserId: string) {
   const actor = await requireActor();
   await markConversationRead(actor, otherUserId);
+  // Счётчик «Сообщения» в сайдбаре живёт в общем каркасе (AppShell) —
+  // без этого он остаётся прежним, пока не сработает другая ревалидация
+  revalidatePath("/", "layout");
 }

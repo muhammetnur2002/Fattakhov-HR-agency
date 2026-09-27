@@ -18,6 +18,7 @@ export async function markAllReadAction(): Promise<void> {
 export async function markReadAction(ids: string[]): Promise<void> {
   const actor = await requireActor();
   await markNotificationsRead(actor.id, ids);
+  revalidatePath("/", "layout");
 }
 
 /** Настройки каналов. Событийный состав фиксирован, включаются каналы. */

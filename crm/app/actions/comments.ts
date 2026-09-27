@@ -108,6 +108,9 @@ export async function deleteCommentAction(
 export async function markReadAction(commentIds: string[]): Promise<void> {
   const actor = await requireActor();
   await markCommentsRead(actor, commentIds);
+  // Счётчик «Сообщения» в сайдбаре считает и обсуждения (AppShell) —
+  // без этого он остаётся прежним до случайной ревалидации извне
+  revalidatePath("/", "layout");
 }
 
 async function loadSubject(params: {

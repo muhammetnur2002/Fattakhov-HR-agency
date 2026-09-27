@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useRef } from "react";
+
+import { markReadAction } from "@/app/actions/notifications";
 import { LoadMore } from "@/components/shell/load-more";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -16,6 +20,11 @@ export type HistoryNotification = {
 /**
  * Полная история уведомлений — колокольчик обрезан тридцатью последними
  * (см. lib/notifications/notify.ts), эта страница листает дальше.
+ *
+ * Открыли страницу — увиденное на ней считается прочитанным, как и в
+ * колокольчике: иначе непрочитанное отсюда никогда не гасло бы само —
+ * пометить прочитанным вручную здесь нечем, а ссылка на карточку уводит
+ * со страницы раньше, чем человек это заметит.
  */
 export function NotificationHistory({
   items,
@@ -26,6 +35,17 @@ export function NotificationHistory({
   hasMore: boolean;
   loadMoreHref: string;
 }) {
+  const marked = useRef(false);
+  useEffect(() => {
+    if (marked.current) return;
+    marked.current = true;
+    const unreadIds = items.filter((n) => !n.isRead).map((n) => n.id);
+    if (unreadIds.length > 0) void markReadAction(unreadIds);
+    // Один раз на маунт страницы — «Показать ещё» дозагружает элементы,
+    // но не пересоздаёт компонент, так что дубля вызова не будет
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (items.length === 0) {
     return (
       <Card>

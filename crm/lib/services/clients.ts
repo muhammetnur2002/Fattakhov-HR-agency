@@ -170,7 +170,11 @@ export async function getClient(actor: Actor, clientId: string) {
   };
 }
 
-export async function createClient(actor: Actor, input: ClientInput) {
+export async function createClient(
+  actor: Actor,
+  input: ClientInput,
+  options: { fromStudentsPlatform?: boolean } = {},
+) {
   return prisma.client.create({
     data: {
       ...input,
@@ -178,8 +182,17 @@ export async function createClient(actor: Actor, input: ClientInput) {
       // Новый клиент — лид: активным его делает подтверждённый договор
       status: "LEAD",
       accountManagerId: input.accountManagerId ?? actor.id,
+      fromStudentsPlatform: options.fromStudentsPlatform ?? false,
     },
     select: { id: true },
+  });
+}
+
+/** Клиент уже существовал в CRM, но его связали с профилем со студенческой платформы. */
+export async function markClientFromStudentsPlatform(clientId: string): Promise<void> {
+  await prisma.client.update({
+    where: { id: clientId },
+    data: { fromStudentsPlatform: true },
   });
 }
 

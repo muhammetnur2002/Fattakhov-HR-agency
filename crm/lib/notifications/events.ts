@@ -208,26 +208,29 @@ export const EVENTS = {
   },
 
   // --- Студенческая платформа (см. app/api/webhooks/students-event) ---
+  // Только Telegram молчал бы для всех, кто бота не привязал, — а бот
+  // для этих событий пока никто специально не настраивал. Почта здесь
+  // не разговор, а очередь дел на проверку — ей самое место.
   STUDENTS_COMPANY_PENDING: {
-    channels: ["telegram"],
+    channels: ["email", "telegram"],
     priority: "normal",
     description: "Новая компания ждёт проверки на студенческой платформе",
     category: "students",
   },
   STUDENTS_VACANCY_PENDING: {
-    channels: ["telegram"],
+    channels: ["email", "telegram"],
     priority: "normal",
     description: "Новая вакансия ждёт проверки на студенческой платформе",
     category: "students",
   },
   STUDENTS_STUDY_PENDING: {
-    channels: ["telegram"],
+    channels: ["email", "telegram"],
     priority: "normal",
     description: "Справка студента ждёт проверки",
     category: "students",
   },
   STUDENTS_CRM_LINK_REQUESTED: {
-    channels: ["telegram"],
+    channels: ["email", "telegram"],
     priority: "normal",
     description: "Компания просит объединить профиль с клиентом в CRM",
     category: "students",

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import type { FormState } from "../actions";
 import { AccessDeniedError } from "@/lib/access";
 import { authorizeOrThrow, requireAgencyActor } from "@/lib/auth/session";
-import { createClient } from "@/lib/services/clients";
+import { createClient, markClientFromStudentsPlatform } from "@/lib/services/clients";
 import {
   rejectCrmLinkRequest,
   resolveCrmLinkRequest,
@@ -39,7 +39,7 @@ export async function createClientFromLinkRequestAction(
   let clientId: string;
   try {
     authorizeOrThrow(actor, "client.manage");
-    ({ id: clientId } = await createClient(actor, parsed.data));
+    ({ id: clientId } = await createClient(actor, parsed.data, { fromStudentsPlatform: true }));
     await resolveCrmLinkRequest(employerId, clientId);
   } catch (error) {
     if (error instanceof AccessDeniedError) {
@@ -66,6 +66,7 @@ export async function linkExistingClientAction(
   try {
     authorizeOrThrow(actor, "client.manage", { clientId });
     await resolveCrmLinkRequest(employerId, clientId);
+    await markClientFromStudentsPlatform(clientId);
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return { error: "Недостаточно прав" };

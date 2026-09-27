@@ -32,7 +32,7 @@ export default async function ClientLayout({
     actor.clientId
       ? prisma.client.findFirst({
           where: { id: actor.clientId },
-          select: { name: true },
+          select: { name: true, fromStudentsPlatform: true },
         })
       : null,
     actor.clientId ? hasAgreement(actor.clientId) : true,
@@ -64,8 +64,10 @@ export default async function ClientLayout({
         У нас есть ещё и студенческая платформа — для подработки и разовых
         задач, где мы не ищем сами, а даём кабинет напрямую. Не все клиенты
         об этом знают, узнают только если сами наткнутся на пункт меню.
+        Кто сам пришёл оттуда (client.fromStudentsPlatform), баннер не видит —
+        рекламировать им то, откуда они уже пришли, незачем.
       */}
-      {canDo(actor, "students.enterAsClient") && (
+      {canDo(actor, "students.enterAsClient") && !client?.fromStudentsPlatform && (
         <Alert variant="default" className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <AlertTitle>У нас есть и студенческая платформа</AlertTitle>

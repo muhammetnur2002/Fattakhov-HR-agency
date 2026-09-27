@@ -133,6 +133,10 @@ model Client {
   createdAt DateTime     @default(now())
   deletedAt DateTime?
 
+  // true, если клиент сам пришёл со студенческой платформы (уже там был,
+  // рекламировать её ему незачем)
+  fromStudentsPlatform Boolean @default(false)
+
   users       User[]
   agreements  Agreement[]
   vacancies   Vacancy[]
