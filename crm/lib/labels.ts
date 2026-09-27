@@ -14,6 +14,7 @@ import type {
   InterviewFormat,
   InterviewStatus,
   InterviewType,
+  LeadStatus,
   RejectionReason,
   RejectionSide,
   UserRole,
@@ -98,6 +99,14 @@ export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
   ACTIVE: "Активный",
   PAUSED: "На паузе",
   ARCHIVED: "В архиве",
+};
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  NEW: "Новая",
+  IN_PROGRESS: "В работе",
+  CONVERTED: "Стал клиентом",
+  REJECTED: "Не сложилось",
+  SPAM: "Спам",
 };
 
 export const URGENCY_LABELS: Record<VacancyUrgency, string> = {

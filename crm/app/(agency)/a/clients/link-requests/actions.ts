@@ -74,6 +74,7 @@ export async function linkExistingClientAction(
   }
 
   revalidatePath("/a/clients/link-requests");
+  revalidatePath("/a/clients");
   return { ok: "Заявка привязана к клиенту" };
 }
 

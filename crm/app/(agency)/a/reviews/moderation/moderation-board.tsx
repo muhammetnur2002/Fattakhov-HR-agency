@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Check, Flame, MapPin, X } from "lucide-react";
+import { Building2, Check, Flame, MapPin, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type {
@@ -67,6 +68,17 @@ export function ModerationBoard({
   const [vacancies, setVacancies] = useState(initialVacancies);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [preview, setPreview] = useState<ModerationVacancy | null>(null);
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const visibleCompanies = q
+    ? companies.filter((c) => c.companyName.toLowerCase().includes(q) || (c.city ?? "").toLowerCase().includes(q))
+    : companies;
+  const visibleVacancies = q
+    ? vacancies.filter(
+        (v) => v.vacancy.title.toLowerCase().includes(q) || v.vacancy.company.toLowerCase().includes(q),
+      )
+    : vacancies;
 
   async function decide(
     entity: "company" | "vacancy",
@@ -117,16 +129,30 @@ export function ModerationBoard({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Название компании или вакансии…"
+          className="pl-8"
+        />
+      </div>
+
+      {q && visibleCompanies.length === 0 && visibleVacancies.length === 0 && (
+        <p className="text-sm text-muted-foreground">Ничего не нашлось по этому запросу.</p>
+      )}
+
       <section>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-          Компании <span className="tabular-nums">{companies.length}</span>
+          Компании <span className="tabular-nums">{visibleCompanies.length}</span>
         </h2>
-        {companies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Новых компаний нет.</p>
+        {visibleCompanies.length === 0 ? (
+          !q && <p className="text-sm text-muted-foreground">Новых компаний нет.</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {companies.map((company) => (
+            {visibleCompanies.map((company) => (
               <CompanyCard
                 key={company.id}
                 company={company}
@@ -140,13 +166,13 @@ export function ModerationBoard({
 
       <section>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-          Вакансии <span className="tabular-nums">{vacancies.length}</span>
+          Вакансии <span className="tabular-nums">{visibleVacancies.length}</span>
         </h2>
-        {vacancies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Новых вакансий нет.</p>
+        {visibleVacancies.length === 0 ? (
+          !q && <p className="text-sm text-muted-foreground">Новых вакансий нет.</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {vacancies.map((item) => (
+            {visibleVacancies.map((item) => (
               <VacancyCard
                 key={item.vacancy.id}
                 item={item}

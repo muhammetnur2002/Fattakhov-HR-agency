@@ -1,18 +1,14 @@
 import { LeadActions } from "./lead-actions";
+import { LeadStatusFilter } from "@/components/leads/lead-status-filter";
+import { SearchField } from "@/components/shell/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { listLeads, type LeadView } from "@/lib/services/leads";
+import { LEAD_STATUS_LABELS as STATUS_LABELS } from "@/lib/labels";
+import { listLeads } from "@/lib/services/leads";
+import type { LeadStatus } from "@/lib/generated/prisma/enums";
 
 export const metadata = { title: "Заявки с сайта" };
-
-const STATUS_LABELS: Record<LeadView["status"], string> = {
-  NEW: "Новая",
-  IN_PROGRESS: "В работе",
-  CONVERTED: "Стал клиентом",
-  REJECTED: "Не сложилось",
-  SPAM: "Спам",
-};
 
 /**
  * Заявки с лендинга.
@@ -21,11 +17,16 @@ const STATUS_LABELS: Record<LeadView["status"], string> = {
  * подчинено этому, потому что задача здесь одна, позвонить быстрее,
  * чем конкурент.
  */
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: LeadStatus }>;
+}) {
   const actor = await requireAgencyActor();
   authorize(actor, "client.manage", { clientId: null });
 
-  const leads = await listLeads();
+  const { q, status } = await searchParams;
+  const leads = await listLeads({ query: q, status });
   const fresh = leads.filter((l) => l.status === "NEW").length;
   /*
     Взятая в работу заявка ещё не разобрана: у неё те же кнопки
@@ -50,11 +51,17 @@ export default async function LeadsPage() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <SearchField placeholder="Имя, компания, контакт…" />
+        <LeadStatusFilter />
+      </div>
+
       {leads.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Заявки с главной страницы сайта появляются здесь сразу после
-            отправки, вместе с уведомлением.
+            {q || status
+              ? "Ничего не нашлось по этому запросу."
+              : "Заявки с главной страницы сайта появляются здесь сразу после отправки, вместе с уведомлением."}
           </CardContent>
         </Card>
       ) : (

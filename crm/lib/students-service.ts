@@ -28,6 +28,24 @@ export interface CrmLinkRequest {
   requestedAt: string;
 }
 
+/**
+ * Компания, одобренная на студенческой платформе, но без клиента в CRM
+ * и без заявки на привязку — раньше такие пропадали из виду среди
+ * клиентов насовсем, видна была только заявка, если компания сама её
+ * оставляла.
+ */
+export interface ApprovedCompany {
+  employerId: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string | null;
+  inn: string | null;
+  city: string | null;
+  createdAt: string;
+  pendingVacancies: number;
+}
+
 export interface ModerationCompany {
   id: string;
   companyName: string;
@@ -133,6 +151,14 @@ export async function fetchCrmLinkRequests(): Promise<CrmLinkRequest[]> {
   if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
   const data = (await response.json()) as { requests: CrmLinkRequest[] };
   return data.requests;
+}
+
+/** Компании, одобренные на платформе, но без клиента в CRM и без заявки на привязку. */
+export async function fetchApprovedCompanies(): Promise<ApprovedCompany[]> {
+  const response = await call("/api/service/companies");
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { companies: ApprovedCompany[] };
+  return data.companies;
 }
 
 /** Одобрить заявку — компания получает crmClientId у себя. */

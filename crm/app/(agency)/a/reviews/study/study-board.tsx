@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, X } from "lucide-react";
+import { Check, FileText, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { decideStudyReviewAction } from "./actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type { PendingStudyStudent } from "@/lib/students-service";
@@ -17,6 +18,12 @@ export function StudyBoard({ students: initial }: { students: PendingStudyStuden
   const router = useRouter();
   const [students, setStudents] = useState(initial);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? students.filter((s) => s.fullName.toLowerCase().includes(q) || s.university.toLowerCase().includes(q))
+    : students;
 
   async function decide(student: PendingStudyStudent, decision: "APPROVE" | "REJECT", note?: string): Promise<boolean> {
     setBusy((current) => new Set(current).add(student.id));
@@ -53,15 +60,31 @@ export function StudyBoard({ students: initial }: { students: PendingStudyStuden
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {students.map((student) => (
-        <StudentCard
-          key={student.id}
-          student={student}
-          busy={busy.has(student.id)}
-          onDecide={(decision, note) => decide(student, decision, note)}
+    <div className="space-y-6">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Имя студента или вуз…"
+          className="pl-8"
         />
-      ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Ничего не нашлось по этому запросу.</p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {visible.map((student) => (
+            <StudentCard
+              key={student.id}
+              student={student}
+              busy={busy.has(student.id)}
+              onDecide={(decision, note) => decide(student, decision, note)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

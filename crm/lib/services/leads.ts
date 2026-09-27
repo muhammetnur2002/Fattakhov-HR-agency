@@ -90,9 +90,23 @@ export type LeadView = {
  * Заявки для кабинета агентства.
  *
  * Свежие сверху: заявка ценна первые часы, а не как архивная запись.
+ * Поиск и фильтр по статусу — очередь копится бессрочно, и через
+ * пару месяцев в ней нечем найти конкретную заявку без них.
  */
-export async function listLeads(): Promise<LeadView[]> {
+export async function listLeads(
+  filters: { query?: string; status?: LeadView["status"] } = {},
+): Promise<LeadView[]> {
   return prisma.lead.findMany({
+    where: {
+      ...(filters.status && { status: filters.status }),
+      ...(filters.query && {
+        OR: [
+          { name: { contains: filters.query, mode: "insensitive" } },
+          { company: { contains: filters.query, mode: "insensitive" } },
+          { contact: { contains: filters.query, mode: "insensitive" } },
+        ],
+      }),
+    },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,

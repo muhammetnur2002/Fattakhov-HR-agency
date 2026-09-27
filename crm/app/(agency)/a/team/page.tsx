@@ -1,6 +1,5 @@
-import { withEmailOff } from "@/components/shared/email-off";
-import { StaffCreateForm, StaffMemberEditor } from "@/components/team/staff-forms";
-import { Badge } from "@/components/ui/badge";
+import { StaffCreateForm } from "@/components/team/staff-forms";
+import { TeamList } from "@/components/team/team-list";
 import {
   Card,
   CardContent,
@@ -77,65 +76,17 @@ export default async function TeamPage() {
         <CardHeader>
           <CardTitle className="text-base">Команда</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
-          {members.map((member) => (
-            <div key={member.id} className="space-y-2.5 border-b pb-5 last:border-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <div className="min-w-0 flex-1 basis-56">
-                  <div className="text-sm font-medium">
-                    {member.fullName}
-                    {member.isSelf && <span className="font-normal text-muted-foreground"> · это вы</span>}
-                  </div>
-                  <div className="text-xs break-words text-muted-foreground">
-                    {withEmailOff(member.email, member.email)}
-                    {member.position ? ` · ${member.position}` : ""}
-                  </div>
-                </div>
-                <Badge variant="outline">{ROLE_LABELS[member.role]}</Badge>
-                {!member.isActive && <Badge variant="destructive">Доступ отключён</Badge>}
-                <div className="text-xs text-muted-foreground">
-                  {member.lastLoginAt
-                    ? `Заходил ${formatDate(member.lastLoginAt)}`
-                    : "Ни разу не заходил"}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {member.role === "OWNER" ? (
-                  <Badge variant="secondary">Все доступы</Badge>
-                ) : member.grants.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">Дополнительных доступов нет</span>
-                ) : (
-                  member.grants.map((grant) => (
-                    <Badge key={grant} variant="secondary">
-                      {STAFF_GRANT_LABELS[grant].label}
-                    </Badge>
-                  ))
-                )}
-              </div>
-
-              {member.manageable && (
-                <StaffMemberEditor
-                  member={member}
-                  roles={roleOptions}
-                  grants={grantOptions}
-                  updateAction={updateStaffAction}
-                  activeAction={setStaffActiveAction}
-                  resetPasswordAction={resetStaffPasswordAction}
-                />
-              )}
-            </div>
-          ))}
+        <CardContent>
+          <TeamList
+            members={members}
+            roles={roleOptions}
+            grants={grantOptions}
+            updateAction={updateStaffAction}
+            activeAction={setStaffActiveAction}
+            resetPasswordAction={resetStaffPasswordAction}
+          />
         </CardContent>
       </Card>
     </div>
   );
-}
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
 }
