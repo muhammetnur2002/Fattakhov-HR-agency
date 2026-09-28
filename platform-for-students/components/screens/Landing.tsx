@@ -45,6 +45,15 @@ export function Landing({
 }) {
   const navigate = useCurtainNav();
 
+  // Самостоятельная регистрация компании переехала в CRM (кабинет клиента
+  // заводится там же, без второй анкеты внутри агентства) — поэтому это
+  // внешняя ссылка на другое приложение, как и «Сайт агентства» в подвале,
+  // а не navigate() и не next/link. Свой внутренний /register/company
+  // здесь больше не существует, поэтому без AGENCY_SITE_URL на проде
+  // кнопку «Я работодатель» просто не показываем — как и ссылку на сайт
+  // агентства ниже, вести её было бы некуда.
+  const employerRegisterUrl = agencyUrl ? `${agencyUrl}/register/company` : null;
+
   return (
     <div className="relative">
       <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-7xl items-center justify-between">
@@ -115,9 +124,13 @@ export function Landing({
             <Button size="lg" onClick={() => navigate('/register')} iconRight={<ArrowRight />}>
               Я студент
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/register/company')}>
-              Я работодатель
-            </Button>
+            {employerRegisterUrl && (
+              <a href={employerRegisterUrl}>
+                <Button size="lg" variant="outline">
+                  Я работодатель
+                </Button>
+              </a>
+            )}
           </motion.div>
 
           <motion.div
@@ -242,11 +255,13 @@ export function Landing({
             <Button size="lg" onClick={() => navigate('/register')} iconRight={<ArrowRight />}>
               Создать профиль
             </Button>
-            <Link href="/register/company">
-              <Button variant="ghost" size="lg">
-                Я работодатель
-              </Button>
-            </Link>
+            {employerRegisterUrl && (
+              <a href={employerRegisterUrl}>
+                <Button variant="ghost" size="lg">
+                  Я работодатель
+                </Button>
+              </a>
+            )}
           </div>
         </div>
       </section>

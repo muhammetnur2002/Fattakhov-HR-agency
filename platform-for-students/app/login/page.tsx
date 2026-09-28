@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { LoginForm } from '@/components/screens/LoginForm';
 import { isDemoMode } from '@/lib/db';
 import { DEMO_CREDENTIALS } from '@/lib/db/seed-data';
+import { agencySiteUrl } from '@/lib/agency';
 
 export const metadata: Metadata = { title: 'Вход' };
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
 
   return (
     <Suspense>
-      <LoginForm demoHint={demoHint} />
+      <LoginForm demoHint={demoHint} agencyUrl={agencySiteUrl()} />
     </Suspense>
   );
 }

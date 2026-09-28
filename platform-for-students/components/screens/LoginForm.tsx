@@ -35,9 +35,21 @@ const CRM_LOGIN_MESSAGES: Record<string, string> = {
   config: 'Вход из CRM не настроен: нужен STUDENTS_SSO_SECRET — тот же, что в CRM.',
 };
 
-export function LoginForm({ demoHint }: { demoHint?: DemoHint }) {
+export function LoginForm({
+  demoHint,
+  agencyUrl,
+}: {
+  demoHint?: DemoHint;
+  /** Сайт агентства (CRM); null — адрес на проде не задан */
+  agencyUrl?: string | null;
+}) {
   const router = useRouter();
   const params = useSearchParams();
+  // Регистрация компании переехала в CRM — та же логика, что на витрине
+  // (см. components/screens/Landing.tsx): внешняя ссылка на другое
+  // приложение. Своего внутреннего /register/company больше нет, поэтому
+  // без адреса CRM ссылку просто не показываем.
+  const employerRegisterUrl = agencyUrl ? `${agencyUrl}/register/company` : null;
   const toast = useToast();
 
   const [email, setEmail] = useState('');
@@ -220,12 +232,14 @@ export function LoginForm({ demoHint }: { demoHint?: DemoHint }) {
             Регистрация студента
           </Link>
         </p>
-        <p className="mt-1.5 text-center text-[13px] text-paper-faint">
-          Вы работодатель?{' '}
-          <Link href="/register/company" className="text-paper underline-offset-4 transition-colors hover:underline">
-            Зарегистрировать компанию
-          </Link>
-        </p>
+        {employerRegisterUrl && (
+          <p className="mt-1.5 text-center text-[13px] text-paper-faint">
+            Вы работодатель?{' '}
+            <a href={employerRegisterUrl} className="text-paper underline-offset-4 transition-colors hover:underline">
+              Зарегистрировать компанию
+            </a>
+          </p>
+        )}
       </motion.div>
     </div>
   );

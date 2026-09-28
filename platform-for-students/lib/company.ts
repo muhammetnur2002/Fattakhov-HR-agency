@@ -1,15 +1,19 @@
 import { z } from 'zod';
 import { httpUrlSchema, linkItemSchema } from '@/lib/portfolio';
 import { isValidInn, normalizeInn } from '@/lib/inn';
-import { consentFields, emailSchema, passwordSchema, phoneSchema, requiredPhoneSchema } from '@/lib/validation';
+import { phoneSchema } from '@/lib/validation';
 import type { CompanyProfile, LinkItem } from '@/lib/types';
 
 /**
- * Компания: проверка регистрации и страницы, чтение из базы.
+ * Компания: проверка страницы профиля, чтение из базы.
  *
  * Схемы общие для формы и сервера, как и остальные. Отдельным модулем,
  * потому что хранилищу нужны правила чтения JSON, а мастеру регистрации
  * студента правила компании ни к чему.
+ *
+ * Регистрация компании отсюда переехала в CRM (app/(public)/register/company
+ * там же) — этот модуль больше не отвечает за неё, только за профиль внутри
+ * уже открытого кабинета.
  */
 
 const emptyToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
@@ -108,19 +112,6 @@ export function hasCompanyProfile(employer: {
   if (employer.companyName.trim().length === 0 || employer.contactName.trim().length === 0) return false;
   return employer.crmClientId !== null || Boolean(employer.inn);
 }
-
-export const companyRegistrationSchema = z.object({
-  companyName: z.preprocess((v) => (v === undefined ? null : emptyToNull(v)), companyName.nullable()),
-  contactName: z.preprocess((v) => (v === undefined ? null : emptyToNull(v)), contactName.nullable()),
-  email: emailSchema,
-  password: passwordSchema,
-  city: optionalText(80),
-  inn: z.preprocess((v) => (v === undefined ? null : emptyToNull(v)), innSchema.nullable()),
-  phone: requiredPhoneSchema,
-  ...consentFields(),
-});
-
-export type CompanyRegistrationInput = z.infer<typeof companyRegistrationSchema>;
 
 /**
  * Страница компании из строки базы.

@@ -882,55 +882,80 @@ async function main() {
     await again.delete('/api/students/me', {});
   }
 
+  // ---------- Билеты входа из CRM ----------
+  // Вынесены сюда, перед «Компанией», а не только к «Входу из CRM» ниже:
+  // самостоятельная регистрация переехала в CRM (app/(public)/register/company
+  // там же), и с этого момента билет из CRM — единственный путь завести
+  // компанию на этой платформе вообще. Он нужен уже для бутстрапа кабинета
+  // компании чуть ниже, а не только для собственной проверки входа сотрудника
+  // и клиента CRM дальше по файлу.
+  const ssoSecret = process.env.STUDENTS_SSO_SECRET?.trim() ?? '';
+  const crmTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
+    const now = Math.floor(Date.now() / 1000);
+    const body = Buffer.from(
+      JSON.stringify({
+        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'staff', sub: 'usr_smoke', email: `smoke-${Date.now() + 4242}@demo.ru`,
+        name: 'Сотрудник Проверкин', position: 'Администратор', permissions: ['students'], iat: now, exp: now + 60,
+        jti: crypto.randomBytes(16).toString('base64url'), ...claims,
+      }),
+    ).toString('base64url');
+    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
+  };
+  const crmClientTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
+    const now = Math.floor(Date.now() / 1000);
+    const body = Buffer.from(
+      JSON.stringify({
+        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'client', sub: 'usr_smoke_client',
+        crmClientId: `crm-client-smoke-${Date.now() + 4242}`, companyName: 'Смоук-клиент CRM',
+        contactName: 'Проверкина Клиентова', contactEmail: `smoke-client-${Date.now() + 4242}@demo.ru`,
+        iat: now, exp: now + 60, jti: crypto.randomBytes(16).toString('base64url'), ...claims,
+      }),
+    ).toString('base64url');
+    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
+  };
+  const enterFromCrm = async (ticket: string) => {
+    const response = await fetch(`${BASE}/api/auth/crm?ticket=${encodeURIComponent(ticket)}`, { redirect: 'manual' });
+    return {
+      status: response.status,
+      location: response.headers.get('location') ?? '',
+      cookie: (response.headers.get('set-cookie') ?? '').split(';')[0],
+    };
+  };
+  if (ssoSecret.length < 32) {
+    throw new Error(
+      'STUDENTS_SSO_SECRET не задан (нужно ≥32 символов) — без него не проверить кабинет компании: ' +
+        'самостоятельная регистрация ушла в CRM, и билет из CRM теперь единственный путь туда.',
+    );
+  }
+
   // ---------- Компания ----------
-  // Самостоятельная регистрация: кабинет открывается сразу, а публичной
-  // страница становится только после одобрения агентством.
+  // Самостоятельная регистрация ушла в CRM — сюда компания попадает тем же
+  // билетом, которым CRM пускает своего клиента (см. «Вход из CRM» ниже,
+  // тот же enterFromCrm/crmClientTicket). Кабинет поэтому открывается сразу
+  // одобренным: реквизиты уже сверены агентством по договору, а не
+  // HR-модерацией на этой платформе (см. hasCompanyProfile в lib/company.ts
+  // и Employer.moderationStatus в prisma/schema.prisma).
   console.log('\nКомпания');
   const companyEmail = `smoke-company-${Date.now()}@demo.ru`;
-  const companyInn = randomInn();
-  const companyData = {
+  const companyTicket = crmClientTicket({
+    contactEmail: companyEmail,
     companyName: 'Проверочная Компания',
     contactName: 'Иван Проверкин',
-    email: companyEmail,
-    password: 'Smoke12345!',
-    city: 'Казань',
-    inn: companyInn,
-    phone: '+7 900 777-66-55',
-    consent: true,
-    terms: true,
-  };
+  });
+  const companyEntered = await enterFromCrm(companyTicket);
+  check(
+    'компания входит по билету из CRM сразу в форму новой вакансии',
+    [303, 307].includes(companyEntered.status) &&
+      companyEntered.location.endsWith('/employer/vacancies/new') &&
+      companyEntered.cookie.startsWith('fhr_session='),
+    companyEntered.status,
+  );
   const company = new Session();
-  const companyStarted = await company.post('/api/auth/register/company', companyData);
-  check('компания регистрируется сама: код отправлен', companyStarted.status === 201 && !!companyStarted.body?.pending, companyStarted.body);
-  const companyCode = codeFrom(await lastMail(companyEmail, 'Код подтверждения'));
-  check('компании пришёл код подтверждения почты', !!companyCode);
-  const companyReg = await company.post('/api/auth/register/company/confirm', {
-    pending: companyStarted.body?.pending,
-    code: companyCode,
-  });
-  check('компания подтверждает код и получает кабинет', companyReg.status === 201, companyReg.body);
-  check('новая компания на модерации', companyReg.body?.moderationStatus === 'PENDING', companyReg.body);
-
-  const companyNoConsent = await new Session().post('/api/auth/register/company', {
-    ...companyData,
-    email: `smoke-company-${Date.now() + 1}@demo.ru`,
-    consent: false,
-    terms: false,
-  });
-  check('без согласия компанию не регистрируют', companyNoConsent.status === 400, companyNoConsent.status);
-  const companyDup = await new Session().post('/api/auth/register/company', companyData);
-  check('почту компании нельзя занять повторно', companyDup.status === 409, companyDup.status);
-  const innDup = await new Session().post('/api/auth/register/company', {
-    ...companyData,
-    email: `smoke-company-${Date.now() + 2}@demo.ru`,
-  });
-  check('ИНН компании нельзя занять повторно', innDup.status === 409 && !!innDup.body?.fields?.inn, innDup.body);
-
-  const companyLogin = await new Session().post('/api/auth/login', { email: companyEmail, password: 'Smoke12345!' });
-  check('компания входит по почте и паролю', companyLogin.status === 200 && companyLogin.body?.role === 'EMPLOYER', companyLogin.body);
+  (company as any).cookie = companyEntered.cookie;
   check('кабинет компании открывается', (await company.request('/employer/company')).status === 200);
 
   const companyId = (await company.request('/api/auth/me')).body.session?.profileId as string;
+  check('компания клиента CRM публична сразу, без модерации', (await new Session().request(`/companies/${companyId}`)).status === 200);
   const companyPage = {
     companyName: 'Проверочная Компания',
     contactName: 'Иван Проверкин',
@@ -947,10 +972,8 @@ async function main() {
   check('страница компании сохраняется', companySaved.status === 200, companySaved.body);
   const badInn = await company.patch('/api/employer/company', { ...companyPage, inn: '1234567890' });
   check('ИНН с неверной контрольной цифрой отвергнут', badInn.status === 400 && !!badInn.body?.fields?.inn, badInn.body);
-  const phoneErased = await company.patch('/api/employer/company', { ...companyPage, phone: '' });
-  check('телефон компании нельзя стереть', phoneErased.status === 400 && !!phoneErased.body?.fields?.phone, phoneErased.body);
-  check('компания на модерации не публична', (await new Session().request(`/companies/${companyId}`)).status === 404);
-
+  // Телефон у клиента CRM не обязателен (реквизиты в CRM, а не здесь —
+  // см. app/api/employer/company/route.ts), поэтому стереть его можно
   const stolen = await company.patch('/api/employer/company', {
     ...companyPage,
     logoUrl: '/api/files/photo/00000000-0000-0000-0000-000000000000.jpg',
@@ -985,7 +1008,8 @@ async function main() {
     const { url } = (await companyUpload.json()) as { url: string };
     const withLogo = await company.patch('/api/employer/company', { ...companyPage, logoUrl: url });
     check('логотип сохраняется', withLogo.status === 200, withLogo.body);
-    check('логотип компании на модерации гостю не отдаётся', (await fetch(`${BASE}${url}`)).status === 404);
+    // Компания клиента CRM одобрена сразу — логотип публичен гостю без ожидания модерации
+    check('логотип одобренной компании отдаётся гостю', (await fetch(`${BASE}${url}`)).status === 200);
     check('свой логотип компания видит', (await company.request(url)).status === 200);
   }
 
@@ -1083,29 +1107,19 @@ async function main() {
 
   const queue = await admin.request('/api/admin/moderation');
   check(
-    'компания в очереди модерации',
-    queue.status === 200 && ((queue.body?.companies ?? []) as Array<{ id: string }>).some((c) => c.id === companyId),
+    'компания клиента CRM не в очереди модерации — она уже одобрена',
+    queue.status === 200 && !((queue.body?.companies ?? []) as Array<{ id: string }>).some((c) => c.id === companyId),
     queue.status,
   );
   check(
     'вакансия в очереди модерации',
     ((queue.body?.vacancies ?? []) as Array<{ vacancy: { id: string } }>).some((v) => v.vacancy.id === vacancyId),
   );
-  const queuedCompany = ((queue.body?.companies ?? []) as Array<{ id: string; inn: string | null; phone: string | null }>).find(
-    (c) => c.id === companyId,
-  );
-  check(
-    'в очереди у компании ИНН и телефон для проверки',
-    queuedCompany?.inn === companyInn && queuedCompany?.phone === '+7 900 777-66-55',
-    queuedCompany,
-  );
   check('страница модерации открывается', (await admin.request('/admin/moderation')).status === 200);
   const statsBody = (await admin.request('/api/admin/stats')).body;
   const moderationStats = statsBody?.moderation ?? statsBody?.stats?.moderation;
   check('в статистике есть очередь модерации', typeof moderationStats?.vacancies === 'number', statsBody);
 
-  const earlyApprove = await admin.post('/api/admin/moderation', { entity: 'vacancy', id: vacancyId, decision: 'APPROVE' });
-  check('вакансию не одобрить раньше компании', earlyApprove.status === 409, earlyApprove.body);
   const silentReject = await admin.post('/api/admin/moderation', { entity: 'vacancy', id: vacancyId, decision: 'REJECT' });
   check('отказ без причины не принимается', silentReject.status === 400, silentReject.status);
   const rejected = await admin.post('/api/admin/moderation', {
@@ -1132,33 +1146,6 @@ async function main() {
   });
   check('исправленная вакансия снова на проверке', resubmitted.status === 200 && resubmitted.body?.status === 'PENDING', resubmitted.body);
 
-  const companyRejected = await admin.post('/api/admin/moderation', {
-    entity: 'company',
-    id: companyId,
-    decision: 'REJECT',
-    note: 'Добавьте, чем занимается команда',
-  });
-  check('компанию можно отклонить с причиной', companyRejected.status === 200 && companyRejected.body?.status === 'REJECTED', companyRejected.body);
-  const companyRejectMail = await lastMail(companyEmail, 'Компанию вернули');
-  check('компании пришло письмо о доработке с причиной', !!companyRejectMail?.text.includes('Добавьте, чем занимается команда'), companyRejectMail?.subject);
-  const companyResubmitted = await company.patch('/api/employer/company', companyPage);
-  check(
-    'отклонённая компания после правки снова на проверке',
-    companyResubmitted.status === 200 && companyResubmitted.body?.moderationStatus === 'PENDING',
-    companyResubmitted.body,
-  );
-
-  const companyApproved = await admin.post('/api/admin/moderation', { entity: 'company', id: companyId, decision: 'APPROVE' });
-  check('компания одобряется', companyApproved.status === 200 && companyApproved.body?.status === 'APPROVED', companyApproved.body);
-  check('компании пришло письмо об одобрении', !!(await lastMail(companyEmail, 'Компания прошла проверку')));
-  check('одобренная компания открыта гостю', (await new Session().request(`/companies/${companyId}`)).status === 200);
-  const innLocked = await company.patch('/api/employer/company', { ...companyPage, inn: randomInn() });
-  const lockedPage = String((await company.request('/employer/company')).body);
-  check(
-    'ИНН одобренной компании из кабинета не меняется',
-    innLocked.status === 200 && innLocked.body?.moderationStatus === 'APPROVED' && lockedPage.includes(companyInn),
-    innLocked.body,
-  );
   const vacancyApproved = await admin.post('/api/admin/moderation', { entity: 'vacancy', id: vacancyId, decision: 'APPROVE' });
   check('вакансия одобряется', vacancyApproved.status === 200 && vacancyApproved.body?.status === 'PUBLISHED', vacancyApproved.body);
   check('компании пришло письмо о публикации вакансии', !!(await lastMail(companyEmail, 'Вакансия опубликована')));
@@ -1252,14 +1239,13 @@ async function main() {
 
   const renamedCompany = await company.patch('/api/employer/company', { ...companyPage, companyName: 'Проверочная Компания Плюс' });
   check(
-    'смена названия возвращает компанию на проверку',
-    renamedCompany.status === 200 && renamedCompany.body?.moderationStatus === 'PENDING',
+    'смена названия клиентом CRM не отправляет компанию на повторную проверку — имя ведёт договор в CRM, а не HR-модерация здесь',
+    renamedCompany.status === 200 && renamedCompany.body?.moderationStatus === 'APPROVED',
     renamedCompany.body,
   );
-  check('вакансии компании на проверке нет в ленте', !(await inFeed()));
-  const hiddenSwipe = await student.post('/api/swipes', { vacancyId, direction: 'RIGHT' });
-  check('откликнуться на скрытую вакансию нельзя', hiddenSwipe.status === 404, hiddenSwipe.status);
-  if (vacancyPhoto) check('фото вакансии скрытой компании гостю не отдаётся', (await fetch(`${BASE}${vacancyPhoto}`)).status === 404);
+  // Не «остаётся в ленте»: к этому моменту вакансия уже PENDING из-за
+  // непроверенной правки чуть выше — смена названия не должна это менять
+  check('страница компании остаётся открытой гостю после смены названия', (await new Session().request(`/companies/${companyId}`)).status === 200);
 
   const closedVacancy = await company.post(`/api/employer/vacancies/${vacancyId}`, { action: 'close' });
   check('вакансия снимается', closedVacancy.status === 200 && closedVacancy.body?.status === 'CLOSED', closedVacancy.body);
@@ -1314,39 +1300,9 @@ async function main() {
   check('страница метрик пилота открывается', (await admin.request('/admin/pilot')).status === 200);
 
   // ---------- Вход сотрудника из CRM ----------
+  // ssoSecret/crmTicket/crmClientTicket/enterFromCrm определены выше, перед
+  // «Компанией» — они нужны были уже там для бутстрапа её кабинета.
   console.log('\nВход из CRM');
-  const ssoSecret = process.env.STUDENTS_SSO_SECRET?.trim() ?? '';
-  const crmTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
-    const now = Math.floor(Date.now() / 1000);
-    const body = Buffer.from(
-      JSON.stringify({
-        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'staff', sub: 'usr_smoke', email: `smoke-${Date.now() + 4242}@demo.ru`,
-        name: 'Сотрудник Проверкин', position: 'Администратор', permissions: ['students'], iat: now, exp: now + 60,
-        jti: crypto.randomBytes(16).toString('base64url'), ...claims,
-      }),
-    ).toString('base64url');
-    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
-  };
-  const crmClientTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
-    const now = Math.floor(Date.now() / 1000);
-    const body = Buffer.from(
-      JSON.stringify({
-        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'client', sub: 'usr_smoke_client',
-        crmClientId: `crm-client-smoke-${Date.now() + 4242}`, companyName: 'Смоук-клиент CRM',
-        contactName: 'Проверкина Клиентова', contactEmail: `smoke-client-${Date.now() + 4242}@demo.ru`,
-        iat: now, exp: now + 60, jti: crypto.randomBytes(16).toString('base64url'), ...claims,
-      }),
-    ).toString('base64url');
-    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
-  };
-  const enterFromCrm = async (ticket: string) => {
-    const response = await fetch(`${BASE}/api/auth/crm?ticket=${encodeURIComponent(ticket)}`, { redirect: 'manual' });
-    return {
-      status: response.status,
-      location: response.headers.get('location') ?? '',
-      cookie: (response.headers.get('set-cookie') ?? '').split(';')[0],
-    };
-  };
   if (ssoSecret.length >= 32) {
     const staffEmail = `smoke-${Date.now() + 4242}@demo.ru`;
     const firstTicket = crmTicket({ email: staffEmail });
@@ -1410,10 +1366,10 @@ async function main() {
 
     const clientReplay = await enterFromCrm(firstClientTicket);
     check('по тому же билету клиента второй раз не войти', clientReplay.location.includes('crm=used'), clientReplay.location);
-  } else {
-    const notConfigured = await enterFromCrm(crmTicket({}));
-    check('без секрета вход из CRM выключен', notConfigured.location.includes('crm=config'), notConfigured.location);
   }
+  // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET
+  // скрипт бросает исключение ещё в «Компании» — это теперь единственный
+  // путь завести кабинет компании, а не необязательная возможность
 
   // ---------- Напоминания и сводки ----------
   console.log('\nНапоминания');

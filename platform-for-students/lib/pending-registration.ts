@@ -1,6 +1,5 @@
 import 'server-only';
 import { EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_TTL_MINUTES, resendWaitSeconds } from '@/lib/account-codes';
-import type { CompanyRegistrationInput } from '@/lib/company';
 import { emailCodeMail } from '@/lib/mail/templates';
 import { sendMail } from '@/lib/mail/transport';
 import { decrypt, encrypt, safeEqual } from '@/lib/security/crypto';
@@ -23,7 +22,6 @@ import type { RegistrationInput } from '@/lib/validation';
 export type PendingKind = 'student' | 'employer';
 
 export type PendingStudentData = RegistrationInput & { consentIp: string };
-export type PendingEmployerData = CompanyRegistrationInput;
 
 export interface IssuedPending {
   token: string;

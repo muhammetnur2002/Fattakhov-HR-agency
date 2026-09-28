@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { verifyStaffTicket } from '../lib/security/staff-ticket';
 import { staffCan, staffHome } from '../lib/staff-permissions';
 import { ageFromIso, fullYears, parseIsoDate } from '../lib/age';
-import { companyRegistrationSchema, hasCompanyProfile, innSchema } from '../lib/company';
+import { hasCompanyProfile, innSchema } from '../lib/company';
 import { isValidInn } from '../lib/inn';
 import { rankInstitutions } from '../lib/rating';
 import { fitHours, maxHoursPerWeek } from '../lib/schedule';
@@ -80,33 +80,6 @@ test('ИНН из формы очищается от пробелов и про�
   assert.equal(innSchema.parse(' 7707 083 893 '), '7707083893');
   assert.equal(innSchema.safeParse('1234567890').success, false);
   assert.equal(innSchema.safeParse('12345').success, false);
-});
-test('регистрация компании требует телефон и оба согласия — название, ИНН и контакт дозаполняются потом', () => {
-  const company = {
-    companyName: 'Компания',
-    contactName: 'Иван Иванов',
-    email: 'hr@example.org',
-    password: 'Smoke12345!',
-    city: 'Казань',
-    inn: '7707083893',
-    phone: '+7 900 111-22-33',
-    consent: true,
-    terms: true,
-  };
-  assert.equal(companyRegistrationSchema.safeParse(company).success, true);
-  assert.equal(companyRegistrationSchema.safeParse({ ...company, phone: '' }).success, false);
-  assert.equal(companyRegistrationSchema.safeParse({ ...company, terms: false }).success, false);
-  assert.equal(companyRegistrationSchema.safeParse({ ...company, inn: '7707083894' }).success, false);
-  // Упрощённая регистрация: название, контакт и ИНН можно не присылать вовсе
-  const minimal = {
-    email: 'hr2@example.org',
-    password: 'Smoke12345!',
-    city: null,
-    phone: '+7 900 111-22-33',
-    consent: true,
-    terms: true,
-  };
-  assert.equal(companyRegistrationSchema.safeParse(minimal).success, true);
 });
 test('клиенту CRM для отправки вакансии ИНН не нужен — он сверен по договору', () => {
   const base = { companyName: 'Кофейни «Север»', contactName: 'Иван Иванов' };
