@@ -101,7 +101,7 @@ export function InviteForm({
         учёл, отчего поле вставало на 4px выше положенного. Число
         одно, место одно — на родителе.
       */}
-      <div className="grid gap-x-4 gap-y-2 sm:grid-cols-[1fr_auto_auto] sm:grid-rows-[20px_32px] sm:items-start">
+      <div className="grid gap-x-4 gap-y-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:grid-rows-[20px_32px] sm:items-start">
         <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
           <Label htmlFor="invite-email">Email</Label>
           <Input
@@ -111,6 +111,11 @@ export function InviteForm({
             placeholder="name@company.ru"
             required
           />
+        </div>
+
+        <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
+          <Label htmlFor="invite-position">Должность</Label>
+          <Input id="invite-position" name="position" placeholder="Руководитель отдела" />
         </div>
 
         <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
@@ -137,10 +142,19 @@ export function InviteForm({
         {/* Колонка указана явно вместе с рядом. С одним только рядом
             раскладка ставила кнопку в первую свободную ячейку строки —
             то есть перед Email, хотя в разметке она последняя */}
-        <div className="sm:col-start-3 sm:row-start-2">
+        <div className="sm:col-start-4 sm:row-start-2">
           <SubmitButton />
         </div>
       </div>
+
+      {/* Приглашённый получает реальный доступ к кандидатам и вакансиям
+          компании сразу после перехода по ссылке — предупреждение рядом
+          с формой, а не только в самом письме, чтобы его увидели ещё
+          до отправки, когда решение ещё можно передумать */}
+      <p className="text-xs text-muted-foreground">
+        Приглашённый получит доступ к данным компании в этом кабинете —
+        зовите только тех, кому доверяете.
+      </p>
 
       {state.error && (
         <Alert variant="destructive">

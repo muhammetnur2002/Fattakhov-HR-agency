@@ -4,6 +4,9 @@ import { hashPassword } from "@/lib/auth/password";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
+import { ROLE_LABELS } from "@/lib/labels";
+import { getEmailTransport } from "@/lib/notifications/channels";
+import { appUrl } from "@/lib/urls";
 
 /** Срок жизни ссылки-приглашения. */
 const INVITE_TTL_DAYS = 7;
@@ -62,7 +65,7 @@ export async function createInvitation(params: {
     Замок на строке организации — тот же приём, что у номеров вакансий,
     счетов и у выбора условий сотрудничества.
   */
-  return prismaRaw.$transaction(async (tx) => {
+  const token = await prismaRaw.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${params.organizationId} FOR UPDATE`;
 
     const taken = await tx.user.findFirst({
@@ -90,7 +93,7 @@ export async function createInvitation(params: {
       );
     }
 
-    const token = generateToken();
+    const newToken = generateToken();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + INVITE_TTL_DAYS);
 
@@ -102,13 +105,52 @@ export async function createInvitation(params: {
         clientId: params.clientId ?? null,
         position: params.position ?? null,
         grants: [...(params.grants ?? [])],
-        token,
+        token: newToken,
         expiresAt,
         createdById: params.createdById,
       },
     });
 
-    return token;
+    return newToken;
+  });
+
+  // Письмо — вне транзакции: недоставленное не должно откатывать уже
+  // созданное приглашение, ссылку всё равно можно передать вручную.
+  await sendInvitationMail(token);
+
+  return token;
+}
+
+/**
+ * Письмо со ссылкой приглашения. Раньше приглашение только создавалось
+ * в базе, а ссылку передавали руками — «Письма пока не отправляются»
+ * было написано прямо в кабинете клиента.
+ *
+ * Молча проглатывает недоставленное: ссылка остаётся рабочей, и её
+ * всё ещё можно скопировать из кабинета и передать самому.
+ */
+async function sendInvitationMail(token: string): Promise<void> {
+  const invite = await getInvitation(token);
+  if (!invite) return;
+
+  const place = invite.clientName
+    ? `в кабинет компании «${invite.clientName}»`
+    : `в агентство «${invite.organizationName}»`;
+  const from = invite.invitedByName ? `${invite.invitedByName} приглашает вас` : "Вас приглашают";
+  const link = appUrl(`/invite/${token}`);
+
+  await getEmailTransport().send({
+    to: invite.email,
+    subject: `Приглашение ${place}`,
+    text: [
+      `${from} ${place} — роль «${ROLE_LABELS[invite.role]}».`,
+      "",
+      `Ссылка действует ${INVITE_TTL_DAYS} дней и открывается один раз:`,
+      link,
+      "",
+      "Если вы не ожидали этого приглашения, просто не переходите по ссылке" +
+        " и сообщите тому, кто его прислал.",
+    ].join("\n"),
   });
 }
 

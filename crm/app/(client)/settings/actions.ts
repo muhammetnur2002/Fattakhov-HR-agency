@@ -4,10 +4,18 @@ import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
 import { authorizeOrThrow, requireClientActor } from "@/lib/auth/session";
+import { listClientTeam } from "@/lib/services/clients";
 import { createInvitation, InviteError } from "@/lib/services/invitations";
 import { inviteUserSchema } from "@/lib/validation/client";
 
 export type FormState = { error?: string; ok?: string };
+
+/**
+ * Потолок на команду клиента: активные пользователи плюс ещё не принятые
+ * приглашения — иначе счётчик легко обойти, наштамповав приглашений
+ * без единого принятого.
+ */
+const MAX_CLIENT_TEAM_SIZE = 5;
 
 /** Приводит поля формы к объекту для zod. */
 function formToObject(formData: FormData): Record<string, unknown> {
@@ -47,11 +55,20 @@ export async function inviteTeammateAction(
       clientId: actor.clientId,
     });
 
+    const team = await listClientTeam(actor.clientId);
+    if (team.users.length + team.invitations.length >= MAX_CLIENT_TEAM_SIZE) {
+      return {
+        error: `В команде уже ${MAX_CLIENT_TEAM_SIZE} человек, считая ждущих приглашение. ` +
+          `Чтобы позвать ещё одного, сначала отключите кого-то из текущих.`,
+      };
+    }
+
     await createInvitation({
       organizationId: actor.organizationId,
       email: parsed.data.email,
       role: parsed.data.role,
       clientId: actor.clientId,
+      position: parsed.data.position,
       createdById: actor.id,
     });
   } catch (error) {
@@ -65,5 +82,5 @@ export async function inviteTeammateAction(
   }
 
   revalidatePath("/settings");
-  return { ok: `Приглашение для ${parsed.data.email} готово — ссылка ниже` };
+  return { ok: `Письмо со ссылкой отправлено на ${parsed.data.email}` };
 }

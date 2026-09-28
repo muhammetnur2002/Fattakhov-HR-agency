@@ -52,6 +52,7 @@ export type ClientInput = z.infer<typeof clientSchema>;
 export const inviteUserSchema = z.object({
   email: z.email("Проверьте адрес почты").transform((v) => v.toLowerCase().trim()),
   role: z.enum(["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"]),
+  position: optionalText(120),
 });
 
 export type InviteUserInput = z.infer<typeof inviteUserSchema>;

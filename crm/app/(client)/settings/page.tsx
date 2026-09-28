@@ -90,10 +90,15 @@ export default async function ClientSettingsPage() {
       {canManageTeam && team && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Команда</CardTitle>
+            <CardTitle className="text-base">
+              Команда
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {team.users.length + team.invitations.length}/5
+              </span>
+            </CardTitle>
             <CardDescription>
-              Письма пока не отправляются — скопируйте ссылку и передайте
-              сами. Срок действия ссылки 7 дней.
+              Приглашённому уходит письмо со ссылкой; если не дошло — ссылку
+              ниже можно скопировать и передать самому. Действует 7 дней.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
