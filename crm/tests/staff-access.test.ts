@@ -147,6 +147,7 @@ describe("билет входа в студенческую платформу",
         companyName: "Кофейни «Север»",
         contactName: "Анна",
         contactEmail: "anna@sever.ru",
+        active: true,
       },
       secret,
     );
@@ -157,6 +158,23 @@ describe("билет входа в студенческую платформу",
     expect(payload.kind).toBe("client");
     expect(payload.crmClientId).toBe("client_a");
     expect(payload.companyName).toBe("Кофейни «Север»");
+    expect(payload.active).toBe(true);
     expect(payload.permissions).toBeUndefined();
+  });
+
+  it("билет клиента-лида без договора несёт active: false", () => {
+    const ticket = issueClientTicket(
+      {
+        userId: "usr_client_2",
+        crmClientId: "client_b",
+        companyName: "Новый лид",
+        contactName: "Борис",
+        contactEmail: "boris@lead.ru",
+        active: false,
+      },
+      secret,
+    );
+    const payload = JSON.parse(Buffer.from(ticket.split(".")[0], "base64url").toString("utf8"));
+    expect(payload.active).toBe(false);
   });
 });

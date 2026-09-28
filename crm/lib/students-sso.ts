@@ -62,8 +62,12 @@ export type StaffTicket = {
 
 /**
  * Билет клиента CRM — открывает кабинет компании, привязанной к этому
- * клиенту (Employer.crmClientId), без модерации: агентство уже проверило
- * клиента договором, как и у вакансий, которые оно заводит из CRM само.
+ * клиенту (Employer.crmClientId).
+ *
+ * active — действующий договор (Client.status ACTIVE): у таких клиентов
+ * вакансии публикуются сразу, минуя проверку HR, как и вакансии, которые
+ * агентство заводит из CRM само. У клиентов-лидов (заявка есть, договора
+ * ещё нет) вакансии проверяются как у самостоятельных компаний.
  */
 export type ClientTicket = {
   v: 1;
@@ -75,6 +79,7 @@ export type ClientTicket = {
   companyName: string;
   contactName: string;
   contactEmail: string;
+  active: boolean;
   iat: number;
   exp: number;
   jti: string;
@@ -127,6 +132,7 @@ export function issueClientTicket(
     companyName: string;
     contactName: string;
     contactEmail: string;
+    active: boolean;
   },
   secret: string,
   now: number = Date.now(),
@@ -143,6 +149,7 @@ export function issueClientTicket(
       companyName: input.companyName,
       contactName: input.contactName,
       contactEmail: input.contactEmail,
+      active: input.active,
       iat,
       exp: iat + STUDENTS_TICKET_TTL_SECONDS,
       jti: randomBytes(16).toString("base64url"),

@@ -16,6 +16,10 @@ import {
   CANDIDATE_CONSENT_VERSION,
   DRAFT_CANDIDATE_CONSENT_VERSION,
 } from "@/lib/legal/candidate-consent";
+import {
+  DRAFT_REGISTRATION_CONSENT_VERSION,
+  REGISTRATION_CONSENT_VERSION,
+} from "@/lib/legal/registration-consent";
 
 const KEYS = [
   "S3_ENDPOINT",
@@ -73,9 +77,10 @@ describe("настройки прода", () => {
   it("пустое окружение даёт замечание на каждое требование", () => {
     clearAll();
     // Четыре блока переменных: файлы, почта, ключ подписи, адрес
-    // приложения. Плюс пятое замечание — текст согласия: пока он
-    // заглушка, оно есть всегда, независимо от окружения
-    expect(productionConfigProblems()).toHaveLength(5);
+    // приложения. Плюс два замечания про черновики согласий — кандидата
+    // и компании при регистрации в CRM: пока они заглушки, замечания
+    // есть всегда, независимо от окружения
+    expect(productionConfigProblems()).toHaveLength(6);
   });
 
   /*
@@ -95,13 +100,16 @@ describe("настройки прода", () => {
 
     const problems = productionConfigProblems();
     const проСогласие = problems.filter((p) => /согласи/i.test(p));
+    const ожидаемых =
+      Number(CANDIDATE_CONSENT_VERSION === DRAFT_CANDIDATE_CONSENT_VERSION) +
+      Number(REGISTRATION_CONSENT_VERSION === DRAFT_REGISTRATION_CONSENT_VERSION);
+    expect(проСогласие).toHaveLength(ожидаемых);
 
     if (CANDIDATE_CONSENT_VERSION === DRAFT_CANDIDATE_CONSENT_VERSION) {
-      expect(проСогласие).toHaveLength(1);
-      expect(проСогласие[0]).toContain(DRAFT_CANDIDATE_CONSENT_VERSION);
-    } else {
-      // Текст заменён — замечания быть не должно
-      expect(проСогласие).toHaveLength(0);
+      expect(проСогласие.some((p) => p.includes(DRAFT_CANDIDATE_CONSENT_VERSION))).toBe(true);
+    }
+    if (REGISTRATION_CONSENT_VERSION === DRAFT_REGISTRATION_CONSENT_VERSION) {
+      expect(проСогласие.some((p) => p.includes(DRAFT_REGISTRATION_CONSENT_VERSION))).toBe(true);
     }
   });
 

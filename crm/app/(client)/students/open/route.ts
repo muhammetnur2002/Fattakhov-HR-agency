@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }),
     prisma.client.findFirst({
       where: { id: actor.clientId },
-      select: { name: true },
+      select: { name: true, status: true },
     }),
   ]);
   if (!user || !client) {
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       companyName: client.name,
       contactName: user.fullName,
       contactEmail: user.email,
+      active: client.status === "ACTIVE",
     },
     secret,
   );
