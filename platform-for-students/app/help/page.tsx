@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
+import { SupportForm } from '@/components/forms/SupportForm';
 import { ShowTourButton } from '@/components/onboarding/ShowTourButton';
 import { PENDING_APPLICATION_DAYS, STUDY_DOC_WORKDAYS } from '@/lib/study';
 
@@ -122,6 +123,13 @@ export default function HelpPage() {
         <Group title="Студентам" items={STUDENTS} />
         <Group title="Компаниям" items={COMPANIES} />
         <Group title="HR-менеджеру агентства" items={HR} />
+
+        <section className="mt-10">
+          <h2 className="text-eyebrow uppercase text-paper-faint">Написать в поддержку</h2>
+          <div className="mt-3">
+            <SupportForm />
+          </div>
+        </section>
 
         <p className="mt-10 text-[13px] leading-relaxed text-paper-faint">
           Документы: <Link href="/legal/terms" className="underline underline-offset-4 hover:text-paper">пользовательское соглашение</Link>,{' '}

@@ -88,6 +88,31 @@ export function renderMail(layout: Layout): MailContent {
 
 const REMINDERS_NOTE = 'Напоминания и сводки можно отключить в профиле, в разделе «Вход и согласие».';
 
+/**
+ * Обращение из формы «Написать в поддержку» (страница /help).
+ *
+ * Не через renderMail(): его футер «отвечать не нужно» здесь ровно
+ * наоборот — письмо уходит на personal-почту, которую читает человек, и
+ * sendMail() ставит replyTo на адрес автора обращения, так что обычный
+ * «Ответить» в почтовом клиенте уходит прямо ему.
+ */
+export function supportMessageMail(input: { fromEmail: string; fromName?: string; body: string }): MailContent {
+  const who = input.fromName ? `${input.fromName} (${input.fromEmail})` : input.fromEmail;
+  const subject = `Обращение с платформы — ${who}`;
+  const text = [`От: ${who}`, '', input.body].join('\n');
+  const html =
+    '<!doctype html><html lang="ru"><body style="margin:0;padding:0;background:#eef1f4">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f4;padding:24px 12px">' +
+    '<tr><td align="center">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;padding:28px 26px;font-family:Arial,Helvetica,sans-serif">' +
+    `<tr><td><p style="margin:0 0 18px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#6b7278">${BRAND} · обращение с платформы</p>` +
+    `<p style="margin:0 0 14px;font-size:13px;color:#6b7278">От: ${escapeHtml(who)}</p>` +
+    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2b2f33;white-space:pre-wrap">${escapeHtml(input.body)}</p>` +
+    `<p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e3e7eb;font-size:12px;line-height:1.5;color:#8a939c">Ответьте на это письмо обычным «Ответить» — уйдёт на почту автора.</p>` +
+    '</td></tr></table></td></tr></table></body></html>';
+  return { subject, text, html };
+}
+
 export function emailCodeMail(input: { code: string; minutes: number }): MailContent {
   return renderMail({
     subject: `Код подтверждения почты: ${input.code}`,

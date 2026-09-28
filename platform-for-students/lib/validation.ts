@@ -349,3 +349,14 @@ export const UPLOAD_LIMITS = {
 } as const;
 
 export type UploadKind = keyof typeof UPLOAD_LIMITS;
+
+/** Форма «Написать в поддержку» на /help — доступна и без входа. */
+export const supportMessageSchema = z.object({
+  email: emailSchema,
+  name: z.preprocess(emptyToNull, z.string().trim().max(120, 'Слишком длинное имя').nullable()),
+  body: z
+    .string()
+    .trim()
+    .min(1, 'Напишите сообщение')
+    .max(MESSAGE_MAX_LENGTH, `Не длиннее ${MESSAGE_MAX_LENGTH} символов`),
+});

@@ -60,6 +60,9 @@ export const RATE_LIMITS = {
   passwordReset: { limit: 5, windowSeconds: 3600 },
   // Вход из CRM: билеты разовые и живут минуту, лимит — от перебора подписи
   crmTicket: { limit: 30, windowSeconds: 900 },
+  // Форма поддержки уходит на личную почту одного человека — щедрый лимит
+  // защищает не от обычного посетителя, а от рассылки спама через форму
+  support: { limit: 5, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

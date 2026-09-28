@@ -5,6 +5,8 @@ import type { MailContent } from './templates';
 
 export interface OutgoingMail extends MailContent {
   to: string;
+  /** Куда уйдёт ответ получателя — например, обратно автору обращения в поддержку. */
+  replyTo?: string;
 }
 
 interface SentMail extends OutgoingMail {
@@ -50,6 +52,7 @@ export async function sendMail(mail: OutgoingMail): Promise<boolean> {
     await globalForMail.fhrMailer.sendMail({
       from: process.env.SMTP_FROM!.trim(),
       to: mail.to,
+      replyTo: mail.replyTo,
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
