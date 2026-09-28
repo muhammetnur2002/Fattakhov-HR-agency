@@ -956,3 +956,36 @@ model RecoveryCode {
 
   @@index([userId, usedAt])
 }
+
+/// Заявка на самостоятельную регистрацию компании (Client + CLIENT_ADMIN)
+/// без приглашения от агентства — два экрана: телефон/почта/пароль,
+/// затем код из письма.
+///
+/// Пароль хешируется уже на первом экране: plaintext не переживает один
+/// запрос. Код хешируется argon2, а не sha256, той же логикой, что и
+/// RecoveryCode — шесть цифр перебираемы, и медленный хеш здесь к месту.
+model PendingClientRegistration {
+  id    String @id @default(cuid())
+  email String
+  phone String
+
+  passwordHash String
+  codeHash     String
+
+  /// Версия текста согласия (lib/legal/registration-consent.ts), под которым
+  /// поставили галочку — тем же приёмом, что и Lead.consentVersion.
+  consentVersion String
+  consentAt      DateTime
+
+  expiresAt DateTime
+  /// Счётчик неверных попыток — после лимита заявка гасится, чтобы код
+  /// нельзя было перебрать даже медленным хешем.
+  attempts  Int       @default(0)
+  /// Одноразовость: использованная заявка не годится для повторного экрана кода.
+  usedAt    DateTime?
+
+  requestedIp String?
+  createdAt   DateTime @default(now())
+
+  @@index([email, createdAt])
+}

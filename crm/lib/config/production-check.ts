@@ -2,6 +2,10 @@ import {
   CANDIDATE_CONSENT_VERSION,
   DRAFT_CANDIDATE_CONSENT_VERSION,
 } from "@/lib/legal/candidate-consent";
+import {
+  DRAFT_REGISTRATION_CONSENT_VERSION,
+  REGISTRATION_CONSENT_VERSION,
+} from "@/lib/legal/registration-consent";
 
 /**
  * Проверка настроек на запуске.
@@ -90,6 +94,21 @@ function draftConsentProblem(): string | null {
   );
 }
 
+/** То же самое, но про согласие компании при самостоятельной регистрации в CRM. */
+function draftRegistrationConsentProblem(): string | null {
+  if (REGISTRATION_CONSENT_VERSION !== DRAFT_REGISTRATION_CONSENT_VERSION) {
+    return null;
+  }
+  return (
+    "Текст согласия компании на обработку персональных данных при " +
+    "самостоятельной регистрации — заглушка (версия = «" +
+    DRAFT_REGISTRATION_CONSENT_VERSION +
+    "»), а не выверенный юристом документ. Открывать публичную регистрацию " +
+    "реальным компаниям по нему нельзя.\n  Замените текст и версию в " +
+    "lib/legal/registration-consent.ts"
+  );
+}
+
 function isSet(name: string): boolean {
   return name.split("|").some((key) => Boolean(process.env[key]?.trim()));
 }
@@ -108,8 +127,10 @@ export function productionConfigProblems(): string[] {
     return `${req.breaks}.\n  Не заданы: ${missing.join(", ")}`;
   });
 
-  const draft = draftConsentProblem();
-  return draft ? [...missingVars, draft] : missingVars;
+  const drafts = [draftConsentProblem(), draftRegistrationConsentProblem()].filter(
+    (p): p is string => p !== null,
+  );
+  return [...missingVars, ...drafts];
 }
 
 /**
@@ -139,15 +160,15 @@ export function assertProductionConfig(): void {
 
   let problems = productionConfigProblems();
   if (allowDraftConsent()) {
-    const draft = draftConsentProblem();
-    if (draft) {
+    const drafts = [draftConsentProblem(), draftRegistrationConsentProblem()];
+    if (drafts.some((d) => d !== null)) {
       console.warn(
         "[production-check] ALLOW_DRAFT_CONSENT=yes — платформа запущена с " +
-          "черновиком согласия кандидатов. Уберите флаг, как только текст " +
-          "заменит юрист.",
+          "черновиком согласия (кандидатов и/или компаний при регистрации). " +
+          "Уберите флаг, как только текст заменит юрист.",
       );
     }
-    problems = problems.filter((p) => p !== draft);
+    problems = problems.filter((p) => !drafts.includes(p));
   }
   if (problems.length === 0) return;
 
