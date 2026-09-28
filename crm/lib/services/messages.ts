@@ -13,6 +13,10 @@ export type Correspondent = {
   position: string | null;
   /** null — сотрудник агентства. */
   clientName: string | null;
+  /** Своя фотография — только у сотрудников (агентства и клиента). */
+  avatarUrl: string | null;
+  /** Логотип компании — показывается вместо фото у сотрудников клиента. */
+  clientLogoUrl: string | null;
 };
 
 export type DirectConversation = {
@@ -49,7 +53,8 @@ export async function listCorrespondents(
       fullName: true,
       role: true,
       position: true,
-      client: { select: { name: true } },
+      avatarUrl: true,
+      client: { select: { name: true, logoUrl: true } },
     },
     orderBy: { fullName: "asc" },
   });
@@ -60,6 +65,8 @@ export async function listCorrespondents(
     role: u.role,
     position: u.position,
     clientName: u.client?.name ?? null,
+    avatarUrl: u.avatarUrl,
+    clientLogoUrl: u.client?.logoUrl ?? null,
   }));
 }
 
@@ -138,7 +145,8 @@ export async function listDirectConversations(
       fullName: true,
       role: true,
       position: true,
-      client: { select: { name: true } },
+      avatarUrl: true,
+      client: { select: { name: true, logoUrl: true } },
     },
   });
   const userById = new Map(users.map((u) => [u.id, u]));
@@ -154,6 +162,8 @@ export async function listDirectConversations(
           role: u.role,
           position: u.position,
           clientName: u.client?.name ?? null,
+          avatarUrl: u.avatarUrl,
+          clientLogoUrl: u.client?.logoUrl ?? null,
         },
         lastMessage: {
           body: acc.last.body,
@@ -203,7 +213,8 @@ export async function getCorrespondent(
       fullName: true,
       role: true,
       position: true,
-      client: { select: { name: true } },
+      avatarUrl: true,
+      client: { select: { name: true, logoUrl: true } },
     },
   });
   if (!u) return null;
@@ -214,6 +225,8 @@ export async function getCorrespondent(
     role: u.role,
     position: u.position,
     clientName: u.client?.name ?? null,
+    avatarUrl: u.avatarUrl,
+    clientLogoUrl: u.client?.logoUrl ?? null,
   };
 }
 

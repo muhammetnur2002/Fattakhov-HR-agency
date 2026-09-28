@@ -1,10 +1,11 @@
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { describeUser } from "@/components/messages/direct-conversation-list";
 import { MessageThread } from "@/components/messages/message-thread";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { requireAgencyActor } from "@/lib/auth/session";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import {
@@ -43,27 +44,29 @@ export default async function AgencyMessageThreadPage({
   const hasUnread = messages.some((m) => !m.fromMe && m.readAt === null);
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/a/messages">← Сообщения</Link>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-3 border-b p-3.5">
+        <Button asChild variant="ghost" size="icon" className="-ml-1 shrink-0 md:hidden">
+          <Link href="/a/messages" aria-label="К списку диалогов">
+            <ArrowLeft className="size-4" />
+          </Link>
         </Button>
-        <h1 className="text-2xl font-semibold">{user.fullName}</h1>
-        <p className="text-sm text-muted-foreground">
-          {describeUser(user.role as UserRole, user.clientName)}
-          {user.position ? ` · ${user.position}` : ""}
-        </p>
+        <Avatar>
+          <AvatarImage src={user.clientLogoUrl ?? user.avatarUrl ?? undefined} />
+          <AvatarFallback>{user.fullName.slice(0, 1)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{user.fullName}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            {describeUser(user.role as UserRole, user.clientName)}
+            {user.position ? ` · ${user.position}` : ""}
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <MessageThread
-            messages={messages}
-            recipientId={user.id}
-            hasUnread={hasUnread}
-          />
-        </CardContent>
-      </Card>
+      <div className="min-h-0 flex-1">
+        <MessageThread messages={messages} recipientId={user.id} hasUnread={hasUnread} />
+      </div>
     </div>
   );
 }

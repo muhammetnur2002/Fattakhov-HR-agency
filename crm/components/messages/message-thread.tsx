@@ -48,6 +48,7 @@ export function MessageThread({
 }) {
   const [state, setState] = useState<MessageState>({});
   const formRef = useRef<HTMLFormElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
 
   /*
     Обычный обработчик вместо useActionState: после отправки надо
@@ -66,8 +67,16 @@ export function MessageThread({
     if (hasUnread) void markConversationReadAction(recipientId);
   }, [hasUnread, recipientId]);
 
+  // Панель фиксированной высоты — без этого новое сообщение уезжало бы
+  // за нижний край, не сдвигая видимую часть ленты
+  useEffect(() => {
+    const node = scroller.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [messages.length]);
+
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto p-4">
       {messages.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           Переписки пока нет. Напишите первым.
@@ -120,12 +129,13 @@ export function MessageThread({
           })}
         </div>
       )}
+      </div>
 
-      <form ref={formRef} action={handleSubmit} className="space-y-2 border-t pt-4">
+      <form ref={formRef} action={handleSubmit} className="shrink-0 space-y-2 border-t p-4">
         <input type="hidden" name="recipientId" value={recipientId} />
         <Textarea
           name="body"
-          rows={3}
+          rows={2}
           required
           maxLength={5000}
           placeholder="Написать сообщение…"
