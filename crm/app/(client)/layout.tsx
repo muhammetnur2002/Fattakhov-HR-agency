@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
+import { TELEGRAM_HREF } from "@/lib/contacts";
 import { prisma } from "@/lib/db/prisma";
 import { CLIENT_NAV } from "@/lib/nav";
 import { hasAgreement } from "@/lib/services/agreements";
@@ -51,13 +52,25 @@ export default async function ClientLayout({
           <div>
             <AlertTitle>Условия сотрудничества ещё не выбраны</AlertTitle>
             <AlertDescription>
-              Посмотрите кабинет и попробуйте завести вакансию — тариф
-              понадобится, только когда решите отправить её в работу.
+              Кабинет, вакансии и кандидаты уже доступны — тариф понадобится,
+              только когда решите отправить вакансию в работу: дальше
+              подбором занимается агентство, а не вы сами.
             </AlertDescription>
           </div>
-          <Button asChild size="sm">
-            <Link href="/onboarding">Выбрать условия</Link>
-          </Button>
+          {/* Тарифы выбираются самостоятельно (TariffPicker), но у только
+              что зарегистрированного клиента ещё нет закреплённого
+              менеджера, с кем это обсудить, — вторая кнопка ведёт не в
+              форму, а живому человеку, тем же каналом, что и на сайте */}
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <a href={TELEGRAM_HREF} target="_blank" rel="noreferrer">
+                Обсудить с нами
+              </a>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/onboarding">Выбрать условия</Link>
+            </Button>
+          </div>
         </Alert>
       )}
       {/*
