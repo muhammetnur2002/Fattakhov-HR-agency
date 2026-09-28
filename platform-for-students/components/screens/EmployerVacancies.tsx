@@ -14,7 +14,7 @@ import { EMPLOYMENT_TYPE_LABEL, type EmployerVacancyDTO, type ModerationStatus }
 import { SUBMITTABLE_STATUSES } from '@/lib/vacancy';
 
 /** Что сейчас происходит с вакансией — словами, а не только цветом статуса. */
-function statusHint(vacancy: EmployerVacancyDTO, companyStatus: ModerationStatus): string {
+function statusHint(vacancy: EmployerVacancyDTO, companyStatus: ModerationStatus, skipsModeration: boolean): string {
   if (vacancy.fromCrm) {
     return vacancy.status === 'CLOSED'
       ? 'Закрыта в CRM. Вакансии из CRM ведёт агентство.'
@@ -22,7 +22,9 @@ function statusHint(vacancy: EmployerVacancyDTO, companyStatus: ModerationStatus
   }
   switch (vacancy.status) {
     case 'DRAFT':
-      return 'Черновик — студенты его не видят. Когда будет готово, отправьте на проверку.';
+      return skipsModeration
+        ? 'Черновик — студенты его не видят. Когда будет готово, опубликуйте.'
+        : 'Черновик — студенты его не видят. Когда будет готово, отправьте на проверку.';
     case 'PENDING':
       return 'Ждёт проверки агентством. После одобрения появится в ленте.';
     case 'PUBLISHED':
@@ -36,9 +38,13 @@ function statusHint(vacancy: EmployerVacancyDTO, companyStatus: ModerationStatus
         return 'Снята с публикации. Не сохранена — будет удалена автоматически через 3 дня, или удалите сейчас.';
       }
       if (vacancy.keepAfterClose === true) {
-        return 'Снята с публикации и сохранена. Можно поправить и отправить на проверку снова или удалить.';
+        return skipsModeration
+          ? 'Снята с публикации и сохранена. Можно поправить и опубликовать снова или удалить.'
+          : 'Снята с публикации и сохранена. Можно поправить и отправить на проверку снова или удалить.';
       }
-      return 'Снята с публикации. Можно поправить и отправить на проверку снова.';
+      return skipsModeration
+        ? 'Снята с публикации. Можно поправить и опубликовать снова.'
+        : 'Снята с публикации. Можно поправить и отправить на проверку снова.';
   }
 }
 
@@ -55,9 +61,12 @@ function statusHint(vacancy: EmployerVacancyDTO, companyStatus: ModerationStatus
 export function EmployerVacancies({
   vacancies,
   companyStatus,
+  skipsModeration = false,
 }: {
   vacancies: EmployerVacancyDTO[];
   companyStatus: ModerationStatus;
+  /** У клиента CRM с действующим договором вакансии публикуются сразу — см. lib/vacancy.ts */
+  skipsModeration?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -78,7 +87,11 @@ export function EmployerVacancies({
         toast.error(data.error ?? 'Не удалось выполнить действие');
         return;
       }
-      const messages = { close: 'Вакансия снята', submit: 'Вакансия на проверке', delete: 'Вакансия удалена' };
+      const messages = {
+        close: 'Вакансия снята',
+        submit: skipsModeration ? 'Вакансия опубликована' : 'Вакансия на проверке',
+        delete: 'Вакансия удалена',
+      };
       toast.success(messages[action], `«${vacancy.title}»`);
       setClosing(null);
       setDeleting(null);
@@ -109,7 +122,9 @@ export function EmployerVacancies({
           <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
           <h1 className="mt-3 text-display-md text-paper">Вакансии</h1>
           <p className="mt-2.5 max-w-[52ch] text-[14px] leading-relaxed text-paper-dim">
-            Агентство проверяет каждую вакансию перед публикацией в ленте студентов.
+            {skipsModeration
+              ? 'По вашему договору вакансии публикуются сразу, без проверки агентством.'
+              : 'Агентство проверяет каждую вакансию перед публикацией в ленте студентов.'}
           </p>
         </div>
         {vacancies.length > 0 && newButton}
@@ -132,7 +147,11 @@ export function EmployerVacancies({
       {vacancies.length === 0 ? (
         <EmptyState
           title="Вакансий пока нет"
-          description="Создайте первую вакансию — после проверки агентством её увидят студенты в ленте."
+          description={
+            skipsModeration
+              ? 'Создайте первую вакансию — студенты увидят её сразу, без проверки.'
+              : 'Создайте первую вакансию — после проверки агентством её увидят студенты в ленте.'
+          }
           action={newButton}
         />
       ) : (
@@ -160,7 +179,7 @@ export function EmployerVacancies({
                 </div>
 
                 <p className="mt-3 text-[13.5px] leading-relaxed text-paper-dim">
-                  {statusHint(vacancy, companyStatus)}
+                  {statusHint(vacancy, companyStatus, skipsModeration)}
                 </p>
 
                 {vacancy.moderationNote && (
@@ -216,7 +235,7 @@ export function EmployerVacancies({
                           loading={isBusy}
                           onClick={() => void act(vacancy, 'submit')}
                         >
-                          Отправить на проверку
+                          {skipsModeration ? 'Опубликовать' : 'Отправить на проверку'}
                         </Button>
                       )}
                       {vacancy.status !== 'CLOSED' && (

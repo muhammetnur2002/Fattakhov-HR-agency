@@ -1,8 +1,9 @@
+import { track } from '@/lib/analytics';
 import { fail, handle, ok } from '@/lib/api';
 import { notifyCrm } from '@/lib/notify-crm';
 import { assertCompanyProfileComplete, assertEmailVerified, assertSameOrigin, audit, requireEmployer } from '@/lib/security/guards';
 import { listEmployerVacancies } from '@/lib/services';
-import { VACANCY_LIMITS, vacancyInputSchema, vacancySaveSchema } from '@/lib/vacancy';
+import { skipsModeration, VACANCY_LIMITS, vacancyInputSchema, vacancySaveSchema } from '@/lib/vacancy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,9 +19,12 @@ export async function GET() {
 /**
  * Новая вакансия из кабинета.
  *
- * В ленту она сразу не попадает никогда: либо черновик, либо на проверку
- * агентству. Статус выставляет сервер по флагу submit — «опубликована» в
- * теле запроса прислать нельзя, такого поля схема не знает и отбрасывает.
+ * В ленту она сразу не попадает никогда, кроме одного случая: клиент CRM
+ * с действующим договором (skipsModeration) публикуется сразу же, как и
+ * вакансия, заведённая агентством в CRM напрямую. У остальных — либо
+ * черновик, либо на проверку агентству. Статус выставляет сервер по флагу
+ * submit — «опубликована» в теле запроса прислать нельзя, такого поля
+ * схема не знает и отбрасывает.
  */
 export async function POST(request: Request) {
   return handle(async () => {
@@ -46,11 +50,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // moderatedAt и publishedAt остаются на значениях по умолчанию схемы —
+    // так же, как и у вакансий, которые агентство синкает из CRM напрямую
+    // (syncFromCrm): человек решения не принимал, отмечать нечего
+    const autoPublish = submit && skipsModeration(employer);
     const vacancy = await store.vacancies.create({
       ...input,
       employerId: employer.id,
-      status: submit ? 'PENDING' : 'DRAFT',
-      isActive: false,
+      status: submit ? (autoPublish ? 'PUBLISHED' : 'PENDING') : 'DRAFT',
+      isActive: autoPublish,
       submittedAt: submit ? new Date() : null,
     });
 
@@ -60,13 +68,16 @@ export async function POST(request: Request) {
       request.headers,
     );
 
-    if (submit) {
+    if (submit && !autoPublish) {
       await notifyCrm(
         'vacancy',
         `Новая вакансия: ${employer.companyName}`,
         vacancy.title,
         vacancy.id,
       );
+    }
+    if (autoPublish) {
+      await track('vacancy.published', { vacancyId: vacancy.id, employerId: employer.id });
     }
 
     return ok({ id: vacancy.id, status: vacancy.status }, { status: 201 });

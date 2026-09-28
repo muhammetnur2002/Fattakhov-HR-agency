@@ -6,7 +6,7 @@ import { employerNav } from '@/lib/employer-nav';
 import { requireEmployerPage } from '@/lib/security/guards';
 import { PILOT_CITY } from '@/lib/pilot';
 import { buildEmployerBoard, listEmployerAddresses } from '@/lib/services';
-import { EMPTY_VACANCY_FORM } from '@/lib/vacancy';
+import { EMPTY_VACANCY_FORM, skipsModeration } from '@/lib/vacancy';
 
 export const metadata: Metadata = { title: 'Новая вакансия' };
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,7 @@ export default async function NewVacancyPage() {
         // Город компании подставлен сразу: чаще всего вакансия там же
         initial={{ ...EMPTY_VACANCY_FORM, city: employer.city ?? PILOT_CITY }}
         companyStatus={employer.moderationStatus}
+        skipsModeration={skipsModeration(employer)}
         knownAddresses={addresses}
       />
     </AppShell>

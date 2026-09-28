@@ -5,6 +5,7 @@ import { countUnread } from '@/lib/chat';
 import { employerNav } from '@/lib/employer-nav';
 import { requireEmployerPage } from '@/lib/security/guards';
 import { buildEmployerBoard, listEmployerVacancies } from '@/lib/services';
+import { skipsModeration } from '@/lib/vacancy';
 
 export const metadata: Metadata = { title: 'Вакансии компании' };
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,11 @@ export default async function EmployerVacanciesPage() {
       user={{ name: employer.companyName, subtitle: employer.contactName, href: '/employer/company' }}
       nav={employerNav(board.applications.length, unread)}
     >
-      <EmployerVacancies vacancies={vacancies} companyStatus={employer.moderationStatus} />
+      <EmployerVacancies
+        vacancies={vacancies}
+        companyStatus={employer.moderationStatus}
+        skipsModeration={skipsModeration(employer)}
+      />
     </AppShell>
   );
 }

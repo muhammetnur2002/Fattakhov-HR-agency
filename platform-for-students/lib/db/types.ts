@@ -105,6 +105,8 @@ export interface EmployerRecord {
   inn: string | null;
   logoUrl: string | null;
   crmClientId: string | null;
+  /** Действующий договор в CRM (Client.status ACTIVE) — см. lib/vacancy.ts, skipsModeration. */
+  crmActive: boolean;
   industry: string | null;
   about: string | null;
   culture: string | null;
@@ -546,14 +548,18 @@ export interface DataStore {
     /**
      * Компания клиента CRM — заводится по первому входу так же, как и по
      * первой вакансии из синка (crmClientId уникален и общий для обоих
-     * путей). Повторный вход ничего не перезаписывает: имя и контакт ведёт
+     * путей). Повторный вход не перезаписывает имя и контакт — их ведёт
      * синк из CRM, а не то, кто из сотрудников клиента зашёл сейчас.
+     * Статус договора (active) — исключение: он приходит только билетом
+     * входа и обновляется при каждом входе, иначе клиент, подписавший
+     * договор после регистрации, продолжал бы считаться лидом.
      */
     ensureForCrmClient(input: {
       crmClientId: string;
       companyName: string;
       contactName: string;
       contactEmail: string;
+      active: boolean;
     }): Promise<EmployerRecord>;
 
     /**

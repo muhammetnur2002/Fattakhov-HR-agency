@@ -168,15 +168,36 @@ export function isVacancyVisible(
 export const SUBMITTABLE_STATUSES: readonly VacancyStatus[] = ['DRAFT', 'REJECTED', 'CLOSED'];
 
 /**
+ * Публикуется ли вакансия сразу при отправке, минуя проверку HR.
+ *
+ * Только у клиентов CRM с действующим договором (Employer.crmActive,
+ * синк — Client.status ACTIVE): агентство уже отвечает за них по
+ * контракту, как и за вакансии, которые оно заводит из CRM само (те
+ * приходят сразу опубликованными — см. Vacancy.status в схеме).
+ * Клиенты-лиды и самостоятельные компании проверяются как раньше:
+ * лид — тоже клиент CRM, но без подтверждённого договора.
+ */
+export function skipsModeration(employer: { crmClientId: string | null; crmActive: boolean }): boolean {
+  return Boolean(employer.crmClientId) && employer.crmActive;
+}
+
+/**
  * Статус после сохранения из кабинета.
  *
- * Опубликованная вакансия после любой правки уходит на повторную проверку:
- * иначе одобренную «Бариста» можно было бы переписать во что угодно, не
- * показав агентству. Остальные статусы правка не меняет — меняет явное
- * «отправить на проверку».
+ * Опубликованная вакансия после любой правки уходит на повторную проверку
+ * (или сразу переопубликовывается — у клиентов с договором): иначе
+ * одобренную «Бариста» можно было бы переписать во что угодно, не показав
+ * агентству. Остальные статусы правка не меняет — меняет явное «отправить
+ * на проверку».
  */
-export function statusAfterEdit(current: VacancyStatus, submit: boolean): VacancyStatus {
-  if (submit || current === 'PUBLISHED') return 'PENDING';
+export function statusAfterEdit(
+  current: VacancyStatus,
+  submit: boolean,
+  employer: { crmClientId: string | null; crmActive: boolean },
+): VacancyStatus {
+  if (submit || current === 'PUBLISHED') {
+    return skipsModeration(employer) ? 'PUBLISHED' : 'PENDING';
+  }
   return current;
 }
 

@@ -82,6 +82,7 @@ async function signInClient(request: Request, ticket: ClientTicket): Promise<Nex
     companyName: ticket.companyName,
     contactName: ticket.contactName,
     contactEmail: ticket.contactEmail,
+    active: ticket.active,
   });
 
   const session: SessionUser = {

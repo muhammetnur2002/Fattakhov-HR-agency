@@ -8,7 +8,7 @@ import { countUnread } from '@/lib/chat';
 import { employerNav } from '@/lib/employer-nav';
 import { requireEmployerPage } from '@/lib/security/guards';
 import { buildEmployerBoard, getEmployerVacancy, listEmployerAddresses } from '@/lib/services';
-import { vacancyToForm } from '@/lib/vacancy';
+import { skipsModeration, vacancyToForm } from '@/lib/vacancy';
 
 export const metadata: Metadata = { title: 'Вакансия' };
 export const dynamic = 'force-dynamic';
@@ -56,6 +56,7 @@ export default async function EditVacancyPage({ params }: Props) {
           moderationNote={vacancy.status === 'REJECTED' ? vacancy.moderationNote : null}
           initial={vacancyToForm(vacancy)}
           companyStatus={employer.moderationStatus}
+          skipsModeration={skipsModeration(employer)}
           knownAddresses={addresses.filter((a) => a.address !== vacancy.address || a.city !== vacancy.city)}
         />
       )}

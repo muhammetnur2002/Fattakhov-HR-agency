@@ -1,3 +1,4 @@
+import { track } from '@/lib/analytics';
 import { fail, handle, ok } from '@/lib/api';
 import { notifyCrm } from '@/lib/notify-crm';
 import {
@@ -9,9 +10,11 @@ import {
   requireEmployer,
 } from '@/lib/security/guards';
 import {
+  skipsModeration,
   SUBMITTABLE_STATUSES,
   statusAfterEdit,
   vacancyActionSchema,
+  vacancyContentOf,
   vacancyInputSchema,
   vacancySaveSchema,
 } from '@/lib/vacancy';
@@ -53,17 +56,24 @@ export async function PATCH(request: Request, { params }: Params) {
       assertCompanyProfileComplete(employer);
     }
 
-    const status = statusAfterEdit(vacancy.status, submit);
-    const justSubmitted = status === 'PENDING' && vacancy.status !== 'PENDING';
+    const status = statusAfterEdit(vacancy.status, submit, employer);
+    const changed = status !== vacancy.status;
+    // У клиента с договором правка публикуется сразу — статус меняется
+    // на PUBLISHED, а не на PENDING (см. statusAfterEdit/skipsModeration)
+    const autoPublished = status === 'PUBLISHED' && changed;
+    const now = new Date();
     const updated = await store.vacancies.update(vacancy.id, {
       ...input,
       status,
-      // После правки вакансии в ленте нет ни в каком случае: она либо ещё
-      // не публиковалась, либо ждёт повторной проверки
-      isActive: false,
-      submittedAt: justSubmitted ? new Date() : vacancy.submittedAt,
+      // После правки вакансии в ленте нет, кроме случая автопубликации:
+      // остальным либо ещё не публиковалась, либо ждёт повторной проверки
+      isActive: autoPublished,
+      submittedAt: changed ? now : vacancy.submittedAt,
+      ...(autoPublished
+        ? { moderationNote: null, moderatedAt: now, publishedAt: now, approvedContent: vacancyContentOf(input) }
+        : {}),
       // Отправлена повторно из CLOSED — уборка её больше не касается
-      ...(justSubmitted && vacancy.status === 'CLOSED'
+      ...(changed && vacancy.status === 'CLOSED'
         ? { closedAt: null, keepAfterClose: null, lastCleanupReminderAt: null }
         : {}),
     });
@@ -74,8 +84,11 @@ export async function PATCH(request: Request, { params }: Params) {
       request.headers,
     );
 
-    if (justSubmitted) {
+    if (status === 'PENDING' && changed) {
       await notifyCrm('vacancy', `Новая вакансия: ${employer.companyName}`, updated.title, updated.id);
+    }
+    if (autoPublished) {
+      await track('vacancy.published', { vacancyId: updated.id, employerId: employer.id });
     }
 
     return ok({ id: updated.id, status: updated.status });
@@ -124,17 +137,26 @@ export async function POST(request: Request, { params }: Params) {
     await assertEmailVerified(session.accountId);
     assertCompanyProfileComplete(employer);
 
+    const autoPublish = skipsModeration(employer);
+    const now = new Date();
     const updated = await store.vacancies.update(vacancy.id, {
-      status: 'PENDING',
-      isActive: false,
-      submittedAt: new Date(),
+      status: autoPublish ? 'PUBLISHED' : 'PENDING',
+      isActive: autoPublish,
+      submittedAt: now,
+      ...(autoPublish
+        ? { moderationNote: null, moderatedAt: now, publishedAt: now, approvedContent: vacancyContentOf(vacancy) }
+        : {}),
       // Возвращается в оборот — уборка её больше не касается
       closedAt: null,
       keepAfterClose: null,
       lastCleanupReminderAt: null,
     });
     await audit(session, { action: 'vacancy.submitted', entity: 'Vacancy', entityId: vacancy.id }, request.headers);
-    await notifyCrm('vacancy', `Новая вакансия: ${employer.companyName}`, updated.title, updated.id);
+    if (autoPublish) {
+      await track('vacancy.published', { vacancyId: updated.id, employerId: employer.id });
+    } else {
+      await notifyCrm('vacancy', `Новая вакансия: ${employer.companyName}`, updated.title, updated.id);
+    }
     return ok({ id: updated.id, status: updated.status });
   });
 }

@@ -34,6 +34,8 @@ export interface ClientTicket {
   companyName: string;
   contactName: string;
   contactEmail: string;
+  /** Действующий договор в CRM (Client.status ACTIVE) — см. lib/vacancy.ts, skipsModeration. */
+  active: boolean;
   jti: string;
   exp: number;
 }
@@ -127,6 +129,9 @@ export function verifyStaffTicket(
         companyName: payload.companyName.trim().slice(0, 200),
         contactName,
         contactEmail,
+        // Билет без этого поля — из версии CRM до доработки: считаем
+        // лидом, а не активом, это более строгая сторона по умолчанию
+        active: payload.active === true,
         jti: payload.jti,
         exp,
       },

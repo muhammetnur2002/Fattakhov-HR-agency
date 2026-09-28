@@ -908,6 +908,8 @@ async function main() {
         v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'client', sub: 'usr_smoke_client',
         crmClientId: `crm-client-smoke-${Date.now() + 4242}`, companyName: 'Смоук-клиент CRM',
         contactName: 'Проверкина Клиентова', contactEmail: `smoke-client-${Date.now() + 4242}@demo.ru`,
+        // Без договора по умолчанию — как у лида; кто active: true, задаёт явно
+        active: false,
         iat: now, exp: now + 60, jti: crypto.randomBytes(16).toString('base64url'), ...claims,
       }),
     ).toString('base64url');
@@ -1392,6 +1394,54 @@ async function main() {
 
     const clientReplay = await enterFromCrm(firstClientTicket);
     check('по тому же билету клиента второй раз не войти', clientReplay.location.includes('crm=used'), clientReplay.location);
+
+    // ---------- Клиент CRM с действующим договором: без модерации ----------
+    // active: true в билете — вакансия публикуется сразу, минуя очередь HR,
+    // как и вакансии, которые агентство заводит из CRM напрямую
+    const activeClientTicket = crmClientTicket({ active: true });
+    const activeEntered = await enterFromCrm(activeClientTicket);
+    const activeSession = new Session();
+    (activeSession as any).cookie = activeEntered.cookie;
+    const activeVacancy = await activeSession.post('/api/employer/vacancies', {
+      ...vacancyForm,
+      title: 'Вакансия клиента с договором',
+      photos: [],
+      submit: true,
+    });
+    check(
+      'вакансия клиента с договором публикуется сразу, минуя очередь HR',
+      activeVacancy.status === 201 && activeVacancy.body?.status === 'PUBLISHED',
+      activeVacancy.body,
+    );
+    const activeVacancyId = String(activeVacancy.body?.id);
+    const activeInFeed = (((await student.request('/api/feed')).body?.vacancies ?? []) as Array<{ id: string }>).some(
+      (v) => v.id === activeVacancyId,
+    );
+    check('она сразу видна в ленте студента', activeInFeed);
+    const activeQueue = await admin.request('/api/admin/moderation');
+    check(
+      'в очереди модерации её нет',
+      !((activeQueue.body?.vacancies ?? []) as Array<{ vacancy: { id: string } }>).some(
+        (v) => v.vacancy.id === activeVacancyId,
+      ),
+    );
+
+    // Лид (без active) — прежнее поведение: обычная проверка
+    const leadClientTicket = crmClientTicket({});
+    const leadEntered = await enterFromCrm(leadClientTicket);
+    const leadSession = new Session();
+    (leadSession as any).cookie = leadEntered.cookie;
+    const leadVacancy = await leadSession.post('/api/employer/vacancies', {
+      ...vacancyForm,
+      title: 'Вакансия клиента-лида',
+      photos: [],
+      submit: true,
+    });
+    check(
+      'вакансия клиента-лида без договора уходит на обычную проверку',
+      leadVacancy.status === 201 && leadVacancy.body?.status === 'PENDING',
+      leadVacancy.body,
+    );
   }
   // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET
   // скрипт бросает исключение ещё в «Компании» — это теперь единственный

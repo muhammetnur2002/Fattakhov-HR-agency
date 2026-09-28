@@ -144,6 +144,8 @@ async function seed(): Promise<Tables> {
         contactName: item.contactName,
         logoUrl: null,
         crmClientId: item.crmClientId,
+        // Демонстрационный партнёр из синка — договор считаем действующим
+        crmActive: true,
         ...structuredClone(EMPTY_COMPANY),
         createdAt: now(),
       };
@@ -739,6 +741,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           contactName: input.contactName,
           logoUrl: null,
           crmClientId: null,
+          crmActive: false,
           ...structuredClone(EMPTY_COMPANY),
           inn: input.inn,
           phoneEnc: encrypt(input.phone),
@@ -779,7 +782,12 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async ensureForCrmClient(input) {
         const existing = t.employers.find((e) => e.crmClientId === input.crmClientId);
-        if (existing) return clone(existing);
+        if (existing) {
+          // Статус договора обновляем при каждом входе — в отличие от
+          // имени и контакта, он приходит только билетом
+          existing.crmActive = input.active;
+          return clone(existing);
+        }
 
         const account: AccountRecord = {
           id: randomUUID(),
@@ -804,6 +812,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           contactName: input.contactName,
           logoUrl: null,
           crmClientId: input.crmClientId,
+          crmActive: input.active,
           ...structuredClone(EMPTY_COMPANY),
           createdAt: now(),
         };
@@ -954,6 +963,9 @@ export async function createMemoryStore(): Promise<DataStore> {
               contactName: item.contactName,
               logoUrl: null,
               crmClientId: item.crmClientId,
+              // Сама выгрузка вакансий не несёт статус договора — уточнится
+              // при первом входе клиента билетом (ensureForCrmClient)
+              crmActive: false,
               ...structuredClone(EMPTY_COMPANY),
               createdAt: now(),
             };

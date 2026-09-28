@@ -361,13 +361,16 @@ export function createPrismaStore(): DataStore {
       async ensureForCrmClient(input) {
         const row = await prisma.employer.upsert({
           where: { crmClientId: input.crmClientId },
-          // Ничего не меняем: имя и контакт компании ведёт синк вакансий
-          // из CRM, а не то, кто из сотрудников клиента зашёл первым
-          update: {},
+          // Имя и контакт компании не трогаем — их ведёт синк вакансий из
+          // CRM, а не то, кто из сотрудников клиента зашёл сейчас. Статус
+          // договора — наоборот, обновляем при каждом входе: он приходит
+          // только билетом, и другого способа его узнать здесь нет
+          update: { crmActive: input.active },
           create: {
             companyName: input.companyName,
             contactName: input.contactName,
             crmClientId: input.crmClientId,
+            crmActive: input.active,
             account: {
               create: {
                 role: 'EMPLOYER',

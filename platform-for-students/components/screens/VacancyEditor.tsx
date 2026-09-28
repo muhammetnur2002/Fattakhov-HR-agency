@@ -57,6 +57,7 @@ export function VacancyEditor({
   moderationNote = null,
   initial,
   companyStatus,
+  skipsModeration = false,
   knownAddresses = [],
 }: {
   vacancyId?: string;
@@ -64,6 +65,8 @@ export function VacancyEditor({
   moderationNote?: string | null;
   initial: VacancyFormState;
   companyStatus: ModerationStatus;
+  /** У клиента CRM с действующим договором вакансия публикуется сразу — см. lib/vacancy.ts */
+  skipsModeration?: boolean;
   /** Адреса прошлых вакансий компании — подставить в одно нажатие */
   knownAddresses?: CompanyAddress[];
 }) {
@@ -133,6 +136,8 @@ export function VacancyEditor({
 
       if (data.status === 'PENDING') {
         toast.success('Вакансия на проверке', 'После одобрения агентством она появится в ленте студентов');
+      } else if (data.status === 'PUBLISHED' && submit) {
+        toast.success('Вакансия опубликована', 'Уже видна студентам в ленте');
       } else {
         toast.success(data.status === 'DRAFT' ? 'Черновик сохранён' : 'Изменения сохранены');
       }
@@ -148,7 +153,13 @@ export function VacancyEditor({
   const showSave = current !== 'PUBLISHED';
   const showSubmit = current !== 'PENDING';
   const saveLabel = isNew || current === 'DRAFT' ? 'Сохранить черновик' : 'Сохранить';
-  const submitLabel = current === 'PUBLISHED' ? 'Сохранить и отправить на проверку' : 'Отправить на проверку';
+  const submitLabel = skipsModeration
+    ? current === 'PUBLISHED'
+      ? 'Сохранить и опубликовать'
+      : 'Опубликовать'
+    : current === 'PUBLISHED'
+      ? 'Сохранить и отправить на проверку'
+      : 'Отправить на проверку';
 
   return (
     <div className="mx-auto w-full max-w-[46rem]">
@@ -166,8 +177,9 @@ export function VacancyEditor({
           {!isNew && <VacancyStatusPill status={current} />}
         </div>
         <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
-          Агентство проверяет каждую вакансию перед публикацией. Чем конкретнее задачи и условия,
-          тем точнее лента подберёт студентов.
+          {skipsModeration
+            ? 'Вакансия публикуется сразу — по вашему договору её не нужно ждать на проверке агентства. Чем конкретнее задачи и условия, тем точнее лента подберёт студентов.'
+            : 'Агентство проверяет каждую вакансию перед публикацией. Чем конкретнее задачи и условия, тем точнее лента подберёт студентов.'}
         </p>
       </header>
 
