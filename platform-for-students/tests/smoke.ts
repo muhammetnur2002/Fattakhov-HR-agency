@@ -1288,7 +1288,8 @@ async function main() {
   );
   const eventTypes = ((pilot.body?.events ?? []) as Array<{ type: string }>).map((e) => e.type);
   check('в журнале есть публикация вакансии', eventTypes.includes('vacancy.published'), eventTypes.slice(0, 12));
-  check('в журнале есть регистрация компании', eventTypes.includes('company.registered'), eventTypes.slice(0, 12));
+  // company.registered больше не проверяем: регистрация ушла в CRM,
+  // и на этой платформе это событие теперь никто не пишет
   check('в журнале есть следующий шаг по отклику', eventTypes.includes('application.next_step'), eventTypes.slice(0, 12));
   if (freshApplication) check('в журнале есть просмотр профиля', eventTypes.includes('profile.viewed'), eventTypes.slice(0, 12));
   if (severVacancy) check('в журнале есть отклик', eventTypes.includes('application.created'), eventTypes.slice(0, 12));
@@ -1363,6 +1364,31 @@ async function main() {
       clientVacancy.status === 201 && clientVacancy.body?.status === 'PENDING',
       clientVacancy.body,
     );
+
+    // ---------- Кандидаты списком (не свайп) ----------
+    // Раздел «Кандидаты» на стороне компании: список вместо колоды,
+    // свайп остался только у студентов (лента вакансий)
+    const clientVacancyId = String(clientVacancy.body?.id);
+    const candidateList = await clientSession.request(`/api/employer/candidates/${clientVacancyId}`);
+    check(
+      'подтверждённый студент виден в списке кандидатов на новую вакансию',
+      candidateList.status === 200 &&
+        ((candidateList.body?.candidates ?? []) as Array<{ id: string }>).some((c) => c.id === studentId),
+      candidateList.body,
+    );
+    const candidateInvite = await clientSession.post(`/api/employer/candidates/${clientVacancyId}`, {
+      studentId,
+    });
+    check('приглашение кандидата из списка отправляется', candidateInvite.status === 200 && candidateInvite.body?.invited === true, candidateInvite.body);
+    const candidateInviteAgain = await clientSession.post(`/api/employer/candidates/${clientVacancyId}`, {
+      studentId,
+    });
+    check(
+      'повторно того же кандидата из списка не пригласить',
+      candidateInviteAgain.status === 200 && candidateInviteAgain.body?.invited === false,
+      candidateInviteAgain.body,
+    );
+    check('раздел «Кандидаты» открывается', (await clientSession.request('/employer/candidates')).status === 200);
 
     const clientReplay = await enterFromCrm(firstClientTicket);
     check('по тому же билету клиента второй раз не войти', clientReplay.location.includes('crm=used'), clientReplay.location);
