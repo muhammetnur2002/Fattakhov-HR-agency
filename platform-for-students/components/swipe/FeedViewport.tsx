@@ -25,11 +25,15 @@ export function FeedViewport({ children }: { children: React.ReactNode }) {
     if (!el) return;
     const html = document.documentElement;
     const main = el.closest('main');
-    const saved = {
-      overflow: html.style.overflow,
-      overscroll: html.style.overscrollBehavior,
-      mainPadding: main?.style.paddingBottom ?? '',
-    };
+    // Ничего не «запоминаем и возвращаем»: при быстрой смене экранов новая лента
+    // монтируется до ухода прежней и запомнила бы уже включённую блокировку —
+    // профиль и остальные страницы перестали бы листаться. Кроме ленты эти
+    // стили на странице никто не ставит, поэтому при уходе их просто снимаем.
+    function unlock() {
+      html.style.removeProperty('overflow');
+      html.style.removeProperty('overscroll-behavior');
+      if (main) main.style.removeProperty('padding-bottom');
+    }
 
     function fit() {
       if (!el) return;
@@ -38,9 +42,7 @@ export function FeedViewport({ children }: { children: React.ReactNode }) {
       const height = Math.floor(window.innerHeight - top - BOTTOM_GAP);
       if (height < MIN_FIT_HEIGHT) {
         el.style.height = '';
-        html.style.overflow = saved.overflow;
-        html.style.overscrollBehavior = saved.overscroll;
-        if (main) main.style.paddingBottom = saved.mainPadding;
+        unlock();
         return;
       }
       el.style.height = `${height}px`;
@@ -63,9 +65,7 @@ export function FeedViewport({ children }: { children: React.ReactNode }) {
       window.removeEventListener('resize', fit);
       window.removeEventListener('orientationchange', fit);
       window.visualViewport?.removeEventListener('resize', fit);
-      html.style.overflow = saved.overflow;
-      html.style.overscrollBehavior = saved.overscroll;
-      if (main) main.style.paddingBottom = saved.mainPadding;
+      unlock();
     };
   }, []);
 
