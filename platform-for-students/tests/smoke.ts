@@ -1549,6 +1549,27 @@ async function main() {
         list.body,
       );
 
+      // Клиент, который на платформу ни разу не входил: CRM заводит компанию сама
+      const provisionId = `crm-client-smoke-provision-${Date.now()}`;
+      const provisionBody = JSON.stringify({
+        crmClientId: provisionId,
+        companyName: 'Компания без входа',
+        contactName: 'Контакт Смоук',
+        contactEmail: `smoke-company-${Date.now()}@demo.ru`,
+        active: false,
+        actor: 'Смоук CRM',
+      });
+      const beforeEnsure = await serviceCall(`/api/service/employer/vacancies?crmClientId=${provisionId}`);
+      check('компания клиента без входа на платформу пока не найдена', beforeEnsure.status === 404, beforeEnsure.body);
+      const ensured1 = await serviceCall('/api/service/employer/ensure', { method: 'POST', body: provisionBody });
+      check('CRM заводит компанию клиента на платформе', ensured1.status === 200 && ensured1.body?.created === true, ensured1.body);
+      const ensured2 = await serviceCall('/api/service/employer/ensure', { method: 'POST', body: provisionBody });
+      check('повторное заведение безопасно и ничего не дублирует', ensured2.status === 200 && ensured2.body?.created === false, ensured2.body);
+      const afterEnsure = await serviceCall(`/api/service/employer/vacancies?crmClientId=${provisionId}`);
+      check('после заведения кабинет отдаёт пустой список вакансий', afterEnsure.status === 200 && afterEnsure.body?.vacancies?.length === 0, afterEnsure.body);
+      const noAuthEnsure = await fetch(`${BASE}/api/service/employer/ensure`, { method: 'POST', body: provisionBody, headers: { 'Content-Type': 'application/json' } });
+      check('заведение компании без служебного секрета закрыто', noAuthEnsure.status === 401 || noAuthEnsure.status === 503);
+
       // Воронка агентства: без секрета закрыто, с секретом — сводка по компании с одной вакансией
       const funnelNoAuth = await fetch(`${BASE}/api/service/employer/funnel`);
       check('воронка без служебного секрета закрыта', funnelNoAuth.status === 401 || funnelNoAuth.status === 503);

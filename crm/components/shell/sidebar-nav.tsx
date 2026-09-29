@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -56,6 +57,9 @@ export function SidebarNav({
               />
             )}
             {item.label}
+            {item.locked && (
+              <Lock aria-label="Откроется после договора" className="ml-auto size-3.5 shrink-0 text-white/40" />
+            )}
             {/* bg-primary тут не видно: на графите сайдбара это тот же
                 цвет, что и фон. Белым — тем же приёмом, что и у активного
                 пункта (засечка, светлая заливка при hover). */}

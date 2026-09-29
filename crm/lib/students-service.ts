@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { FunnelActivity } from "@/lib/students-funnel";
+import { prisma } from "@/lib/db/prisma";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import { studentsUrl } from "@/lib/urls";
 
@@ -126,7 +127,78 @@ function serviceSecret(): string | null {
 
 export class StudentsServiceError extends Error {}
 
+/** Клиент CRM, которого уже заводили на платформе: id → когда и с каким договором. */
+const provisioned = new Map<string, { at: number; active: boolean }>();
+/** Раз в это время подтверждаем статус договора, чтобы платформа не считала подписавшего лидом. */
+const PROVISION_TTL_MS = 5 * 60_000;
+
+function scopedClientId(path: string, init?: RequestInit): string | null {
+  // Только кабинет клиента: у остальных служебных вызовов (заявки на привязку, справки)
+  // crmClientId означает другое — например, к какому клиенту привязывают компанию
+  if (!path.startsWith("/api/service/employer/")) return null;
+  const fromQuery = new URL(path, "http://x").searchParams.get("crmClientId");
+  if (fromQuery) return fromQuery;
+  if (typeof init?.body === "string") {
+    try {
+      const id = (JSON.parse(init.body) as { crmClientId?: unknown }).crmClientId;
+      return typeof id === "string" && id ? id : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Компания клиента появлялась на платформе только при его первом входе туда
+ * билетом. Теперь клиент работает из CRM и туда не заходит, поэтому первый же
+ * запрос за вакансиями получал 404. Перед обращением заводим компанию сами
+ * (ответ идемпотентен) и заодно обновляем статус договора.
+ */
+async function ensureEmployer(crmClientId: string): Promise<void> {
+  const client = await prisma.client.findFirst({
+    where: { id: crmClientId },
+    select: {
+      name: true,
+      status: true,
+      users: {
+        where: { isActive: true, deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: { fullName: true, email: true, role: true },
+      },
+    },
+  });
+  if (!client) return;
+  const active = client.status === "ACTIVE";
+  const known = provisioned.get(crmClientId);
+  if (known && known.active === active && Date.now() - known.at < PROVISION_TTL_MS) return;
+
+  const contact = client.users.find((u) => u.role === "CLIENT_ADMIN") ?? client.users[0];
+  if (!contact) return;
+
+  const response = await rawCall("/api/service/employer/ensure", {
+    method: "POST",
+    body: JSON.stringify({
+      crmClientId,
+      companyName: client.name,
+      contactName: contact.fullName,
+      contactEmail: contact.email,
+      active,
+      actor: "CRM",
+    }),
+  });
+  if (response.ok) provisioned.set(crmClientId, { at: Date.now(), active });
+}
+
 async function call(path: string, init?: RequestInit): Promise<Response> {
+  const crmClientId = scopedClientId(path, init);
+  if (crmClientId && !path.startsWith("/api/service/employer/ensure")) {
+    await ensureEmployer(crmClientId).catch(() => undefined);
+  }
+  return rawCall(path, init);
+}
+
+async function rawCall(path: string, init?: RequestInit): Promise<Response> {
   const secret = serviceSecret();
   const url = studentsUrl(path);
   if (!secret || !url) {

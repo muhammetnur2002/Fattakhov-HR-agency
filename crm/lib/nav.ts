@@ -43,6 +43,8 @@ export type NavItem = {
   exact?: boolean;
   /** Счётчик рядом с пунктом — сейчас только непрочитанные «Сообщения», см. AppShell. */
   badge?: number;
+  /** Раздел закрыт до договора: рядом с названием показывается замок. */
+  locked?: boolean;
 };
 
 export const CLIENT_NAV: NavItem[] = [

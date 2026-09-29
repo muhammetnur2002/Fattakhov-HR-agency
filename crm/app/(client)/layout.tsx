@@ -1,26 +1,22 @@
-import Link from "next/link";
-
 import { AppShell } from "@/components/shell/app-shell";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { canDo } from "@/lib/access";
+import { ContractGate } from "@/components/client/contract-gate";
+import { CooperationBanner } from "@/components/client/cooperation-banner";
 import { requireClientActor } from "@/lib/auth/session";
 import { TELEGRAM_HREF } from "@/lib/contacts";
 import { prisma } from "@/lib/db/prisma";
 import { CLIENT_NAV } from "@/lib/nav";
-import { hasAgreement } from "@/lib/services/agreements";
+import type { ContractState } from "@/lib/contract-gate";
+import { getActiveAgreement, hasAgreement } from "@/lib/services/agreements";
 
 /**
  * Кабинет клиента. Живёт в корне (ТЗ 15): для заказчика платформа —
  * основной адрес, а не подраздел агентского инструмента.
  *
- * Условия сотрудничества здесь не отбирают вход: BR-1 блокирует только
- * запуск вакансии в работу (см. transitionVacancy), а до этого клиент
- * может смотреть кабинет, заводить черновик и отправлять заявку без
- * выбранного тарифа. Раньше первым экраном после входа была страница
- * тарифов — человек, ничего ещё не увидевший в продукте, сразу упирался
- * в решение о деньгах. Теперь тариф предлагает ненавязчивая плашка
- * здесь же, а не стена перед кабинетом.
+ * Вход в кабинет условия не отбирают: без договора клиент видит кабинет,
+ * пользуется студенческой платформой и сообщениями. Разделы работы агентства
+ * (заявки на подбор, кандидаты, календарь, аналитика, документы) до договора
+ * показаны размытыми с замком и причиной — см. ContractGate. Плашку про условия
+ * можно закрыть, но на закрытых разделах она стоит всегда.
  */
 export default async function ClientLayout({
   children,
@@ -29,15 +25,27 @@ export default async function ClientLayout({
 }) {
   const actor = await requireClientActor();
 
-  const [client, agreementChosen] = await Promise.all([
+  const [client, agreementChosen, activeAgreement] = await Promise.all([
     actor.clientId
       ? prisma.client.findFirst({
           where: { id: actor.clientId },
-          select: { name: true, fromStudentsPlatform: true },
+          select: { name: true, status: true },
         })
       : null,
     actor.clientId ? hasAgreement(actor.clientId) : true,
+    actor.clientId ? getActiveAgreement(actor.clientId) : null,
   ]);
+
+  // Договор действует — всё открыто. Условия выбраны, но агентство ещё не
+  // подтвердило — ждём. Ничего не выбрано — предлагаем тариф. Закрыты только
+  // разделы работы агентства (см. lib/contract-gate.ts): студенческая
+  // платформа, сообщения и дашборд доступны всегда
+  const contractState: ContractState =
+    !actor.clientId || activeAgreement || client?.status === "ACTIVE"
+      ? "active"
+      : agreementChosen
+        ? "pending"
+        : "none";
 
   return (
     <AppShell
@@ -46,55 +54,14 @@ export default async function ClientLayout({
       title={client?.name ?? "Кабинет"}
       notificationsHref="/notifications"
       searchHrefBase=""
+      contractLocked={contractState !== "active"}
     >
-      {!agreementChosen && (
-        <Alert className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <AlertTitle>Условия сотрудничества ещё не выбраны</AlertTitle>
-            <AlertDescription>
-              Кабинет, вакансии и кандидаты уже доступны — тариф понадобится,
-              только когда решите отправить вакансию в работу: дальше
-              подбором занимается агентство, а не вы сами.
-            </AlertDescription>
-          </div>
-          {/* Тарифы выбираются самостоятельно (TariffPicker), но у только
-              что зарегистрированного клиента ещё нет закреплённого
-              менеджера, с кем это обсудить, — вторая кнопка ведёт не в
-              форму, а живому человеку, тем же каналом, что и на сайте */}
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="outline">
-              <a href={TELEGRAM_HREF} target="_blank" rel="noreferrer">
-                Обсудить с нами
-              </a>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/onboarding">Выбрать условия</Link>
-            </Button>
-          </div>
-        </Alert>
+      {contractState !== "active" && (
+        <CooperationBanner state={contractState} telegramHref={TELEGRAM_HREF} />
       )}
-      {/*
-        У нас есть ещё и студенческая платформа — для подработки и разовых
-        задач, где мы не ищем сами, а даём кабинет напрямую. Не все клиенты
-        об этом знают, узнают только если сами наткнутся на пункт меню.
-        Кто сам пришёл оттуда (client.fromStudentsPlatform), баннер не видит —
-        рекламировать им то, откуда они уже пришли, незачем.
-      */}
-      {canDo(actor, "students.enterAsClient") && !client?.fromStudentsPlatform && (
-        <Alert variant="default" className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <AlertTitle>У нас есть и студенческая платформа</AlertTitle>
-            <AlertDescription>
-              Нужны подработка или разовая задача — публикуйте вакансии
-              прямо здесь, студенты откликаются сами, без поиска от агентства.
-            </AlertDescription>
-          </div>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/students">Открыть</Link>
-          </Button>
-        </Alert>
-      )}
-      {children}
+      <ContractGate state={contractState} telegramHref={TELEGRAM_HREF}>
+        {children}
+      </ContractGate>
     </AppShell>
   );
 }

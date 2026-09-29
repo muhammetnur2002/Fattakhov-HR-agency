@@ -12,6 +12,7 @@ import {
 import { canDo, type Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
 import { ROLE_LABELS } from "@/lib/labels";
+import { isContractOnlyPath } from "@/lib/contract-gate";
 import type { NavItem } from "@/lib/nav";
 import { countUnreadConversations } from "@/lib/services/comments";
 import { countUnreadDirectMessages } from "@/lib/services/messages";
@@ -30,6 +31,7 @@ export async function AppShell({
   title,
   notificationsHref,
   searchHrefBase,
+  contractLocked = false,
   children,
 }: {
   actor: Actor;
@@ -38,6 +40,8 @@ export async function AppShell({
   notificationsHref: string;
   /** Пустая строка для клиента (/search), "/a" для агентства (/a/search). */
   searchHrefBase: string;
+  /** Клиент без действующего договора: разделы работы агентства помечаются замком. */
+  contractLocked?: boolean;
   children: React.ReactNode;
 }) {
   const [user, notifications, unreadCount, unreadThreads, unreadDirect] =
@@ -69,6 +73,9 @@ export async function AppShell({
       item.href.endsWith("/messages") && unreadMessages > 0
         ? { ...item, badge: unreadMessages }
         : item,
+    )
+    .map((item) =>
+      contractLocked && isContractOnlyPath(item.href) ? { ...item, locked: true } : item,
     );
 
   return (
