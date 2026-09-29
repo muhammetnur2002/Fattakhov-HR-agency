@@ -32,16 +32,20 @@ export function DirectConversationList({
   }
 
   return (
-    <div className="py-1">
+    <div className="space-y-2 p-3">
       {conversations.map((c) => (
         <Link
           key={c.user.id}
           href={`${hrefBase}/messages/${c.user.id}`}
           className={cn(
-            "flex min-w-0 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/60",
-            c.user.id === activeId && "bg-muted",
+            // Каждый диалог — своя карточка; у непрочитанного слева полоска
+            "relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/60",
+            c.user.id === activeId ? "bg-muted" : "bg-card",
           )}
         >
+          {c.unreadCount > 0 && (
+            <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
+          )}
           <Avatar className="shrink-0">
             <AvatarImage src={c.user.clientLogoUrl ?? c.user.avatarUrl ?? undefined} />
             <AvatarFallback>{c.user.fullName.slice(0, 1)}</AvatarFallback>

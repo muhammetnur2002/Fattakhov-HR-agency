@@ -1,7 +1,9 @@
 "use client";
 
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { ConversationList } from "./conversation-list";
 import { DirectConversationList } from "./direct-conversation-list";
@@ -49,6 +51,23 @@ export function MessagesShell({
   const directUnread = direct.filter((c) => c.unreadCount > 0).length;
   const workUnread = work.filter((c) => c.unreadCount > 0).length;
 
+  // Поиск и чипы-фильтры личных диалогов — на клиенте: список уже загружен
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<DirectFilter>("all");
+  const isAgency = hrefBase === "/a";
+  const needle = query.trim().toLowerCase();
+  const visibleDirect = direct.filter((c) => {
+    if (filter === "unread" && c.unreadCount === 0) return false;
+    // Клиент — собеседник со стороны клиента (есть компания), команда — сотрудник агентства
+    if (filter === "clients" && !c.user.clientName) return false;
+    if (filter === "team" && c.user.clientName) return false;
+    if (!needle) return true;
+    return (
+      c.user.fullName.toLowerCase().includes(needle) ||
+      (c.user.clientName ?? "").toLowerCase().includes(needle)
+    );
+  });
+
   return (
     <div className="flex h-[calc(100svh-3.5rem-2rem)] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem)]">
       <aside
@@ -71,6 +90,40 @@ export function MessagesShell({
           </Button>
         </div>
 
+        {!workTab && direct.length > 0 && (
+          <div className="space-y-2.5 px-3 pb-3">
+            <div className="flex h-9 items-center gap-2 rounded-xl border bg-muted/40 px-3">
+              <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск"
+                aria-label="Поиск по диалогам"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto">
+              <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+                Все
+              </FilterChip>
+              <FilterChip active={filter === "unread"} onClick={() => setFilter("unread")}>
+                Непрочитанные{directUnread > 0 ? ` · ${directUnread}` : ""}
+              </FilterChip>
+              {isAgency && (
+                <>
+                  <FilterChip active={filter === "clients"} onClick={() => setFilter("clients")}>
+                    Клиенты
+                  </FilterChip>
+                  <FilterChip active={filter === "team"} onClick={() => setFilter("team")}>
+                    Команда
+                  </FilterChip>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="min-h-0 flex-1 overflow-y-auto border-t">
           {workTab ? (
             <ConversationList
@@ -80,10 +133,14 @@ export function MessagesShell({
             />
           ) : (
             <DirectConversationList
-              conversations={direct}
+              conversations={visibleDirect}
               hrefBase={hrefBase}
               activeId={activeId}
-              emptyText="Личных сообщений пока нет. Нажмите «Написать», чтобы начать."
+              emptyText={
+                direct.length === 0
+                  ? "Личных сообщений пока нет. Нажмите «Написать», чтобы начать."
+                  : "Ничего не нашлось."
+              }
             />
           )}
         </div>
@@ -93,6 +150,34 @@ export function MessagesShell({
         {children}
       </section>
     </div>
+  );
+}
+
+type DirectFilter = "all" | "unread" | "clients" | "team";
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "bg-background text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

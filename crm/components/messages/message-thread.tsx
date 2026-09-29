@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ArrowUp } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -23,8 +24,14 @@ export type ThreadMessage = {
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Отправляем…" : "Отправить"}
+    <Button
+      type="submit"
+      size="icon"
+      className="size-11 shrink-0 rounded-full"
+      disabled={pending}
+      aria-label={pending ? "Отправляем…" : "Отправить"}
+    >
+      <ArrowUp className="size-5" />
     </Button>
   );
 }
@@ -131,24 +138,32 @@ export function MessageThread({
       )}
       </div>
 
-      <form ref={formRef} action={handleSubmit} className="shrink-0 space-y-2 border-t p-4">
+      <form ref={formRef} action={handleSubmit} className="shrink-0 border-t p-3">
         <input type="hidden" name="recipientId" value={recipientId} />
-        <Textarea
-          name="body"
-          rows={2}
-          required
-          maxLength={5000}
-          placeholder="Написать сообщение…"
-          aria-label="Текст сообщения"
-        />
-        <div className="flex items-center gap-3">
+        <div className="flex items-end gap-2">
+          <Textarea
+            name="body"
+            rows={1}
+            required
+            maxLength={5000}
+            placeholder="Сообщение"
+            aria-label="Текст сообщения"
+            className="min-h-11 flex-1 resize-none rounded-3xl px-4 py-2.5"
+            onKeyDown={(e) => {
+              // Enter отправляет, Shift+Enter — перенос строки
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                formRef.current?.requestSubmit();
+              }
+            }}
+          />
           <Submit />
-          {state.error && (
-            <Alert variant="destructive" className="py-2">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
         </div>
+        {state.error && (
+          <Alert variant="destructive" className="mt-2 py-2">
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        )}
       </form>
     </div>
   );
