@@ -1442,6 +1442,104 @@ async function main() {
       leadVacancy.status === 201 && leadVacancy.body?.status === 'PENDING',
       leadVacancy.body,
     );
+
+    // ---------- Служебный API вакансий для CRM: клиент на платформу не заходит ----------
+    // app/api/service/employer/* — CRM правит вакансии сервером, без билета и
+    // сессии клиента; авторизация — CRM_SERVICE_SECRET (lib/security/service-auth.ts).
+    console.log('\nСлужебный API вакансий для CRM');
+    const serviceSecret = process.env.CRM_SERVICE_SECRET ?? '';
+    if (serviceSecret.length < 32) {
+      console.log('  CRM_SERVICE_SECRET не задан — раздел пропущен');
+    } else {
+      const serviceCrmClientId = `crm-client-smoke-service-${Date.now()}`;
+      // Заводит Employer с этим crmClientId — как обычный вход клиента,
+      // но сама форма вакансии дальше идёт только служебными вызовами
+      await enterFromCrm(crmClientTicket({ crmClientId: serviceCrmClientId, active: true }));
+
+      const serviceCall = (path: string, init: RequestInit = {}) =>
+        fetch(`${BASE}${path}`, {
+          ...init,
+          headers: { ...init.headers, Authorization: `Bearer ${serviceSecret}`, 'Content-Type': 'application/json' },
+        }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) as any }));
+
+      const noAuth = await fetch(`${BASE}/api/service/employer/vacancies?crmClientId=${serviceCrmClientId}`);
+      check('без служебного секрета — отказ', noAuth.status === 401 || noAuth.status === 503);
+
+      const wrongClient = await serviceCall('/api/service/employer/vacancies?crmClientId=does-not-exist');
+      check('незнакомый crmClientId — 404', wrongClient.status === 404, wrongClient.body);
+
+      const created = await serviceCall('/api/service/employer/vacancies', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...vacancyForm,
+          title: 'Вакансия через служебный API',
+          crmClientId: serviceCrmClientId,
+          actor: 'Смоук CRM',
+          submit: true,
+        }),
+      });
+      check(
+        'вакансия создаётся через служебный API и сразу публикуется (договор активен)',
+        created.status === 201 && created.body?.status === 'PUBLISHED',
+        created.body,
+      );
+      const serviceVacancyId = String(created.body?.id);
+
+      const list = await serviceCall(`/api/service/employer/vacancies?crmClientId=${serviceCrmClientId}`);
+      check(
+        'список через служебный API содержит созданную вакансию',
+        (list.body?.vacancies ?? []).some((v: { id: string }) => v.id === serviceVacancyId),
+        list.body,
+      );
+
+      const single = await serviceCall(
+        `/api/service/employer/vacancies/${serviceVacancyId}?crmClientId=${serviceCrmClientId}`,
+      );
+      check(
+        'карточка вакансии читается через служебный API',
+        single.status === 200 && single.body?.vacancy?.title === 'Вакансия через служебный API',
+        single.body,
+      );
+
+      const edited = await serviceCall(`/api/service/employer/vacancies/${serviceVacancyId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          ...vacancyForm,
+          title: 'Вакансия через служебный API (правка)',
+          crmClientId: serviceCrmClientId,
+          actor: 'Смоук CRM',
+          submit: true,
+        }),
+      });
+      check(
+        'правка через служебный API проходит и остаётся опубликованной',
+        edited.status === 200 && edited.body?.status === 'PUBLISHED',
+        edited.body,
+      );
+
+      const closed = await serviceCall(`/api/service/employer/vacancies/${serviceVacancyId}`, {
+        method: 'POST',
+        body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', action: 'close', keep: true }),
+      });
+      check('снятие через служебный API проходит', closed.status === 200 && closed.body?.status === 'CLOSED', closed.body);
+
+      const deleted = await serviceCall(`/api/service/employer/vacancies/${serviceVacancyId}`, {
+        method: 'POST',
+        body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', action: 'delete' }),
+      });
+      check(
+        'удаление снятой вакансии через служебный API проходит',
+        deleted.status === 200 && deleted.body?.deleted === true,
+        deleted.body,
+      );
+
+      const addresses = await serviceCall(`/api/service/employer/addresses?crmClientId=${serviceCrmClientId}`);
+      check(
+        'адреса клиента читаются через служебный API',
+        addresses.status === 200 && Array.isArray(addresses.body?.addresses),
+        addresses.body,
+      );
+    }
   }
   // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET
   // скрипт бросает исключение ещё в «Компании» — это теперь единственный

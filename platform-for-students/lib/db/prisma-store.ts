@@ -272,6 +272,10 @@ export function createPrismaStore(): DataStore {
         const row = await prisma.employer.findUnique({ where: { id } });
         return row ? toEmployerRecord(row) : null;
       },
+      async findByCrmClientId(crmClientId) {
+        const row = await prisma.employer.findUnique({ where: { crmClientId } });
+        return row ? toEmployerRecord(row) : null;
+      },
       async findByInn(inn) {
         const row = await prisma.employer.findUnique({ where: { inn } });
         return row ? toEmployerRecord(row) : null;

@@ -538,6 +538,8 @@ export interface DataStore {
   employers: {
     findByAccountId(accountId: string): Promise<EmployerRecord | null>;
     findById(id: string): Promise<EmployerRecord | null>;
+    /** Для служебных вызовов CRM без сессии (см. lib/security/service-employer.ts). */
+    findByCrmClientId(crmClientId: string): Promise<EmployerRecord | null>;
     /** Для проверки ИНН до отправки кода регистрации — без этого письмо ушло бы впустую. */
     findByInn(inn: string): Promise<EmployerRecord | null>;
     list(): Promise<EmployerRecord[]>;

@@ -704,6 +704,9 @@ export async function createMemoryStore(): Promise<DataStore> {
       async findById(id) {
         return clone(t.employers.find((e) => e.id === id) ?? null);
       },
+      async findByCrmClientId(crmClientId) {
+        return clone(t.employers.find((e) => e.crmClientId === crmClientId) ?? null);
+      },
       async findByInn(inn) {
         return clone(t.employers.find((e) => e.inn === inn) ?? null);
       },
