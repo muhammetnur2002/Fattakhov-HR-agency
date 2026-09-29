@@ -85,8 +85,8 @@ export default async function ClientLayout({
           <div>
             <AlertTitle>У нас есть и студенческая платформа</AlertTitle>
             <AlertDescription>
-              Нужны подработка или разовая задача — студенты откликаются
-              сами, без поиска от агентства. Тот же вход, без пароля.
+              Нужны подработка или разовая задача — публикуйте вакансии
+              прямо здесь, студенты откликаются сами, без поиска от агентства.
             </AlertDescription>
           </div>
           <Button asChild size="sm" variant="outline">

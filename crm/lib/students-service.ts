@@ -355,3 +355,59 @@ export async function fetchEmployerAddresses(
   const data = (await response.json()) as { addresses: { city: string; district: string | null; address: string; addressDetails: string | null }[] };
   return data.addresses;
 }
+
+/** Отклики студентов на вакансии клиента — прямо в CRM, без захода на платформу. */
+
+export type StudentsApplicationStatus = "NEW" | "VIEWED" | "INVITED" | "INTERVIEW" | "HIRED" | "REJECTED";
+
+export interface EmployerApplication {
+  id: string;
+  status: StudentsApplicationStatus;
+  createdAt: string;
+  statusChangedAt: string;
+  employerNote: string | null;
+  vacancyId: string;
+  vacancyTitle: string;
+  student: {
+    fullName: string;
+    email: string;
+    phone: string | null;
+    age: number;
+    university: string;
+    speciality: string;
+    studyYear: number;
+    studyVerified: boolean;
+    city: string | null;
+    workDays: string[];
+    hoursPerWeek: number | null;
+    skills: string[];
+    about: string | null;
+  };
+}
+
+export async function fetchEmployerApplications(crmClientId: string): Promise<EmployerApplication[]> {
+  const response = await call(`/api/service/employer/applications?crmClientId=${encodeURIComponent(crmClientId)}`);
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { applications: EmployerApplication[] };
+  return data.applications;
+}
+
+export async function setEmployerApplicationStatus(input: {
+  crmClientId: string;
+  actor: string;
+  applicationId: string;
+  status: StudentsApplicationStatus;
+}): Promise<{ error?: StudentsApiError }> {
+  const response = await call("/api/service/employer/applications", { method: "PATCH", body: JSON.stringify(input) });
+  return response.ok ? {} : { error: await parseError(response) };
+}
+
+/** Карточку открыли: новый отклик становится «просмотренным». */
+export async function markEmployerApplicationViewed(input: {
+  crmClientId: string;
+  actor: string;
+  applicationId: string;
+}): Promise<{ error?: StudentsApiError }> {
+  const response = await call("/api/service/employer/applications", { method: "POST", body: JSON.stringify(input) });
+  return response.ok ? {} : { error: await parseError(response) };
+}

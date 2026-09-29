@@ -7,7 +7,10 @@ import { prisma } from "@/lib/db/prisma";
 import {
   actOnEmployerVacancy,
   createEmployerVacancy,
+  markEmployerApplicationViewed,
+  setEmployerApplicationStatus,
   updateEmployerVacancy,
+  type StudentsApplicationStatus,
   type VacancyFields,
 } from "@/lib/students-service";
 
@@ -117,6 +120,24 @@ export async function vacancyActionAction(
 
   const label = await actorLabel(actor.id);
   const result = await actOnEmployerVacancy(id, { crmClientId: actor.clientId, actor: label, action, keep });
+  if (result.error) return { error: result.error.error ?? "Не удалось выполнить действие" };
+  return {};
+}
+
+/** Смена статуса отклика или отметка «просмотрен» при раскрытии карточки. */
+export async function applicationAction(
+  applicationId: string,
+  status: StudentsApplicationStatus | "VIEW",
+): Promise<{ error?: string }> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
+
+  const label = await actorLabel(actor.id);
+  const result =
+    status === "VIEW"
+      ? await markEmployerApplicationViewed({ crmClientId: actor.clientId, actor: label, applicationId })
+      : await setEmployerApplicationStatus({ crmClientId: actor.clientId, actor: label, applicationId, status });
   if (result.error) return { error: result.error.error ?? "Не удалось выполнить действие" };
   return {};
 }
