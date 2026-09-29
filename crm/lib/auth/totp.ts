@@ -127,18 +127,30 @@ export function verifyTotp(
   code: string,
   atSeconds = Math.floor(Date.now() / 1000),
 ): boolean {
+  return matchTotpStep(secretBase32, code, atSeconds) !== null;
+}
+
+/**
+ * Номер 30-секундного шага, на котором код подошёл, или null. Нужен, чтобы запомнить
+ * использованный шаг и не принять тот же код второй раз (подсмотренный код одноразовый).
+ */
+export function matchTotpStep(
+  secretBase32: string,
+  code: string,
+  atSeconds = Math.floor(Date.now() / 1000),
+): number | null {
   const clean = code.replace(/\s/g, "");
-  if (!/^\d{6}$/.test(clean)) return false;
+  if (!/^\d{6}$/.test(clean)) return null;
 
   const secret = decodeBase32(secretBase32);
   const counter = Math.floor(atSeconds / STEP_SECONDS);
 
-  let matched = false;
+  let matched: number | null = null;
   for (let shift = -WINDOW; shift <= WINDOW; shift += 1) {
     const expected = hotp(secret, counter + shift);
     // Без ранних выходов: цикл всегда проходит целиком, иначе время
     // ответа выдаёт, на каком шаге совпало
-    if (safeEqual(expected, clean)) matched = true;
+    if (safeEqual(expected, clean)) matched = counter + shift;
   }
   return matched;
 }

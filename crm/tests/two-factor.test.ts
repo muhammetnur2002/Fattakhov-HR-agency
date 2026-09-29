@@ -139,6 +139,13 @@ describe("вход со вторым фактором", () => {
     expect(await verifySecondFactor({ userId, code: totp(secret) })).toBe(true);
   });
 
+  it("тот же код из приложения второй раз не проходит", async () => {
+    const { secret } = await enable();
+    const code = totp(secret);
+    expect(await verifySecondFactor({ userId, code })).toBe(true);
+    expect(await verifySecondFactor({ userId, code })).toBe(false);
+  });
+
   it("не принимает чужой или устаревший код", async () => {
     await enable();
     expect(await verifySecondFactor({ userId, code: "000000" })).toBe(false);

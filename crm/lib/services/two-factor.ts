@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { generateSecret, otpauthUrl, verifyTotp } from "@/lib/auth/totp";
+import { generateSecret, matchTotpStep, otpauthUrl, verifyTotp } from "@/lib/auth/totp";
 import { prisma } from "@/lib/db/prisma";
 
 export class TwoFactorError extends Error {}
@@ -209,7 +209,16 @@ export async function verifySecondFactor(params: {
   });
   if (!user?.totpEnabledAt || !user.totpSecret) return false;
 
-  if (verifyTotp(user.totpSecret, clean)) return true;
+  const step = matchTotpStep(user.totpSecret, clean);
+  if (step !== null) {
+    // Шаг принимаем один раз: условие в самом UPDATE, чтобы два одновременных входа
+    // с одним кодом не прошли оба
+    const taken = await prisma.user.updateMany({
+      where: { id: params.userId, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
+      data: { totpLastStep: step },
+    });
+    return taken.count === 1;
+  }
 
   // Не подошло как код из приложения — пробуем как код восстановления
   const candidates = await prisma.recoveryCode.findMany({

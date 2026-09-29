@@ -179,6 +179,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
         }
         if (!user.isActive) throw new StudentsEntryInvalid();
+        // Билет — это вход без пароля; при включённой 2FA он не должен её обходить.
+        // Такой человек входит обычной формой с кодом
+        if (await requiresSecondFactor(user.id)) throw new StudentsEntryInvalid();
 
         await prisma.user.update({
           where: { id: user.id },
