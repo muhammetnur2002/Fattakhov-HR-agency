@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LoadMore } from "@/components/shell/load-more";
 import { SearchField } from "@/components/shell/search-field";
+import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import { VacancyList } from "@/components/vacancies/vacancy-list";
 import { VacancyStatusFilter } from "@/components/vacancies/vacancy-status-filter";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,9 @@ export default async function ClientVacanciesPage({
     take: page * PAGE_SIZE,
   });
   const canCreate = canDo(actor, "vacancy.create", { clientId: actor.clientId });
+  const closedIds = canDo(actor, "vacancy.delete", { clientId: actor.clientId })
+    ? vacancies.filter((v) => v.status.startsWith("CLOSED_")).map((v) => v.id)
+    : [];
 
   const withQuery = (params: Record<string, string>) => {
     const merged = new URLSearchParams({
@@ -65,6 +69,14 @@ export default async function ClientVacanciesPage({
         <SearchField placeholder="Название, подразделение, город…" />
         <VacancyStatusFilter />
       </div>
+
+      {closedIds.length > 0 && (
+        <DeleteVacancies
+          ids={closedIds}
+          label={`Удалить закрытые (${closedIds.length})`}
+          question={`Удалить закрытые и отменённые заявки (${closedIds.length}) из списка?`}
+        />
+      )}
 
       <VacancyList
         vacancies={vacancies}

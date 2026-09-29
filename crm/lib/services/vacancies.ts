@@ -469,6 +469,27 @@ export type VacancyListFilters = {
   skip?: number;
 };
 
+/** Статусы, в которых вакансию можно убрать из списка: закрытые любым способом. */
+export function isDeletableVacancyStatus(status: VacancyStatus): boolean {
+  return status === "CLOSED_SUCCESS" || status === "CLOSED_CANCELLED" || status === "CLOSED_FAILED";
+}
+
+/**
+ * Удалить закрытую вакансию из списков (мягкое удаление, BR-26).
+ * Живую вакансию удалить нельзя — сначала её закрывают: иначе исчезла бы заявка,
+ * по которой агентство ещё работает или обещало сроки.
+ */
+export async function deleteClosedVacancy(actor: Actor, vacancyId: string): Promise<"deleted" | "not_found" | "not_closed"> {
+  const vacancy = await prisma.vacancy.findFirst({
+    where: { id: vacancyId, organizationId: actor.organizationId },
+    select: { id: true, status: true },
+  });
+  if (!vacancy) return "not_found";
+  if (!isDeletableVacancyStatus(vacancy.status)) return "not_closed";
+  await prisma.vacancy.delete({ where: { id: vacancy.id } });
+  return "deleted";
+}
+
 export async function listVacancies(
   actor: Actor,
   filters: VacancyListFilters = {},

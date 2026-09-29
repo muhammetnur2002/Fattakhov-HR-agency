@@ -31,7 +31,9 @@ import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { CLIENT_STATUS_LABELS, ROLE_LABELS } from "@/lib/labels";
 import { describePricing } from "@/lib/pricing";
 import { getAgreementFileUrl, toPricingParams } from "@/lib/services/agreements";
+import { listDeletionRequests } from "@/lib/services/account-deletion";
 import { listUnattachedClientContracts } from "@/lib/services/contract-documents";
+import { DeletionRequest } from "@/components/clients/deletion-request";
 import { getClient, listAccountManagers } from "@/lib/services/clients";
 
 export async function generateMetadata({
@@ -81,6 +83,9 @@ export default async function ClientPage({
   // Подписанные договоры, которые клиент прислал сам и которые пока не привязаны
   // к договору (условия он ещё не выбирал), — чтобы файл не потерялся
   const clientContracts = canViewAgreements ? await listUnattachedClientContracts(id) : [];
+  // Клиенты с договором, которые просят удалить аккаунт — их решает владелец
+  const deletionRequests = new Set(await listDeletionRequests(id));
+  const canDecideDeletion = canDo(actor, "clientUser.confirmDeletion", { clientId: id });
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -174,6 +179,10 @@ export default async function ClientPage({
                           : "Ни разу не заходил"}
                       </div>
                     </div>
+
+                    {deletionRequests.has(u.id) && (
+                      <DeletionRequest userId={u.id} clientId={client.id} canDecide={canDecideDeletion} />
+                    )}
 
                     {canManage && (
                       <details className="rounded-lg border px-3 py-2">

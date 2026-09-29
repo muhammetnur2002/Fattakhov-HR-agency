@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireClientActor } from "@/lib/auth/session";
+import { ClearClosed } from "./clear-closed";
 import {
   fetchEmployerVacancies,
   StudentsServiceError,
@@ -80,6 +81,14 @@ export default async function StudentsVacanciesPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Из CRM-вакансий (fromCrm) удалить нельзя — их ведёт агентство */}
+      {(() => {
+        const ids = vacancies
+          .filter((v) => !v.fromCrm && ["CLOSED", "REJECTED"].includes(v.status))
+          .map((v) => v.id);
+        return ids.length > 0 ? <ClearClosed ids={ids} /> : null;
+      })()}
 
       <div className="grid gap-3">
         {vacancies.map((vacancy) => {

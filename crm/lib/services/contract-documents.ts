@@ -70,6 +70,18 @@ export async function uploadContractTemplate(actor: Actor, file: File): Promise<
 }
 
 /**
+ * Убрать шаблон совсем: клиенты снова увидят подсказку «шаблон готовит менеджер».
+ * Файлы не стираются с диска сразу — это мягкое удаление, как у остальных вложений (BR-26).
+ */
+export async function deleteContractTemplate(actor: Actor): Promise<number> {
+  const result = await prisma.attachment.updateMany({
+    where: { organizationId: actor.organizationId, kind: "CONTRACT", clientId: null, agreementId: null },
+    data: { deletedAt: new Date() },
+  });
+  return result.count;
+}
+
+/**
  * Клиент присылает подписанный договор. Если у него уже есть договор на
  * подтверждении, скан привязывается к нему, иначе остаётся у клиента.
  * Агентству уходит уведомление — проверить и подтвердить.

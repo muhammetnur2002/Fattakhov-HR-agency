@@ -16,6 +16,8 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   function run(action: "close" | "delete", keep?: boolean) {
     setError(null);
     startTransition(async () => {
@@ -25,11 +27,14 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
         return;
       }
       setClosing(false);
-      router.refresh();
+      // Удалённой вакансии больше нет — на её странице делать нечего
+      if (action === "delete") router.push("/students");
+      else router.refresh();
     });
   }
 
-  if (status === "CLOSED") {
+  // Уже не работает: снятую, отклонённую и черновик можно убрать из списка совсем
+  if (status === "CLOSED" || status === "REJECTED" || status === "DRAFT") {
     return (
       <Card>
         <CardHeader>
@@ -41,9 +46,23 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button variant="destructive" disabled={pending} onClick={() => run("delete")}>
-            Удалить
-          </Button>
+          {confirmingDelete ? (
+            <div className="space-y-2">
+              <p className="text-sm">Удалить вакансию из списка? Это нельзя отменить.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="destructive" disabled={pending} onClick={() => run("delete")}>
+                  {pending ? "Удаляем…" : "Да, удалить"}
+                </Button>
+                <Button variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(false)}>
+                  Отмена
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="destructive" disabled={pending} onClick={() => setConfirmingDelete(true)}>
+              Удалить
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

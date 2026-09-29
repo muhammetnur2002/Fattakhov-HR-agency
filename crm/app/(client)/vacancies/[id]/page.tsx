@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ClientVacancyActions } from "@/components/vacancies/client-vacancy-actions";
+import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import { VacancyBrief } from "@/components/vacancies/vacancy-brief";
 import { VacancyStatusBadge } from "@/components/vacancies/vacancy-list";
 import { PrintButton } from "@/components/shell/print-button";
@@ -124,6 +125,18 @@ export default async function ClientVacancyPage({
           </CardContent>
         )}
       </Card>
+
+      {vacancy.status.startsWith("CLOSED_") && canDo(actor, "vacancy.delete", subject) && (
+        <div className="print:hidden">
+          <DeleteVacancies
+            ids={[vacancy.id]}
+            label="Удалить заявку"
+            question="Удалить эту заявку из списка? Отчёты и счета за прошлое не изменятся."
+            redirectTo="/vacancies"
+            variant="ghost"
+          />
+        </div>
+      )}
 
       {stages.length > 0 && (
         <div className="space-y-3 print:hidden">

@@ -11,6 +11,7 @@ import type { Actor } from "@/lib/access";
 import { prismaRaw as db } from "@/lib/db/prisma";
 import { AgreementError } from "@/lib/services/agreements";
 import {
+  deleteContractTemplate,
   getContractTemplate,
   listSubmittedContracts,
   listUnattachedClientContracts,
@@ -74,6 +75,21 @@ describe("шаблон договора", () => {
     await uploadContractTemplate(owner, pdf("[тест] шаблон.pdf"));
     await submitSignedContract(clientActor, pdf("[тест] подписанный.pdf"));
     expect((await getContractTemplate(ORG))?.fileName).toBe("[тест] шаблон.pdf");
+  });
+
+  it("удаление убирает шаблон совсем, файлы клиентов не трогает", async () => {
+    await uploadContractTemplate(owner, pdf("[тест] шаблон.pdf"));
+    await submitSignedContract(clientActor, pdf("[тест] подписанный.pdf"));
+    await deleteContractTemplate(owner);
+    expect(await getContractTemplate(ORG)).toBeNull();
+    expect((await listSubmittedContracts(CLIENT)).map((f) => f.fileName)).toEqual(["[тест] подписанный.pdf"]);
+  });
+
+  it("после удаления можно загрузить новый шаблон", async () => {
+    await uploadContractTemplate(owner, pdf("[тест] старый.pdf"));
+    await deleteContractTemplate(owner);
+    await uploadContractTemplate(owner, pdf("[тест] новый.pdf"));
+    expect((await getContractTemplate(ORG))?.fileName).toBe("[тест] новый.pdf");
   });
 
   it("неподходящий тип файла отвергается", async () => {

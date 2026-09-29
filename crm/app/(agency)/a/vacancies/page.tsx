@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import { VacancyList } from "@/components/vacancies/vacancy-list";
 import { VacancyStatusFilter } from "@/components/vacancies/vacancy-status-filter";
 import { RecruiterFilter } from "@/components/vacancies/recruiter-filter";
@@ -20,6 +21,7 @@ export default async function AgencyVacanciesPage({
   searchParams: Promise<{ status?: string; q?: string; recruiterId?: string }>;
 }) {
   const actor = await requireAgencyActor();
+  const canDelete = canDo(actor, "vacancy.delete");
   const { status, q, recruiterId } = await searchParams;
   const canCreate = canDo(actor, "vacancy.create", { clientId: null });
   const canAccept = canDo(actor, "vacancy.accept");
@@ -65,6 +67,7 @@ export default async function AgencyVacanciesPage({
           </Button>
         </div>
         {filterBar}
+        <ClearClosed vacancies={vacancies} allowed={canDelete} />
         <VacancyList
           vacancies={vacancies}
           hrefBase="/a/vacancies"
@@ -143,6 +146,7 @@ export default async function AgencyVacanciesPage({
         <h2 className="text-lg font-medium">
           {incoming.length > 0 ? "Остальные" : "Все вакансии"}
         </h2>
+        <ClearClosed vacancies={rest} allowed={canDelete} />
         <VacancyList
           vacancies={rest}
           hrefBase="/a/vacancies"
@@ -151,5 +155,18 @@ export default async function AgencyVacanciesPage({
         />
       </section>
     </div>
+  );
+}
+
+/** «Очистить закрытые»: закрытые и отменённые вакансии из показанных — одним нажатием. */
+function ClearClosed({ vacancies, allowed }: { vacancies: { id: string; status: string }[]; allowed: boolean }) {
+  const ids = vacancies.filter((v) => v.status.startsWith("CLOSED_")).map((v) => v.id);
+  if (!allowed || ids.length === 0) return null;
+  return (
+    <DeleteVacancies
+      ids={ids}
+      label={`Удалить закрытые (${ids.length})`}
+      question={`Удалить закрытые и отменённые вакансии (${ids.length}) из списка? Отчёты и счета за прошлое не изменятся.`}
+    />
   );
 }

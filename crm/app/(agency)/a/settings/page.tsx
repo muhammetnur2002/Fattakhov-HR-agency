@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ContractTemplateManager } from "@/components/clients/contract-template-manager";
 import { NotificationSettings } from "@/components/settings/notification-settings";
 import { PasswordForm } from "@/components/settings/password-form";
 import { TwoFactorSettings } from "@/components/settings/two-factor";
@@ -16,6 +17,8 @@ import { requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { ROLE_LABELS } from "@/lib/labels";
 import { channelStatus } from "@/lib/notifications/channels";
+import { formatDate } from "@/lib/format-date";
+import { getContractTemplate } from "@/lib/services/contract-documents";
 import { getTwoFactorStatus } from "@/lib/services/two-factor";
 
 export const metadata = { title: "Настройки" };
@@ -23,6 +26,8 @@ export const metadata = { title: "Настройки" };
 export default async function AgencySettingsPage() {
   const actor = await requireAgencyActor();
   const twoFactor = await getTwoFactorStatus(actor.id);
+  const canManageContract = canDo(actor, "agreement.manage", { clientId: null });
+  const template = canManageContract ? await getContractTemplate(actor.organizationId) : null;
 
   const user = await prisma.user.findFirst({
     where: { id: actor.id },
@@ -99,6 +104,27 @@ export default async function AgencySettingsPage() {
           />
         </CardContent>
       </Card>
+
+      {canManageContract && (
+        <Card id="contract-template">
+          <CardHeader>
+            <CardTitle className="text-base">Договор для клиентов</CardTitle>
+            <CardDescription>
+              Шаблон, который клиенты без договора скачивают в разделе «Документы», подписывают и присылают вам на
+              проверку. Можно заменить новым файлом или удалить.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ContractTemplateManager
+              current={
+                template
+                  ? { fileName: template.fileName, uploadedAt: formatDate(template.createdAt), url: template.url }
+                  : null
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {canDo(actor, "pdn.auditLog") && (
         <Card>

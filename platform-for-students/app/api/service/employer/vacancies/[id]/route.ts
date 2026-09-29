@@ -121,8 +121,10 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     if (action === 'delete') {
-      if (vacancy.status !== 'CLOSED') {
-        return fail(409, 'Удалить можно только снятую вакансию', 'NOT_CLOSED');
+      // Убрать из списка можно то, что уже не работает: снятую, отклонённую вакансию и черновик.
+      // Опубликованную и ждущую проверки сначала снимают — иначе заявка пропала бы у проверяющего
+      if (!['CLOSED', 'REJECTED', 'DRAFT'].includes(vacancy.status)) {
+        return fail(409, 'Удалить можно снятую, отклонённую вакансию или черновик', 'NOT_CLOSED');
       }
       await store.vacancies.delete(vacancy.id);
       await auditService(actor, { action: 'vacancy.deleted', entity: 'Vacancy', entityId: vacancy.id }, request.headers);

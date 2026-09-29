@@ -3,6 +3,7 @@ import { InviteForm } from "@/components/clients/invite-form";
 import { InviteLink } from "@/components/clients/invite-link";
 import { withEmailOff } from "@/components/shared/email-off";
 import { NotificationSettings } from "@/components/settings/notification-settings";
+import { DeleteAccount } from "@/components/settings/delete-account";
 import { PasswordForm } from "@/components/settings/password-form";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { TwoFactorSettings } from "@/components/settings/two-factor";
@@ -20,6 +21,7 @@ import { prisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import { ROLE_LABELS } from "@/lib/labels";
 import { channelStatus } from "@/lib/notifications/channels";
+import { isClientContracted } from "@/lib/services/account-deletion";
 import { listClientTeam } from "@/lib/services/clients";
 import { getTwoFactorStatus } from "@/lib/services/two-factor";
 import { appOrigin } from "@/lib/urls";
@@ -43,10 +45,12 @@ export default async function ClientSettingsPage() {
         position: true,
         telegramChatId: true,
         notifyPrefs: true,
+        deletionRequestedAt: true,
       },
     }),
     canManageTeam ? listClientTeam(actor.clientId!) : null,
   ]);
+  const contracted = actor.clientId ? await isClientContracted(actor.clientId) : false;
 
   const prefs =
     typeof user?.notifyPrefs === "object" && user.notifyPrefs !== null
@@ -206,6 +210,18 @@ export default async function ClientSettingsPage() {
             }
             hideCategories={["leads"]}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Удаление аккаунта</CardTitle>
+          <CardDescription>
+            Ваши данные можно стереть в любой момент. Как это происходит, зависит от того, заключён ли договор.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DeleteAccount contracted={contracted} requested={Boolean(user?.deletionRequestedAt)} />
         </CardContent>
       </Card>
     </div>

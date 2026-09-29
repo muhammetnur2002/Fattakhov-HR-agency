@@ -262,6 +262,7 @@ export default async function AgencyVacancyPage({
               <VacancyStatusActions
                 vacancyId={vacancy.id}
                 status={vacancy.status}
+                canDelete={canDo(actor, "vacancy.delete", { clientId: vacancy.clientId })}
               />
             </CardContent>
           </Card>

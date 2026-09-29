@@ -11,7 +11,12 @@ import {
   confirmAgreement,
   terminateAgreement,
 } from "@/lib/services/agreements";
-import { uploadContractTemplate } from "@/lib/services/contract-documents";
+import {
+  AccountDeletionError,
+  confirmAccountDeletion,
+  rejectAccountDeletion,
+} from "@/lib/services/account-deletion";
+import { deleteContractTemplate, uploadContractTemplate } from "@/lib/services/contract-documents";
 import {
   ClientUserError,
   createClient,
@@ -229,9 +234,24 @@ export async function uploadContractTemplateAction(
     throw error;
   }
 
-  revalidatePath("/a/clients/contract-template");
+  revalidatePath("/a/settings");
   revalidatePath("/documents");
   return { ok: "Шаблон обновлён — клиенты уже видят новый файл" };
+}
+
+/** Убрать шаблон договора: клиенты снова увидят подсказку написать менеджеру. */
+export async function deleteContractTemplateAction(): Promise<FormState> {
+  const actor = await requireAgencyActor();
+  try {
+    authorizeOrThrow(actor, "agreement.manage", { clientId: null });
+    await deleteContractTemplate(actor);
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    throw error;
+  }
+  revalidatePath("/a/settings");
+  revalidatePath("/documents");
+  return { ok: "Шаблон удалён" };
 }
 
 /** Прикрепление скана подписанного договора — клиент видит его в «Документах». */
@@ -261,4 +281,24 @@ export async function attachAgreementFileAction(
   revalidatePath(`/a/clients/${clientId}`);
   revalidatePath("/documents");
   return { ok: "Договор прикреплён" };
+}
+
+/** Владелец решает по просьбе клиента с договором удалить аккаунт: подтвердить или отклонить. */
+export async function decideAccountDeletionAction(
+  userId: string,
+  clientId: string,
+  decision: "confirm" | "reject",
+): Promise<FormState> {
+  const actor = await requireAgencyActor();
+  try {
+    authorizeOrThrow(actor, "clientUser.confirmDeletion", { clientId });
+    if (decision === "confirm") await confirmAccountDeletion(actor, userId);
+    else await rejectAccountDeletion(actor, userId);
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Подтверждает только владелец" };
+    if (error instanceof AccountDeletionError) return { error: error.message };
+    throw error;
+  }
+  revalidatePath(`/a/clients/${clientId}`);
+  return { ok: decision === "confirm" ? "Аккаунт удалён" : "Запрос отклонён, клиент уведомлён" };
 }

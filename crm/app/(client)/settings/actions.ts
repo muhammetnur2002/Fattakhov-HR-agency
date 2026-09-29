@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
 import { authorizeOrThrow, requireClientActor } from "@/lib/auth/session";
+import { signOut } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
+import {
+  AccountDeletionError,
+  cancelDeletionRequest,
+  deleteOwnAccount,
+} from "@/lib/services/account-deletion";
 import { listClientTeam } from "@/lib/services/clients";
+import { actOnEmployerVacancy, fetchEmployerVacancies } from "@/lib/students-service";
 import { createInvitation, InviteError } from "@/lib/services/invitations";
 import { inviteUserSchema } from "@/lib/validation/client";
 
@@ -83,4 +91,51 @@ export async function inviteTeammateAction(
 
   revalidatePath("/settings");
   return { ok: `Письмо со ссылкой отправлено на ${parsed.data.email}` };
+}
+
+/**
+ * Клиент удаляет свой аккаунт. Без договора — сразу и насовсем (выход на страницу входа),
+ * с договором — запрос владельцу агентства: аккаунт работает, пока тот не подтвердит.
+ */
+export async function deleteAccountAction(): Promise<FormState> {
+  const actor = await requireClientActor();
+  let outcome;
+  try {
+    outcome = await deleteOwnAccount(actor);
+  } catch (error) {
+    if (error instanceof AccountDeletionError) return { error: error.message };
+    throw error;
+  }
+
+  if (outcome.result === "requested") {
+    revalidatePath("/settings");
+    return { ok: "Запрос отправлен владельцу агентства. Пока он не подтвердит, аккаунт работает как обычно." };
+  }
+
+  // Последний сотрудник ушёл — компания остаётся в базе агентства архивной, а её вакансии на
+  // студенческой платформе снимаются: иначе студенты продолжали бы откликаться в пустоту
+  if (outcome.wasLastUser && actor.clientId) {
+    await prisma.client.updateMany({ where: { id: actor.clientId, status: { not: "ACTIVE" } }, data: { status: "ARCHIVED" } });
+    try {
+      const vacancies = await fetchEmployerVacancies(actor.clientId);
+      for (const v of vacancies) {
+        if (v.status === "PUBLISHED" || v.status === "PENDING") {
+          await actOnEmployerVacancy(v.id, { crmClientId: actor.clientId, actor: "Удаление аккаунта", action: "close", keep: false });
+        }
+      }
+    } catch {
+      /* платформа недоступна — вакансии снимет агентство вручную */
+    }
+  }
+
+  await signOut({ redirectTo: "/login?deleted=1" });
+  return { ok: "Аккаунт удалён" };
+}
+
+/** Клиент передумал: снять запрос на удаление аккаунта. */
+export async function cancelDeletionRequestAction(): Promise<FormState> {
+  const actor = await requireClientActor();
+  await cancelDeletionRequest(actor);
+  revalidatePath("/settings");
+  return { ok: "Запрос снят" };
 }

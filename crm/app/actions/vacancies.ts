@@ -7,6 +7,7 @@ import { authorizeOrThrow, requireActor, requireClientActor } from "@/lib/auth/s
 import { prisma } from "@/lib/db/prisma";
 import {
   createVacancyDraft,
+  deleteClosedVacancy,
   transitionVacancy,
   updateVacancyBrief,
 } from "@/lib/services/vacancies";
@@ -183,4 +184,37 @@ export async function clientTransitionAction(
 
   revalidatePath(`/vacancies/${vacancyId}`);
   return { ok: "Статус изменён" };
+}
+
+export type DeleteVacanciesState = { error?: string; deleted?: number };
+
+/**
+ * Удалить закрытые вакансии: одну со страницы вакансии или сразу несколько из списка.
+ * Права проверяются на каждую вакансию отдельно, а живые пропускаются — «очистить закрытые»
+ * не должно сносить то, что ещё в работе, даже если в список попал чужой id.
+ */
+export async function deleteVacanciesAction(vacancyIds: string[]): Promise<DeleteVacanciesState> {
+  const actor = await requireActor();
+  const ids = [...new Set(vacancyIds)].slice(0, 200);
+  if (ids.length === 0) return { deleted: 0 };
+
+  const vacancies = await prisma.vacancy.findMany({
+    where: { id: { in: ids }, organizationId: actor.organizationId },
+    select: { id: true, clientId: true, hiringManagerId: true },
+  });
+
+  let deleted = 0;
+  try {
+    for (const vacancy of vacancies) {
+      authorizeOrThrow(actor, "vacancy.delete", { clientId: vacancy.clientId, hiringManagerId: vacancy.hiringManagerId });
+      if ((await deleteClosedVacancy(actor, vacancy.id)) === "deleted") deleted += 1;
+    }
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав", deleted };
+    throw error;
+  }
+
+  revalidatePath("/vacancies");
+  revalidatePath("/a/vacancies");
+  return { deleted };
 }

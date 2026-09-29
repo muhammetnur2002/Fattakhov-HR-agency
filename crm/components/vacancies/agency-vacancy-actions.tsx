@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 
 type Recruiter = {
@@ -280,9 +281,12 @@ export function VacancyIntake({
 export function VacancyStatusActions({
   vacancyId,
   status,
+  canDelete = false,
 }: {
   vacancyId: string;
   status: VacancyStatus;
+  /** Закрытую вакансию можно убрать из списков — право vacancy.delete. */
+  canDelete?: boolean;
 }) {
   const [state, formAction] = useActionState<AgencyVacancyState, FormData>(
     agencyTransitionAction,
@@ -329,6 +333,16 @@ export function VacancyStatusActions({
             <input type="hidden" name="to" value="ACTIVE" />
             <Submit label="Вернуть в работу" variant="outline" />
           </form>
+        )}
+
+        {isClosed && canDelete && (
+          <DeleteVacancies
+            ids={[vacancyId]}
+            label="Удалить вакансию"
+            question="Удалить эту вакансию из списков? Отчёты и счета за прошлое не изменятся."
+            redirectTo="/a/vacancies"
+            variant="ghost"
+          />
         )}
       </div>
 

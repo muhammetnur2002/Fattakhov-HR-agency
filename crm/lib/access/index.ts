@@ -116,6 +116,7 @@ export type Action =
   | "vacancy.close"
   | "vacancy.editBrief"
   | "vacancy.reactivate"
+  | "vacancy.delete"
   // кандидаты и воронка
   | "application.create"
   | "application.moveStage"
@@ -139,6 +140,7 @@ export type Action =
   // администрирование
   | "org.settings"
   | "org.manageClientUsers"
+  | "clientUser.confirmDeletion"
   | "pdn.auditLog"
   // команда агентства и студенческая платформа
   | "staff.manage"
@@ -284,6 +286,12 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
     в счёте. Поэтому только руководство агентства, и никогда клиент.
   */
   "vacancy.reactivate": { OWNER: true, HEAD: true },
+  /*
+    Убрать из списка закрытую или отменённую вакансию, чтобы не висела и не
+    занимала место. Уходит только в мягкое удаление (BR-26): отчёты и счета
+    за прошлое не меняются. Клиент — только свои, наблюдатель и рекрутёр — нет.
+  */
+  "vacancy.delete": { OWNER: true, HEAD: true, ACCOUNT: true, CLIENT_ADMIN: ownClient },
 
   // --- Кандидаты и воронка ---
   "application.create": { OWNER: true, HEAD: true, RECRUITER: true },
@@ -380,6 +388,8 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
   // Сноска ⁵: CLIENT_ADMIN управляет только пользователями своей компании.
   "org.manageClientUsers": { OWNER: true, CLIENT_ADMIN: ownClient },
   "pdn.auditLog": { OWNER: true },
+  // Клиент с договором просит удалить аккаунт — решает только владелец агентства
+  "clientUser.confirmDeletion": { OWNER: true },
 
   // --- Команда агентства ---
   /*

@@ -194,6 +194,18 @@ export const EVENTS = {
   },
 
   // --- Финансы ---
+  ACCOUNT_DELETION_REQUESTED: {
+    channels: ["email"],
+    priority: "high",
+    description: "Клиент просит удалить аккаунт",
+    category: "finance",
+  },
+  ACCOUNT_DELETION_REJECTED: {
+    channels: ["email"],
+    priority: "normal",
+    description: "Запрос на удаление аккаунта отклонён",
+    category: "finance",
+  },
   CONTRACT_UPLOADED: {
     channels: ["email"],
     priority: "high",
