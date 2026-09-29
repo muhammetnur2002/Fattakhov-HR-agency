@@ -208,7 +208,12 @@ async function rawCall(path: string, init?: RequestInit): Promise<Response> {
   }
   return fetch(url, {
     ...init,
-    headers: { ...init?.headers, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${secret}`,
+      // Для файла тип с границей ставит сам fetch
+      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+    },
     cache: "no-store",
   });
 }
@@ -369,6 +374,24 @@ export interface StudentsApiError {
 async function parseError(response: Response): Promise<StudentsApiError> {
   const data = (await response.json().catch(() => ({}))) as StudentsApiError;
   return { error: data.error ?? `Студенческая платформа ответила ${response.status}`, code: data.code, fields: data.fields };
+}
+
+/** Обложка вакансии — картинка компании; платформа проверяет тип и размер (JPG/PNG/WebP до 5 МБ). */
+export async function uploadVacancyCover(
+  crmClientId: string,
+  file: File,
+  actor: string,
+): Promise<{ url?: string; error?: string }> {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("actor", actor);
+  const response = await call(`/api/service/employer/upload?crmClientId=${encodeURIComponent(crmClientId)}`, {
+    method: "POST",
+    body,
+  });
+  if (!response.ok) return { error: (await parseError(response)).error };
+  const data = (await response.json()) as { url: string };
+  return { url: data.url };
 }
 
 /** Все вакансии клиента, всех статусов. */

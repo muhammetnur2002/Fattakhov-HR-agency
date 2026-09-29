@@ -151,6 +151,7 @@ export function SwipeCard({
     EMPLOYMENT_TYPE_LABEL[vacancy.employmentType].toLowerCase(),
   ]);
   const extraTags = vacancy.tags.filter((tag) => !shown.has(tag.toLowerCase()));
+  const cover = vacancy.photos[0] ?? null;
 
   return (
     <motion.div
@@ -202,9 +203,39 @@ export function SwipeCard({
           className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-60"
           style={{ background: companyGradient(vacancy.company) }}
         />
+        {/*
+          Обложка вакансии — первая картинка, которую добавила компания (логотип
+          или фирменное фото). Лежит в шапке поверх подложки и плавно растворяется
+          вниз, в тело карточки; тёмная вуаль сверху держит читаемым светлый текст
+          с названием компании.
+        */}
+        {cover && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- файл с нашего же адреса, размеры зависят от картинки */}
+            <img
+              src={cover}
+              alt=""
+              aria-hidden
+              draggable={false}
+              loading="lazy"
+              className="pointer-events-none absolute inset-x-0 top-0 h-56 w-full select-none object-cover"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,.85) 22%, rgba(0,0,0,.42) 52%, transparent 100%)',
+                maskImage: 'linear-gradient(to bottom, #000 0%, rgba(0,0,0,.85) 22%, rgba(0,0,0,.42) 52%, transparent 100%)',
+              }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-graphite-950/55 via-graphite-950/35 to-transparent"
+            />
+          </>
+        )}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-transparent to-graphite-950/85"
+          className={cn(
+            'pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-transparent to-graphite-950/85',
+            cover && 'opacity-40',
+          )}
         />
 
         {/* Подсветка решения. Вправо — зелёная кромка, влево — затемнение:

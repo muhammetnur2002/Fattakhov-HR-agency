@@ -1,27 +1,35 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { effectiveGrants } from "@/lib/access";
-import { requireAgencyActor } from "@/lib/auth/session";
+import { canDo, effectiveGrants } from "@/lib/access";
+import { requireActor } from "@/lib/auth/session";
 import { fetchStudentsFile } from "@/lib/students-service";
 
+/** Картинка компании (логотип, обложка вакансии): не персональные данные, её видит любой студент. */
+const COMPANY_IMAGE_PATH = /^\/api\/files\/company\/[0-9a-f-]{36}\.(jpg|png|webp)$/i;
+
 /**
- * Проксирует файл со студенческой платформы (фото, справка) для «Проверок»:
- * читает его служебным секретом на сервере и отдаёт браузеру сотрудника —
- * секрет так и не попадает в браузер, а <img>/<a> получают обычную ссылку.
+ * Проксирует файл со студенческой платформы для CRM: читает его служебным
+ * секретом на сервере и отдаёт браузеру — секрет так и не попадает в браузер,
+ * а <img>/<a> получают обычную ссылку.
  *
- * Доступ — как у самих «Проверок»: справка студента и фото на модерации
- * — персональные данные, право смотреть их не шире права их проверять.
+ * Справка студента и фото на модерации — персональные данные, право смотреть
+ * их не шире права их проверять. Картинки компании (обложка вакансии в форме
+ * клиента) доступны и клиенту со студенческой платформой.
  */
 export async function GET(request: NextRequest) {
-  const actor = await requireAgencyActor();
-  const grants = effectiveGrants(actor);
-  if (!grants.includes("students.moderation") && !grants.includes("students.study")) {
-    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
-  }
+  const actor = await requireActor();
 
   const path = request.nextUrl.searchParams.get("path") ?? "";
   if (!path.startsWith("/api/files/")) {
     return NextResponse.json({ error: "Недопустимый путь" }, { status: 400 });
+  }
+
+  const grants = effectiveGrants(actor);
+  const canReview = grants.includes("students.moderation") || grants.includes("students.study");
+  const canSeeCompanyImage =
+    canReview || (COMPANY_IMAGE_PATH.test(path) && canDo(actor, "students.enterAsClient"));
+  if (!canSeeCompanyImage) {
+    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
   }
 
   const upstream = await fetchStudentsFile(path);

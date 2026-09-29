@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+
+import { ImagePlus, Trash2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { VacancyDetail, VacancyFields } from "@/lib/students-service";
+import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type { VacancyFormState } from "./actions";
 
 const WORK_FORMAT_LABEL: Record<VacancyFields["workFormat"], string> = {
@@ -51,6 +54,98 @@ const WEEKDAY_LABEL: Record<(typeof WEEKDAYS)[number], string> = {
   SUN: "Вс",
 };
 
+/**
+ * Обложка вакансии — логотип или фирменная картинка компании. Показывается на
+ * карточке в ленте студентов сверху и плавно растворяется вниз. Файл уходит на
+ * платформу сразу при выборе, а с вакансией сохраняется только его адрес.
+ */
+function CoverField({ initialPhotos }: { initialPhotos: string[] }) {
+  const [photos, setPhotos] = useState(initialPhotos);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const cover = photos[0] ?? null;
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const response = await fetch("/api/students-vacancy-cover", { method: "POST", body });
+      const data = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!response.ok || !data.url) {
+        setError(data.error ?? "Не удалось загрузить картинку");
+        return;
+      }
+      // Новая обложка встаёт первой, остальные фото вакансии сохраняются
+      setPhotos((prev) => [data.url as string, ...prev.slice(1)]);
+    } catch {
+      setError("Нет связи — попробуйте ещё раз");
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Обложка</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {photos.map((url) => (
+          <input key={url} type="hidden" name="photo" value={url} />
+        ))}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex h-24 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
+            {cover ? (
+              // eslint-disable-next-line @next/next/no-img-element -- файл с платформы через прокси, размеры заранее неизвестны
+              <img src={studentsFileProxyUrl(cover)} alt="Обложка вакансии" className="size-full object-cover" />
+            ) : (
+              <ImagePlus className="size-6 text-muted-foreground" aria-hidden />
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+                {busy ? "Загружаем…" : cover ? "Заменить" : "Добавить картинку"}
+              </Button>
+              {cover && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setPhotos((prev) => prev.slice(1))}
+                >
+                  <Trash2 className="mr-1 size-4" aria-hidden />
+                  Убрать
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Логотип или фирменная картинка компании — она украсит карточку вакансии в ленте студентов. JPG, PNG или
+              WebP до 5 МБ.
+            </p>
+          </div>
+        </div>
+        <input
+          ref={input}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="Файл обложки"
+          onChange={(event) => void pick(event.target.files?.[0])}
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SubmitButtons({ submitLabel }: { submitLabel: string }) {
   const { pending } = useFormStatus();
   return (
@@ -82,6 +177,8 @@ export function VacancyForm({
 
   return (
     <form action={formAction} className="space-y-6">
+      <CoverField initialPhotos={initial?.photos ?? []} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Основное</CardTitle>

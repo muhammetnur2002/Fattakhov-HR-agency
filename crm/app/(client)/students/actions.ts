@@ -70,8 +70,12 @@ function parseVacancyFields(formData: FormData): VacancyFields {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    // Фото — пока только через кабинет на самой платформе; см. обсуждение в чате
-    photos: [],
+    // Первая — обложка карточки в ленте студентов; файлы загружаются заранее
+    // (см. CoverField и /api/students-vacancy-cover), сюда приходят только адреса
+    photos: formData
+      .getAll("photo")
+      .map((v) => String(v).trim())
+      .filter(Boolean),
     videoUrl: textOrNull(formData.get("videoUrl")),
   };
 }

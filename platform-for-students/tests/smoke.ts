@@ -1570,16 +1570,62 @@ async function main() {
       const noAuthEnsure = await fetch(`${BASE}/api/service/employer/ensure`, { method: 'POST', body: provisionBody, headers: { 'Content-Type': 'application/json' } });
       check('заведение компании без служебного секрета закрыто', noAuthEnsure.status === 401 || noAuthEnsure.status === 503);
 
+      // Обложка вакансии из формы в CRM: файл идёт серверным вызовом
+      const png = Uint8Array.from(
+        Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64'),
+      );
+      const coverForm = () => {
+        const f = new FormData();
+        f.set('file', new File([png], 'cover.png', { type: 'image/png' }));
+        return f;
+      };
+      const coverUrl = `${BASE}/api/service/employer/upload?crmClientId=${serviceCrmClientId}`;
+      const coverNoAuth = await fetch(coverUrl, { method: 'POST', body: coverForm() });
+      check('загрузка обложки без служебного секрета закрыта', coverNoAuth.status === 401 || coverNoAuth.status === 503);
+      const coverUnknown = await fetch(`${BASE}/api/service/employer/upload?crmClientId=does-not-exist`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${serviceSecret}` },
+        body: coverForm(),
+      });
+      check('обложка для незнакомого клиента — 404', coverUnknown.status === 404, coverUnknown.status);
+      const coverBad = new FormData();
+      coverBad.set('file', new File(['<svg/>'], 'cover.svg', { type: 'image/svg+xml' }));
+      const coverBadRes = await fetch(coverUrl, { method: 'POST', headers: { Authorization: `Bearer ${serviceSecret}` }, body: coverBad });
+      check('обложка не в JPG/PNG/WebP отвергнута', coverBadRes.status === 415, coverBadRes.status);
+      const coverOk = await fetch(coverUrl, { method: 'POST', headers: { Authorization: `Bearer ${serviceSecret}` }, body: coverForm() });
+      const coverBody = (await coverOk.json().catch(() => null)) as { url?: string } | null;
+      check(
+        'обложка загружается и получает адрес картинки компании',
+        coverOk.status === 201 && /^\/api\/files\/company\/[0-9a-f-]{36}\.png$/.test(coverBody?.url ?? ''),
+        coverBody,
+      );
+      const withCover = await serviceCall('/api/service/employer/vacancies', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...vacancyForm,
+          title: 'Вакансия с обложкой',
+          photos: coverBody?.url ? [coverBody.url] : [],
+          crmClientId: serviceCrmClientId,
+          actor: 'Смоук CRM',
+          submit: true,
+        }),
+      });
+      check('вакансия с обложкой сохраняется', withCover.status === 201, withCover.body);
+      if (coverBody?.url) {
+        const feed = await new Session().request('/api/feed');
+        check('обложка публичной вакансии открыта без входа', (await fetch(`${BASE}${coverBody.url}`)).status === 200, feed.status);
+      }
+
       // Воронка агентства: без секрета закрыто, с секретом — сводка по компании с одной вакансией
       const funnelNoAuth = await fetch(`${BASE}/api/service/employer/funnel`);
       check('воронка без служебного секрета закрыта', funnelNoAuth.status === 401 || funnelNoAuth.status === 503);
       const funnel = await serviceCall('/api/service/employer/funnel');
       const funnelRow = (funnel.body?.companies ?? []).find((c: { crmClientId: string }) => c.crmClientId === serviceCrmClientId);
       check(
-        'воронка: компания клиента CRM видна с числом вакансий и без персональных данных',
+        'воронка: компания клиента CRM видна с числом вакансий (две: обычная и с обложкой) и без персональных данных',
         funnel.status === 200 &&
-          funnelRow?.vacancies === 1 &&
-          funnelRow?.published === 1 &&
+          funnelRow?.vacancies === 2 &&
+          funnelRow?.published === 2 &&
           funnelRow?.applications === 0 &&
           !JSON.stringify(funnelRow).includes('@'),
         funnelRow,
