@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { funnelStage, isCold, type FunnelActivity } from "@/lib/students-funnel";
+import { funnelStage, isCold, nudgeFor, type FunnelActivity } from "@/lib/students-funnel";
 
 const base: FunnelActivity = {
   vacancies: 0,
@@ -44,5 +44,27 @@ describe("воронка студенческой платформы", () => {
     expect(isCold({ ...base, lastActivityAt: "2026-09-10T00:00:00.000Z" }, now)).toBe(true);
     // Нет ни одного отклика — отсчёт от регистрации
     expect(isCold(base, now)).toBe(true);
+  });
+});
+
+describe("подсказка «подберём сами»", () => {
+  it("клиенту с договором и без данных не показывается", () => {
+    expect(nudgeFor(true, { applications: 20, hired: 3 })).toBe("none");
+    expect(nudgeFor(false, null)).toBe("none");
+  });
+
+  it("пока откликов нет — рано", () => {
+    expect(nudgeFor(false, { applications: 0, invited: 0, hired: 0 })).toBe("none");
+  });
+
+  it("первые отклики — мягкая подсказка, пять и больше — основная", () => {
+    expect(nudgeFor(false, { applications: 1 })).toBe("responses");
+    expect(nudgeFor(false, { applications: 4 })).toBe("responses");
+    expect(nudgeFor(false, { applications: 5 })).toBe("ready");
+  });
+
+  it("приглашение или найм — сразу основная подсказка", () => {
+    expect(nudgeFor(false, { applications: 1, invited: 1 })).toBe("ready");
+    expect(nudgeFor(false, { applications: 1, hired: 1 })).toBe("ready");
   });
 });

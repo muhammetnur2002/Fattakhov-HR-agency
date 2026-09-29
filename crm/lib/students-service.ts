@@ -639,13 +639,22 @@ export async function fetchStudentsFunnel(): Promise<StudentsFunnelRow[]> {
 }
 
 /** Значки в CRM: новые отклики и непрочитанные сообщения. Не бросает: значок не стоит ошибки страницы. */
-export async function fetchStudentsSummary(
-  crmClientId: string,
-): Promise<{ newApplications: number; unreadMessages: number } | null> {
+export interface StudentsSummary {
+  newApplications: number;
+  unreadMessages: number;
+  /** Общая активность клиента — для подсказки «подберём сами». Нет у старой версии платформы. */
+  vacancies?: number;
+  published?: number;
+  applications?: number;
+  invited?: number;
+  hired?: number;
+}
+
+export async function fetchStudentsSummary(crmClientId: string): Promise<StudentsSummary | null> {
   try {
     const response = await call(`/api/service/employer/summary?crmClientId=${enc(crmClientId)}`);
     if (!response.ok) return null;
-    return (await response.json()) as { newApplications: number; unreadMessages: number };
+    return (await response.json()) as StudentsSummary;
   } catch {
     return null;
   }

@@ -7,7 +7,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Счётчики для значков в CRM: новые отклики и непрочитанные сообщения.
+ * Счётчики для значков в CRM (новые отклики, непрочитанные сообщения) и общая
+ * активность клиента для подсказки «подберём сами».
  * Один лёгкий запрос вместо загрузки всех откликов и диалогов.
  */
 export async function GET(request: Request) {
@@ -22,6 +23,12 @@ export async function GET(request: Request) {
     return ok({
       newApplications: applications.filter((a) => a.status === 'NEW').length,
       unreadMessages: await countUnread({ role: 'EMPLOYER', profileId: employer.id }),
+      // Для подсказки клиенту без договора: сколько у него уже всего происходит
+      vacancies: vacancies.length,
+      published: vacancies.filter((v) => v.status === 'PUBLISHED').length,
+      applications: applications.length,
+      invited: applications.filter((a) => a.status === 'INVITED' || a.status === 'INTERVIEW').length,
+      hired: applications.filter((a) => a.status === 'HIRED').length,
     });
   });
 }

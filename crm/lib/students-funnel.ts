@@ -57,3 +57,21 @@ export function isCold(activity: FunnelActivity, now: Date = new Date()): boolea
   const days = (now.getTime() - lastMove(activity).getTime()) / 86_400_000;
   return days >= COLD_AFTER_DAYS;
 }
+
+/**
+ * Подсказка клиенту без договора: когда на студенческой платформе у него уже идёт
+ * движение, предлагаем, чтобы подбором занялось агентство. Возвращает None, пока
+ * предлагать рано, а клиенту с договором — никогда.
+ */
+export type NudgeKind = "none" | "responses" | "ready";
+
+export function nudgeFor(
+  contracted: boolean,
+  summary: { applications?: number; invited?: number; hired?: number } | null,
+): NudgeKind {
+  if (contracted || !summary) return "none";
+  const applications = summary.applications ?? 0;
+  if ((summary.hired ?? 0) > 0 || (summary.invited ?? 0) > 0 || applications >= READY_APPLICATIONS) return "ready";
+  if (applications > 0) return "responses";
+  return "none";
+}

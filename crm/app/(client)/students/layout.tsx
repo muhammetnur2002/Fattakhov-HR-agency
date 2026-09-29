@@ -1,4 +1,7 @@
 import { StudentsIntro } from "@/components/client/students-intro";
+import { StudentsNudge } from "@/components/client/students-nudge";
+import { TELEGRAM_HREF } from "@/lib/contacts";
+import { nudgeFor } from "@/lib/students-funnel";
 import { requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveAgreement } from "@/lib/services/agreements";
@@ -17,10 +20,14 @@ export default async function StudentsLayout({ children }: { children: React.Rea
       ])
     : [null, null];
   const contracted = Boolean(agreement) || client?.status === "ACTIVE";
+  const nudge = nudgeFor(contracted, summary);
 
   return (
     <div className="space-y-5">
       <StudentsIntro contracted={contracted} />
+      {nudge !== "none" && (
+        <StudentsNudge kind={nudge} applications={summary?.applications ?? 0} telegramHref={TELEGRAM_HREF} />
+      )}
       <StudentsTabs
         newApplications={summary?.newApplications ?? 0}
         unreadMessages={summary?.unreadMessages ?? 0}
