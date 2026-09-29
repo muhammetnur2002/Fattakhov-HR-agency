@@ -1539,6 +1539,22 @@ async function main() {
         addresses.status === 200 && Array.isArray(addresses.body?.addresses),
         addresses.body,
       );
+
+      const appsNoAuth = await fetch(`${BASE}/api/service/employer/applications?crmClientId=${serviceCrmClientId}`);
+      check('отклики без служебного секрета — отказ', appsNoAuth.status === 401 || appsNoAuth.status === 503);
+      const apps = await serviceCall(`/api/service/employer/applications?crmClientId=${serviceCrmClientId}`);
+      check(
+        'отклики клиента читаются через служебный API',
+        apps.status === 200 && Array.isArray(apps.body?.applications) && Array.isArray(apps.body?.vacancies),
+        apps.body,
+      );
+      const appsOther = await serviceCall('/api/service/employer/applications?crmClientId=does-not-exist');
+      check('чужой crmClientId откликов не видит', appsOther.status === 404, appsOther.body);
+      const statusForeign = await serviceCall('/api/service/employer/applications', {
+        method: 'PATCH',
+        body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', applicationId: 'no-such-application', status: 'INVITED' }),
+      });
+      check('статус несуществующего отклика не меняется', statusForeign.status === 404, statusForeign.body);
     }
   }
   // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET
