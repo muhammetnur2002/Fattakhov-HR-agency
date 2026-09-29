@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { EmployerApplication, StudentsApplicationStatus } from "@/lib/students-service";
+import { studyLine } from "@/lib/study-level";
 import { cn } from "@/lib/utils";
 import { applicationAction } from "../actions";
 
@@ -118,7 +119,7 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
                     <div className="min-w-0">
                       <div className="font-medium">{a.student.fullName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {a.vacancyTitle} · {a.student.university}, {a.student.studyYear} курс
+                        {a.vacancyTitle} · {a.student.university}, {studyLine(a.student.studyLevel, a.student.studyYear)}
                       </div>
                     </div>
                     <Badge variant={STATUS_VARIANT[a.status]}>{STATUS_LABEL[a.status]}</Badge>

@@ -376,6 +376,7 @@ export interface EmployerApplication {
     university: string;
     speciality: string;
     studyYear: number;
+    studyLevel?: string | null;
     studyVerified: boolean;
     city: string | null;
     workDays: string[];
@@ -499,6 +500,7 @@ export interface StudentCandidate {
   university: string;
   speciality: string;
   studyYear: number;
+  studyLevel?: string | null;
   city: string | null;
   workDays: string[];
   hoursPerWeek: number | null;

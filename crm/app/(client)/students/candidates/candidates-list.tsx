@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { StudentCandidate } from "@/lib/students-service";
+import { studyLine } from "@/lib/study-level";
 import { cn } from "@/lib/utils";
 import { inviteCandidateAction } from "../actions";
 
@@ -123,7 +124,7 @@ export function CandidatesList({ vacancyId, candidates }: { vacancyId: string; c
                   <div className="min-w-0">
                     <div className="font-medium">{c.fullName}</div>
                     <div className="text-sm text-muted-foreground">
-                      {c.university}, {c.studyYear} курс · {c.speciality}
+                      {c.university}, {studyLine(c.studyLevel, c.studyYear)} · {c.speciality}
                     </div>
                   </div>
                   <Button size="sm" disabled={pending} onClick={() => invite(c.id)}>
