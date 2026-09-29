@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { MessagesSquare } from 'lucide-react';
+import { MessagesSquare, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { Conversation, ThreadRow } from './Conversation';
 import { useLiveThreads } from '@/lib/hooks/useLiveThreads';
@@ -32,6 +32,8 @@ export function ChatScreen({
   const [thread, setThread] = useState<ThreadDTO | null>(initialThread);
   const [activeId, setActiveId] = useState<string | null>(initialThread?.applicationId ?? null);
   const [pending, setPending] = useState<MessageDTO[]>([]);
+  const [query, setQuery] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const sequence = useRef(0);
 
   const refreshThreads = useCallback(async () => {
@@ -138,6 +140,12 @@ export function ChatScreen({
   }
 
   const totalUnread = threads.reduce((sum, t) => sum + t.unread, 0);
+  const visibleThreads = threads.filter((t) => {
+    if (unreadOnly && t.unread === 0) return false;
+    if (!query.trim()) return true;
+    const q = query.trim().toLowerCase();
+    return t.counterpartName.toLowerCase().includes(q) || t.vacancyTitle.toLowerCase().includes(q);
+  });
 
   return (
     <motion.div
@@ -164,14 +172,46 @@ export function ChatScreen({
           </span>
         </div>
 
+        {threads.length > 0 && (
+          <div className="flex items-center gap-2 px-4 pb-3">
+            <div className="flex h-9 flex-1 items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/50 px-3">
+              <Search className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск"
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-paper placeholder:text-paper-faint focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setUnreadOnly((v) => !v)}
+              aria-pressed={unreadOnly}
+              className={cn(
+                'h-9 shrink-0 rounded-xl border px-3 text-[12.5px] font-medium transition-colors',
+                unreadOnly
+                  ? 'border-accent-400/40 bg-accent-500/20 text-accent-100'
+                  : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
+              )}
+            >
+              Непрочитанные
+            </button>
+          </div>
+        )}
+
         <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
           {threads.length === 0 ? (
             <p className="px-3 py-10 text-center text-[13px] leading-relaxed text-paper-faint">
               Диалогов пока нет. Они появятся, когда вы откликнетесь на вакансию и работодатель
               ответит.
             </p>
+          ) : visibleThreads.length === 0 ? (
+            <p className="px-3 py-10 text-center text-[13px] leading-relaxed text-paper-faint">
+              Ничего не нашлось.
+            </p>
           ) : (
-            threads.map((t) => (
+            visibleThreads.map((t) => (
               <ThreadRow
                 key={t.applicationId}
                 thread={t}
