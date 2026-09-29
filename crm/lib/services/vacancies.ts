@@ -7,7 +7,7 @@ import {
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import { plain } from "@/lib/db/serialize";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
-import { UNASSIGNED_RECRUITER } from "@/lib/labels";
+import { UNASSIGNED_RECRUITER, VACANCY_STATUS_LABELS } from "@/lib/labels";
 import { link } from "@/lib/notifications/links";
 import { notify } from "@/lib/notifications/notify";
 import {
@@ -146,7 +146,7 @@ export async function transitionVacancy(
 
   if (!canTransition(from, to)) {
     throw new VacancyTransitionError(
-      `Переход из «${from}» в «${to}» не предусмотрен`,
+      `Из статуса «${VACANCY_STATUS_LABELS[from]}» перейти в «${VACANCY_STATUS_LABELS[to]}» нельзя`,
     );
   }
 

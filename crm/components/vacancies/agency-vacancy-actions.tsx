@@ -134,6 +134,18 @@ export function VacancyIntake({
   const canIntake = ["SUBMITTED", "CLARIFYING", "ESTIMATED"].includes(status);
   if (!canIntake) return null;
 
+  // Правила воронки заявки (ТЗ 6.1): пока клиент не ответил на вопросы,
+  // взять заявку в работу и назвать сроки нельзя — она вернётся на
+  // рассмотрение, когда клиент поправит бриф и отправит её заново
+  if (status === "CLARIFYING") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Вопросы отправлены, ждём клиента. Он уточнит бриф и отправит заявку заново — после этого её можно будет взять в
+        работу или назвать сроки.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
@@ -171,7 +183,7 @@ export function VacancyIntake({
           <Submit label="Взять в работу" />
         </form>
 
-        {status !== "ESTIMATED" && (
+        {status === "SUBMITTED" && (
           <Button
             type="button"
             size="sm"
@@ -229,7 +241,7 @@ export function VacancyIntake({
 
       {/* Сроки уже названы — форму прячем, иначе она висит открытой
           после успешной отправки */}
-      {mode === "estimate" && status !== "ESTIMATED" && (
+      {mode === "estimate" && status === "SUBMITTED" && (
         <form action={estimate} className="space-y-3 rounded-md border p-3">
           <input type="hidden" name="vacancyId" value={vacancyId} />
           <div className="grid gap-3 sm:grid-cols-2">

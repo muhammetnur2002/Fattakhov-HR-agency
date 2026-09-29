@@ -320,7 +320,9 @@ function IntakeCard({
             : ""}
           {vacancy.estimatedFirstCandidatesAt
             ? `Обещали кандидатов к ${formatDate(vacancy.estimatedFirstCandidatesAt)}.`
-            : "Возьмите в работу или назовите сроки."}
+            : vacancy.status === "CLARIFYING"
+              ? "Задали вопросы — пока клиент не ответит, заявка ждёт."
+              : "Возьмите в работу или назовите сроки."}
         </CardDescription>
       </CardHeader>
       <CardContent>
