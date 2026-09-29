@@ -1555,6 +1555,35 @@ async function main() {
         body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', applicationId: 'no-such-application', status: 'INVITED' }),
       });
       check('статус несуществующего отклика не меняется', statusForeign.status === 404, statusForeign.body);
+
+      // Сообщения, счётчики и кандидаты клиента CRM
+      const msgNoAuth = await fetch(`${BASE}/api/service/employer/messages?crmClientId=${serviceCrmClientId}`);
+      check('диалоги без служебного секрета — отказ', msgNoAuth.status === 401 || msgNoAuth.status === 503);
+      const msgList = await serviceCall(`/api/service/employer/messages?crmClientId=${serviceCrmClientId}`);
+      check('диалоги клиента читаются через служебный API', msgList.status === 200 && Array.isArray(msgList.body?.threads), msgList.body);
+      const msgForeign = await serviceCall('/api/service/employer/messages?crmClientId=does-not-exist');
+      check('чужой crmClientId диалогов не видит', msgForeign.status === 404, msgForeign.body);
+      const msgThreadMissing = await serviceCall(
+        `/api/service/employer/messages/no-such-application?crmClientId=${serviceCrmClientId}`,
+      );
+      check('несуществующая переписка — 404', msgThreadMissing.status === 404, msgThreadMissing.body);
+      const msgSendMissing = await serviceCall('/api/service/employer/messages/no-such-application', {
+        method: 'POST',
+        body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', body: 'Привет' }),
+      });
+      check('в несуществующую переписку не написать', msgSendMissing.status === 404, msgSendMissing.body);
+      const summary = await serviceCall(`/api/service/employer/summary?crmClientId=${serviceCrmClientId}`);
+      check(
+        'счётчики для значков отдаются',
+        summary.status === 200 && typeof summary.body?.newApplications === 'number' && typeof summary.body?.unreadMessages === 'number',
+        summary.body,
+      );
+      const candNoAuth = await fetch(`${BASE}/api/service/employer/candidates?crmClientId=${serviceCrmClientId}&vacancyId=x`);
+      check('кандидаты без служебного секрета — отказ', candNoAuth.status === 401 || candNoAuth.status === 503);
+      const candMissing = await serviceCall(
+        `/api/service/employer/candidates?crmClientId=${serviceCrmClientId}&vacancyId=no-such-vacancy`,
+      );
+      check('кандидаты на чужую вакансию — 404', candMissing.status === 404, candMissing.body);
     }
   }
   // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET

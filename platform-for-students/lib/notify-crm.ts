@@ -3,7 +3,7 @@ import 'server-only';
 import { agencySiteUrl } from '@/lib/agency';
 import { crmServiceSecret } from '@/lib/security/service-auth';
 
-export type CrmEventKind = 'company' | 'vacancy' | 'study' | 'crm-link';
+export type CrmEventKind = 'company' | 'vacancy' | 'study' | 'crm-link' | 'application' | 'message';
 
 /**
  * Пинг CRM: «появилось что-то на проверку». До этого колокольчик там
@@ -19,6 +19,8 @@ export async function notifyCrm(
   title: string,
   body?: string,
   groupKey?: string,
+  /** Для событий клиента (отклик, сообщение): кому из людей клиента показать в CRM. */
+  crmClientId?: string,
 ): Promise<void> {
   const secret = crmServiceSecret();
   const base = agencySiteUrl();
@@ -31,7 +33,7 @@ export async function notifyCrm(
       await fetch(`${base}/api/webhooks/students-event`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, title, body, groupKey }),
+        body: JSON.stringify({ kind, title, body, groupKey, crmClientId }),
         signal: controller.signal,
       });
     } finally {
