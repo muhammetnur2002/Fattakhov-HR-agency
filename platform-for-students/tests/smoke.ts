@@ -1549,6 +1549,21 @@ async function main() {
         list.body,
       );
 
+      // Воронка агентства: без секрета закрыто, с секретом — сводка по компании с одной вакансией
+      const funnelNoAuth = await fetch(`${BASE}/api/service/employer/funnel`);
+      check('воронка без служебного секрета закрыта', funnelNoAuth.status === 401 || funnelNoAuth.status === 503);
+      const funnel = await serviceCall('/api/service/employer/funnel');
+      const funnelRow = (funnel.body?.companies ?? []).find((c: { crmClientId: string }) => c.crmClientId === serviceCrmClientId);
+      check(
+        'воронка: компания клиента CRM видна с числом вакансий и без персональных данных',
+        funnel.status === 200 &&
+          funnelRow?.vacancies === 1 &&
+          funnelRow?.published === 1 &&
+          funnelRow?.applications === 0 &&
+          !JSON.stringify(funnelRow).includes('@'),
+        funnelRow,
+      );
+
       const single = await serviceCall(
         `/api/service/employer/vacancies/${serviceVacancyId}?crmClientId=${serviceCrmClientId}`,
       );

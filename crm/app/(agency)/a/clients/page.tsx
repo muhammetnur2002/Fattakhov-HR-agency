@@ -57,6 +57,9 @@ export default async function ClientsPage({
         {canManage && (
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
+              <Link href="/a/clients/funnel">Воронка студплатформы</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/a/clients/link-requests" className="flex items-center gap-2">
                 Заявки на привязку
                 {linkRequests.length > 0 && <Badge>{linkRequests.length}</Badge>}

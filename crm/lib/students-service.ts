@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { FunnelActivity } from "@/lib/students-funnel";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import { studentsUrl } from "@/lib/urls";
 
@@ -478,6 +479,19 @@ export async function markStudentThreadRead(crmClientId: string, applicationId: 
     method: "PATCH",
     body: JSON.stringify({ crmClientId }),
   });
+}
+
+export interface StudentsFunnelRow extends FunnelActivity {
+  crmClientId: string;
+  companyName: string;
+}
+
+/** Активность компаний на платформе — для воронки в агентской части CRM. */
+export async function fetchStudentsFunnel(): Promise<StudentsFunnelRow[]> {
+  const response = await call("/api/service/employer/funnel");
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { companies: StudentsFunnelRow[] };
+  return data.companies;
 }
 
 /** Значки в CRM: новые отклики и непрочитанные сообщения. Не бросает: значок не стоит ошибки страницы. */
