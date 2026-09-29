@@ -325,6 +325,13 @@
   }
 }
 
+/* Экран на весь остаток окна (чат на телефоне): плавающие кнопки поверх него не нужны */
+@media (max-width: 1023px) {
+  html[data-app-screen] [data-theme-toggle] {
+    display: none;
+  }
+}
+
 @layer utilities {
   .page-x {
     padding-left: var(--page-gutter);

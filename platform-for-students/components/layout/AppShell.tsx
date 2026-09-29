@@ -42,7 +42,12 @@ export async function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-50 border-b border-[var(--hairline)] bg-ink/70 backdrop-blur-glass">
+      {/*
+        before: сплошная полоса над шапкой. В iOS Safari страница рисуется и под
+        статус-баром, а липкая шапка встаёт ниже него — без полосы содержимое (фото
+        студента и т.п.) просвечивало над шапкой при прокрутке.
+      */}
+      <header className="sticky top-0 z-50 border-b border-[var(--hairline)] bg-ink/70 backdrop-blur-glass before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
         <div
           className={cn(
             'page-x mx-auto flex h-[var(--header-h)] items-center justify-between gap-4',

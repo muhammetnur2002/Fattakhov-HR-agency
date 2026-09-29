@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { MessagesSquare, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { Conversation, ThreadRow } from './Conversation';
+import { useAppViewport } from './useAppViewport';
 import { useLiveThreads } from '@/lib/hooks/useLiveThreads';
 import { durations, easeOutExpo } from '@/lib/motion';
 import { cn, plural } from '@/lib/utils';
@@ -32,6 +33,8 @@ export function ChatScreen({
   const [thread, setThread] = useState<ThreadDTO | null>(initialThread);
   const [activeId, setActiveId] = useState<string | null>(initialThread?.applicationId ?? null);
   const [pending, setPending] = useState<MessageDTO[]>([]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useAppViewport(rootRef);
   const [query, setQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const sequence = useRef(0);
@@ -149,10 +152,14 @@ export function ChatScreen({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      ref={rootRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: durations.base, ease: easeOutExpo }}
-      className="surface grid h-[calc(100dvh-var(--header-h)-7rem)] min-h-[30rem] grid-cols-1 overflow-hidden rounded-3xl lg:grid-cols-[22rem_minmax(0,1fr)]"
+      // На телефоне — экран приложения: без рамки и скруглений, на всю ширину
+      // и весь остаток высоты (см. useAppViewport). Карточка с двумя колонками —
+      // только на широком экране.
+      className="-mx-[var(--page-gutter)] grid grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem] lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl"
     >
       {/* ---------- список ---------- */}
       <aside

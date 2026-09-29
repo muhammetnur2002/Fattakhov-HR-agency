@@ -30,6 +30,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     <button
       type="button"
       aria-label="Переключить тему"
+      data-theme-toggle
       title="Переключить тему"
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
       className={cn(

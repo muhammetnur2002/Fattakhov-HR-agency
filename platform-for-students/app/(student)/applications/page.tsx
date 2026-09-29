@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { RefreshOnMount } from '@/components/layout/RefreshOnMount';
 import { ApplicationsList } from '@/components/screens/ApplicationsList';
 import { getStore } from '@/lib/db';
 import { requireStudentPage } from '@/lib/security/guards';
@@ -15,5 +16,10 @@ export default async function ApplicationsPage() {
     // Гасит счётчик в навигации — открыл вкладку, значит увидел, что там
     (await getStore()).students.markApplicationsViewed(student.id),
   ]);
-  return <ApplicationsList applications={applications} pending={pending} study={buildStudyState(student)} />;
+  return (
+    <>
+      <RefreshOnMount />
+      <ApplicationsList applications={applications} pending={pending} study={buildStudyState(student)} />
+    </>
+  );
 }

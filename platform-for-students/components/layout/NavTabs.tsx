@@ -42,7 +42,10 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
         // иначе новый ответ работодателя был виден только после перехода
         // на другую страницу — сервер считал его один раз при заходе.
         const badge = item.href.endsWith('/messages') && liveUnread !== null ? liveUnread : item.badge;
-        const hasBadge = badge !== undefined && badge > 0;
+        // Пока открыт сам раздел «Отклики», значок на нём не нужен: человек уже
+        // смотрит на то, о чём он сообщает (сервер снимет отметку при показе страницы)
+        const seenHere = active && item.href === '/applications';
+        const hasBadge = badge !== undefined && badge > 0 && !seenHere;
         return (
           <Link
             key={item.href}
