@@ -7,9 +7,16 @@ import { prisma } from "@/lib/db/prisma";
 import {
   actOnEmployerVacancy,
   createEmployerVacancy,
+  fetchStudentThread,
+  fetchStudentThreads,
+  inviteStudentCandidate,
   markEmployerApplicationViewed,
+  markStudentThreadRead,
+  sendStudentMessage,
   setEmployerApplicationStatus,
   updateEmployerVacancy,
+  type StudentThread,
+  type StudentThreadSummary,
   type StudentsApplicationStatus,
   type VacancyFields,
 } from "@/lib/students-service";
@@ -140,4 +147,55 @@ export async function applicationAction(
       : await setEmployerApplicationStatus({ crmClientId: actor.clientId, actor: label, applicationId, status });
   if (result.error) return { error: result.error.error ?? "Не удалось выполнить действие" };
   return {};
+}
+
+/** Ветка целиком — для живого обновления открытой переписки. */
+export async function loadThreadAction(applicationId: string): Promise<StudentThread | null> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return null;
+  try {
+    return await fetchStudentThread(actor.clientId, applicationId);
+  } catch {
+    return null;
+  }
+}
+
+/** Список диалогов — то же, для опроса раз в несколько секунд. */
+export async function loadThreadsAction(): Promise<StudentThreadSummary[] | null> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return null;
+  try {
+    return await fetchStudentThreads(actor.clientId);
+  } catch {
+    return null;
+  }
+}
+
+export async function sendStudentMessageAction(applicationId: string, body: string): Promise<{ error?: string }> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
+  const label = await actorLabel(actor.id);
+  const result = await sendStudentMessage({ crmClientId: actor.clientId, actor: label, applicationId, body });
+  if (result.error) return { error: result.error.fields?.body ?? result.error.error ?? "Не удалось отправить" };
+  return {};
+}
+
+export async function markStudentThreadReadAction(applicationId: string): Promise<void> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return;
+  await markStudentThreadRead(actor.clientId, applicationId);
+}
+
+export async function inviteCandidateAction(vacancyId: string, studentId: string): Promise<{ error?: string; invited?: boolean }> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
+  const label = await actorLabel(actor.id);
+  const result = await inviteStudentCandidate({ crmClientId: actor.clientId, actor: label, vacancyId, studentId });
+  if (result.error) return { error: result.error.error ?? "Не удалось пригласить" };
+  return { invited: result.invited };
 }

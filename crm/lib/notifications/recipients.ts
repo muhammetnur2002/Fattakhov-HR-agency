@@ -140,3 +140,20 @@ export async function threadRecipients(params: {
   );
   return [...new Set([...agency, ...client])];
 }
+
+/**
+ * Клиентская сторона студенческой платформы: администраторы и нанимающие
+ * менеджеры клиента — те же роли, которым открыт раздел «Студенческая
+ * платформа» (право students.enterAsClient).
+ */
+export async function studentsClientRecipients(clientId: string): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      clientId,
+      isActive: true,
+      role: { in: ["CLIENT_ADMIN", "CLIENT_HIRING"] },
+    },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}

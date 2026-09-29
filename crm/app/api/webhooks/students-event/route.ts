@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { notify } from "@/lib/notifications/notify";
-import { studentsGrantRecipients } from "@/lib/notifications/recipients";
+import { studentsClientRecipients, studentsGrantRecipients } from "@/lib/notifications/recipients";
 import { safeEqual } from "@/lib/services/passwords";
 import type { EventCode } from "@/lib/notifications/events";
 import type { StaffGrant } from "@/lib/access";
@@ -17,6 +17,17 @@ import type { StaffGrant } from "@/lib/access";
  * один общий CRM_SERVICE_SECRET, вызовы симметричны — кто угодно из двух
  * приложений может проверить подпись другого.
  */
+type ClientMapping = { event: EventCode; linkUrl: string };
+
+/**
+ * События для клиента: отклик и сообщение студента. Получатели — люди
+ * клиента с crmClientId из запроса, а не сотрудники по гранту.
+ */
+const CLIENT_KIND_TO_EVENT: Record<string, ClientMapping> = {
+  application: { event: "STUDENTS_APPLICATION_NEW", linkUrl: "/students/applications" },
+  message: { event: "STUDENTS_MESSAGE_NEW", linkUrl: "/students/messages" },
+};
+
 const KIND_TO_EVENT: Record<
   string,
   { event: EventCode; grant: StaffGrant; linkUrl: string }
@@ -57,10 +68,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { kind?: string; title?: string; body?: string; groupKey?: string }
+    | { kind?: string; title?: string; body?: string; groupKey?: string; crmClientId?: string }
     | null;
+  const clientMapping = body?.kind ? CLIENT_KIND_TO_EVENT[body.kind] : undefined;
   const mapping = body?.kind ? KIND_TO_EVENT[body.kind] : undefined;
-  if (!mapping || !body?.title) {
+  if ((!mapping && !clientMapping) || !body?.title) {
     return NextResponse.json({ error: "Неизвестное событие" }, { status: 400 });
   }
 
@@ -69,13 +81,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Организация не настроена" }, { status: 503 });
   }
 
+  if (clientMapping) {
+    if (!body.crmClientId) {
+      return NextResponse.json({ error: "Не указан клиент" }, { status: 400 });
+    }
+    await notify({
+      organizationId: organization.id,
+      userIds: await studentsClientRecipients(body.crmClientId),
+      event: clientMapping.event,
+      title: body.title,
+      body: body.body,
+      linkUrl: clientMapping.linkUrl,
+      groupKey: body.groupKey,
+    });
+    return NextResponse.json({ ok: true }, { status: 201 });
+  }
+
   await notify({
     organizationId: organization.id,
-    userIds: await studentsGrantRecipients(organization.id, mapping.grant),
-    event: mapping.event,
+    userIds: await studentsGrantRecipients(organization.id, mapping!.grant),
+    event: mapping!.event,
     title: body.title,
     body: body.body,
-    linkUrl: mapping.linkUrl,
+    linkUrl: mapping!.linkUrl,
     groupKey: body.groupKey,
   });
 

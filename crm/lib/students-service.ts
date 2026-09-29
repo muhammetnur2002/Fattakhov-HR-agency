@@ -411,3 +411,118 @@ export async function markEmployerApplicationViewed(input: {
   const response = await call("/api/service/employer/applications", { method: "POST", body: JSON.stringify(input) });
   return response.ok ? {} : { error: await parseError(response) };
 }
+
+/** Переписка клиента со студентами, счётчики для значков и поиск кандидатов. */
+
+export interface StudentThreadSummary {
+  applicationId: string;
+  vacancyId: string;
+  vacancyTitle: string;
+  counterpartName: string;
+  counterpartSubtitle: string;
+  status: StudentsApplicationStatus;
+  lastMessageBody: string | null;
+  lastMessageAuthor: "STUDENT" | "EMPLOYER" | null;
+  lastMessageAt: string | null;
+  unread: number;
+  canWrite: boolean;
+  lockedReason: string | null;
+}
+
+export interface StudentThreadMessage {
+  id: string;
+  author: "STUDENT" | "EMPLOYER";
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+  mine: boolean;
+}
+
+export interface StudentThread extends StudentThreadSummary {
+  messages: StudentThreadMessage[];
+}
+
+const enc = encodeURIComponent;
+
+export async function fetchStudentThreads(crmClientId: string): Promise<StudentThreadSummary[]> {
+  const response = await call(`/api/service/employer/messages?crmClientId=${enc(crmClientId)}`);
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  return ((await response.json()) as { threads: StudentThreadSummary[] }).threads;
+}
+
+/** null — переписки нет или она чужая. */
+export async function fetchStudentThread(crmClientId: string, applicationId: string): Promise<StudentThread | null> {
+  const response = await call(`/api/service/employer/messages/${enc(applicationId)}?crmClientId=${enc(crmClientId)}`);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  return ((await response.json()) as { thread: StudentThread }).thread;
+}
+
+export async function sendStudentMessage(input: {
+  crmClientId: string;
+  actor: string;
+  applicationId: string;
+  body: string;
+}): Promise<{ error?: StudentsApiError }> {
+  const { applicationId, ...rest } = input;
+  const response = await call(`/api/service/employer/messages/${enc(applicationId)}`, {
+    method: "POST",
+    body: JSON.stringify(rest),
+  });
+  return response.ok ? {} : { error: await parseError(response) };
+}
+
+export async function markStudentThreadRead(crmClientId: string, applicationId: string): Promise<void> {
+  await call(`/api/service/employer/messages/${enc(applicationId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ crmClientId }),
+  });
+}
+
+/** Значки в CRM: новые отклики и непрочитанные сообщения. Не бросает: значок не стоит ошибки страницы. */
+export async function fetchStudentsSummary(
+  crmClientId: string,
+): Promise<{ newApplications: number; unreadMessages: number } | null> {
+  try {
+    const response = await call(`/api/service/employer/summary?crmClientId=${enc(crmClientId)}`);
+    if (!response.ok) return null;
+    return (await response.json()) as { newApplications: number; unreadMessages: number };
+  } catch {
+    return null;
+  }
+}
+
+export interface StudentCandidate {
+  id: string;
+  fullName: string;
+  age: number;
+  university: string;
+  speciality: string;
+  studyYear: number;
+  city: string | null;
+  workDays: string[];
+  hoursPerWeek: number | null;
+  skills: string[];
+  about: string | null;
+}
+
+export async function fetchStudentCandidates(
+  crmClientId: string,
+  vacancyId: string,
+): Promise<{ vacancy: { id: string; title: string }; candidates: StudentCandidate[] } | null> {
+  const response = await call(`/api/service/employer/candidates?crmClientId=${enc(crmClientId)}&vacancyId=${enc(vacancyId)}`);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  return (await response.json()) as { vacancy: { id: string; title: string }; candidates: StudentCandidate[] };
+}
+
+export async function inviteStudentCandidate(input: {
+  crmClientId: string;
+  actor: string;
+  vacancyId: string;
+  studentId: string;
+}): Promise<{ invited?: boolean; error?: StudentsApiError }> {
+  const response = await call("/api/service/employer/candidates", { method: "POST", body: JSON.stringify(input) });
+  if (!response.ok) return { error: await parseError(response) };
+  return { invited: ((await response.json()) as { invited: boolean }).invited };
+}

@@ -236,6 +236,22 @@ export const EVENTS = {
     category: "students",
   },
 
+  // Клиенту, а не агентству: событие приходит с платформы по клиенту-получателю.
+  // Письмо о новом отклике и сводку о сообщениях платформа шлёт сама, поэтому
+  // здесь только колокольчик и Telegram (последний — лишь у тех, кто привязал бота)
+  STUDENTS_APPLICATION_NEW: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Новый отклик студента на вашу вакансию",
+    category: "students",
+  },
+  STUDENTS_MESSAGE_NEW: {
+    channels: ["telegram"],
+    priority: "normal",
+    description: "Новое сообщение от студента",
+    category: "students",
+  },
+
   // --- Сводка ---
   WEEKLY_DIGEST: {
     channels: ["email"],
