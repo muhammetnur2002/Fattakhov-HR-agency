@@ -1,71 +1,120 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireClientActor } from "@/lib/auth/session";
-import { studentsSsoSecret } from "@/lib/students-sso";
-import { studentsUrl } from "@/lib/urls";
+import {
+  fetchEmployerVacancies,
+  StudentsServiceError,
+  type EmployerVacancyDTO,
+  type StudentsVacancyStatus,
+} from "@/lib/students-service";
 
 export const metadata = { title: "Студенческая платформа" };
 
+const STATUS_LABEL: Record<StudentsVacancyStatus, string> = {
+  DRAFT: "Черновик",
+  PENDING: "На проверке",
+  PUBLISHED: "Опубликована",
+  REJECTED: "Отклонена",
+  CLOSED: "Снята",
+};
+
+const STATUS_VARIANT: Record<StudentsVacancyStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  DRAFT: "outline",
+  PENDING: "secondary",
+  PUBLISHED: "default",
+  REJECTED: "destructive",
+  CLOSED: "outline",
+};
+
 /**
- * Вход клиента на студенческую платформу — тем же паролем, что и в CRM.
- * Компанию агентство уже проверило (договор), поэтому вакансия публикуется
- * сразу, без очереди модерации — как и вакансии, которые заводит из CRM
- * само агентство.
+ * Вакансии клиента на студенческой платформе — прямо в CRM, без перехода
+ * на другой сайт (было: кнопка-редирект, app/(client)/students/open/route.ts).
+ * Данные и правила берутся служебным вызовом (lib/students-service.ts),
+ * клиент своей сессией на ту платформу не заходит.
  */
-export default async function ClientStudentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function StudentsVacanciesPage() {
   const actor = await requireClientActor();
   authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return null;
 
-  const { error } = await searchParams;
-  const configured = Boolean(studentsSsoSecret() && studentsUrl("/"));
+  let vacancies: EmployerVacancyDTO[] = [];
+  let error: string | null = null;
+  try {
+    vacancies = await fetchEmployerVacancies(actor.clientId);
+  } catch (err) {
+    error = err instanceof StudentsServiceError ? err.message : "Не удалось загрузить вакансии";
+  }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Студенческая платформа</h1>
-        <p className="text-sm text-muted-foreground">
-          Публикуйте вакансии для студентов напрямую — вход по вашей учётной
-          записи, второй пароль не нужен.
-        </p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Студенческая платформа</h1>
+          <p className="text-sm text-muted-foreground">
+            Вакансии для подработки — студенты откликаются сами, без поиска от агентства.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/students/new">
+            <Plus />
+            Новая вакансия
+          </Link>
+        </Button>
       </div>
 
-      {(!configured || error === "config") && (
+      {error && (
         <Alert variant="destructive">
-          <AlertDescription>
-            Вход пока не настроен — обратитесь в агентство.
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Кабинет компании</CardTitle>
-          <CardDescription>
-            Компания уже проверена агентством — вакансия публикуется сразу.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <form method="post" action="/students/open">
-            <Button type="submit" disabled={!configured}>
-              Открыть студенческую платформу
-            </Button>
-          </form>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Откроется в этой же вкладке, сразу в форме новой вакансии.
-          </p>
-        </CardContent>
-      </Card>
+      {!error && vacancies.length === 0 && (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            Вакансий пока нет — создайте первую.
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-3">
+        {vacancies.map((vacancy) => {
+          const card = (
+            <Card
+              className={
+                vacancy.fromCrm ? undefined : "transition-colors hover:border-primary/40 cursor-pointer"
+              }
+            >
+              <CardContent className="flex flex-wrap items-start justify-between gap-3 py-4">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{vacancy.title}</span>
+                    {vacancy.fromCrm && <Badge variant="outline">Из CRM</Badge>}
+                    <Badge variant={STATUS_VARIANT[vacancy.status]}>{STATUS_LABEL[vacancy.status]}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {vacancy.city} · откликов: {vacancy.applications}
+                  </p>
+                  {vacancy.moderationNote && (
+                    <p className="text-sm text-destructive">Причина: {vacancy.moderationNote}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+          return vacancy.fromCrm ? (
+            <div key={vacancy.id}>{card}</div>
+          ) : (
+            <Link key={vacancy.id} href={`/students/${vacancy.id}`}>
+              {card}
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

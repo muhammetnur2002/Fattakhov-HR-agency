@@ -232,3 +232,126 @@ export async function fetchPilotMetrics(): Promise<PilotMetrics> {
   if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
   return (await response.json()) as PilotMetrics;
 }
+
+/**
+ * Вакансии клиента на студенческой платформе — без захода клиента туда
+ * (см. app/(client)/students/*). Поля и правила те же, что в кабинете
+ * компании там (lib/vacancy.ts на той стороне): лимит на компанию,
+ * автопубликация по действующему договору.
+ */
+
+export type StudentsVacancyStatus = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | "CLOSED";
+
+export interface EmployerVacancyDTO {
+  id: string;
+  title: string;
+  status: StudentsVacancyStatus;
+  fromCrm: boolean;
+  moderationNote: string | null;
+  applications: number;
+  city: string;
+  employmentType: "PART_TIME" | "SHIFT" | "PROJECT" | "INTERNSHIP" | "FULL_TIME";
+  updatedAt: string;
+  keepAfterClose: boolean | null;
+}
+
+export interface VacancyFields {
+  title: string;
+  summary: string;
+  responsibilities: string[];
+  requirements: string[];
+  perks: string[];
+  learnings: string[];
+  team: string | null;
+  salaryFrom: number | null;
+  salaryTo: number | null;
+  salaryPeriod: "MONTH" | "SHIFT" | "HOUR";
+  city: string;
+  district: string | null;
+  address: string | null;
+  addressDetails: string | null;
+  workFormat: "ONSITE" | "HYBRID" | "REMOTE";
+  employmentType: "PART_TIME" | "SHIFT" | "PROJECT" | "INTERNSHIP" | "FULL_TIME";
+  shiftDays: ("MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN")[];
+  hoursPerWeek: number | null;
+  tags: string[];
+  photos: string[];
+  videoUrl: string | null;
+}
+
+export interface VacancyDetail extends VacancyFields {
+  id: string;
+  status: StudentsVacancyStatus;
+  crmId: string | null;
+  moderationNote: string | null;
+  keepAfterClose: boolean | null;
+}
+
+export interface StudentsApiError {
+  error?: string;
+  code?: string;
+  fields?: Record<string, string>;
+}
+
+async function parseError(response: Response): Promise<StudentsApiError> {
+  const data = (await response.json().catch(() => ({}))) as StudentsApiError;
+  return { error: data.error ?? `Студенческая платформа ответила ${response.status}`, code: data.code, fields: data.fields };
+}
+
+/** Все вакансии клиента, всех статусов. */
+export async function fetchEmployerVacancies(crmClientId: string): Promise<EmployerVacancyDTO[]> {
+  const response = await call(`/api/service/employer/vacancies?crmClientId=${encodeURIComponent(crmClientId)}`);
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { vacancies: EmployerVacancyDTO[] };
+  return data.vacancies;
+}
+
+/** Одна вакансия — для формы правки. Null — не найдена или ведётся из CRM отдельно. */
+export async function fetchEmployerVacancy(crmClientId: string, id: string): Promise<VacancyDetail | null> {
+  const response = await call(`/api/service/employer/vacancies/${id}?crmClientId=${encodeURIComponent(crmClientId)}`);
+  if (response.status === 404 || response.status === 409) return null;
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { vacancy: VacancyDetail };
+  return data.vacancy;
+}
+
+/** Новая вакансия. submit — черновик (false) или сразу на проверку/публикацию (true). */
+export async function createEmployerVacancy(
+  input: VacancyFields & { crmClientId: string; actor: string; submit: boolean },
+): Promise<{ error?: StudentsApiError; id?: string; status?: StudentsVacancyStatus }> {
+  const response = await call("/api/service/employer/vacancies", { method: "POST", body: JSON.stringify(input) });
+  if (!response.ok) return { error: await parseError(response) };
+  const data = (await response.json()) as { id: string; status: StudentsVacancyStatus };
+  return data;
+}
+
+/** Правка вакансии. */
+export async function updateEmployerVacancy(
+  id: string,
+  input: VacancyFields & { crmClientId: string; actor: string; submit: boolean },
+): Promise<{ error?: StudentsApiError; id?: string; status?: StudentsVacancyStatus }> {
+  const response = await call(`/api/service/employer/vacancies/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+  if (!response.ok) return { error: await parseError(response) };
+  const data = (await response.json()) as { id: string; status: StudentsVacancyStatus };
+  return data;
+}
+
+/** Действие: отправить на проверку/опубликовать, снять или удалить. */
+export async function actOnEmployerVacancy(
+  id: string,
+  input: { crmClientId: string; actor: string; action: "submit" | "close" | "delete"; keep?: boolean },
+): Promise<{ error?: StudentsApiError; id?: string; status?: StudentsVacancyStatus; deleted?: boolean }> {
+  const response = await call(`/api/service/employer/vacancies/${id}`, { method: "POST", body: JSON.stringify(input) });
+  if (!response.ok) return { error: await parseError(response) };
+  return (await response.json()) as { id: string; status?: StudentsVacancyStatus; deleted?: boolean };
+}
+
+/** Адреса, где клиент уже нанимал, — подсказки в форме вакансии. */
+export async function fetchEmployerAddresses(
+  crmClientId: string,
+): Promise<{ city: string; district: string | null; address: string; addressDetails: string | null }[]> {
+  const response = await call(`/api/service/employer/addresses?crmClientId=${encodeURIComponent(crmClientId)}`);
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { addresses: { city: string; district: string | null; address: string; addressDetails: string | null }[] };
+  return data.addresses;
+}
