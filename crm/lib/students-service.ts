@@ -67,6 +67,17 @@ export interface ModerationCompany {
 export interface ModerationVacancy {
   companyId: string;
   companyStatus: "PENDING" | "APPROVED" | "REJECTED";
+  /** Кто публикует: реквизиты и «о компании» — чем проверять вакансию. Нет у ответа старой платформы. */
+  company?: {
+    name: string;
+    inn: string | null;
+    about: string | null;
+    website: string | null;
+    city: string | null;
+    logoUrl: string | null;
+    /** Клиент с действующим договором — компанию агентство уже знает */
+    contracted: boolean;
+  };
   submittedAt: string;
   version: string;
   vacancy: {
@@ -374,6 +385,28 @@ export interface StudentsApiError {
 async function parseError(response: Response): Promise<StudentsApiError> {
   const data = (await response.json().catch(() => ({}))) as StudentsApiError;
   return { error: data.error ?? `Студенческая платформа ответила ${response.status}`, code: data.code, fields: data.fields };
+}
+
+export interface CompanyProfileSync {
+  crmClientId: string;
+  actor: string;
+  companyName: string;
+  inn: string | null;
+  about: string | null;
+  website: string | null;
+  city: string | null;
+  /** Логотип, уже загруженный на платформу; undefined — не менять */
+  logoUrl?: string | null;
+}
+
+/** Профиль компании клиента уходит на платформу: агентство видит его при проверке вакансии. */
+export async function syncCompanyProfile(input: CompanyProfileSync): Promise<{ error?: string; code?: string }> {
+  const response = await call("/api/service/employer/profile", { method: "PUT", body: JSON.stringify(input) });
+  if (!response.ok) {
+    const failure = await parseError(response);
+    return { error: failure.error, code: failure.code };
+  }
+  return {};
 }
 
 /** Обложка вакансии — картинка компании; платформа проверяет тип и размер (JPG/PNG/WebP до 5 МБ). */

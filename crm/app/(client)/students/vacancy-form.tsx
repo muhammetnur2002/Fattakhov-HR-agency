@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { startTransition, useActionState, useRef, useState } from "react";
 
 import { ImagePlus, Trash2 } from "lucide-react";
 
@@ -146,8 +145,7 @@ function CoverField({ initialPhotos }: { initialPhotos: string[] }) {
   );
 }
 
-function SubmitButtons({ submitLabel }: { submitLabel: string }) {
-  const { pending } = useFormStatus();
+function SubmitButtons({ submitLabel, pending }: { submitLabel: string; pending: boolean }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button type="submit" name="submit" value="false" variant="outline" disabled={pending}>
@@ -172,11 +170,21 @@ export function VacancyForm({
   skipsModeration: boolean;
   fieldErrors?: Record<string, string>;
 }) {
-  const [state, formAction] = useActionState<VacancyFormState, FormData>(action, {});
+  const [state, formAction, pending] = useActionState<VacancyFormState, FormData>(action, {});
+
+  // Отправляем вручную, а не через action формы: React 19 после action очищает все
+  // поля формы, и при любой ошибке («заполните ИНН», «выберите день») клиент терял бы
+  // всё, что успел ввести
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+    const data = new FormData(event.currentTarget, submitter);
+    startTransition(() => formAction(data));
+  }
   const errors = state.fields ?? fieldErrors ?? {};
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <CoverField initialPhotos={initial?.photos ?? []} />
 
       <Card>
@@ -349,7 +357,7 @@ export function VacancyForm({
         </Alert>
       )}
 
-      <SubmitButtons submitLabel={skipsModeration ? "Опубликовать" : "Отправить на проверку"} />
+      <SubmitButtons submitLabel={skipsModeration ? "Опубликовать" : "Отправить на проверку"} pending={pending} />
       <p className="text-xs text-muted-foreground">
         {skipsModeration
           ? "По вашему договору вакансия публикуется сразу, без проверки агентством."

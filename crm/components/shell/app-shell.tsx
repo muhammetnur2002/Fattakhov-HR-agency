@@ -134,6 +134,7 @@ export async function AppShell({
               fullName={user?.fullName ?? ""}
               email={user?.email ?? ""}
               roleLabel={ROLE_LABELS[actor.role]}
+              companyHref={actor.clientId ? "/company" : undefined}
             />
           </div>
         </header>

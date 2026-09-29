@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { Building2, LogOut } from "lucide-react";
+import Link from "next/link";
 
 import { logout } from "@/app/actions/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,10 +19,13 @@ export function UserMenu({
   fullName,
   email,
   roleLabel,
+  companyHref,
 }: {
   fullName: string;
   email: string;
   roleLabel: string;
+  /** Профиль компании — только у клиентов: логотип, ИНН, «о компании». */
+  companyHref?: string;
 }) {
   return (
     <DropdownMenu>
@@ -49,6 +53,14 @@ export function UserMenu({
           <div className="mt-1 text-xs text-muted-foreground">{roleLabel}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {companyHref && (
+          <DropdownMenuItem asChild>
+            <Link href={companyHref} className="cursor-pointer">
+              <Building2 className="size-4" />
+              Профиль компании
+            </Link>
+          </DropdownMenuItem>
+        )}
         <form action={logout}>
           <DropdownMenuItem asChild>
             <button type="submit" className="w-full cursor-pointer">

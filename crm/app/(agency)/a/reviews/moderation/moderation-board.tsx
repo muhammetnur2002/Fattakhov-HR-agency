@@ -420,6 +420,8 @@ function VacancyCard({
           </div>
         </div>
 
+        {item.company && <CompanyBrief company={item.company} />}
+
         <p className="text-sm text-primary">
           {money(vacancy.salaryFrom, vacancy.salaryTo)}
           <span className="text-muted-foreground"> · {vacancy.city}</span>
@@ -439,6 +441,66 @@ function VacancyCard({
         />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Чем проверять вакансию: реквизиты и рассказ о компании. Без ИНН и описания
+ * проверять нечего — это видно сразу, а не после того, как вакансию одобрили.
+ */
+function CompanyBrief({ company }: { company: NonNullable<ModerationVacancy["company"]> }) {
+  const website = company.website && /^https?:\/\//i.test(company.website) ? company.website : null;
+  return (
+    <div className="space-y-2 rounded-xl border bg-muted/30 p-3 text-sm">
+      <div className="flex items-center gap-3">
+        <Avatar className="size-9">
+          {company.logoUrl && <AvatarImage src={studentsFileProxyUrl(company.logoUrl)} alt="" />}
+          <AvatarFallback>
+            <Building2 className="size-4" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{company.name}</p>
+          <p className="text-xs text-muted-foreground">{company.city ?? "Город не указан"}</p>
+        </div>
+        {company.contracted && <Badge variant="secondary">Клиент по договору</Badge>}
+      </div>
+      <dl className="space-y-1">
+        <div className="flex gap-2">
+          <dt className="text-muted-foreground">ИНН</dt>
+          <dd>
+            {company.inn ? (
+              <a
+                href={`https://egrul.nalog.ru/index.html`}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline"
+                title="Проверить в реестре ФНС"
+              >
+                {company.inn}
+              </a>
+            ) : (
+              <span className="text-destructive">не указан — проверить компанию нечем</span>
+            )}
+          </dd>
+        </div>
+        {website && (
+          <div className="flex gap-2">
+            <dt className="text-muted-foreground">Сайт</dt>
+            <dd className="break-all">
+              <a href={website} target="_blank" rel="noreferrer" className="hover:underline">
+                {website}
+              </a>
+            </dd>
+          </div>
+        )}
+      </dl>
+      {company.about ? (
+        <p className="line-clamp-4 text-muted-foreground">{company.about}</p>
+      ) : (
+        <p className="text-destructive">Описание компании не заполнено</p>
+      )}
+    </div>
   );
 }
 

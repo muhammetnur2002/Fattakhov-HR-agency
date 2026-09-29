@@ -1567,6 +1567,50 @@ async function main() {
       check('повторное заведение безопасно и ничего не дублирует', ensured2.status === 200 && ensured2.body?.created === false, ensured2.body);
       const afterEnsure = await serviceCall(`/api/service/employer/vacancies?crmClientId=${provisionId}`);
       check('после заведения кабинет отдаёт пустой список вакансий', afterEnsure.status === 200 && afterEnsure.body?.vacancies?.length === 0, afterEnsure.body);
+      // Профиль компании из CRM: ИНН и описание видны при проверке вакансии
+      const profileBody = (patch: Record<string, unknown> = {}) =>
+        JSON.stringify({
+          crmClientId: provisionId,
+          actor: 'Смоук CRM',
+          companyName: 'Компания без входа',
+          inn: '7707083893',
+          about: 'Проверяемая компания из смоука',
+          website: 'https://smoke.example.ru',
+          city: 'Казань',
+          ...patch,
+        });
+      const profileNoAuth = await fetch(`${BASE}/api/service/employer/profile`, {
+        method: 'PUT',
+        body: profileBody(),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      check('профиль компании без служебного секрета закрыт', profileNoAuth.status === 401 || profileNoAuth.status === 503);
+      const profileBadInn = await serviceCall('/api/service/employer/profile', { method: 'PUT', body: profileBody({ inn: '123' }) });
+      check('кривой ИНН в профиле отвергнут', profileBadInn.status === 400, profileBadInn.body);
+      const profileOk = await serviceCall('/api/service/employer/profile', { method: 'PUT', body: profileBody() });
+      check('профиль компании из CRM сохраняется', profileOk.status === 200 && profileOk.body?.synced === true, profileOk.body);
+      const submittedFromCrm = await serviceCall('/api/service/employer/vacancies', {
+        method: 'POST',
+        body: JSON.stringify({ ...vacancyForm, title: 'Вакансия лида на проверку', crmClientId: provisionId, actor: 'Смоук CRM', submit: true }),
+      });
+      check('вакансия клиента без договора уходит на проверку', submittedFromCrm.status === 201 && submittedFromCrm.body?.status === 'PENDING', submittedFromCrm.body);
+      const queue = await serviceCall('/api/service/moderation');
+      const queued = (queue.body?.vacancies ?? []).find((v: any) => v.vacancy?.title === 'Вакансия лида на проверку');
+      check(
+        'в проверке видны ИНН, описание и сайт компании',
+        queue.status === 200 &&
+          queued?.company?.inn === '7707083893' &&
+          queued?.company?.about === 'Проверяемая компания из смоука' &&
+          queued?.company?.website === 'https://smoke.example.ru' &&
+          queued?.company?.contracted === false,
+        queued?.company,
+      );
+      const duplicateInn = await serviceCall('/api/service/employer/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ crmClientId: serviceCrmClientId, actor: 'Смоук CRM', companyName: 'Смоук-клиент CRM', inn: '7707083893' }),
+      });
+      check('ИНН, занятый другой компанией, отвергнут', duplicateInn.status === 409, duplicateInn.body);
+
       const noAuthEnsure = await fetch(`${BASE}/api/service/employer/ensure`, { method: 'POST', body: provisionBody, headers: { 'Content-Type': 'application/json' } });
       check('заведение компании без служебного секрета закрыто', noAuthEnsure.status === 401 || noAuthEnsure.status === 503);
 

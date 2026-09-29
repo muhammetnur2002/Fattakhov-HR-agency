@@ -642,6 +642,15 @@ export async function buildModerationQueue(): Promise<ModerationQueue> {
       {
         companyId: employer.id,
         companyStatus: employer.moderationStatus,
+        company: {
+          name: employer.companyName,
+          inn: employer.inn,
+          about: employer.about,
+          website: employer.website,
+          city: employer.city,
+          logoUrl: employer.logoUrl,
+          contracted: employer.crmActive,
+        },
         submittedAt: (vacancy.submittedAt ?? vacancy.updatedAt).toISOString(),
         version: vacancy.updatedAt.toISOString(),
         // Страница неодобренной компании не публична — ссылке из карточки вести некуда

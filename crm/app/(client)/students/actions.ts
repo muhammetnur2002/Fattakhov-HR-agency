@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 
 import { authorize, requireClientActor } from "@/lib/auth/session";
+import { getActiveAgreement } from "@/lib/services/agreements";
+import { getCompanyProfile } from "@/lib/services/company-profile";
+import { pushCompanyProfile } from "@/lib/services/company-sync";
 import { prisma } from "@/lib/db/prisma";
 import {
   actOnEmployerVacancy,
@@ -28,6 +31,30 @@ async function actorLabel(userId: string): Promise<string> {
 }
 
 export type VacancyFormState = { error?: string; fields?: Record<string, string> };
+
+/**
+ * Перед отправкой вакансии на проверку у компании без договора должен быть
+ * заполнен профиль: по ИНН и описанию агентство решает, публиковать ли вакансию.
+ * У клиента с действующим договором компанию уже проверили — его не задерживаем.
+ * Заодно передаём актуальный профиль на платформу, чтобы проверяющий его видел.
+ */
+async function requireCompanyProfileForReview(clientId: string, label: string): Promise<string | null> {
+  const [company, agreement, client] = await Promise.all([
+    getCompanyProfile(clientId),
+    getActiveAgreement(clientId),
+    prisma.client.findFirst({ where: { id: clientId }, select: { status: true } }),
+  ]);
+  const contracted = Boolean(agreement) || client?.status === "ACTIVE";
+  if (!contracted) {
+    const missing = [!company?.inn && "ИНН", !company?.description?.trim() && "описание компании"].filter(Boolean);
+    if (missing.length > 0) {
+      return `Заполните в профиле компании: ${missing.join(" и ")}. Профиль открывается из меню на вашем кружке справа вверху — по нему агентство проверяет компанию перед публикацией.`;
+    }
+  }
+  const sync = await pushCompanyProfile(clientId, label);
+  if (sync?.code === "INN_EXISTS") return sync.error;
+  return null;
+}
 
 function line(value: FormDataEntryValue | null): string[] {
   return String(value ?? "")
@@ -92,6 +119,11 @@ export async function createVacancyAction(
   const input = parseVacancyFields(formData);
   const label = await actorLabel(actor.id);
 
+  if (submit) {
+    const blocked = await requireCompanyProfileForReview(actor.clientId, label);
+    if (blocked) return { error: blocked };
+  }
+
   const result = await createEmployerVacancy({ ...input, crmClientId: actor.clientId, actor: label, submit });
   if (result.error) {
     return { error: result.error.error ?? "Не удалось сохранить вакансию", fields: result.error.fields };
@@ -112,6 +144,11 @@ export async function updateVacancyAction(
   const input = parseVacancyFields(formData);
   const label = await actorLabel(actor.id);
 
+  if (submit) {
+    const blocked = await requireCompanyProfileForReview(actor.clientId, label);
+    if (blocked) return { error: blocked };
+  }
+
   const result = await updateEmployerVacancy(id, { ...input, crmClientId: actor.clientId, actor: label, submit });
   if (result.error) {
     return { error: result.error.error ?? "Не удалось сохранить вакансию", fields: result.error.fields };
@@ -130,6 +167,10 @@ export async function vacancyActionAction(
   if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
 
   const label = await actorLabel(actor.id);
+  if (action === "submit") {
+    const blocked = await requireCompanyProfileForReview(actor.clientId, label);
+    if (blocked) return { error: blocked };
+  }
   const result = await actOnEmployerVacancy(id, { crmClientId: actor.clientId, actor: label, action, keep });
   if (result.error) return { error: result.error.error ?? "Не удалось выполнить действие" };
   return {};

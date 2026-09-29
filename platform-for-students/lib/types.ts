@@ -457,6 +457,17 @@ export interface ApprovedCompanyDTO {
 export interface ModerationVacancyDTO {
   companyId: string;
   companyStatus: ModerationStatus;
+  /** Кто публикует: реквизиты и «о компании» — чем проверять вакансию (открытые данные, не контакты) */
+  company: {
+    name: string;
+    inn: string | null;
+    about: string | null;
+    website: string | null;
+    city: string | null;
+    logoUrl: string | null;
+    /** Клиент CRM с действующим договором — компанию агентство уже знает */
+    contracted: boolean;
+  };
   submittedAt: string;
   /** Версия, которую видит HR: решение по устаревшей версии сервер отклонит */
   version: string;
