@@ -173,34 +173,60 @@ export function ChatScreen({
         </div>
 
         {threads.length > 0 && (
-          <div className="flex items-center gap-2 px-4 pb-3">
-            <div className="flex h-9 flex-1 items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/50 px-3">
-              <Search className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Поиск"
-                className="min-w-0 flex-1 bg-transparent text-[13px] text-paper placeholder:text-paper-faint focus:outline-none"
-              />
+          <>
+            <div className="px-4 pb-2.5">
+              <div className="flex h-9 items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/50 px-3">
+                <Search className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Поиск"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-paper placeholder:text-paper-faint focus:outline-none"
+                />
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setUnreadOnly((v) => !v)}
-              aria-pressed={unreadOnly}
-              className={cn(
-                'h-9 shrink-0 rounded-xl border px-3 text-[12.5px] font-medium transition-colors',
-                unreadOnly
-                  ? 'border-accent-400/40 bg-accent-500/20 text-accent-100'
-                  : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
-              )}
-            >
-              Непрочитанные
-            </button>
-          </div>
+
+            {/* Чипы-фильтры: «Все» и «Непрочитанные». «Клиенты»/«Команда»
+                из макета сюда не переносим — у диалогов работодателя со
+                студентами такого деления нет, кнопка была бы пустой. */}
+            <div className="flex gap-2 px-4 pb-3">
+              <button
+                type="button"
+                onClick={() => setUnreadOnly(false)}
+                aria-pressed={!unreadOnly}
+                className={cn(
+                  'rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors',
+                  !unreadOnly
+                    ? 'border-accent-400/40 bg-accent-500/25 text-paper'
+                    : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
+                )}
+              >
+                Все
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnreadOnly(true)}
+                aria-pressed={unreadOnly}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors',
+                  unreadOnly
+                    ? 'border-accent-400/40 bg-accent-500/25 text-paper'
+                    : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
+                )}
+              >
+                Непрочитанные
+                {totalUnread > 0 && (
+                  <span className="grid min-w-[17px] place-items-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold tabular-nums leading-[17px] text-paper">
+                    {totalUnread}
+                  </span>
+                )}
+              </button>
+            </div>
+          </>
         )}
 
-        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
           {threads.length === 0 ? (
             <p className="px-3 py-10 text-center text-[13px] leading-relaxed text-paper-faint">
               Диалогов пока нет. Они появятся, когда вы откликнетесь на вакансию и работодатель

@@ -198,12 +198,17 @@ export function ThreadRow({
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors duration-300',
+        // Каждый диалог — своя карточка (макет, вариант 3): отдельный фон и
+        // рамка вместо голой строки списка, слева полоска у непрочитанного
+        'relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-left shadow-sm transition-colors duration-300',
         active
-          ? 'border-[var(--hairline-strong)] bg-paper/[0.07]'
-          : 'border-transparent hover:bg-paper/[0.035]',
+          ? 'border-[var(--hairline-strong)] bg-paper/[0.09]'
+          : 'border-[var(--hairline)] bg-graphite-900/40 hover:bg-paper/[0.05]',
       )}
     >
+      {thread.unread > 0 && (
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-accent-500" />
+      )}
       <Avatar
         name={thread.counterpartName}
         src={thread.counterpartPhotoUrl}
