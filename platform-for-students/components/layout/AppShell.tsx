@@ -27,11 +27,14 @@ export async function AppShell({
   user,
   children,
   wide = false,
+  bell,
 }: {
   nav?: NavItem[];
   user?: { name: string; subtitle?: string; href?: string };
   children: React.ReactNode;
   wide?: boolean;
+  /** Кнопка справа в шапке вместо «Выйти» (колокольчик студента) */
+  bell?: React.ReactNode;
 }) {
   const session = await getSession();
   const unverifiedEmail = await pendingEmail(session);
@@ -51,7 +54,7 @@ export async function AppShell({
           {nav && <NavTabs items={nav} className="hidden md:flex" />}
 
           {user ? (
-            <UserMenu name={user.name} subtitle={user.subtitle} href={user.href} backToCrmUrl={backToCrmUrl} />
+            <UserMenu name={user.name} subtitle={user.subtitle} href={user.href} backToCrmUrl={backToCrmUrl} bell={bell} />
           ) : (
             <span className="text-[12.5px] text-paper-faint">Fattakhov HR Agency</span>
           )}

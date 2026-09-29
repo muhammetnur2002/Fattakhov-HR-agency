@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { History, Inbox, Layers, MessageCircle } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
+import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { countUnread } from '@/lib/chat';
 import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
@@ -48,6 +49,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   return (
     <AppShell
       user={{ name: studentName(student), subtitle: student.university, href: '/profile' }}
+      bell={<NotificationsBell />}
       nav={[
         // Все вкладки — иконками: с текстом разной длины подложка активной
         // вкладки при переезде между ними меняла ширину, дёргаясь. «Профиль»

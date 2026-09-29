@@ -125,6 +125,7 @@ export function createPrismaStore(): DataStore {
                   university: input.university,
                   speciality: input.speciality,
                   studyYear: input.studyYear,
+                  studyLevel: input.studyLevel ?? null,
                   institutionId: input.institutionId,
                   city: input.city,
                   workDays: input.workDays,
@@ -228,6 +229,7 @@ export function createPrismaStore(): DataStore {
             university: input.university,
             speciality: input.speciality,
             studyYear: input.studyYear,
+            studyLevel: input.studyLevel,
             institutionId: input.institutionId,
             city: input.city,
             workDays: input.workDays,
@@ -665,6 +667,25 @@ export function createPrismaStore(): DataStore {
         // одного кода не должны оба пройти
         const { count } = await prisma.authToken.updateMany({ where: { id, usedAt: null }, data: { usedAt: new Date() } });
         return count === 1;
+      },
+    },
+
+    studentNotifications: {
+      async create(input) {
+        await prisma.studentNotification.create({ data: input });
+      },
+      async listByStudent(studentId, limit) {
+        return prisma.studentNotification.findMany({
+          where: { studentId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        });
+      },
+      async countUnread(studentId) {
+        return prisma.studentNotification.count({ where: { studentId, readAt: null } });
+      },
+      async markAllRead(studentId) {
+        await prisma.studentNotification.updateMany({ where: { studentId, readAt: null }, data: { readAt: new Date() } });
       },
     },
 

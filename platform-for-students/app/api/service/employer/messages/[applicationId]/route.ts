@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { getThread, markThreadRead, postMessage, ThreadLockedError } from '@/lib/chat';
 import { publishThreadEvent } from '@/lib/events';
+import { notifyStudentNewMessage } from '@/lib/notify';
 import { auditService } from '@/lib/security/guards';
 import { rateLimit } from '@/lib/security/rate-limit';
 import { assertServiceAuth } from '@/lib/security/service-auth';
@@ -53,6 +54,7 @@ export async function POST(request: Request, { params }: Params) {
         recipientRole: result.recipient.role,
         recipientId: result.recipient.profileId,
       });
+      await notifyStudentNewMessage(params.applicationId);
       // В журнал — факт и длина, не текст: переписка — те же ПДн
       await auditService(
         actor,

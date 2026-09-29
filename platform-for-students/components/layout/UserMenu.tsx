@@ -30,10 +30,13 @@ export function UserMenu({
   subtitle,
   href,
   backToCrmUrl,
+  bell,
 }: {
   name: string;
   subtitle?: string;
   href?: string;
+  /** Вместо кнопки «Выйти» — например, колокольчик студента; выход тогда живёт в другом месте */
+  bell?: React.ReactNode;
   /** Пришёл из CRM (сотрудник агентства или представитель клиента) — вернуться туда же. */
   backToCrmUrl?: string | null;
 }) {
@@ -155,19 +158,21 @@ export function UserMenu({
         )}
       </div>
 
-      <motion.button
-        type="button"
-        onClick={logout}
-        disabled={pending}
-        whileHover={{ y: -1.5 }}
-        whileTap={{ scale: 0.92 }}
-        transition={springSnappy}
-        aria-label="Выйти из аккаунта"
-        title="Выйти"
-        className={cn(roundButton, 'hover:border-danger/40 hover:text-danger disabled:opacity-50')}
-      >
-        <LogOut className="size-4" />
-      </motion.button>
+      {bell ?? (
+        <motion.button
+          type="button"
+          onClick={logout}
+          disabled={pending}
+          whileHover={{ y: -1.5 }}
+          whileTap={{ scale: 0.92 }}
+          transition={springSnappy}
+          aria-label="Выйти из аккаунта"
+          title="Выйти"
+          className={cn(roundButton, 'hover:border-danger/40 hover:text-danger disabled:opacity-50')}
+        >
+          <LogOut className="size-4" />
+        </motion.button>
+      )}
 
       <TourController />
     </div>

@@ -64,6 +64,7 @@ export async function POST(request: Request) {
         institutionId: input.institutionId ?? null,
         speciality: input.speciality ?? EDUCATION_PLACEHOLDER,
         studyYear: input.studyYear ?? EDUCATION_PLACEHOLDER_YEAR,
+        studyLevel: input.studyLevel ?? null,
         city: input.city,
         workDays: input.workDays,
         hoursPerWeek: input.hoursPerWeek,

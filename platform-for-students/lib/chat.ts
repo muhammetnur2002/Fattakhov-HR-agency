@@ -4,6 +4,7 @@ import { studentName } from '@/lib/db/mappers';
 import { decryptSafe } from '@/lib/security/crypto';
 import { studentFacingVacancy } from '@/lib/vacancy';
 import type { ApplicationRecord, MessageRecord } from '@/lib/db/types';
+import { studyLine } from '@/lib/types';
 import type {
   ApplicationStatus,
   MessageAuthor,
@@ -129,7 +130,7 @@ function buildSummary(
       : {
           name: studentName(student),
           photoUrl: student.photoUrl,
-          subtitle: `${student.university}, ${student.studyYear} курс`,
+          subtitle: [student.university, studyLine(student.studyLevel, student.studyYear)].filter(Boolean).join(', '),
         };
 
   return {

@@ -46,6 +46,7 @@ export async function GET(request: Request) {
           university: a.student.university,
           speciality: a.student.speciality,
           studyYear: a.student.studyYear,
+          studyLevel: a.student.studyLevel,
           studyVerified: a.student.studyVerified,
           city: a.student.city,
           workDays: a.student.workDays,

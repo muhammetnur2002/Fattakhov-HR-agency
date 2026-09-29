@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, Inbox } from 'lucide-react';
+import { Check, Inbox } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { SwipeControls } from './SwipeControls';
 import { VacancyDetail } from './VacancyDetail';
@@ -49,7 +49,6 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
   const [detail, setDetail] = useState<VacancyDTO | null>(null);
   const [restored, setRestored] = useState<Restored | null>(null);
   const [counts, setCounts] = useState({ applied: 0, skipped: 0 });
-  const [hintSeen, setHintSeen] = useState(false);
 
   const progress = useMotionValue(0);
   const total = useRef(initial.length);
@@ -136,7 +135,6 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
         direction === 'RIGHT' ? { ...c, applied: c.applied + 1 } : { ...c, skipped: c.skipped + 1 },
       );
       setRestored(null);
-      setHintSeen(true);
       progress.set(0);
 
       void send(card, direction);
@@ -209,10 +207,12 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
   const done = total.current - cards.length;
 
   return (
-    <div className="flex w-full flex-col items-center">
+    <div className="flex h-full min-h-0 w-full flex-col items-center">
       <DeckProgress done={done} total={total.current} counts={counts} />
 
-      <div data-tour="deck" className="relative mt-5 h-[clamp(460px,64dvh,600px)] w-full max-w-[26rem]">
+      {/* Карточка занимает всё свободное место под счётчиком и над кнопками:
+          страница не листается, лента стоит на экране целиком (FeedViewport) */}
+      <div data-tour="deck" className="relative mt-3 min-h-0 w-full max-w-[26rem] flex-1 sm:max-h-[640px]">
         {/* mode по умолчанию: улетающая карточка и поднимающаяся снизу
             должны двигаться одновременно, а не по очереди */}
         <AnimatePresence custom={exitDir}>
@@ -234,7 +234,7 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
         {cards.length === 0 && <EmptyDeck applied={counts.applied} />}
       </div>
 
-      <div className="mt-7 w-full max-w-[26rem]">
+      <div className="mt-4 w-full max-w-[26rem] shrink-0">
         <SwipeControls
           progress={progress}
           onSkip={() => decide('LEFT')}
@@ -243,22 +243,6 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
           canUndo={history.length > 0}
           disabled={cards.length === 0}
         />
-
-        <AnimatePresence>
-          {!hintSeen && cards.length > 0 && (
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: durations.base, ease: easeOutExpo, delay: 0.6 }}
-              className="mt-5 flex items-center justify-center gap-2 text-center text-[12.5px] text-paper-faint"
-            >
-              <ArrowLeft className="size-3.5" aria-hidden />
-              Смахните карточку или нажмите стрелку
-              <ArrowRight className="size-3.5" aria-hidden />
-            </motion.p>
-          )}
-        </AnimatePresence>
       </div>
 
       <VacancyDetail vacancy={detail} onClose={() => setDetail(null)} onDecide={decide} />
@@ -278,12 +262,12 @@ function DeckProgress({
   const ratio = total > 0 ? Math.min(1, done / total) : 1;
 
   return (
-    <div className="w-full max-w-[26rem]">
+    <div className="w-full max-w-[26rem] shrink-0">
       <div className="flex items-baseline justify-between text-[12.5px]">
         <span className="text-paper-faint">
           {total - done > 0
-            ? `${total - done} ${plural(total - done, 'вакансия', 'вакансии', 'вакансий')} в подборке`
-            : 'Подборка разобрана'}
+            ? `Осталось ${total - done} ${plural(total - done, 'вакансия', 'вакансии', 'вакансий')}`
+            : 'Все вакансии просмотрены'}
         </span>
         <span className="flex items-center gap-3 tabular-nums">
           <span className="flex items-center gap-1 text-yes-glow">
@@ -317,7 +301,7 @@ function EmptyDeck({ applied }: { applied: number }) {
     >
       <CubeMark className="h-20 w-20 text-paper/25" />
       <div className="space-y-2">
-        <h3 className="text-display-sm text-paper">Подборка закончилась</h3>
+        <h3 className="text-display-sm text-paper">Вакансии закончились</h3>
         <p className="mx-auto max-w-[22rem] text-[14px] leading-relaxed text-paper-dim">
           {applied > 0
             ? `Вы отправили ${applied} ${plural(applied, 'отклик', 'отклика', 'откликов')}. Работодатели ответят в течение двух рабочих дней — следите за разделом «Отклики».`

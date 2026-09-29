@@ -41,6 +41,7 @@ export default async function ProfilePage() {
         institutionId: student.institutionId,
         speciality: student.speciality,
         studyYear: student.studyYear,
+        studyLevel: student.studyLevel,
         city: student.city ?? '',
         workDays: student.workDays,
         hoursPerWeek: student.hoursPerWeek,

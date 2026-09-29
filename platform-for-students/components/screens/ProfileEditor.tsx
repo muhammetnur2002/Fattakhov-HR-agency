@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Plus, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Check, LogOut, Plus, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SelectField, TextAreaField, TextField } from '@/components/ui/Field';
@@ -29,6 +29,9 @@ import {
   GENDERS,
   LOOKING_FOR,
   LOOKING_FOR_LABEL,
+  STUDY_LEVELS,
+  STUDY_LEVEL_LABEL,
+  STUDY_LEVEL_MAX_YEAR,
   WEEKDAYS,
   WEEKDAY_LABEL,
   type AchievementItem,
@@ -38,6 +41,7 @@ import {
   type LinkItem,
   type LookingFor,
   type ProjectItem,
+  type StudyLevel,
   type StudyStateDTO,
   type Weekday,
 } from '@/lib/types';
@@ -64,6 +68,7 @@ export interface ProfileFormState {
   institutionId: string | null;
   speciality: string;
   studyYear: number;
+  studyLevel: StudyLevel | null;
   city: string;
   workDays: Weekday[];
   hoursPerWeek: number | null;
@@ -326,10 +331,34 @@ export function ProfileEditor({
             />
             <fieldset>
               <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+                Уровень обучения
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {STUDY_LEVELS.map((level) => (
+                  <Chip
+                    key={level}
+                    selected={form.studyLevel === level}
+                    onToggle={() =>
+                      patch({
+                        studyLevel: level,
+                        // Курс не длиннее программы: с 5-го курса на магистратуру
+                        // не остаться — сбрасываем до последнего
+                        studyYear: Math.min(form.studyYear, STUDY_LEVEL_MAX_YEAR[level]),
+                      })
+                    }
+                  >
+                    {STUDY_LEVEL_LABEL[level]}
+                  </Chip>
+                ))}
+              </div>
+              {errors.studyLevel && <p className="pt-2 text-[12.5px] text-danger">{errors.studyLevel}</p>}
+            </fieldset>
+            <fieldset>
+              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
                 Курс
               </legend>
               <div className="flex flex-wrap gap-2">
-                {[1, 2, 3, 4, 5, 6].map((year) => (
+                {Array.from({ length: form.studyLevel ? STUDY_LEVEL_MAX_YEAR[form.studyLevel] : 6 }, (_, i) => i + 1).map((year) => (
                   <Chip
                     key={year}
                     selected={form.studyYear === year}
@@ -647,6 +676,7 @@ export function ProfileEditor({
           </div>
         </Section>
 
+        <LogoutSection />
         <DangerZone />
       </div>
 
@@ -747,6 +777,37 @@ function AddButton({
  * нажимают на том же движении, что и первую. Удаление необратимо и
  * уносит отклики и переписку, поэтому здесь нужна пауза, а не щелчок.
  */
+/**
+ * Выход из аккаунта — в конце профиля, перед удалением. Из шапки его убрали:
+ * там теперь колокольчик уведомлений, а выходят из аккаунта редко.
+ */
+function LogoutSection() {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function logout() {
+    setPending(true);
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
+    router.push('/');
+    router.refresh();
+  }
+
+  return (
+    <section className="rounded-3xl border border-[var(--hairline)] bg-graphite-900/40 p-6 sm:p-7">
+      <h2 className="mb-2 flex items-center gap-2 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+        <LogOut className="size-3.5" aria-hidden />
+        Выход из аккаунта
+      </h2>
+      <p className="text-[13.5px] leading-relaxed text-paper-dim">
+        Вы выйдете на этом устройстве. Вернуться можно в любой момент — по почте и паролю.
+      </p>
+      <Button variant="outline" size="sm" className="mt-5" loading={pending} onClick={() => void logout()} icon={<LogOut />}>
+        Выйти
+      </Button>
+    </section>
+  );
+}
+
 function DangerZone() {
   const router = useRouter();
   const toast = useToast();

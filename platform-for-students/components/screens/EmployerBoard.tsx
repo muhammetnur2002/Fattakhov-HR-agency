@@ -21,6 +21,7 @@ import {
   WEEKDAY_LABEL,
   type ApplicationStatus,
   type EmployerApplicationDTO,
+  studyLine,
 } from '@/lib/types';
 import type { EmployerBoard as BoardData } from '@/lib/services';
 
@@ -285,7 +286,8 @@ function CandidateRow({
                 <span className="text-paper-faint">·</span>
                 <span className="flex items-center gap-1">
                   <GraduationCap className="size-3.5 shrink-0" aria-hidden />
-                  {student.university}, {student.studyYear} курс
+                  {student.university}
+                  {studyLine(student.studyLevel, student.studyYear) ? `, ${studyLine(student.studyLevel, student.studyYear)}` : ''}
                 </span>
                 {student.studyVerified && (
                   <Tag tone="accent">

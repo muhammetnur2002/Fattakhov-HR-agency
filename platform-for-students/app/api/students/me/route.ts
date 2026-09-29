@@ -64,6 +64,7 @@ export async function PATCH(request: Request) {
       studyVerified: resetVerification ? false : undefined,
       speciality: input.speciality ?? EDUCATION_PLACEHOLDER,
       studyYear: input.studyYear ?? EDUCATION_PLACEHOLDER_YEAR,
+      studyLevel: input.studyLevel,
       city: input.city || null,
       workDays: input.workDays,
       hoursPerWeek: input.hoursPerWeek,

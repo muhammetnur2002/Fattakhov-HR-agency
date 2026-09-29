@@ -15,6 +15,7 @@ import {
   type AdminStudentDTO,
   type InstitutionOption,
   type StudentStatus,
+  studyLine,
 } from '@/lib/types';
 
 type VerificationFilter = 'ALL' | 'PENDING_DOC' | 'VERIFIED' | 'UNVERIFIED';
@@ -207,7 +208,7 @@ export function AdminStudents({
                     </p>
                     <p className="mt-0.5 break-words text-[12.5px] text-paper-faint">
                       {student.university}
-                      {student.institutionId ? '' : ' (не из справочника)'} · {student.studyYear} курс ·{' '}
+                      {student.institutionId ? '' : ' (не из справочника)'} · {studyLine(student.studyLevel, student.studyYear)} ·{' '}
                       {student.applications} {plural(student.applications, 'отклик', 'отклика', 'откликов')} ·{' '}
                       {timeAgo(student.createdAt)}
                     </p>

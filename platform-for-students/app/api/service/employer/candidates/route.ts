@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         university: c.university,
         speciality: c.speciality,
         studyYear: c.studyYear,
+        studyLevel: c.studyLevel,
         city: c.city,
         workDays: c.workDays,
         hoursPerWeek: c.hoursPerWeek,

@@ -17,6 +17,28 @@ export const GENDERS = ['MALE', 'FEMALE', 'UNSPECIFIED'] as const;
 export type Gender = (typeof GENDERS)[number];
 
 export const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+
+export const STUDY_LEVELS = ['BACHELOR', 'SPECIALIST', 'MASTER'] as const;
+export type StudyLevel = (typeof STUDY_LEVELS)[number];
+
+export const STUDY_LEVEL_LABEL: Record<StudyLevel, string> = {
+  BACHELOR: 'Бакалавриат',
+  SPECIALIST: 'Специалитет',
+  MASTER: 'Магистратура',
+};
+
+/** Сколько курсов в программе: курс не может быть больше. */
+export const STUDY_LEVEL_MAX_YEAR: Record<StudyLevel, number> = {
+  BACHELOR: 4,
+  SPECIALIST: 6,
+  MASTER: 2,
+};
+
+/** «Бакалавриат, 3 курс» — уровень и курс одной строкой; чего нет, того не пишем. */
+export function studyLine(level: StudyLevel | null | undefined, year: number): string {
+  const parts = [level ? STUDY_LEVEL_LABEL[level] : null, year > 0 ? `${year} курс` : null].filter(Boolean);
+  return parts.join(', ');
+}
 export type Weekday = (typeof WEEKDAYS)[number];
 
 /** Что студент ищет. Сразу несколько: стажировка не исключает подработку. */
@@ -276,6 +298,7 @@ export interface StudentProfileDTO extends StudentPortfolio {
   university: string;
   speciality: string;
   studyYear: number;
+  studyLevel: StudyLevel | null;
   /** Вуз из справочника; null — вписан вручную */
   institutionId: string | null;
   /** Учёбу подтвердил HR агентства */
@@ -503,6 +526,7 @@ export interface AdminStudentDTO {
   institutionId: string | null;
   speciality: string;
   studyYear: number;
+  studyLevel: StudyLevel | null;
   city: string | null;
   status: StudentStatus;
   studyVerified: boolean;

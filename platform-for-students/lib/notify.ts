@@ -74,6 +74,36 @@ function shownTitle(vacancy: VacancyRecord): string {
   return (vacancy.approvedContent ?? vacancy).title;
 }
 
+/**
+ * Уведомление в колокольчик студента. Никогда не бросает, как и письма:
+ * колокольчик не должен отменять решение HR или смену статуса отклика.
+ */
+async function pushStudent(
+  studentId: string,
+  item: { kind: 'application' | 'message' | 'study' | 'reminder'; title: string; body?: string | null; href: string },
+): Promise<void> {
+  try {
+    const store = await getStore();
+    await store.studentNotifications.create({
+      studentId,
+      kind: item.kind,
+      title: item.title,
+      body: item.body ?? null,
+      href: item.href,
+    });
+  } catch (error) {
+    console.error('[уведомление] колокольчик студента не обновлён:', error);
+  }
+}
+
+const APPLICATION_BELL_TITLE: Partial<Record<ApplicationStatus, string>> = {
+  VIEWED: 'Работодатель посмотрел ваш отклик',
+  INVITED: 'Вас пригласили',
+  INTERVIEW: 'Вас зовут на собеседование',
+  HIRED: 'Вы приняты — выход на работу',
+  REJECTED: 'Работодатель отказал',
+};
+
 export async function notifyStudyDecision(
   student: StudentRecord,
   decision: { approved: true; released: number } | { approved: false; note: string },
@@ -82,6 +112,21 @@ export async function notifyStudyDecision(
     ? studyApprovedMail({ released: decision.released, url: appUrl('/feed') })
     : studyRejectedMail({ note: decision.note, url: appUrl('/profile#study') });
   await deliver(student.accountId, content, 'decision');
+  if (decision.approved) {
+    await pushStudent(student.id, {
+      kind: 'study',
+      title: 'Учёба подтверждена',
+      body: decision.released > 0 ? `Отклики ушли работодателям: ${decision.released}` : null,
+      href: '/feed',
+    });
+  } else {
+    await pushStudent(student.id, {
+      kind: 'study',
+      title: 'Справка не принята',
+      body: decision.note,
+      href: '/profile#study',
+    });
+  }
 }
 
 export async function notifyCompanyDecision(employer: EmployerRecord, approved: boolean, note: string | null): Promise<void> {
@@ -124,6 +169,15 @@ export async function notifyApplicationStatus(application: ApplicationRecord, st
       url: appUrl('/applications'),
     });
     if (content) await deliver(student.accountId, content, 'decision');
+    const bellTitle = APPLICATION_BELL_TITLE[status];
+    if (bellTitle) {
+      await pushStudent(student.id, {
+        kind: 'application',
+        title: bellTitle,
+        body: `${employer?.companyName ?? 'Работодатель'} · ${shownTitle(vacancy)}`,
+        href: '/applications',
+      });
+    }
   } catch (error) {
     console.error('[уведомление] статус отклика не отправлен:', error);
   }
@@ -199,6 +253,7 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
             const daysText = state.workdaysLeft === 1 ? 'Остался один рабочий день' : 'Сегодня последний день';
             const sent = await deliver(student.accountId, studyDeadlineMail({ daysText, url: appUrl('/profile#study') }), 'reminder');
             if (sent) result.studyDeadline++;
+            await pushStudent(student.id, { kind: 'reminder', title: 'Подтвердите учёбу', body: daysText, href: '/profile#study' });
           }
         }
       }
@@ -211,6 +266,12 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
       if (expiring > 0) {
         const sent = await deliver(student.accountId, pendingExpiryMail({ count: expiring, url: appUrl('/applications') }), 'reminder');
         if (sent) result.pendingExpiry++;
+        await pushStudent(student.id, {
+          kind: 'reminder',
+          title: 'Отклики скоро удалятся',
+          body: `Не хватает подтверждения учёбы — откликов: ${expiring}`,
+          href: '/applications',
+        });
       }
     } catch (error) {
       console.error('[напоминания] студент пропущен:', error);
@@ -310,5 +371,33 @@ export async function notifyEmployerNewMessage(applicationId: string): Promise<v
     await notifyCrm('message', 'Новое сообщение от студента', vacancy.title, `message:${applicationId}`, employer.crmClientId);
   } catch (error) {
     console.error('[уведомление] сообщение студента не передано в CRM:', error);
+  }
+}
+
+/**
+ * Работодатель написал студенту — колокольчик. Пока по этой переписке есть
+ * непрочитанное уведомление, новое не заводим: десять реплик подряд — один
+ * пункт в списке, а не десять.
+ */
+export async function notifyStudentNewMessage(applicationId: string): Promise<void> {
+  try {
+    const store = await getStore();
+    const application = await store.applications.findById(applicationId);
+    const vacancy = application ? await store.vacancies.findById(application.vacancyId) : null;
+    const employer = vacancy ? await store.employers.findById(vacancy.employerId) : null;
+    if (!application || !vacancy || !employer) return;
+
+    const href = `/messages?thread=${applicationId}`;
+    const recent = await store.studentNotifications.listByStudent(application.studentId, 20);
+    if (recent.some((n) => n.kind === 'message' && n.href === href && !n.readAt)) return;
+
+    await pushStudent(application.studentId, {
+      kind: 'message',
+      title: 'Новое сообщение от работодателя',
+      body: `${employer.companyName} · ${shownTitle(vacancy)}`,
+      href,
+    });
+  } catch (error) {
+    console.error('[уведомление] сообщение работодателя не передано в колокольчик:', error);
   }
 }

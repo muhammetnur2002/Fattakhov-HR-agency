@@ -9,8 +9,12 @@ import {
   GENDERS,
   MESSAGE_MAX_LENGTH,
   STUDENT_STATUSES,
+  STUDY_LEVELS,
+  STUDY_LEVEL_LABEL,
+  STUDY_LEVEL_MAX_YEAR,
   SWIPE_DIRECTIONS,
   WEEKDAYS,
+  type StudyLevel,
 } from '@/lib/types';
 
 /**
@@ -117,6 +121,22 @@ function scheduleRule(value: { workDays: readonly string[]; hoursPerWeek: number
   }
 }
 
+/**
+ * Курс не больше, чем в программе: третий курс магистратуры — опечатка.
+ * Отдельной функцией по той же причине, что и scheduleRule.
+ */
+function studyLevelRule(value: { studyLevel?: StudyLevel | null; studyYear: number | null }, ctx: z.RefinementCtx) {
+  if (!value.studyLevel || value.studyYear === null) return;
+  const max = STUDY_LEVEL_MAX_YEAR[value.studyLevel];
+  if (value.studyYear > max) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['studyYear'],
+      message: `${STUDY_LEVEL_LABEL[value.studyLevel]}: не больше ${max} курса`,
+    });
+  }
+}
+
 /** Шаги мастера валидируются по отдельности — форма проверяет ровно то,
  *  что человек уже заполнил, а не всё сразу. */
 export const registrationSteps = {
@@ -147,6 +167,8 @@ export const registrationSteps = {
       (v) => (v === '' || v === undefined ? null : v),
       z.number().int().min(1, 'От 1 курса').max(6, 'До 6 курса').nullable(),
     ),
+    // Не пришло — не менять; null — не указан. Бакалавриат, специалитет, магистратура
+    studyLevel: z.preprocess((v) => (v === '' ? null : v), z.enum(STUDY_LEVELS).nullable().optional()),
     city: z.string().trim().max(80).nullable(),
   }),
   schedule: scheduleObject.superRefine(scheduleRule),
@@ -187,7 +209,8 @@ export const registrationSchema = registrationSteps.identity
   .merge(scheduleObject)
   .merge(registrationSteps.skills)
   .merge(registrationSteps.account)
-  .superRefine(scheduleRule);
+  .superRefine(scheduleRule)
+  .superRefine(studyLevelRule);
 
 export type RegistrationInput = z.infer<typeof registrationSchema>;
 
@@ -212,7 +235,8 @@ export const profileUpdateSchema = registrationSteps.identity
   .extend({ phone: phoneSchema })
   // Портфолио частично: поле, которого нет в запросе, не меняется
   .merge(portfolioSchema.partial())
-  .superRefine(scheduleRule);
+  .superRefine(scheduleRule)
+  .superRefine(studyLevelRule);
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 

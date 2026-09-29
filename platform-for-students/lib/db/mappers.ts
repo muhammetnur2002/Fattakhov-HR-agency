@@ -155,6 +155,7 @@ export function toStudentDTO(
     university: student.university,
     speciality: student.speciality,
     studyYear: student.studyYear,
+    studyLevel: student.studyLevel,
     institutionId: student.institutionId,
     studyVerified: student.studyVerified,
     city: student.city,

@@ -832,6 +832,7 @@ export async function listAdminStudents(): Promise<AdminStudentDTO[]> {
     institutionId: s.institutionId,
     speciality: s.speciality,
     studyYear: s.studyYear,
+    studyLevel: s.studyLevel,
     city: s.city,
     status: s.status,
     studyVerified: s.studyVerified,

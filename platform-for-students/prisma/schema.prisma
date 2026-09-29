@@ -41,6 +41,13 @@ enum Gender {
   UNSPECIFIED
 }
 
+/// Уровень обучения. Пусто у анкет, заведённых до этого поля, и у тех, кто ещё не указал.
+enum StudyLevel {
+  BACHELOR
+  SPECIALIST
+  MASTER
+}
+
 enum Weekday {
   MON
   TUE
@@ -147,7 +154,7 @@ model Account {
   emailVerifiedAt    DateTime?
   // Напоминания и сводки о сообщениях. Письма о решениях приходят всегда
   notifyEmail        Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  createdAt          DateTime  @default(now())
 
   student       Student?
   employer      Employer?
@@ -224,6 +231,7 @@ model Student {
   university String
   speciality String
   studyYear  Int
+  studyLevel StudyLevel?
 
   // Вуз из справочника. Пусто — студент вписал свой: справочник не обязан
   // знать каждый колледж, а регистрация не должна на этом останавливаться.
@@ -276,8 +284,9 @@ model Student {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  swipes       Swipe[]
-  applications Application[]
+  swipes               Swipe[]
+  applications         Application[]
+  studentNotifications StudentNotification[]
 
   @@index([status])
   @@index([createdAt])
@@ -293,13 +302,13 @@ model Employer {
   contactName String
   // Телефон контактного лица: HR-менеджер звонит, чтобы подтвердить
   // компанию. ПДн — зашифрован, студентам не показывается.
-  phoneEnc String?
+  phoneEnc    String?
 
   // ИНН: 10 цифр у организации, 12 у ИП. По нему HR сверяет компанию с
   // госреестром. Уникален — вторая регистрация той же компании видна сразу.
   // Пуст у клиентов из CRM: реквизиты там.
-  inn String? @unique
-  logoUrl     String?
+  inn     String? @unique
+  logoUrl String?
 
   // Страница компании. Заполняет сама компания после регистрации;
   // у клиентов из CRM поля пусты, пока агентство их не заполнит.
@@ -429,12 +438,12 @@ model Vacancy {
   /// Момент снятия с публикации. Пусто у вакансии, которую не снимали, или
   /// у старых записей до появления этого поля — их автоудаление не трогает,
   /// чтобы не потерять историю, снятую до этой доработки.
-  closedAt DateTime?
+  closedAt              DateTime?
   /// Решение компании при снятии: сохранить в истории (правит только
   /// напоминания раз в неделю) или нет (тогда через 3 дня после closedAt
   /// вакансию удаляет уборка — см. lib/notify.ts). Null — решение ещё не
   /// спрашивали (старые записи).
-  keepAfterClose Boolean?
+  keepAfterClose        Boolean?
   /// Когда в последний раз напомнили про сохранённую снятую вакансию —
   /// чтобы не слать письмо чаще раза в неделю.
   lastCleanupReminderAt DateTime?
@@ -614,4 +623,25 @@ model AnalyticsEvent {
   @@index([type, createdAt])
   @@index([createdAt])
   @@index([studentId])
+}
+
+/// Уведомления студента в колокольчике: статусы откликов, сообщения работодателя,
+/// решения по справке, напоминания. Письма по-прежнему уходят отдельно.
+/// Текста переписки здесь нет — только факт и куда перейти.
+model StudentNotification {
+  id        String  @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// application | message | study | reminder
+  kind      String
+  title     String
+  body      String?
+  /// Куда ведёт уведомление внутри платформы
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([studentId, createdAt])
+  @@index([studentId, readAt])
 }

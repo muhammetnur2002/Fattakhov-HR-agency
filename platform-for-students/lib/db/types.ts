@@ -9,6 +9,7 @@ import type {
   Role,
   StudentPortfolio,
   StudentStatus,
+  StudyLevel,
   SwipeDirection,
   SyncStatus,
   VacancyStatus,
@@ -57,6 +58,8 @@ export interface StudentRecord extends StudentPortfolio {
   university: string;
   speciality: string;
   studyYear: number;
+  /** null — не указан (анкета до этого поля или ещё не заполнил) */
+  studyLevel: StudyLevel | null;
   institutionId: string | null;
   studyVerified: boolean;
   studyVerifiedAt: Date | null;
@@ -290,6 +293,8 @@ export interface StudentProfileUpdate extends Partial<StudentPortfolio> {
   university: string;
   speciality: string;
   studyYear: number;
+  /** undefined — не менять; null — очистить */
+  studyLevel?: StudyLevel | null;
   institutionId: string | null;
   /** false — снять подтверждение учёбы: сменился вуз. undefined — не трогать */
   studyVerified?: boolean;
@@ -298,6 +303,18 @@ export interface StudentProfileUpdate extends Partial<StudentPortfolio> {
   hoursPerWeek: number | null;
   skills: string[];
   about: string | null;
+}
+
+export interface StudentNotificationRecord {
+  id: string;
+  studentId: string;
+  /** application | message | study | reminder */
+  kind: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: Date | null;
+  createdAt: Date;
 }
 
 export interface NewStudentInput {
@@ -315,6 +332,7 @@ export interface NewStudentInput {
   university: string;
   speciality: string;
   studyYear: number;
+  studyLevel?: StudyLevel | null;
   city: string | null;
   workDays: Weekday[];
   hoursPerWeek: number | null;
@@ -487,6 +505,15 @@ export interface DataStore {
     recordFailure(id: string): Promise<number>;
     /** Погасить. false — его уже погасил параллельный запрос */
     consume(id: string): Promise<boolean>;
+  };
+
+  /** Уведомления студента в колокольчике (см. StudentNotification в schema.prisma). */
+  studentNotifications: {
+    create(input: { studentId: string; kind: string; title: string; body: string | null; href: string | null }): Promise<void>;
+    /** Свежие сверху */
+    listByStudent(studentId: string, limit: number): Promise<StudentNotificationRecord[]>;
+    countUnread(studentId: string): Promise<number>;
+    markAllRead(studentId: string): Promise<void>;
   };
 
   notifications: {

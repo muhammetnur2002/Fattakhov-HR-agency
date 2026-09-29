@@ -19,6 +19,7 @@ import {
   type Gender,
   type StudentProfileDTO,
   type Weekday,
+  studyLine,
 } from '@/lib/types';
 
 const GENDER_LABEL: Record<Gender, string> = {
@@ -304,7 +305,7 @@ function CandidateRow({
               <span className="flex items-center gap-1.5">
                 <GraduationCap className="size-3.5 shrink-0" aria-hidden />
                 {student.university}
-                {student.studyYear > 0 ? `, ${student.studyYear} курс` : ''}
+                {studyLine(student.studyLevel, student.studyYear) ? `, ${studyLine(student.studyLevel, student.studyYear)}` : ''}
               </span>
             )}
             {student.city && (

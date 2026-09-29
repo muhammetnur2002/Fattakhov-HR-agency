@@ -30,6 +30,7 @@ import type {
   EventRecord,
   InstitutionRecord,
   MessageRecord,
+  StudentNotificationRecord,
   NewEmployerInput,
   NewStudentInput,
   StudentRecord,
@@ -66,6 +67,7 @@ interface Tables {
   events: EventRecord[];
   authTokens: AuthTokenRecord[];
   notificationLog: Array<{ accountId: string; key: string; createdAt: Date }>;
+  studentNotifications: StudentNotificationRecord[];
   staffTickets: string[];
 }
 
@@ -112,6 +114,7 @@ async function seed(): Promise<Tables> {
     events: [],
     authTokens: [],
     notificationLog: [],
+    studentNotifications: [],
     staffTickets: [],
   };
 
@@ -240,6 +243,7 @@ async function seed(): Promise<Tables> {
     university: DEMO_STUDENT_PROFILE.university,
     speciality: DEMO_STUDENT_PROFILE.speciality,
     studyYear: DEMO_STUDENT_PROFILE.studyYear,
+    studyLevel: 'BACHELOR' as const,
     // Учёба демо-студента подтверждена: так на демо видна отметка у работодателя
     institutionId: institutionFor(DEMO_STUDENT_PROFILE.university)?.id ?? null,
     studyVerified: true,
@@ -304,6 +308,7 @@ async function seed(): Promise<Tables> {
       university: extra.university,
       speciality: extra.speciality,
       studyYear: 2 + (i % 3),
+      studyLevel: 'BACHELOR' as const,
       institutionId: institutionFor(extra.university)?.id ?? null,
       studyVerified: i % 2 === 0,
       studyVerifiedAt: i % 2 === 0 ? now() : null,
@@ -537,6 +542,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           university: input.university,
           speciality: input.speciality,
           studyYear: input.studyYear,
+          studyLevel: input.studyLevel ?? null,
           institutionId: input.institutionId,
           // Учёбу подтверждает HR, а не форма регистрации
           studyVerified: false,
@@ -637,6 +643,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           university: input.university,
           speciality: input.speciality,
           studyYear: input.studyYear,
+          ...(input.studyLevel !== undefined ? { studyLevel: input.studyLevel } : {}),
           institutionId: input.institutionId,
           city: input.city,
           workDays: [...input.workDays],
@@ -674,6 +681,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           t.messages = t.messages.filter((m) => !applicationIds.includes(m.applicationId));
           t.applications = t.applications.filter((a) => a.studentId !== student.id);
           t.swipes = t.swipes.filter((s) => s.studentId !== student.id);
+          t.studentNotifications = t.studentNotifications.filter((n) => n.studentId !== student.id);
           t.students = t.students.filter((s) => s.id !== student.id);
         }
         t.accounts = t.accounts.filter((a) => a.id !== accountId);
@@ -1277,6 +1285,26 @@ export async function createMemoryStore(): Promise<DataStore> {
         if (!row || row.usedAt) return false;
         row.usedAt = now();
         return true;
+      },
+    },
+
+    studentNotifications: {
+      async create(input) {
+        t.studentNotifications.push({ id: randomUUID(), ...input, readAt: null, createdAt: now() });
+      },
+      async listByStudent(studentId, limit) {
+        return clone(
+          t.studentNotifications
+            .filter((n) => n.studentId === studentId)
+            .sort((a, b) => +b.createdAt - +a.createdAt)
+            .slice(0, limit),
+        );
+      },
+      async countUnread(studentId) {
+        return t.studentNotifications.filter((n) => n.studentId === studentId && !n.readAt).length;
+      },
+      async markAllRead(studentId) {
+        for (const n of t.studentNotifications) if (n.studentId === studentId && !n.readAt) n.readAt = now();
       },
     },
 

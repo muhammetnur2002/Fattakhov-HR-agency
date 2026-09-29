@@ -87,6 +87,19 @@ class Session {
   }
 }
 
+/**
+ * Страница кабинета работодателя на платформе ведёт в CRM: обычный редирект
+ * или, у страниц с loading.tsx, редирект внутри потока (200 и NEXT_REDIRECT в теле).
+ */
+async function sendsToCrm(session: Session, path: string, crmPath: string): Promise<boolean> {
+  const cookie = (session as unknown as { cookie: string }).cookie;
+  const response = await fetch(`${BASE}${path}`, { headers: { Cookie: cookie }, redirect: 'manual' });
+  const location = response.headers.get('location') ?? '';
+  if (response.status >= 300 && response.status < 400) return location.endsWith(crmPath);
+  const text = await response.text();
+  return text.includes('NEXT_REDIRECT') && text.includes(crmPath);
+}
+
 /** Письма без почтового сервера — из журнала процесса (только в разработке). */
 async function mailbox(address: string): Promise<Array<{ subject: string; text: string }>> {
   const response = await fetch(`${BASE}/api/dev/outbox?email=${encodeURIComponent(address)}`);
@@ -732,6 +745,48 @@ async function main() {
   });
   check('график «каждый день, 40 часов» сохраняется', everyDay.status === 200, everyDay.body);
 
+  // Уровень обучения: необязателен, но курс не может быть больше срока программы
+  const levelBad = await owner.patch('/api/students/me', {
+    ...ownerProfile,
+    fullName: 'Профиль Изменённый',
+    studyLevel: 'MASTER',
+    studyYear: 3,
+  });
+  check(
+    'магистратура: 3 курс отвергнут (программа двухлетняя)',
+    levelBad.status === 400 && !!levelBad.body?.fields?.studyYear,
+    levelBad.body,
+  );
+  const levelUnknown = await owner.patch('/api/students/me', {
+    ...ownerProfile,
+    fullName: 'Профиль Изменённый',
+    studyLevel: 'DOCTOR',
+  });
+  check('неизвестный уровень обучения отвергнут', levelUnknown.status === 400, levelUnknown.status);
+  const levelOk = await owner.patch('/api/students/me', {
+    ...ownerProfile,
+    fullName: 'Профиль Изменённый',
+    studyLevel: 'SPECIALIST',
+    studyYear: 5,
+  });
+  check('специалитет: 5 курс сохраняется', levelOk.status === 200, levelOk.body);
+  const levelPage = await fetch(`${BASE}/profile`, { headers: { Cookie: (owner as any).cookie } }).then((r) => r.text());
+  check('уровень обучения приходит в форму профиля', /studyLevel\\?":\\?"SPECIALIST/.test(levelPage));
+
+  // Колокольчик
+  const bellGuest = await new Session().request('/api/notifications');
+  check('колокольчик гостю недоступен', bellGuest.status === 401, bellGuest.status);
+  const bell = await owner.request('/api/notifications');
+  check(
+    'колокольчик студента отдаёт список и счётчик',
+    bell.status === 200 && Array.isArray(bell.body?.notifications) && typeof bell.body?.unread === 'number',
+    bell.body,
+  );
+  const bellRead = await owner.post('/api/notifications', {});
+  check('открытие колокольчика отмечает прочитанным', bellRead.status === 200 && bellRead.body?.unread === 0, bellRead.body);
+  const bellEmployer = await employer.request('/api/notifications');
+  check('колокольчик — только для студента', bellEmployer.status === 401 || bellEmployer.status === 403, bellEmployer.status);
+
   const portfolio = {
     lookingFor: ['JOB', 'PROJECT'],
     goals: 'Хочу в продуктовую аналитику',
@@ -954,7 +1009,7 @@ async function main() {
   );
   const company = new Session();
   (company as any).cookie = companyEntered.cookie;
-  check('кабинет компании открывается', (await company.request('/employer/company')).status === 200);
+  check('кабинет компании на платформе ведёт в CRM', await sendsToCrm(company, '/employer/company', '/students'));
 
   const companyId = (await company.request('/api/auth/me')).body.session?.profileId as string;
   check('компания клиента CRM публична сразу, без модерации', (await new Session().request(`/companies/${companyId}`)).status === 200);
@@ -1073,16 +1128,18 @@ async function main() {
   const remoteDraft = await company.post('/api/employer/vacancies', { ...vacancyForm, workFormat: 'REMOTE', address: null, addressDetails: null });
   check('удалённая вакансия сохраняется без адреса', remoteDraft.status === 201, remoteDraft.body);
 
-  check('раздел вакансий открывается', (await company.request('/employer/vacancies')).status === 200);
-  check('форма новой вакансии открывается', (await company.request('/employer/vacancies/new')).status === 200);
-  check('своя вакансия открывается на правку', (await company.request(`/employer/vacancies/${vacancyId}`)).status === 200);
+  check('раздел вакансий на платформе ведёт в CRM', await sendsToCrm(company, '/employer/vacancies', '/students'));
+  check('форма новой вакансии на платформе ведёт в CRM', await sendsToCrm(company, '/employer/vacancies/new', '/students'));
   // Кабинет стримится через loading.tsx, поэтому notFound() приходит
   // страницей «не найдено» со статусом 200 — проверяем содержимое, а не код
   const foreignEdit = await employer.request(`/employer/vacancies/${vacancyId}`);
   const foreignEditBody = String(foreignEdit.body);
   check(
     'чужая вакансия на правку не открывается',
-    (foreignEdit.status === 404 || foreignEditBody.includes('NEXT_NOT_FOUND')) &&
+    (foreignEdit.status === 404 ||
+      (foreignEdit.status >= 300 && foreignEdit.status < 400) ||
+      foreignEditBody.includes('NEXT_NOT_FOUND') ||
+      foreignEditBody.includes('NEXT_REDIRECT')) &&
       !foreignEditBody.includes('Стажёр-аналитик'),
     foreignEdit.status,
   );
@@ -1351,7 +1408,7 @@ async function main() {
     );
     const clientSession = new Session();
     (clientSession as any).cookie = clientEntered.cookie;
-    check('кабинет компании клиента CRM открыт', (await clientSession.request('/employer')).status === 200);
+    check('кабинет клиента CRM на платформе ведёт в его отклики в CRM', await sendsToCrm(clientSession, '/employer', '/students/applications'));
 
     // Реквизиты клиента CRM сверены по договору и лежат в CRM — здесь у
     // него нет ИНН, и раньше это ошибочно блокировало отправку вакансии
@@ -1390,7 +1447,7 @@ async function main() {
       candidateInviteAgain.status === 200 && candidateInviteAgain.body?.invited === false,
       candidateInviteAgain.body,
     );
-    check('раздел «Кандидаты» открывается', (await clientSession.request('/employer/candidates')).status === 200);
+    check('раздел «Кандидаты» на платформе ведёт в CRM', await sendsToCrm(clientSession, '/employer/candidates', '/students/candidates'));
 
     const clientReplay = await enterFromCrm(firstClientTicket);
     check('по тому же билету клиента второй раз не войти', clientReplay.location.includes('crm=used'), clientReplay.location);

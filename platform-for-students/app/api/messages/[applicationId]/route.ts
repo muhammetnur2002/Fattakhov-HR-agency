@@ -7,7 +7,7 @@ import {
   viewerFromSession,
 } from '@/lib/chat';
 import { publishThreadEvent } from '@/lib/events';
-import { notifyEmployerNewMessage } from '@/lib/notify';
+import { notifyEmployerNewMessage, notifyStudentNewMessage } from '@/lib/notify';
 import { assertSameOrigin, audit, getSession } from '@/lib/security/guards';
 import { rateLimit } from '@/lib/security/rate-limit';
 import { messageSchema } from '@/lib/validation';
@@ -57,6 +57,7 @@ export async function POST(request: Request, { params }: Params) {
 
       // Клиенту CRM — колокольчик в его кабинете (у остальных работодателей нет)
       if (viewer.role === 'STUDENT') await notifyEmployerNewMessage(params.applicationId);
+      else await notifyStudentNewMessage(params.applicationId);
 
       // В журнал уходит факт и длина, но не текст: переписка — те же ПДн,
       // и дублировать её в лог значит хранить вторую незашифрованную копию
