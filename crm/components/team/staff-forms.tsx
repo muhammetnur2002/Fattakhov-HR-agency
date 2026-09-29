@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
 
 import {
   FormMessages,
@@ -108,6 +108,67 @@ function RoleAndPosition({
   );
 }
 
+/**
+ * Создание сотрудника по требованию: на странице только кнопка и список команды,
+ * бланк раскрывается по нажатию, а после успешного создания сворачивается обратно.
+ */
+export function StaffCreatePanel({
+  action,
+  roles,
+  grants,
+}: {
+  action: TeamAction;
+  roles: TeamOption[];
+  grants: TeamOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [created, setCreated] = useState<string | null>(null);
+
+  // Успех закрывает бланк; сообщение остаётся над списком, чтобы было видно, что получилось
+  const wrapped: TeamAction = async (prev, formData) => {
+    const result = await action(prev, formData);
+    if (result.ok) {
+      setCreated(result.ok);
+      setOpen(false);
+    }
+    return result;
+  };
+
+  if (!open) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          onClick={() => {
+            setCreated(null);
+            setOpen(true);
+          }}
+        >
+          Создать аккаунт сотрудника
+        </Button>
+        {created && <p className="text-sm text-muted-foreground">{created}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Новый сотрудник</h2>
+          <p className="text-sm text-muted-foreground">
+            Задайте пароль и сообщите его человеку лично — почта и пароль работают сразу, ссылка-приглашение не нужна.
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
+          Отмена
+        </Button>
+      </div>
+      <StaffCreateForm action={wrapped} roles={roles} grants={grants} />
+    </div>
+  );
+}
+
 export function StaffCreateForm({
   action,
   roles,
@@ -120,8 +181,16 @@ export function StaffCreateForm({
   const [state, formAction] = useActionState<TeamFormState, FormData>(action, {});
   const defaultRole = roles.find((r) => r.value === "RECRUITER")?.value ?? roles[0]?.value ?? "";
 
+  // Отправляем вручную: после action формы React 19 очищает поля, и при ошибке
+  // («пароли не совпадают») пришлось бы вводить всё заново
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  }
+
   return (
-    <form action={formAction} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="staff-create-email">Почта</Label>

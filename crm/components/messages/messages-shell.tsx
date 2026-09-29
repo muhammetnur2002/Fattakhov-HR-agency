@@ -74,7 +74,9 @@ export function MessagesShell({
   return (
     <div
       ref={rootRef}
-      className="flex h-[calc(100svh-3.5rem-2rem)] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem)]"
+      // На телефоне — экран приложения: без рамки и скруглений, на всю ширину и высоту под шапкой
+      // (отступы main p-4 гасятся отрицательными). Карточка с рамкой — только с md
+      className="-m-4 flex h-[calc(100svh-3.5rem)] overflow-hidden md:m-0 md:h-[calc(100svh-3.5rem-3rem)] md:rounded-3xl md:border"
     >
       <aside
         className={cn(

@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowUp, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StudentThread, StudentThreadMessage, StudentThreadSummary } from "@/lib/students-service";
@@ -109,7 +109,8 @@ export function StudentMessages({
   return (
     <div
       ref={rootRef}
-      className="flex h-[calc(100svh-3.5rem-2rem-4rem)] min-h-[28rem] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem-4rem)]"
+      // На телефоне — без рамки и скруглений, на всю ширину; вкладки раздела остаются над чатом
+      className="-mx-4 -mb-4 flex h-[calc(100svh-3.5rem-1rem-4rem)] min-h-[28rem] overflow-hidden md:mx-0 md:mb-0 md:h-[calc(100svh-3.5rem-3rem-4rem)] md:rounded-3xl md:border"
     >
       <aside className={cn("flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r", activeId && "hidden md:flex")}>
         <div className="border-b p-4">
@@ -200,6 +201,7 @@ function ThreadCard({ thread, active, onClick }: { thread: StudentThreadSummary;
     >
       {thread.unread > 0 && <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />}
       <Avatar className="shrink-0">
+        <ThreadPhoto thread={thread} />
         <AvatarFallback>{thread.counterpartName.slice(0, 1)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
@@ -264,6 +266,7 @@ function Conversation({ thread, onBack, onSent }: { thread: StudentThread; onBac
           <ArrowLeft className="size-4" />
         </Button>
         <Avatar>
+          <ThreadPhoto thread={thread} />
           <AvatarFallback>{thread.counterpartName.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
@@ -384,4 +387,15 @@ function formatWhen(value: string): string {
   const now = new Date();
   const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
   return sameDay ? timeOnly(value) : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date);
+}
+
+/** Фото студента в кружке: файл берётся по отклику своей компании, у кого фото нет — остаётся инициал. */
+function ThreadPhoto({ thread }: { thread: { applicationId: string; counterpartPhotoUrl?: string | null } }) {
+  if (!thread.counterpartPhotoUrl) return null;
+  return (
+    <AvatarImage
+      src={`/api/students-applicant-file?applicationId=${encodeURIComponent(thread.applicationId)}&kind=photo`}
+      alt=""
+    />
+  );
 }

@@ -1660,6 +1660,16 @@ async function main() {
         check('обложка публичной вакансии открыта без входа', (await fetch(`${BASE}${coverBody.url}`)).status === 200, feed.status);
       }
 
+      // Фото и резюме откликнувшегося студента: только по отклику своей компании
+      const filesUrl = (crm: string, app: string, kind = 'photo') =>
+        `/api/service/employer/files?crmClientId=${crm}&applicationId=${app}&kind=${kind}&actor=${encodeURIComponent('Смоук CRM')}`;
+      const filesNoAuth = await fetch(`${BASE}${filesUrl(serviceCrmClientId, 'x')}`);
+      check('файлы студента без служебного секрета закрыты', filesNoAuth.status === 401 || filesNoAuth.status === 503);
+      const filesUnknown = await serviceCall(filesUrl(serviceCrmClientId, 'does-not-exist'));
+      check('файлы несуществующего отклика — 404', filesUnknown.status === 404, filesUnknown.status);
+      const filesBadKind = await serviceCall(filesUrl(serviceCrmClientId, 'x', 'study'));
+      check('справка об обучении через этот маршрут недоступна', filesBadKind.status === 400, filesBadKind.status);
+
       // Воронка агентства: без секрета закрыто, с секретом — сводка по компании с одной вакансией
       const funnelNoAuth = await fetch(`${BASE}/api/service/employer/funnel`);
       check('воронка без служебного секрета закрыта', funnelNoAuth.status === 401 || funnelNoAuth.status === 503);

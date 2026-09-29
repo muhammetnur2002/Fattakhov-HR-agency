@@ -48,7 +48,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <AppShell
-      user={{ name: studentName(student), subtitle: student.university, href: '/profile' }}
+      user={{ name: studentName(student), photoUrl: student.photoUrl, subtitle: student.university, href: '/profile' }}
       bell={<NotificationsBell />}
       nav={[
         // Все вкладки — иконками: с текстом разной длины подложка активной

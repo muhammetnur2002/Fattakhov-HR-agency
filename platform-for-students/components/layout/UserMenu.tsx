@@ -27,12 +27,15 @@ import { cn } from '@/lib/utils';
  */
 export function UserMenu({
   name,
+  photoUrl,
   subtitle,
   href,
   backToCrmUrl,
   bell,
 }: {
   name: string;
+  /** Фото из профиля студента — в кружке вместо инициалов; без фото остаются инициалы */
+  photoUrl?: string | null;
   subtitle?: string;
   href?: string;
   /** Вместо кнопки «Выйти» — например, колокольчик студента; выход тогда живёт в другом месте */
@@ -72,7 +75,7 @@ export function UserMenu({
     'flex items-center gap-2.5 rounded-full border border-[var(--hairline)] bg-graphite-900/50 py-1 pl-1 pr-3.5 backdrop-blur';
   const card = (
     <>
-      <Avatar name={name} size={30} />
+      <Avatar name={name} src={photoUrl} size={30} />
       <span className="hidden min-w-0 sm:block">
         <span className="block max-w-[11rem] truncate text-[13px] font-medium leading-tight text-paper">
           {name}

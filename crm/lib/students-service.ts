@@ -512,7 +512,21 @@ export interface EmployerApplication {
     hoursPerWeek: number | null;
     skills: string[];
     about: string | null;
+    hasPhoto?: boolean;
+    hasResume?: boolean;
+    resumeName?: string | null;
   };
+}
+
+/** Фото или резюме студента по его отклику на вакансию клиента. Отклик чужой компании платформа не отдаёт. */
+export async function fetchApplicantFile(
+  crmClientId: string,
+  applicationId: string,
+  kind: "photo" | "resume",
+  actor: string,
+): Promise<Response> {
+  const query = new URLSearchParams({ crmClientId, applicationId, kind, actor });
+  return call(`/api/service/employer/files?${query.toString()}`);
 }
 
 export async function fetchEmployerApplications(crmClientId: string): Promise<EmployerApplication[]> {
@@ -550,6 +564,8 @@ export interface StudentThreadSummary {
   vacancyTitle: string;
   counterpartName: string;
   counterpartSubtitle: string;
+  /** Фото собеседника (путь на платформе): есть — значит, его можно показать по отклику */
+  counterpartPhotoUrl?: string | null;
   status: StudentsApplicationStatus;
   lastMessageBody: string | null;
   lastMessageAuthor: "STUDENT" | "EMPLOYER" | null;

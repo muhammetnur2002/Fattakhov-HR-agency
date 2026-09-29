@@ -19,8 +19,8 @@ const scopeSchema = z.object({
 /**
  * Отклики на вакансии клиента CRM — служебный аналог /api/employer/applications.
  * Студенту отдаём то же, что видит работодатель в своём кабинете (контакты
- * раскрыты: он сам откликнулся), но без фото и резюме — это защищённые
- * файлы платформы, а CRM их пока не проксирует.
+ * раскрыты: он сам откликнулся). Фото и резюме — защищённые файлы: здесь только
+ * признак, что они есть, а сами файлы CRM берёт по отклику из /files.
  */
 export async function GET(request: Request) {
   return handle(async () => {
@@ -53,6 +53,10 @@ export async function GET(request: Request) {
           hoursPerWeek: a.student.hoursPerWeek,
           skills: a.student.skills,
           about: a.student.about,
+          // Сами файлы отдаёт /api/service/employer/files по отклику — здесь только признак и имя
+          hasPhoto: Boolean(a.student.photoUrl),
+          hasResume: Boolean(a.student.resumeUrl),
+          resumeName: a.student.resumeName,
         },
       })),
     });

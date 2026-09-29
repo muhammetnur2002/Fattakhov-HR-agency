@@ -1,9 +1,11 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,10 +118,13 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
                     aria-expanded={open}
                     className="flex w-full flex-wrap items-start justify-between gap-2 text-left"
                   >
-                    <div className="min-w-0">
-                      <div className="font-medium">{a.student.fullName}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {a.vacancyTitle} · {a.student.university}, {studyLine(a.student.studyLevel, a.student.studyYear)}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ApplicantPhoto applicationId={a.id} name={a.student.fullName} hasPhoto={a.student.hasPhoto} />
+                      <div className="min-w-0">
+                        <div className="font-medium">{a.student.fullName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {a.vacancyTitle} · {a.student.university}, {studyLine(a.student.studyLevel, a.student.studyYear)}
+                        </div>
                       </div>
                     </div>
                     <Badge variant={STATUS_VARIANT[a.status]}>{STATUS_LABEL[a.status]}</Badge>
@@ -154,6 +159,18 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
                         </div>
                       )}
                       {a.student.about && <p className="text-muted-foreground">{a.student.about}</p>}
+                      {a.student.hasResume && (
+                        <Button asChild size="sm" variant="outline" className="w-fit">
+                          <a
+                            href={`/api/students-applicant-file?applicationId=${encodeURIComponent(a.id)}&kind=resume`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <FileText className="size-4" aria-hidden />
+                            {a.student.resumeName ?? "Резюме"}
+                          </a>
+                        </Button>
+                      )}
                       {!a.student.studyVerified && (
                         <p className="text-xs text-muted-foreground">Учёба ещё не подтверждена агентством.</p>
                       )}
@@ -197,6 +214,23 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     >
       {children}
     </button>
+  );
+}
+
+/** Фото студента, откликнувшегося на вакансию: файл берётся по отклику, чужие не открываются. */
+function ApplicantPhoto({ applicationId, name, hasPhoto }: { applicationId: string; name: string; hasPhoto?: boolean }) {
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <Avatar className="size-10 shrink-0">
+      {hasPhoto && (
+        <AvatarImage src={`/api/students-applicant-file?applicationId=${encodeURIComponent(applicationId)}&kind=photo`} alt="" />
+      )}
+      <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+    </Avatar>
   );
 }
 

@@ -1,9 +1,8 @@
-import { StaffCreateForm } from "@/components/team/staff-forms";
+import { StaffCreatePanel } from "@/components/team/staff-forms";
 import { TeamList } from "@/components/team/team-list";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -59,18 +58,7 @@ export default async function TeamPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Создать аккаунт сотрудника</CardTitle>
-          <CardDescription>
-            Задайте пароль и сообщите его человеку лично — почта и пароль
-            работают сразу, ссылка-приглашение не нужна.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <StaffCreateForm action={createStaffAction} roles={roleOptions} grants={grantOptions} />
-        </CardContent>
-      </Card>
+      <StaffCreatePanel action={createStaffAction} roles={roleOptions} grants={grantOptions} />
 
       <Card>
         <CardHeader>

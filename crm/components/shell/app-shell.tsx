@@ -90,7 +90,9 @@ export async function AppShell({
         глубину, которой белое на белом не даёт никогда, и заодно держит
         бренд на экране всё время, пока человек работает.
       */}
-      <aside className="relative hidden w-60 shrink-0 flex-col bg-brand-graphite p-4 md:flex print:hidden">
+      {/* На компьютере меню закреплено на высоту экрана: при прокрутке страницы стоит на месте,
+          а если разделов больше, чем влезает, прокручивается само */}
+      <aside className="relative hidden w-60 shrink-0 flex-col bg-brand-graphite p-4 md:sticky md:top-0 md:flex md:h-svh md:self-start md:overflow-y-auto print:hidden">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-25 mix-blend-overlay"
@@ -111,7 +113,7 @@ export async function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header data-app-header className="flex h-14 items-center justify-between gap-4 border-b px-4 print:hidden">
+        <header data-app-header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:sticky md:top-0 md:z-30 print:hidden">
           <div className="flex items-center gap-2 md:hidden">
             {/* Единственный способ дойти до разделов на телефоне: сайдбар
                 скрыт до md, а без этой кнопки на мобильном не было вообще
