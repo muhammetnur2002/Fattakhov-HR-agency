@@ -7,6 +7,9 @@ import bcrypt from 'bcryptjs';
  */
 const COST = 12;
 
+/** Настоящий хеш случайной строки: сравнение с ним занимает столько же, сколько с чужим паролем. */
+const DUMMY_HASH = '$2a$12$e6rBJ3M3PEXR2QgdFWwUSu5YecljlsvazDMXY7cIGpKKebj2s6Wwy';
+
 export function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, COST);
 }
@@ -15,7 +18,7 @@ export function verifyPassword(plain: string, hash: string | null | undefined): 
   if (!hash) {
     // Аккаунта без пароля не существует, но сравнение всё равно выполняем:
     // мгновенный отказ отличал бы «нет такого пользователя» от «неверный пароль».
-    return bcrypt.compare(plain, '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin');
+    return bcrypt.compare(plain, DUMMY_HASH);
   }
   return bcrypt.compare(plain, hash);
 }

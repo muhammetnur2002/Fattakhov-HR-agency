@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { fail, handle, ok } from '@/lib/api';
+import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { inviteCandidate, listCandidatesForVacancy } from '@/lib/services';
 import { assertSameOrigin, requireEmployer } from '@/lib/security/guards';
+import { rateLimit } from '@/lib/security/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,11 @@ export async function POST(request: Request, { params }: Params) {
     assertSameOrigin(request);
     const { employer } = await requireEmployer();
     const { studentId } = inviteSchema.parse(await request.json());
+
+    // Каждое приглашение открывает работодателю контакты студента — массовая рассылка приглашений
+    // равна выгрузке базы, поэтому число приглашений в час ограничено
+    const limit = await rateLimit('invite', employer.id);
+    if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
     const result = await inviteCandidate(employer.id, params.vacancyId, studentId);
     if (result === 'NOT_FOUND') return fail(404, 'Кандидат или вакансия не найдены', 'NOT_FOUND');

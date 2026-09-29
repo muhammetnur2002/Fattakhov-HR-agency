@@ -137,6 +137,14 @@ function studyLevelRule(value: { studyLevel?: StudyLevel | null; studyYear: numb
   }
 }
 
+/**
+ * Ссылка на наш загруженный файл. Принимаем только адрес, который выдаёт /api/upload:
+ * иначе в профиль можно положить внешний адрес или javascript: и он попадёт в href у работодателя.
+ */
+function fileUrl(kind: string, extensions: string) {
+  return z.string().regex(new RegExp(`^/api/files/${kind}/[0-9a-f-]{36}\\.(${extensions})$`, 'i'), 'Некорректная ссылка на файл');
+}
+
 /** Шаги мастера валидируются по отдельности — форма проверяет ровно то,
  *  что человек уже заполнил, а не всё сразу. */
 export const registrationSteps = {
@@ -146,7 +154,7 @@ export const registrationSteps = {
     birthDate: birthDateSchema,
   }),
   photo: z.object({
-    photoUrl: z.string().max(500).nullable(),
+    photoUrl: fileUrl('photo', 'jpg|png|webp').nullable(),
   }),
   education: z.object({
     // Пусто — не заполнили ещё: шаг убрали из регистрации, чтобы не
@@ -176,7 +184,7 @@ export const registrationSteps = {
     skills: z.array(z.string().trim().min(1).max(40)).max(20, 'Не больше 20 навыков'),
     lookingFor: lookingForSchema.default([]),
     about: z.string().trim().max(600, 'Не длиннее 600 символов').nullable(),
-    resumeUrl: z.string().max(500).nullable(),
+    resumeUrl: fileUrl('resume', 'pdf|doc|docx').nullable(),
     resumeName: z.string().max(200).nullable(),
   }),
   account: z.object({

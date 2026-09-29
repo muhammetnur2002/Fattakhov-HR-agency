@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeNext } from '@/lib/security/safe-next';
 import { SESSION_COOKIE } from '@/lib/security/session';
 
 export const runtime = 'nodejs';
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
   const reason = incoming.searchParams.get('reason');
   if (reason) target.searchParams.set('reason', reason);
   const next = incoming.searchParams.get('next');
-  if (next && next.startsWith('/')) target.searchParams.set('next', next);
+  const safe = safeNext(next);
+  if (safe) target.searchParams.set('next', safe);
 
   // Куку снимаем на ответе, а не через cookies(): так она уходит именно
   // с этим редиректом и не зависит от порядка выполнения

@@ -6,6 +6,9 @@ import { UPLOAD_LIMITS, type UploadKind } from '@/lib/validation';
 
 export const runtime = 'nodejs';
 
+/** Самый большой допустимый файл плюс запас на служебные поля формы. */
+const MAX_BODY_BYTES = Math.max(...Object.values(UPLOAD_LIMITS).map((limit) => limit.maxBytes)) + 1024 * 1024;
+
 /**
  * Приём фото, резюме, изображений компании и справок об обучении.
  *
@@ -19,6 +22,13 @@ export async function POST(request: Request) {
 
     const limit = await rateLimit('upload', clientIp(request.headers));
     if (!limit.ok) return tooManyRequests(limit.retryAfter);
+
+    // Тело читаем целиком только после проверки заявленного размера: иначе formData()
+    // сначала разберёт сколько угодно данных, а уже потом мы скажем «слишком большой»
+    const declared = Number(request.headers.get('content-length') ?? '0');
+    if (!Number.isFinite(declared) || declared > MAX_BODY_BYTES) {
+      return fail(413, 'Файл слишком большой', 'TOO_LARGE');
+    }
 
     const form = await request.formData();
     const kind = String(form.get('kind') ?? '');

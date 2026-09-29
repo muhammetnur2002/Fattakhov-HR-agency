@@ -1,5 +1,6 @@
 import 'server-only';
 import { getRedis } from './redis';
+import { prisma } from '@/lib/db/prisma-client';
 
 /**
  * Скользящее окно по журналу попыток.
@@ -63,7 +64,39 @@ export const RATE_LIMITS = {
   // Форма поддержки уходит на личную почту одного человека — щедрый лимит
   // защищает не от обычного посетителя, а от рассылки спама через форму
   support: { limit: 5, windowSeconds: 3600 },
+  // Письмо с кодом на конкретный адрес: без этого чужую почту можно заваливать письмами,
+  // просто раз за разом начиная регистрацию
+  registerEmail: { limit: 3, windowSeconds: 3600 },
+  // Ввод кода регистрации по адресу: перебор шести цифр не должен зависеть от того, сколько
+  // раз атакующий запросил новый токен (счётчик попыток внутри токена он просто обнуляет)
+  registerConfirmEmail: { limit: 10, windowSeconds: 900 },
+  // Приглашения кандидатов: живой работодатель зовёт десятки, а не сотни в час
+  invite: { limit: 60, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
+
+/**
+ * Лимиты, которым нужен счёт общий для всех экземпляров сервера: защита пароля, кодов, почты и
+ * загрузок. Без Redis они считаются в базе. Частые и безобидные (свайпы, реплики чата) остаются
+ * в памяти — платить запросом в базу за каждый свайп незачем.
+ */
+const SHARED_COUNT: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
+  'login',
+  'loginIp',
+  'register',
+  'upload',
+  'employerCode',
+  'emailCode',
+  'emailVerify',
+  'registerConfirm',
+  'registerResend',
+  'passwordResetIp',
+  'passwordReset',
+  'crmTicket',
+  'support',
+  'registerEmail',
+  'registerConfirmEmail',
+  'invite',
+]);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
 
@@ -77,7 +110,13 @@ export async function rateLimit(
   const windowStart = now - rule.windowSeconds * 1000;
 
   const redis = getRedis();
-  if (!redis) return memoryLimit(key, rule, now, windowStart);
+  if (!redis) {
+    if (SHARED_COUNT.has(name) && process.env.DATABASE_URL) {
+      const shared = await databaseLimit(key, rule, now, windowStart);
+      if (shared) return shared;
+    }
+    return memoryLimit(key, rule, now, windowStart);
+  }
 
   try {
     const pipeline = redis.multi();
@@ -101,6 +140,45 @@ export async function rateLimit(
   } catch {
     // Недоступный Redis не должен закрывать вход всем пользователям
     return memoryLimit(key, rule, now, windowStart);
+  }
+}
+
+/** Общий счёт в базе. null — база недоступна: тогда работает счёт в памяти, вход не закрываем всем. */
+async function databaseLimit(
+  key: string,
+  rule: RateLimitRule,
+  now: number,
+  windowStart: number,
+): Promise<RateLimitResult | null> {
+  try {
+    const since = new Date(windowStart);
+    const [, , count] = await prisma.$transaction([
+      prisma.rateLimitHit.deleteMany({ where: { key, at: { lt: since } } }),
+      prisma.rateLimitHit.create({ data: { key } }),
+      prisma.rateLimitHit.count({ where: { key, at: { gte: since } } }),
+    ]);
+
+    // Ключи, к которым больше не возвращаются, чистим изредка и разом: не на каждый запрос
+    if (Math.random() < 0.02) {
+      void prisma.rateLimitHit.deleteMany({ where: { at: { lt: new Date(now - 86_400_000) } } }).catch(() => undefined);
+    }
+
+    if (count > rule.limit) {
+      const oldest = await prisma.rateLimitHit.findFirst({
+        where: { key, at: { gte: since } },
+        orderBy: { at: 'asc' },
+        select: { at: true },
+      });
+      const oldestAt = oldest?.at.getTime() ?? now;
+      return {
+        ok: false,
+        remaining: 0,
+        retryAfter: Math.max(1, Math.ceil((oldestAt + rule.windowSeconds * 1000 - now) / 1000)),
+      };
+    }
+    return { ok: true, remaining: rule.limit - count, retryAfter: 0 };
+  } catch {
+    return null;
   }
 }
 
@@ -133,6 +211,10 @@ function memoryLimit(
 
 /** IP из заголовков прокси. Без него лимит был бы общим на всех. */
 export function clientIp(headers: Headers): string {
+  // На Vercel этот заголовок ставит сама платформа, и подделать его клиент не может — в отличие
+  // от x-forwarded-for, куда клиентский запрос может добавить свои адреса
+  const platform = headers.get('x-vercel-forwarded-for');
+  if (platform) return platform.split(',')[0].trim();
   const forwarded = headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0].trim();
   return headers.get('x-real-ip') ?? '127.0.0.1';

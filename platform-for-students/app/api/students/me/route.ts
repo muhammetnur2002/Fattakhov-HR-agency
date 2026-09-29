@@ -4,6 +4,7 @@ import { studentName } from '@/lib/db/mappers';
 import { assertSameOrigin, audit, requireStudent } from '@/lib/security/guards';
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
 import { profileUpdateSchema } from '@/lib/validation';
+import { deleteStored } from '@/lib/storage';
 import { track } from '@/lib/analytics';
 import { COMPLETE_PROFILE_PERCENT, profileCompleteness } from '@/lib/portfolio';
 import { releasePendingApplications } from '@/lib/services';
@@ -137,6 +138,14 @@ export async function DELETE(request: Request) {
     );
 
     await store.students.deleteByAccountId(session.accountId);
+
+    // Загруженные файлы — тоже персональные данные: без этого фото, резюме и справка
+    // остались бы в хранилище уже без владельца. Сбой удаления не должен отменять стирание анкеты.
+    await Promise.allSettled(
+      [student.photoUrl, student.resumeUrl, student.studyDocUrl, student.videoUrl]
+        .filter((url): url is string => Boolean(url))
+        .map((url) => deleteStored(url)),
+    );
 
     // Куку снимаем здесь же: сессия ссылается на учётную запись,
     // которой больше нет, и без этого следующий переход упёрся бы

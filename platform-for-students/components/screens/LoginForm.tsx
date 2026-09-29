@@ -1,5 +1,6 @@
 'use client';
 
+import { safeNext } from '@/lib/security/safe-next';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -76,7 +77,7 @@ export function LoginForm({
 
       // «next» из middleware: вернуть человека туда, куда он шёл
       const next = params.get('next');
-      router.push(next && next.startsWith('/') ? next : (data.redirectTo ?? '/'));
+      router.push(safeNext(next) ?? safeNext(data.redirectTo) ?? '/');
       router.refresh();
     } catch {
       toast.error('Сеть недоступна', 'Проверьте соединение и попробуйте ещё раз');

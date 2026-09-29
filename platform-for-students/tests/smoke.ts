@@ -723,6 +723,14 @@ async function main() {
   // человек сохранит новое имя и продолжит видеть старое
   check('новое имя сразу попадает в сессию', me.body.session?.name === 'Профиль Изменённый', me.body);
 
+  for (const bad of [
+    { photoUrl: 'javascript:alert(1)' },
+    { photoUrl: 'https://evil.example/x.jpg' },
+    { resumeUrl: 'https://evil.example/cv.pdf', resumeName: 'cv.pdf' },
+  ]) {
+    const res = await owner.patch('/api/students/me', { ...ownerProfile, ...bad });
+    check(`ссылка на чужой файл в профиле отклоняется: ${Object.values(bad)[0]}`, res.status === 400, res.status);
+  }
   const invalid = await owner.patch('/api/students/me', { ...ownerProfile, studyYear: 9 });
   check('кривые данные профиля отвергнуты', invalid.status === 400, invalid.status);
 
@@ -1061,6 +1069,22 @@ async function main() {
     body: uploadForm(),
   });
   check('кабинет компании загружает изображение', companyUpload.status === 201, companyUpload.status);
+  // Заголовок типа задаёт отправитель: скрипт под видом PNG по содержимому не проходит
+  const disguised = new FormData();
+  disguised.append('kind', 'company');
+  disguised.append('file', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'logo.png');
+  const disguisedUpload = await fetch(`${BASE}/api/upload`, {
+    method: 'POST',
+    headers: { Origin: BASE, Cookie: (company as any).cookie },
+    body: disguised,
+  });
+  check('файл с поддельным типом не принимается', disguisedUpload.status === 415, disguisedUpload.status);
+  const hugeDeclared = await fetch(`${BASE}/api/upload`, {
+    method: 'POST',
+    headers: { Origin: BASE, Cookie: (company as any).cookie, 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': String(500 * 1024 * 1024) },
+    body: '--x--',
+  }).catch(() => null);
+  check('заявленный размер тела свыше лимита отсекается до чтения', hugeDeclared === null || [400, 413].includes(hugeDeclared.status), hugeDeclared?.status);
   if (companyUpload.status === 201) {
     const { url } = (await companyUpload.json()) as { url: string };
     const withLogo = await company.patch('/api/employer/company', { ...companyPage, logoUrl: url });
@@ -1428,24 +1452,20 @@ async function main() {
     // Раздел «Кандидаты» на стороне компании: список вместо колоды,
     // свайп остался только у студентов (лента вакансий)
     const clientVacancyId = String(clientVacancy.body?.id);
+    // Лид без договора кандидатов не видит и никого не приглашает: анкеты студентов — только клиентам с договором
     const candidateList = await clientSession.request(`/api/employer/candidates/${clientVacancyId}`);
     check(
-      'подтверждённый студент виден в списке кандидатов на новую вакансию',
-      candidateList.status === 200 &&
-        ((candidateList.body?.candidates ?? []) as Array<{ id: string }>).some((c) => c.id === studentId),
+      'клиент без договора не видит список кандидатов',
+      candidateList.status === 403 && candidateList.body?.code === 'CANDIDATES_LOCKED',
       candidateList.body,
     );
     const candidateInvite = await clientSession.post(`/api/employer/candidates/${clientVacancyId}`, {
       studentId,
     });
-    check('приглашение кандидата из списка отправляется', candidateInvite.status === 200 && candidateInvite.body?.invited === true, candidateInvite.body);
-    const candidateInviteAgain = await clientSession.post(`/api/employer/candidates/${clientVacancyId}`, {
-      studentId,
-    });
     check(
-      'повторно того же кандидата из списка не пригласить',
-      candidateInviteAgain.status === 200 && candidateInviteAgain.body?.invited === false,
-      candidateInviteAgain.body,
+      'клиент без договора не может пригласить студента',
+      candidateInvite.status === 403 && candidateInvite.body?.code === 'CANDIDATES_LOCKED',
+      candidateInvite.body,
     );
     check('раздел «Кандидаты» на платформе ведёт в CRM', await sendsToCrm(clientSession, '/employer/candidates', '/students/candidates'));
 
@@ -1475,6 +1495,23 @@ async function main() {
       (v) => v.id === activeVacancyId,
     );
     check('она сразу видна в ленте студента', activeInFeed);
+
+    // Кандидаты списком (не свайп): клиенту с договором список открыт
+    const activeCandidates = await activeSession.request(`/api/employer/candidates/${activeVacancyId}`);
+    check(
+      'подтверждённый студент виден в списке кандидатов клиента с договором',
+      activeCandidates.status === 200 &&
+        ((activeCandidates.body?.candidates ?? []) as Array<{ id: string }>).some((c) => c.id === studentId),
+      activeCandidates.body,
+    );
+    const activeInvite = await activeSession.post(`/api/employer/candidates/${activeVacancyId}`, { studentId });
+    check('приглашение кандидата из списка отправляется', activeInvite.status === 200 && activeInvite.body?.invited === true, activeInvite.body);
+    const activeInviteAgain = await activeSession.post(`/api/employer/candidates/${activeVacancyId}`, { studentId });
+    check(
+      'повторно того же кандидата из списка не пригласить',
+      activeInviteAgain.status === 200 && activeInviteAgain.body?.invited === false,
+      activeInviteAgain.body,
+    );
     const activeQueue = await admin.request('/api/admin/moderation');
     check(
       'в очереди модерации её нет',

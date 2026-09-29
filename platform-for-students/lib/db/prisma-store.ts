@@ -404,9 +404,16 @@ export function createPrismaStore(): DataStore {
         return rows.map(toEmployerRecord);
       },
       async resolveCrmLink(id, crmClientId) {
-        const row = await prisma.employer
-          .update({ where: { id }, data: { crmClientId, crmLinkRequestedAt: null, crmLinkNote: null } })
-          .catch(() => null);
+        // Привязать можно только компанию, у которой клиента CRM ещё нет: иначе служебный вызов
+        // с чужим id переписал бы связь уже работающей компании
+        const linked = await prisma.employer
+          .updateMany({
+            where: { id, crmClientId: null },
+            data: { crmClientId, crmLinkRequestedAt: null, crmLinkNote: null },
+          })
+          .catch(() => ({ count: 0 }));
+        if (linked.count === 0) return null;
+        const row = await prisma.employer.findUnique({ where: { id } });
         return row ? toEmployerRecord(row) : null;
       },
       async rejectCrmLink(id, note) {

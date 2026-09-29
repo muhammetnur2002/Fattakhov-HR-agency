@@ -24,6 +24,12 @@ export async function POST(request: Request) {
     if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
     const input = registrationSchema.parse(await request.json());
+
+    // Письмо с кодом уходит на любой адрес, который назвали, — без предела по адресу форму можно
+    // использовать, чтобы заваливать чужую почту. Предел стоит до любых проверок и отправки
+    const perEmail = await rateLimit('registerEmail', blindIndex(input.email));
+    if (!perEmail.ok) return tooManyRequests(perEmail.retryAfter);
+
     const store = await getStore();
 
     // Вуз из справочника сверяется с базой, и название берётся оттуда, а не

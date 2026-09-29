@@ -65,6 +65,12 @@ function withSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
+  // Без script-src: Next вставляет встроенные скрипты, и жёсткая политика их сломает.
+  // Зато запрещены <base>, чужие цели у форм, плагины и встраивание в чужие страницы.
+  response.headers.set(
+    'Content-Security-Policy',
+    "base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'",
+  );
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), interest-cohort=()',

@@ -2,7 +2,8 @@ import 'server-only';
 import { EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_TTL_MINUTES, resendWaitSeconds } from '@/lib/account-codes';
 import { emailCodeMail } from '@/lib/mail/templates';
 import { sendMail } from '@/lib/mail/transport';
-import { decrypt, encrypt, safeEqual } from '@/lib/security/crypto';
+import { blindIndex, decrypt, encrypt, safeEqual } from '@/lib/security/crypto';
+import { rateLimit } from '@/lib/security/rate-limit';
 import {
   signPendingRegistration,
   verifyPendingRegistration,
@@ -58,6 +59,12 @@ export async function confirmPendingRegistration<T>(
   const claims = await verifyPendingRegistration(token);
   if (!claims || claims.kind !== kind) return { status: 'BAD_TOKEN' };
   if (claims.attempts >= EMAIL_CODE_MAX_ATTEMPTS) return { status: 'LOCKED' };
+
+  // Счётчик попыток внутри токена обнуляется тем, кто просто присылает старый токен снова.
+  // Настоящий предел — по адресу и на сервере: сколько бы токенов ни запросили, шесть цифр
+  // за окно перебрать не выйдет
+  const perEmail = await rateLimit('registerConfirmEmail', blindIndex(claims.email));
+  if (!perEmail.ok) return { status: 'LOCKED' };
 
   if (!safeEqual(claims.codeHash, hashPendingCode(claims.email, code))) {
     const attempts = claims.attempts + 1;

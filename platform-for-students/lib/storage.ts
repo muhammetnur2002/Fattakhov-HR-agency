@@ -111,6 +111,34 @@ const EXTENSION: Record<string, string> = {
   'video/webm': 'webm',
 };
 
+/**
+ * Тип из заголовка запроса задаёт сам отправитель, поэтому смотрим ещё и на первые байты:
+ * иначе под видом картинки можно сложить на сервер что угодно.
+ */
+function matchesMagic(mime: string, head: Buffer): boolean {
+  const startsWith = (...bytes: number[]) => bytes.every((b, i) => head[i] === b);
+  switch (mime) {
+    case 'image/jpeg':
+      return startsWith(0xff, 0xd8, 0xff);
+    case 'image/png':
+      return startsWith(0x89, 0x50, 0x4e, 0x47);
+    case 'image/webp':
+      return head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP';
+    case 'application/pdf':
+      return head.subarray(0, 1024).toString('latin1').includes('%PDF-');
+    case 'application/msword':
+      return startsWith(0xd0, 0xcf, 0x11, 0xe0);
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      return startsWith(0x50, 0x4b);
+    case 'video/mp4':
+      return head.subarray(4, 8).toString('latin1') === 'ftyp';
+    case 'video/webm':
+      return startsWith(0x1a, 0x45, 0xdf, 0xa3);
+    default:
+      return false;
+  }
+}
+
 export interface StoredFile {
   /** Путь для клиента: /api/files/<kind>/<name> */
   url: string;
@@ -135,6 +163,9 @@ export async function storeUpload(kind: UploadKind, file: File): Promise<StoredF
   // и в нём может быть и обход каталога, и что угодно ещё.
   const stored = `${randomUUID()}.${EXTENSION[file.type] ?? 'bin'}`;
   const body = Buffer.from(await file.arrayBuffer());
+  if (!matchesMagic(file.type, body)) {
+    throw new HttpError(415, `Содержимое не похоже на заявленный формат. Нужен ${limits.label}`, 'BAD_CONTENT');
+  }
 
   const s3 = s3Client();
   if (s3) {
@@ -244,7 +275,7 @@ function sanitizeDisplayName(name: string): string {
  * что и при чтении, — удалить что-то вне каталога загрузок нельзя.
  */
 export async function deleteStored(url: string): Promise<void> {
-  const match = /^\/api\/files\/([a-z]+)\/([^/]+)$/.exec(url);
+  const match = /^\/api\/files\/([A-Za-z]+)\/([^/]+)$/.exec(url);
   if (!match) return;
   const [, kind, name] = match;
   if (!Object.prototype.hasOwnProperty.call(UPLOAD_LIMITS, kind) || !NAME_PATTERN.test(name)) return;

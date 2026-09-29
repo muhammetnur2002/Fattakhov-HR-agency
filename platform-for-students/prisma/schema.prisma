@@ -645,3 +645,15 @@ model StudentNotification {
   @@index([studentId, createdAt])
   @@index([studentId, readAt])
 }
+
+/// Попытки для ограничителя частоты, когда общего Redis нет (сервер без состояния — Vercel):
+/// счётчик в памяти там у каждого экземпляра свой и обнуляется при каждом холодном старте,
+/// то есть перебор пароля или кода он не останавливает. Здесь счёт общий для всех экземпляров.
+model RateLimitHit {
+  id  String   @id @default(cuid())
+  key String
+  at  DateTime @default(now())
+
+  @@index([key, at])
+  @@index([at])
+}

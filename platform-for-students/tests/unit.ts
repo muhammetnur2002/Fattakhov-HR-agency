@@ -23,6 +23,7 @@ import { addWorkdays, applicationsOpen, isPendingExpired, studyStatus, workdaysL
 import { isCodeShape, maskEmail, normalizeCode, resendWaitSeconds } from '../lib/account-codes';
 import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, passwordResetMail } from '../lib/mail/templates';
 import { emailCodeSchema, registrationSteps } from '../lib/validation';
+import { safeNext } from '../lib/security/safe-next';
 
 let passed = 0;
 const failures: string[] = [];
@@ -320,6 +321,31 @@ test('справка до дозаполнения профиля — без в�
     ],
   });
   assert.deepEqual(items, [{ kind: 'study', id: 's4', title: 'Вуз не указан', submittedAt: '2026-09-24T09:00:00.000Z' }]);
+});
+
+const UUID = '123e4567-e89b-12d3-a456-426614174000';
+test('фото и резюме — только наши загруженные файлы', () => {
+  const photo = (photoUrl: string | null) => registrationSteps.photo.safeParse({ photoUrl }).success;
+  const resume = (resumeUrl: string | null) =>
+    registrationSteps.skills.safeParse({ skills: [], about: null, resumeUrl, resumeName: null }).success;
+  assert.equal(photo(null), true);
+  assert.equal(photo(`/api/files/photo/${UUID}.jpg`), true);
+  assert.equal(photo('javascript:alert(1)'), false);
+  assert.equal(photo('https://evil.example/x.jpg'), false);
+  assert.equal(photo(`/api/files/resume/${UUID}.pdf`), false);
+  assert.equal(photo(`/api/files/photo/${UUID}.svg`), false);
+  assert.equal(resume(`/api/files/resume/${UUID}.pdf`), true);
+  assert.equal(resume('data:text/html,<script>1</script>'), false);
+});
+test('адрес возврата после входа — только путь внутри сайта', () => {
+  assert.equal(safeNext('/feed'), '/feed');
+  assert.equal(safeNext('/employer?tab=1'), '/employer?tab=1');
+  assert.equal(safeNext('//evil.example'), null);
+  assert.equal(safeNext('/\\evil.example'), null);
+  assert.equal(safeNext('https://evil.example'), null);
+  assert.equal(safeNext('javascript:alert(1)'), null);
+  assert.equal(safeNext('/a\nb'), null);
+  assert.equal(safeNext(null), null);
 });
 
 console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);

@@ -847,7 +847,7 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async resolveCrmLink(id, crmClientId) {
         const employer = t.employers.find((e) => e.id === id);
-        if (!employer) return null;
+        if (!employer || employer.crmClientId) return null;
         employer.crmClientId = crmClientId;
         employer.crmLinkRequestedAt = null;
         employer.crmLinkNote = null;

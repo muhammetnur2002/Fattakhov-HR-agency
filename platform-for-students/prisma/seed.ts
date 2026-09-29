@@ -25,6 +25,21 @@ import {
  *
  * Идемпотентно: повторный запуск обновляет, а не дублирует.
  */
+/**
+ * Демо-данные с известными паролями (admin@fattakhov.ru и др.) нельзя заливать в боевую базу:
+ * иначе у чужого человека появится вход администратором. Разрешаем только локальную базу
+ * или явное подтверждение ALLOW_REMOTE_SEED=1.
+ */
+function assertSafeTarget() {
+  const url = process.env.DATABASE_URL ?? '';
+  const local = /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
+  if (process.env.NODE_ENV === 'production' || (!local && process.env.ALLOW_REMOTE_SEED !== '1')) {
+    console.error('Отказ: seed запускается только на локальной базе (или с ALLOW_REMOTE_SEED=1 вне production).');
+    process.exit(1);
+  }
+}
+assertSafeTarget();
+
 const prisma = new PrismaClient();
 
 /** Портфолио — JSON-колонки; интерфейсы TypeScript Prisma принимает только приведёнными. */

@@ -2,6 +2,7 @@ import 'server-only';
 import { getStore } from '@/lib/db';
 import { scoreMatch, studentName, toStudentDTO, toVacancyDTO } from '@/lib/db/mappers';
 import { decryptSafe } from '@/lib/security/crypto';
+import { HttpError } from '@/lib/security/guards';
 import type { EmployerRecord, InstitutionRecord, StudentRecord, SwipeRecord, VacancyRecord } from '@/lib/db/types';
 import { isVacancyVisible, studentFacingVacancy, type CompanyAddress } from '@/lib/vacancy';
 import { NEXT_STEP_STATUSES, track } from '@/lib/analytics';
@@ -473,6 +474,28 @@ export async function getEmployerVacancy(employerId: string, id: string): Promis
  * откликнувшемуся, — после того, как отклик появился (здесь — после
  * приглашения).
  */
+/**
+ * Кому открыт поиск кандидатов и приглашения. Это доступ ко всей базе проверенных студентов
+ * (имя, вуз, навыки, а после приглашения — почта и телефон), поэтому он открыт только тем,
+ * кого агентство знает: клиенту CRM с действующим договором и самостоятельной компании,
+ * прошедшей модерацию. Клиент CRM без договора (лид) сюда не попадает: в базе у компаний
+ * по умолчанию стоит «одобрена», и одной проверки статуса модерации для него мало.
+ */
+export function canSearchCandidates(employer: {
+  moderationStatus: string;
+  crmClientId: string | null;
+  crmActive: boolean;
+}): boolean {
+  return employer.moderationStatus === 'APPROVED' && (employer.crmClientId === null || employer.crmActive);
+}
+
+function assertCandidateAccess(employer: EmployerRecord | null): asserts employer is EmployerRecord {
+  if (!employer) throw new HttpError(404, 'Вакансия не найдена', 'NOT_FOUND');
+  if (!canSearchCandidates(employer)) {
+    throw new HttpError(403, 'Поиск кандидатов откроется после заключения договора с агентством', 'CANDIDATES_LOCKED');
+  }
+}
+
 export async function listCandidatesForVacancy(
   employerId: string,
   vacancyId: string,
@@ -480,6 +503,7 @@ export async function listCandidatesForVacancy(
   const store = await getStore();
   const vacancy = await store.vacancies.findById(vacancyId);
   if (!vacancy || vacancy.employerId !== employerId) return null;
+  assertCandidateAccess(await store.employers.findById(employerId));
 
   const [students, applications] = await Promise.all([
     store.students.list(),
@@ -493,7 +517,13 @@ export async function listCandidatesForVacancy(
 
   return {
     vacancy: { id: vacancy.id, title: vacancy.title },
-    candidates: eligible.map((s) => toStudentDTO(s, '', { includeContacts: false })),
+    // Файлы студента (фото, резюме) до отклика работодателю не принадлежат: отдать адрес значило
+    // бы раскрыть, что они есть, и подсказать имя файла. Открываются они после приглашения.
+    candidates: eligible.map((s) => ({
+      ...toStudentDTO(s, '', { includeContacts: false }),
+      photoUrl: null,
+      resumeUrl: null,
+    })),
   };
 }
 
@@ -516,6 +546,10 @@ export async function inviteCandidate(
     store.students.findById(studentId),
   ]);
   if (!vacancy || vacancy.employerId !== employerId || !student) return 'NOT_FOUND';
+  assertCandidateAccess(await store.employers.findById(employerId));
+  // Приглашать можно только тех, кого показывает список: подтверждённых, не на паузе и не трудоустроенных.
+  // Иначе список можно обойти, подставив чужой studentId
+  if (!student.studyVerified || student.status === 'PAUSED' || student.status === 'PLACED') return 'NOT_FOUND';
 
   const invite = await store.applications.createInvite({ studentId, vacancyId });
   if (!invite) return 'ALREADY_DECIDED';

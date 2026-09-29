@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { fail, handle, ok } from '@/lib/api';
+import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { auditService } from '@/lib/security/guards';
+import { rateLimit } from '@/lib/security/rate-limit';
 import { assertServiceAuth } from '@/lib/security/service-auth';
 import { requireServiceEmployer } from '@/lib/security/service-employer';
 import { inviteCandidate, listCandidatesForVacancy } from '@/lib/services';
@@ -56,6 +57,10 @@ export async function POST(request: Request) {
     assertServiceAuth(request);
     const { crmClientId, actor, vacancyId, studentId } = inviteSchema.parse(await request.json());
     const { employer } = await requireServiceEmployer(crmClientId);
+
+    // Приглашение открывает контакты студента: число приглашений в час на компанию ограничено
+    const limit = await rateLimit('invite', employer.id);
+    if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
     const result = await inviteCandidate(employer.id, vacancyId, studentId);
     if (result === 'NOT_FOUND') return fail(404, 'Кандидат или вакансия не найдены', 'NOT_FOUND');
