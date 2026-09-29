@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StudentThread, StudentThreadMessage, StudentThreadSummary } from "@/lib/students-service";
+import { useKeyboardViewport, useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
 import {
   loadThreadAction,
@@ -34,6 +35,8 @@ export function StudentMessages({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, startLoading] = useTransition();
+  const rootRef = useRef<HTMLDivElement>(null);
+  useKeyboardViewport(rootRef);
 
   const refreshThreads = useCallback(async () => {
     const next = await loadThreadsAction();
@@ -104,7 +107,10 @@ export function StudentMessages({
   }
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem-2rem-4rem)] min-h-[28rem] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem-4rem)]">
+    <div
+      ref={rootRef}
+      className="flex h-[calc(100svh-3.5rem-2rem-4rem)] min-h-[28rem] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem-4rem)]"
+    >
       <aside className={cn("flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r", activeId && "hidden md:flex")}>
         <div className="border-b p-4">
           <h1 className="text-lg font-semibold">Сообщения студентам</h1>
@@ -222,6 +228,7 @@ function ThreadCard({ thread, active, onClick }: { thread: StudentThreadSummary;
 
 function Conversation({ thread, onBack, onSent }: { thread: StudentThread; onBack: () => void; onSent: () => Promise<void> }) {
   const scroller = useRef<HTMLDivElement>(null);
+  useScrollToLatestOnKeyboard(scroller);
   const stick = useRef(true);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);

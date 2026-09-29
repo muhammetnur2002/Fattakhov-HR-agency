@@ -12,6 +12,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
 
 export type ThreadMessage = {
@@ -56,6 +57,7 @@ export function MessageThread({
   const [state, setState] = useState<MessageState>({});
   const formRef = useRef<HTMLFormElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  useScrollToLatestOnKeyboard(scroller);
 
   /*
     Обычный обработчик вместо useActionState: после отправки надо

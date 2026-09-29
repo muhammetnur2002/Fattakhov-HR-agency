@@ -26,7 +26,8 @@ export function useAppViewport(ref: RefObject<HTMLElement>) {
     function unlock() {
       if (!el) return;
       html.removeAttribute('data-app-screen');
-      el.style.removeProperty('height');
+      html.removeAttribute('data-app-keyboard');
+      for (const prop of ['height', 'position', 'top', 'left', 'right', 'z-index']) el.style.removeProperty(prop);
       html.style.removeProperty('overflow');
       html.style.removeProperty('overscroll-behavior');
       main?.style.removeProperty('padding-top');
@@ -39,17 +40,38 @@ export function useAppViewport(ref: RefObject<HTMLElement>) {
         unlock();
         return;
       }
-      window.scrollTo(0, 0);
+      // Пока открыта клавиатура, положением страницы управляет iOS — не мешаем ему
+      if (!html.hasAttribute('data-app-keyboard')) window.scrollTo(0, 0);
       // Плавающая кнопка темы закрывала бы поле ввода: на экране-приложении её прячем (см. globals.css)
       html.setAttribute('data-app-screen', '');
+      // Клавиатура открыта, когда видимая область заметно ниже окна. Тогда, как в
+      // Telegram, шапка сайта с вкладками уходит: иначе она занимает почти всё, что
+      // осталось над клавиатурой, а переписка сжимается в полоску (см. globals.css)
+      const visible = window.visualViewport?.height ?? window.innerHeight;
+      if (window.innerHeight - visible > 120) html.setAttribute('data-app-keyboard', '');
+      else html.removeAttribute('data-app-keyboard');
       if (main) {
         main.style.paddingTop = '0px';
         main.style.paddingBottom = '0px';
       }
       html.style.overflow = 'hidden';
       html.style.overscrollBehavior = 'none';
-      const viewport = window.visualViewport?.height ?? window.innerHeight;
-      el.style.height = `${Math.floor(viewport - el.getBoundingClientRect().top)}px`;
+      const vv = window.visualViewport;
+      const viewport = vv?.height ?? window.innerHeight;
+      if (window.innerHeight - viewport > 120) {
+        // Клавиатура открыта. iOS при этом сдвигает видимую область вверх, чтобы показать
+        // поле ввода, — обычная вёрстка уезжает за её край. Закрепляем экран чата прямо по
+        // видимой области: он всегда занимает ровно место между верхом и клавиатурой
+        el.style.position = 'fixed';
+        el.style.top = `${Math.round(vv?.offsetTop ?? 0)}px`;
+        el.style.left = '0';
+        el.style.right = '0';
+        el.style.zIndex = '40';
+        el.style.height = `${Math.floor(viewport)}px`;
+      } else {
+        for (const prop of ['position', 'top', 'left', 'right', 'z-index']) el.style.removeProperty(prop);
+        el.style.height = `${Math.floor(viewport - el.getBoundingClientRect().top)}px`;
+      }
     }
 
     fit();
@@ -58,6 +80,7 @@ export function useAppViewport(ref: RefObject<HTMLElement>) {
     window.addEventListener('resize', fit);
     window.addEventListener('orientationchange', fit);
     window.visualViewport?.addEventListener('resize', fit);
+    window.visualViewport?.addEventListener('scroll', fit);
     desktop.addEventListener('change', fit);
 
     return () => {
@@ -65,6 +88,7 @@ export function useAppViewport(ref: RefObject<HTMLElement>) {
       window.removeEventListener('resize', fit);
       window.removeEventListener('orientationchange', fit);
       window.visualViewport?.removeEventListener('resize', fit);
+      window.visualViewport?.removeEventListener('scroll', fit);
       desktop.removeEventListener('change', fit);
       unlock();
     };

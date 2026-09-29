@@ -194,6 +194,12 @@ export const EVENTS = {
   },
 
   // --- Финансы ---
+  CONTRACT_UPLOADED: {
+    channels: ["email"],
+    priority: "high",
+    description: "Клиент прислал подписанный договор",
+    category: "finance",
+  },
   INVOICE_ISSUED: {
     channels: ["email"],
     priority: "high",

@@ -94,7 +94,9 @@ export function Composer({
       </div>
 
       <div className="mt-1.5 flex items-center justify-between px-1">
-        <span className="text-[11.5px] text-paper-faint">
+        {/* Подсказка про клавиши нужна с клавиатурой компьютера; на телефоне она
+            только отнимает место над клавиатурой */}
+        <span className="hidden text-[11.5px] text-paper-faint lg:inline">
           Enter — отправить, Shift + Enter — перенос строки
         </span>
         {/* Счётчик появляется на подходе к пределу, а не висит всегда */}

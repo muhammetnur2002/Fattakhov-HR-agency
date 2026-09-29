@@ -57,6 +57,9 @@ export default async function ClientsPage({
         {canManage && (
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
+              <Link href="/a/clients/contract-template">Шаблон договора</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/a/clients/funnel">Воронка студплатформы</Link>
             </Button>
             <Button asChild variant="outline">

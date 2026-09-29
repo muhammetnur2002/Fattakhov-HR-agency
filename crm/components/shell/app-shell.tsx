@@ -111,7 +111,7 @@ export async function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-4 border-b px-4 print:hidden">
+        <header data-app-header className="flex h-14 items-center justify-between gap-4 border-b px-4 print:hidden">
           <div className="flex items-center gap-2 md:hidden">
             {/* Единственный способ дойти до разделов на телефоне: сайдбар
                 скрыт до md, а без этой кнопки на мобильном не было вообще

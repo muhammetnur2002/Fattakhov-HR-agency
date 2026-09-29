@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 
+import { ContractUpload } from "@/components/client/contract-upload";
 import { InvoiceList } from "@/components/finance/invoice-list";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import { formatDate } from "@/lib/format-date";
 import type { AgreementStatus } from "@/lib/generated/prisma/enums";
 import { describePricing } from "@/lib/pricing";
 import { getAgreementFileUrl, toPricingParams } from "@/lib/services/agreements";
+import { getContractTemplate, listSubmittedContracts } from "@/lib/services/contract-documents";
 import { listInvoices } from "@/lib/services/invoices";
 
 export const metadata = { title: "Документы" };
@@ -23,12 +25,14 @@ export default async function DocumentsPage() {
   const actor = await requireClientActor();
   authorize(actor, "invoice.view", { clientId: actor.clientId });
 
-  const [agreements, invoices] = await Promise.all([
+  const [agreements, invoices, template, submitted] = await Promise.all([
     prisma.agreement.findMany({
       where: { clientId: actor.clientId ?? "" },
       orderBy: { createdAt: "desc" },
     }),
     listInvoices(actor),
+    getContractTemplate(actor.organizationId),
+    actor.clientId ? listSubmittedContracts(actor.clientId) : Promise.resolve([]),
   ]);
 
   const active = agreements.find((a) => a.status === "ACTIVE");
@@ -45,6 +49,59 @@ export default async function DocumentsPage() {
           Условия сотрудничества и счета
         </p>
       </div>
+
+      {/* Пока действующего договора нет, здесь его и оформляют: шаблон, подпись,
+          скан или фото агентству. Когда агентство подтвердит, откроются разделы
+          работы; блок остаётся, пока договор не действует */}
+      {!active && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Оформить договор</CardTitle>
+            <CardDescription>
+              Скачайте шаблон, подпишите и пришлите нам скан или фото. Агентство проверит и подтвердит договор — после
+              этого откроются заявки на подбор, кандидаты, календарь, аналитика и переписка с командой.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">1. Шаблон договора</p>
+              {template ? (
+                <Button asChild variant="outline" size="sm">
+                  <a href={template.url} target="_blank" rel="noopener noreferrer">
+                    <FileText className="size-4" />
+                    Скачать шаблон ({template.fileName})
+                  </a>
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Шаблон готовит менеджер — напишите нам через «Обсудить с нами», и мы пришлём его сразу.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">2. Подписанный договор</p>
+              <ContractUpload />
+            </div>
+            {submitted.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Вы присылали</p>
+                <ul className="space-y-1 text-sm">
+                  {submitted.map((f) => (
+                    <li key={f.id} className="flex flex-wrap items-center gap-2">
+                      <a href={f.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                        {f.fileName}
+                      </a>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(f.createdAt)} · на проверке у агентства
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

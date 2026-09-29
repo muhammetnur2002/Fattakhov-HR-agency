@@ -342,3 +342,10 @@
     --text-7xl: 3.875rem;
   }
 }
+
+/* Клавиатура открыта на телефоне: шапка кабинета уступает место переписке, как в мессенджерах */
+@media (max-width: 767px) {
+  html[data-app-keyboard] [data-app-header] {
+    display: none;
+  }
+}

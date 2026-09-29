@@ -3,12 +3,13 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConversationList } from "./conversation-list";
 import { DirectConversationList } from "./direct-conversation-list";
 import { NewMessageDialog } from "./new-message-dialog";
 import { Button } from "@/components/ui/button";
+import { useKeyboardViewport } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/lib/services/comments";
 import type { Correspondent, DirectConversation } from "@/lib/services/messages";
@@ -52,6 +53,8 @@ export function MessagesShell({
   const workUnread = work.filter((c) => c.unreadCount > 0).length;
 
   // Поиск и чипы-фильтры личных диалогов — на клиенте: список уже загружен
+  const rootRef = useRef<HTMLDivElement>(null);
+  useKeyboardViewport(rootRef);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<DirectFilter>("all");
   const isAgency = hrefBase === "/a";
@@ -69,7 +72,10 @@ export function MessagesShell({
   });
 
   return (
-    <div className="flex h-[calc(100svh-3.5rem-2rem)] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem)]">
+    <div
+      ref={rootRef}
+      className="flex h-[calc(100svh-3.5rem-2rem)] overflow-hidden rounded-3xl border md:h-[calc(100svh-3.5rem-3rem)]"
+    >
       <aside
         className={cn(
           "flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r",

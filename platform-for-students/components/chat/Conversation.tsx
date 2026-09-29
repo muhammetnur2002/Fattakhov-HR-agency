@@ -59,6 +59,30 @@ export function Conversation({
     stickToBottom.current = true;
   }, [thread?.applicationId]);
 
+  // Клавиатура на телефоне уменьшает видимую область: переписка должна поднять
+  // последнее сообщение над полем ввода, как в Telegram, а не оставить его под
+  // клавиатурой. Нажали в поле — считаем, что человек пишет ответ на последнее
+  useEffect(() => {
+    const toBottom = () => {
+      const node = scroller.current;
+      if (node && stickToBottom.current) node.scrollTop = node.scrollHeight;
+    };
+    const onFocus = (event: FocusEvent) => {
+      if (!(event.target instanceof HTMLTextAreaElement)) return;
+      stickToBottom.current = true;
+      // Клавиатура выезжает с задержкой — догоняем, когда размер уже поменялся
+      window.setTimeout(toBottom, 120);
+      window.setTimeout(toBottom, 420);
+    };
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', toBottom);
+    document.addEventListener('focusin', onFocus);
+    return () => {
+      viewport?.removeEventListener('resize', toBottom);
+      document.removeEventListener('focusin', onFocus);
+    };
+  }, []);
+
   if (!thread) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">

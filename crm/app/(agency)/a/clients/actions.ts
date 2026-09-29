@@ -11,6 +11,7 @@ import {
   confirmAgreement,
   terminateAgreement,
 } from "@/lib/services/agreements";
+import { uploadContractTemplate } from "@/lib/services/contract-documents";
 import {
   ClientUserError,
   createClient,
@@ -208,6 +209,29 @@ export async function terminateAgreementAction(
 
   revalidatePath(`/a/clients/${clientId}`);
   return { ok: "Договор расторгнут" };
+}
+
+/** Шаблон договора для клиентов без договора: они скачивают его в «Документах». */
+export async function uploadContractTemplateAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const actor = await requireAgencyActor();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Выберите файл" };
+
+  try {
+    authorizeOrThrow(actor, "agreement.manage", { clientId: null });
+    await uploadContractTemplate(actor, file);
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof FileValidationError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath("/a/clients/contract-template");
+  revalidatePath("/documents");
+  return { ok: "Шаблон обновлён — клиенты уже видят новый файл" };
 }
 
 /** Прикрепление скана подписанного договора — клиент видит его в «Документах». */

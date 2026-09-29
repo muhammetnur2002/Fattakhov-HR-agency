@@ -31,6 +31,7 @@ import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { CLIENT_STATUS_LABELS, ROLE_LABELS } from "@/lib/labels";
 import { describePricing } from "@/lib/pricing";
 import { getAgreementFileUrl, toPricingParams } from "@/lib/services/agreements";
+import { listUnattachedClientContracts } from "@/lib/services/contract-documents";
 import { getClient, listAccountManagers } from "@/lib/services/clients";
 
 export async function generateMetadata({
@@ -76,6 +77,10 @@ export default async function ClientPage({
         ),
       )
     : {};
+
+  // Подписанные договоры, которые клиент прислал сам и которые пока не привязаны
+  // к договору (условия он ещё не выбирал), — чтобы файл не потерялся
+  const clientContracts = canViewAgreements ? await listUnattachedClientContracts(id) : [];
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -215,6 +220,28 @@ export default async function ClientPage({
         {/* --- Договоры --- */}
         {canViewAgreements && (
         <TabsContent value="agreements" className="space-y-4 pt-4">
+          {clientContracts.length > 0 && (
+            <Card className="border-primary/40">
+              <CardHeader>
+                <CardTitle className="text-base">Клиент прислал подписанный договор</CardTitle>
+                <CardDescription>
+                  Проверьте файл. Условия клиент ещё не выбрал — оформите договор вместе с ним.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1 text-sm">
+                  {clientContracts.map((f) => (
+                    <li key={f.id} className="flex flex-wrap items-center gap-2">
+                      <a href={f.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                        {f.fileName}
+                      </a>
+                      <span className="text-xs text-muted-foreground">{formatDate(f.createdAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           {client.agreements.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-sm text-muted-foreground">
