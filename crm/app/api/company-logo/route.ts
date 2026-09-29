@@ -5,6 +5,7 @@ import { authorizeOrThrow, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { CompanyProfileError, removeCompanyLogo, saveCompanyLogo } from "@/lib/services/company-profile";
 import { pushCompanyProfile } from "@/lib/services/company-sync";
+import { rejectForeignOrOversized } from "@/lib/security/request-guard";
 import { FileValidationError } from "@/lib/storage";
 import { uploadVacancyCover } from "@/lib/students-service";
 
@@ -28,6 +29,8 @@ function failure(error: unknown) {
 
 /** Загрузка логотипа: сохраняем у себя и передаём копию на платформу для карточки вакансии. */
 export async function POST(request: NextRequest) {
+  const rejected = rejectForeignOrOversized(request, { upload: true });
+  if (rejected) return rejected;
   try {
     const { actor, clientId, label } = await currentClient();
     const file = (await request.formData()).get("file");
@@ -45,7 +48,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const rejected = rejectForeignOrOversized(request);
+  if (rejected) return rejected;
   try {
     const { clientId, label } = await currentClient();
     await removeCompanyLogo(clientId);

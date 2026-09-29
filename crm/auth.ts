@@ -6,6 +6,13 @@ import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import {
+  clearLoginFailures,
+  isLoginBlocked,
+  isSecondFactorBlocked,
+  recordLoginFailure,
+  recordSecondFactorFailure,
+} from "@/lib/security/login-throttle";
+import {
   requiresSecondFactor,
   verifySecondFactor,
 } from "@/lib/services/two-factor";
@@ -66,6 +73,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { email, password, code } = parsed.data;
 
+        // Лимит здесь, а не только в форме: Auth.js принимает запрос и напрямую
+        if (await isLoginBlocked(email)) throw new InvalidCredentials();
+
         const user = await prisma.user.findFirst({
           where: { email: email.toLowerCase().trim(), isActive: true },
           select: {
@@ -86,16 +96,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$3wRJDPBLYSMPmwLmFvxNPHFTJZFTh9tXPFmzeXKXUeQ";
 
         const ok = await verifyPassword(hashToCheck, password);
-        if (!user || !user.passwordHash || !ok) throw new InvalidCredentials();
+        if (!user || !user.passwordHash || !ok) {
+          await recordLoginFailure(email);
+          throw new InvalidCredentials();
+        }
 
         // Второй фактор проверяется только после пароля: до этого мы
         // не должны даже подтверждать, что такой человек есть
         if (await requiresSecondFactor(user.id)) {
           if (!code?.trim()) throw new SecondFactorRequired();
+          // Шесть цифр перебираются быстро, поэтому код считаем отдельно и строже пароля
+          if (await isSecondFactorBlocked(user.id)) throw new SecondFactorInvalid();
           if (!(await verifySecondFactor({ userId: user.id, code }))) {
+            await recordSecondFactorFailure(user.id);
             throw new SecondFactorInvalid();
           }
         }
+
+        await clearLoginFailures(email, user.id);
 
         await prisma.user.update({
           where: { id: user.id },

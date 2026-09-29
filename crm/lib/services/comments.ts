@@ -332,6 +332,17 @@ export async function createComment(
     throw new CommentError("Комментарий не привязан ни к кандидату, ни к вакансии");
   }
 
+  // Вакансия комментария — всегда вакансия отклика. Пара «мой отклик + чужая вакансия» из формы
+  // иначе положила бы реплику в чужой тред и разослала уведомления его участникам
+  if (params.applicationId) {
+    const application = await prisma.application.findFirst({
+      where: { id: params.applicationId, organizationId: actor.organizationId },
+      select: { vacancyId: true },
+    });
+    if (!application) throw new CommentError("Не найдено");
+    params = { ...params, vacancyId: application.vacancyId };
+  }
+
   // Внутренний комментарий может написать только агентство. Проверка
   // здесь, а не только в интерфейсе: иначе форму можно подделать
   if (params.visibility === "INTERNAL" && !canDo(actor, "comment.writeInternal")) {
@@ -494,8 +505,22 @@ export async function deleteComment(actor: Actor, commentId: string) {
 export async function markCommentsRead(actor: Actor, commentIds: string[]) {
   if (commentIds.length === 0) return;
 
+  // Отмечаем только то, что человек вправе видеть: иначе по ответу можно узнавать чужие id
+  const readable = await prisma.comment.findMany({
+    where: {
+      id: { in: commentIds },
+      organizationId: actor.organizationId,
+      ...visibleCommentsFilter(actor),
+      OR: [
+        { vacancy: visibleVacanciesFilter(actor) },
+        { application: visibleApplicationsFilter(actor) },
+      ],
+    },
+    select: { id: true },
+  });
+
   await prisma.commentRead.createMany({
-    data: commentIds.map((commentId) => ({ commentId, userId: actor.id })),
+    data: readable.map(({ id }) => ({ commentId: id, userId: actor.id })),
     skipDuplicates: true,
   });
 }

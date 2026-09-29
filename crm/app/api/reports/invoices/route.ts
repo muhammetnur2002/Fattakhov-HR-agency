@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { canDo } from "@/lib/access";
 import { getActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { buildCsv, reportFileName, type Sheet } from "@/lib/services/analytics/export";
@@ -24,7 +25,10 @@ const STATUS_LABELS: Record<string, string> = {
 export async function GET() {
   const actor = await getActor();
   if (!actor) return new NextResponse("Требуется вход", { status: 401 });
-  if (!actor.clientId) return new NextResponse("Не найдено", { status: 404 });
+  // Та же проверка, что и у страницы «Документы»: счета видит администратор компании
+  if (!actor.clientId || !canDo(actor, "invoice.view", { clientId: actor.clientId })) {
+    return new NextResponse("Не найдено", { status: 404 });
+  }
 
   const invoices = await listInvoices(actor);
 

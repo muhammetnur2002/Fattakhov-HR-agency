@@ -138,6 +138,28 @@ function serviceSecret(): string | null {
 
 export class StudentsServiceError extends Error {}
 
+/** Поиск студентов открывается после договора: платформа отвечает 403 CANDIDATES_LOCKED. */
+export class CandidatesLockedError extends StudentsServiceError {}
+
+/**
+ * Идентификатор в адресе служебного запроса. Значения приходят из форм клиента, а запрос уходит
+ * со служебным секретом: «../../crm-links/…» иначе превратился бы в вызов чужого маршрута.
+ */
+function segment(id: string): string {
+  if (!/^[\w-]{1,64}$/.test(id)) throw new StudentsServiceError("Недопустимый идентификатор");
+  return encodeURIComponent(id);
+}
+
+/** Путь должен остаться тем, что мы написали: без «..», «%2e%2e», обратных слэшей и чужих префиксов. */
+function assertPlainPath(path: string) {
+  const raw = path.split("?")[0];
+  const parsed = new URL(path, "http://x");
+  const okPrefix = raw.startsWith("/api/service/") || raw.startsWith("/api/files/");
+  if (!okPrefix || parsed.pathname !== raw || raw.includes("\\")) {
+    throw new StudentsServiceError("Недопустимый путь служебного запроса");
+  }
+}
+
 /** Клиент CRM, которого уже заводили на платформе: id → когда и с каким договором. */
 const provisioned = new Map<string, { at: number; active: boolean }>();
 /** Раз в это время подтверждаем статус договора, чтобы платформа не считала подписавшего лидом. */
@@ -210,6 +232,7 @@ async function call(path: string, init?: RequestInit): Promise<Response> {
 }
 
 async function rawCall(path: string, init?: RequestInit): Promise<Response> {
+  assertPlainPath(path);
   const secret = serviceSecret();
   const url = studentsUrl(path);
   if (!secret || !url) {
@@ -252,7 +275,7 @@ export async function fetchApprovedCompanies(): Promise<ApprovedCompany[]> {
 
 /** Одобрить заявку — компания получает crmClientId у себя. */
 export async function resolveCrmLinkRequest(employerId: string, crmClientId: string): Promise<void> {
-  const response = await call(`/api/service/crm-links/${employerId}/resolve`, {
+  const response = await call(`/api/service/crm-links/${segment(employerId)}/resolve`, {
     method: "POST",
     body: JSON.stringify({ crmClientId }),
   });
@@ -261,7 +284,7 @@ export async function resolveCrmLinkRequest(employerId: string, crmClientId: str
 
 /** Отклонить заявку с пояснением — компания увидит его у себя. */
 export async function rejectCrmLinkRequest(employerId: string, note: string): Promise<void> {
-  const response = await call(`/api/service/crm-links/${employerId}/reject`, {
+  const response = await call(`/api/service/crm-links/${segment(employerId)}/reject`, {
     method: "POST",
     body: JSON.stringify({ note }),
   });
@@ -437,7 +460,8 @@ export async function fetchEmployerVacancies(crmClientId: string): Promise<Emplo
 
 /** Одна вакансия — для формы правки. Null — не найдена или ведётся из CRM отдельно. */
 export async function fetchEmployerVacancy(crmClientId: string, id: string): Promise<VacancyDetail | null> {
-  const response = await call(`/api/service/employer/vacancies/${id}?crmClientId=${encodeURIComponent(crmClientId)}`);
+  if (!/^[\w-]{1,64}$/.test(id)) return null;
+  const response = await call(`/api/service/employer/vacancies/${segment(id)}?crmClientId=${encodeURIComponent(crmClientId)}`);
   if (response.status === 404 || response.status === 409) return null;
   if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
   const data = (await response.json()) as { vacancy: VacancyDetail };
@@ -459,7 +483,7 @@ export async function updateEmployerVacancy(
   id: string,
   input: VacancyFields & { crmClientId: string; actor: string; submit: boolean },
 ): Promise<{ error?: StudentsApiError; id?: string; status?: StudentsVacancyStatus }> {
-  const response = await call(`/api/service/employer/vacancies/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+  const response = await call(`/api/service/employer/vacancies/${segment(id)}`, { method: "PATCH", body: JSON.stringify(input) });
   if (!response.ok) return { error: await parseError(response) };
   const data = (await response.json()) as { id: string; status: StudentsVacancyStatus };
   return data;
@@ -470,7 +494,7 @@ export async function actOnEmployerVacancy(
   id: string,
   input: { crmClientId: string; actor: string; action: "submit" | "close" | "delete"; keep?: boolean },
 ): Promise<{ error?: StudentsApiError; id?: string; status?: StudentsVacancyStatus; deleted?: boolean }> {
-  const response = await call(`/api/service/employer/vacancies/${id}`, { method: "POST", body: JSON.stringify(input) });
+  const response = await call(`/api/service/employer/vacancies/${segment(id)}`, { method: "POST", body: JSON.stringify(input) });
   if (!response.ok) return { error: await parseError(response) };
   return (await response.json()) as { id: string; status?: StudentsVacancyStatus; deleted?: boolean };
 }
@@ -681,6 +705,9 @@ export async function fetchStudentCandidates(
 ): Promise<{ vacancy: { id: string; title: string }; candidates: StudentCandidate[] } | null> {
   const response = await call(`/api/service/employer/candidates?crmClientId=${enc(crmClientId)}&vacancyId=${enc(vacancyId)}`);
   if (response.status === 404) return null;
+  if (response.status === 403) {
+    throw new CandidatesLockedError("Поиск студентов откроется после заключения договора с агентством");
+  }
   if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
   return (await response.json()) as { vacancy: { id: string; title: string }; candidates: StudentCandidate[] };
 }

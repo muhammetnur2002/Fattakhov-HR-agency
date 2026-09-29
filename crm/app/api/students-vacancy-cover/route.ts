@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { rejectForeignOrOversized } from "@/lib/security/request-guard";
 import { uploadVacancyCover } from "@/lib/students-service";
 
 /**
@@ -10,6 +11,8 @@ import { uploadVacancyCover } from "@/lib/students-service";
  * сохраняется вместе с вакансией.
  */
 export async function POST(request: NextRequest) {
+  const rejected = rejectForeignOrOversized(request, { upload: true });
+  if (rejected) return rejected;
   const actor = await requireClientActor();
   authorize(actor, "students.enterAsClient");
   if (!actor.clientId) return NextResponse.json({ error: "Кабинет не привязан к компании" }, { status: 400 });

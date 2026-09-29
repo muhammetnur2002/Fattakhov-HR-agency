@@ -7,6 +7,9 @@ import { fetchStudentsFile } from "@/lib/students-service";
 /** Картинка компании (логотип, обложка вакансии): не персональные данные, её видит любой студент. */
 const COMPANY_IMAGE_PATH = /^\/api\/files\/company\/[0-9a-f-]{36}\.(jpg|png|webp)$/i;
 
+/** Справка, фото студента и картинка компании — единственное, что проверяющим нужно из хранилища. */
+const REVIEW_FILE_PATH = /^\/api\/files\/(photo|study|company)\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/i;
+
 /**
  * Проксирует файл со студенческой платформы для CRM: читает его служебным
  * секретом на сервере и отдаёт браузеру — секрет так и не попадает в браузер,
@@ -20,7 +23,8 @@ export async function GET(request: NextRequest) {
   const actor = await requireActor();
 
   const path = request.nextUrl.searchParams.get("path") ?? "";
-  if (!path.startsWith("/api/files/")) {
+  // Строго один файл: свободный путь со служебным секретом открыл бы и другие маршруты платформы
+  if (!REVIEW_FILE_PATH.test(path)) {
     return NextResponse.json({ error: "Недопустимый путь" }, { status: 400 });
   }
 

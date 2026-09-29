@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { visibleVacanciesFilter, type Actor } from "@/lib/access";
+import { canDo, visibleVacanciesFilter, type Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
 import type {
   InterviewFormat,
@@ -22,6 +22,15 @@ export { InterviewError };
 /** Токен публичной ссылки для кандидата. Одноразовый по смыслу, гасится после выбора. */
 function generateToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -62,6 +71,11 @@ export async function proposeSlots(
   }
 
   validateSlots(params.slots);
+
+  // Ссылка попадает в href у клиента и кандидата и в календарь: «javascript:» там недопустим
+  if (params.meetingUrl && !isHttpUrl(params.meetingUrl)) {
+    throw new InterviewError("Ссылка на встречу должна начинаться с http:// или https://");
+  }
 
   const token = generateToken();
   const tokenExpiresAt = new Date();
@@ -370,11 +384,20 @@ export async function submitFeedback(
   interviewId: string,
   params: { rating: number; note?: string },
 ) {
+  // Оценку ставит тот, кто вправе вести встречу: сотрудник агентства или клиент этой вакансии.
+  // Без этого любой вошедший, зная id, записывал бы оценку в чужую встречу.
   const interview = await prisma.interview.findFirst({
-    where: { id: interviewId, organizationId: actor.organizationId },
-    select: { id: true, status: true },
+    where: {
+      id: interviewId,
+      organizationId: actor.organizationId,
+      vacancy: visibleVacanciesFilter(actor),
+    },
+    select: { id: true, status: true, vacancy: { select: { clientId: true, hiringManagerId: true } } },
   });
   if (!interview) throw new InterviewError("Встреча не найдена");
+  if (!canDo(actor, "interview.confirm", interview.vacancy)) {
+    throw new InterviewError("Недостаточно прав");
+  }
 
   if (interview.status !== "COMPLETED" && interview.status !== "CONFIRMED") {
     throw new InterviewError("Обратная связь возможна после встречи");

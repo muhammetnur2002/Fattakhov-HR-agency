@@ -643,9 +643,25 @@ export function visibleAttachmentsFilter(actor: Actor): object {
     return { organizationId: actor.organizationId };
   }
 
+  // Файл должен принадлежать компании клиента — напрямую или через вакансию, отклик, счёт, договор.
+  // Одних «общих в организации» мало: подписанная ссылка на чужой договор иначе открывалась бы
+  const clientId = actor.clientId ?? "";
   return {
     organizationId: actor.organizationId,
     visibility: "SHARED" as const,
     kind: { notIn: [...ATTACHMENT_KINDS_HIDDEN_FROM_CLIENT] },
+    // AND, а не OR на верхнем уровне: вызывающие подмешивают свой OR, и он затёр бы этот
+    AND: [
+      {
+        OR: [
+          { clientId },
+          { vacancy: { clientId } },
+          { application: { vacancy: { clientId } } },
+          { invoice: { clientId } },
+          { agreement: { clientId } },
+          { candidate: { applications: { some: { vacancy: { clientId } } } } },
+        ],
+      },
+    ],
   };
 }

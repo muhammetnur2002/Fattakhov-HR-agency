@@ -339,6 +339,31 @@ describe("перенос, отмена, обратная связь", () => {
     expect(interview?.feedbackById).toBe(recruiter.id);
   });
 
+  it("оценку не ставит наблюдатель и клиент чужой компании", async () => {
+    await confirmed();
+    const application = await db.application.findUnique({
+      where: { id: applicationId },
+      select: { vacancy: { select: { clientId: true } } },
+    });
+    const ownClient = application?.vacancy.clientId ?? null;
+    const viewer: Actor = { id: "usr_cl_viewer", organizationId: ORG, role: "CLIENT_VIEWER", clientId: ownClient };
+    const stranger: Actor = { id: "usr_cl2_admin", organizationId: ORG, role: "CLIENT_ADMIN", clientId: "cl_other_company" };
+
+    await expect(submitFeedback(viewer, interviewId, { rating: 5 })).rejects.toThrow(InterviewError);
+    await expect(submitFeedback(stranger, interviewId, { rating: 1 })).rejects.toThrow(/не найдена/);
+
+    const interview = await db.interview.findUnique({ where: { id: interviewId }, select: { feedbackRating: true } });
+    expect(interview?.feedbackRating).toBeNull();
+  });
+
+  it("ссылка на встречу — только http(s): javascript: не принимается", async () => {
+    for (const meetingUrl of ["javascript:alert(1)", "data:text/html,x", "не ссылка"]) {
+      await expect(
+        proposeSlots(recruiter, interviewId, { ...proposeParams, meetingUrl, slots: [futureSlot(2, 10), futureSlot(2, 14)] }),
+      ).rejects.toThrow(/http/);
+    }
+  });
+
   it("оценка вне шкалы не принимается", async () => {
     await confirmed();
     await expect(

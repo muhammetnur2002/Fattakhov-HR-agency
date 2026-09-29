@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import {
+  CandidatesLockedError,
   fetchEmployerVacancies,
   fetchStudentCandidates,
   StudentsServiceError,
@@ -34,6 +35,7 @@ export default async function StudentsCandidatesPage({
   let vacancies: EmployerVacancyDTO[] = [];
   let candidates: StudentCandidate[] = [];
   let error: string | null = null;
+  let locked = false;
   let selected: EmployerVacancyDTO | null = null;
   try {
     // Приглашать можно только на опубликованную вакансию своего кабинета
@@ -44,7 +46,12 @@ export default async function StudentsCandidatesPage({
       candidates = result?.candidates ?? [];
     }
   } catch (err) {
-    error = err instanceof StudentsServiceError ? err.message : "Не удалось загрузить кандидатов";
+    if (err instanceof CandidatesLockedError) {
+      locked = true;
+      selected = null;
+    } else {
+      error = err instanceof StudentsServiceError ? err.message : "Не удалось загрузить кандидатов";
+    }
   }
 
   return (
@@ -56,13 +63,28 @@ export default async function StudentsCandidatesPage({
         </p>
       </div>
 
-      {error && (
+      {locked && (
+        <Card>
+          <CardContent className="space-y-2 py-10 text-center text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Поиск студентов откроется после договора</p>
+            <p>
+              Анкеты студентов доступны компаниям, которые заключили договор с агентством.{" "}
+              <Link href="/documents" className="underline underline-offset-4">
+                Договор — в «Документах»
+              </Link>
+              .
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && !locked && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {!error && vacancies.length === 0 && (
+      {!error && !locked && vacancies.length === 0 && (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Чтобы искать студентов, сначала опубликуйте вакансию.

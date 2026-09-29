@@ -992,3 +992,14 @@ model PendingClientRegistration {
 
   @@index([email, createdAt])
 }
+
+/// Неудачная попытка входа (пароль или код 2FA). Считаем по ключу «аккаунт» и «адрес»:
+/// в памяти процесса лимит на Vercel обнуляется с каждым инстансом, а здесь общий.
+model AuthFailure {
+  id  String   @id @default(cuid())
+  key String
+  at  DateTime @default(now())
+
+  @@index([key, at])
+  @@index([at])
+}

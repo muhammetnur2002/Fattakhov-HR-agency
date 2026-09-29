@@ -139,10 +139,12 @@ export async function resetStaffPassword(
 ): Promise<void> {
   const target = await prisma.user.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
-    select: { id: true, role: true },
+    select: { id: true, role: true, grants: true },
   });
   if (!target) throw new StaffError("Сотрудник не найден");
-  if (!canManageStaffMember(actor, target)) {
+  // Новый пароль — это вход под чужой учёткой со всеми её доступами, поэтому правило то же, что
+  // при выдаче доступов: нельзя перевыдать пароль тому, у кого есть то, чего нет у самого управляющего
+  if (!canAssignStaff(actor, target, effectiveGrants({ ...actor, id: target.id, role: target.role, grants: target.grants }))) {
     throw new AccessDeniedError("staff.manage");
   }
 

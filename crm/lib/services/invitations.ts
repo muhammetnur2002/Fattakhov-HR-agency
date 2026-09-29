@@ -75,6 +75,18 @@ export async function createInvitation(params: {
     if (taken) {
       // Где именно занят адрес — важно: чаще всего это сам приглашающий
       // или сотрудник, которого уже завели в другой роли
+      // Подробности — только своим: сотрудник агентства видит всё, клиент — лишь про свою компанию.
+      // Иначе форма приглашения превращается в проверку «кто и где зарегистрирован» по всей системе
+      const inviter = await tx.user.findFirst({
+        where: { id: params.createdById },
+        select: { clientId: true },
+      });
+      const mayDisclose = !inviter?.clientId || taken.clientId === inviter.clientId;
+      if (!mayDisclose) {
+        throw new InviteError(
+          `Не удалось пригласить ${email}: адрес недоступен. Укажите другой.`,
+        );
+      }
       const where = taken.clientId ? "в кабинете клиента" : "в агентстве";
       throw new InviteError(
         `${email} уже занят: ${taken.fullName}, ${where}. ` +

@@ -155,9 +155,18 @@ export async function clientTransitionAction(
 
   const vacancy = await prisma.vacancy.findFirst({
     where: { id: vacancyId, clientId: actor.clientId ?? "" },
-    select: { hiringManagerId: true, clientId: true },
+    select: { hiringManagerId: true, clientId: true, status: true },
   });
   if (!vacancy) return { error: "Заявка не найдена" };
+
+  // Клиент делает ровно три вещи, которые предлагает экран: приостановить, возобновить после
+  // паузы и отменить. Остальные переходы (в «Активна» мимо оценки, в «Закрыта успешно» для отчётов)
+  // — дело агентства; форму можно отправить и с чужим значением, поэтому проверяем здесь.
+  const allowed =
+    (to === "ON_HOLD" && vacancy.status === "ACTIVE") ||
+    (to === "ACTIVE" && vacancy.status === "ON_HOLD") ||
+    to === "CLOSED_CANCELLED";
+  if (!allowed) return { error: "Это действие недоступно" };
 
   const subject = {
     clientId: vacancy.clientId,
@@ -167,7 +176,7 @@ export async function clientTransitionAction(
   try {
     authorizeOrThrow(
       actor,
-      to === "ON_HOLD" ? "vacancy.hold" : "vacancy.close",
+      to === "ON_HOLD" || to === "ACTIVE" ? "vacancy.hold" : "vacancy.close",
       subject,
     );
     await transitionVacancy(
