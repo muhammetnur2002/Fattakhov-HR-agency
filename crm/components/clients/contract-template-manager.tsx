@@ -1,8 +1,7 @@
 "use client";
 
 import { FileText, Trash2 } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
-import { useFormStatus } from "react-dom";
+import { startTransition as startUpload, useActionState, useState, useTransition } from "react";
 
 import {
   deleteContractTemplateAction,
@@ -14,8 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function Submit({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function Submit({ label, pending }: { label: string; pending: boolean }) {
   return (
     <Button type="submit" size="sm" disabled={pending}>
       {pending ? "Загружаем…" : label}
@@ -32,7 +30,7 @@ export function ContractTemplateManager({
 }: {
   current: { fileName: string; uploadedAt: string; url: string } | null;
 }) {
-  const [uploadState, upload] = useActionState<FormState, FormData>(uploadContractTemplateAction, {});
+  const [uploadState, upload, uploading] = useActionState<FormState, FormData>(uploadContractTemplateAction, {});
   const [deleteState, setDeleteState] = useState<FormState>({});
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -91,13 +89,31 @@ export function ContractTemplateManager({
         )}
       </div>
 
-      <form action={upload} className="space-y-3">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          startUpload(() => upload(data));
+        }}
+        className="space-y-3"
+      >
         <div className="space-y-2">
           <Label htmlFor="contractTemplate">{current ? "Заменить новым файлом" : "Загрузить шаблон"}</Label>
-          <Input id="contractTemplate" name="file" type="file" required accept=".pdf,.doc,.docx,.rtf,.odt" />
-          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, RTF или ODT до 20 МБ.</p>
+          <Input
+            id="contractTemplate"
+            name="file"
+            type="file"
+            required
+            accept=".pdf,.doc,.docx,.rtf,.odt"
+            onChange={(event) => {
+              const big = (event.target.files?.[0]?.size ?? 0) > 4 * 1024 * 1024;
+              event.target.setCustomValidity(big ? "Файл больше 4 МБ — сожмите его" : "");
+              event.target.reportValidity();
+            }}
+          />
+          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, RTF или ODT до 4 МБ.</p>
         </div>
-        <Submit label={current ? "Заменить шаблон" : "Загрузить шаблон"} />
+        <Submit label={current ? "Заменить шаблон" : "Загрузить шаблон"} pending={uploading} />
         {uploadState.error && (
           <Alert variant="destructive">
             <AlertDescription>{uploadState.error}</AlertDescription>

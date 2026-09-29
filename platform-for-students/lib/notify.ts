@@ -142,11 +142,23 @@ export async function notifyVacancyDecision(vacancy: VacancyRecord, approved: bo
     const store = await getStore();
     const employer = await store.employers.findById(vacancy.employerId);
     if (!employer) return;
-    await deliver(
-      employer.accountId,
-      vacancyDecisionMail({ title: vacancy.title, approved, note, url: employerLink(employer, '/employer/vacancies', '/students') }),
-      'decision',
-    );
+    // Клиент CRM: решение видят все сотрудники компании — рассылает CRM; своё письмо — запасное
+    const viaCrm = employer.crmClientId
+      ? await notifyCrm(
+          'vacancy-decision',
+          approved ? 'Вакансия опубликована' : 'Вакансия отклонена',
+          approved ? vacancy.title : `${vacancy.title}${note ? ` — ${note}` : ''}`,
+          `vacancy-decision:${vacancy.id}`,
+          employer.crmClientId,
+        )
+      : false;
+    if (!viaCrm) {
+      await deliver(
+        employer.accountId,
+        vacancyDecisionMail({ title: vacancy.title, approved, note, url: employerLink(employer, '/employer/vacancies', '/students') }),
+        'decision',
+      );
+    }
   } catch (error) {
     console.error('[уведомление] решение по вакансии не отправлено:', error);
   }
@@ -196,14 +208,17 @@ export async function notifyNewApplications(applicationIds: string[]): Promise<v
       const employer = vacancy ? await store.employers.findById(vacancy.employerId) : null;
       if (!vacancy || !employer) continue;
       if (!(await store.notifications.claim(employer.accountId, `new-application:${id}`))) continue;
-      await deliver(
-        employer.accountId,
-        newApplicationMail({ title: vacancy.title, url: employerLink(employer, '/employer', '/students/applications') }),
-        'decision',
-      );
-      // Колокольчик в CRM у людей клиента — сразу, не дожидаясь, пока прочтут письмо
-      if (employer.crmClientId) {
-        await notifyCrm('application', 'Новый отклик студента', vacancy.title, `application:${vacancy.id}`, employer.crmClientId);
+      // Клиент CRM: колокольчик и письма получает каждый сотрудник компании на свой адрес — их
+      // рассылает CRM. Письмо на единственный адрес компании — только если CRM не ответила
+      const viaCrm = employer.crmClientId
+        ? await notifyCrm('application', 'Новый отклик студента', vacancy.title, `application:${vacancy.id}`, employer.crmClientId)
+        : false;
+      if (!viaCrm) {
+        await deliver(
+          employer.accountId,
+          newApplicationMail({ title: vacancy.title, url: employerLink(employer, '/employer', '/students/applications') }),
+          'decision',
+        );
       }
     } catch (error) {
       console.error('[уведомление] новый отклик не отправлен:', error);
@@ -304,6 +319,8 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
         group.author === 'STUDENT'
           ? await (async () => {
               const employer = await store.employers.findById(vacancy.employerId);
+              // Клиенту CRM о сообщениях студентов сообщает сама CRM — каждому сотруднику на его адрес
+              if (employer?.crmClientId) return { accountId: undefined, url: '' };
               return { accountId: employer?.accountId, url: employer ? employerLink(employer, '/employer/messages', '/students/messages') : appUrl('/employer/messages') };
             })()
           : { accountId: (await store.students.findById(application.studentId))?.accountId, url: appUrl('/messages') };

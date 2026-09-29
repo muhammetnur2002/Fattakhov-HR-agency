@@ -26,6 +26,7 @@ type ClientMapping = { event: EventCode; linkUrl: string };
 const CLIENT_KIND_TO_EVENT: Record<string, ClientMapping> = {
   application: { event: "STUDENTS_APPLICATION_NEW", linkUrl: "/students/applications" },
   message: { event: "STUDENTS_MESSAGE_NEW", linkUrl: "/students/messages" },
+  "vacancy-decision": { event: "STUDENTS_VACANCY_DECISION", linkUrl: "/students" },
 };
 
 const KIND_TO_EVENT: Record<

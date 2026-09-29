@@ -28,6 +28,11 @@ function LogoField({ initialUrl, editable, name }: { initialUrl: string | null; 
 
   async function upload(file: File | undefined) {
     if (!file) return;
+    // Vercel не пропускает запрос больше 4,5 МБ — предупреждаем до отправки, а не ошибкой после
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Файл больше 4 МБ — уменьшите картинку");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -77,7 +82,7 @@ function LogoField({ initialUrl, editable, name }: { initialUrl: string | null; 
               </Button>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">JPG или PNG до 20 МБ. Виден студентам на карточке вакансии.</p>
+          <p className="text-xs text-muted-foreground">JPG или PNG до 4 МБ. Виден студентам на карточке вакансии.</p>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <input
             ref={input}
