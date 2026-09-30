@@ -5,9 +5,8 @@ import { CalendarView } from "@/components/interviews/calendar-view";
 import { Button } from "@/components/ui/button";
 import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
-import { calendarTokenFor } from "@/lib/calendar/ical";
+import { calendarFeedUrl } from "@/lib/calendar/feed";
 import { listInterviews } from "@/lib/services/interviews";
-import { appOrigin } from "@/lib/urls";
 
 export const metadata = { title: "Календарь" };
 
@@ -34,8 +33,7 @@ export default async function ClientCalendarPage({
   // клиент не увидит даже теоретически
   const interviews = await listInterviews(actor, { from, to });
 
-  const baseUrl = appOrigin();
-  const feedUrl = `${baseUrl}/api/calendar/${calendarTokenFor(actor.id)}.ics`;
+  const feedUrl = await calendarFeedUrl(actor.id);
 
   return (
     <div className="space-y-6">

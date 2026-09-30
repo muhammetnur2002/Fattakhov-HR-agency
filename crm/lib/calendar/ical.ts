@@ -122,30 +122,39 @@ export function buildCalendar(params: {
 /**
  * Персональный токен подписки на календарь.
  *
- * Устроен как `<id>.<подпись>`: подпись не даёт подобрать чужую ссылку,
- * а id внутри позволяет понять, чей это фид, — из одного HMAC
- * пользователя не восстановить.
+ * Устроен как `<id>.<подпись>` (версия 0) или `<id>.<версия>.<подпись>`: подпись не даёт
+ * подобрать чужую ссылку, а id внутри позволяет понять, чей это фид.
  *
- * Токен не хранится в БД: отдельное поле потребовало бы миграции ради
- * значения, которое всегда выводится из id. Отзыв — сменой AUTH_SECRET,
- * она обнуляет все ссылки разом. Для v1 достаточно.
+ * Версия хранится у пользователя (User.calendarTokenVersion). Кнопка «Обновить ссылку»
+ * увеличивает её, и все прежние ссылки перестают работать — не трогая остальных людей
+ * и сессии. Ссылки версии 0 имеют прежний вид, поэтому уже выданные подписки не ломаются.
  */
-function sign(userId: string): string {
+function sign(userId: string, version: number): string {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET не задан");
   return createHmac("sha256", secret)
-    .update(`calendar:${userId}`)
+    .update(version === 0 ? `calendar:${userId}` : `calendar:${userId}:${version}`)
     .digest("base64url");
 }
 
-export function calendarTokenFor(userId: string): string {
-  return `${Buffer.from(userId).toString("base64url")}.${sign(userId)}`;
+export function calendarTokenFor(userId: string, version = 0): string {
+  const id = Buffer.from(userId).toString("base64url");
+  return version === 0 ? `${id}.${sign(userId, 0)}` : `${id}.${version}.${sign(userId, version)}`;
 }
 
-/** Возвращает id пользователя или null, если подпись не сходится. */
-export function parseCalendarToken(token: string): string | null {
-  const [encodedId, signature] = token.split(".");
+/** Id пользователя и версия ссылки или null, если подпись не сходится. */
+export function parseCalendarTokenVersioned(token: string): { userId: string; version: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  const [encodedId, ...rest] = parts;
+  const signature = rest[rest.length - 1];
   if (!encodedId || !signature) return null;
+
+  let version = 0;
+  if (parts.length === 3) {
+    if (!/^[1-9]\d{0,8}$/.test(rest[0])) return null;
+    version = Number(rest[0]);
+  }
 
   let userId: string;
   try {
@@ -155,7 +164,12 @@ export function parseCalendarToken(token: string): string | null {
   }
   if (!userId) return null;
 
-  return equalSignatures(sign(userId), signature) ? userId : null;
+  return equalSignatures(sign(userId, version), signature) ? { userId, version } : null;
+}
+
+/** Возвращает id пользователя или null, если подпись не сходится (версию не сверяет). */
+export function parseCalendarToken(token: string): string | null {
+  return parseCalendarTokenVersioned(token)?.userId ?? null;
 }
 
 /**

@@ -8,7 +8,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { calendarTokenFor, parseCalendarToken } from "@/lib/calendar/ical";
+import { calendarTokenFor, parseCalendarToken, parseCalendarTokenVersioned } from "@/lib/calendar/ical";
 
 const USER = "usr_rec1";
 const OTHER = "usr_owner";
@@ -68,5 +68,28 @@ describe("подпись календарной ссылки", () => {
     const [, signature] = calendarTokenFor(USER).split(".");
 
     expect(parseCalendarToken(`${empty}.${signature}`)).toBeNull();
+  });
+});
+
+describe("версии ссылки (кнопка «Обновить ссылку»)", () => {
+  it("версия 0 выглядит как раньше, выданные подписки не ломаются", () => {
+    expect(calendarTokenFor(USER).split(".")).toHaveLength(2);
+    expect(parseCalendarTokenVersioned(calendarTokenFor(USER))).toEqual({ userId: USER, version: 0 });
+  });
+
+  it("новая версия даёт другую ссылку, которая разбирается с номером версии", () => {
+    const v1 = calendarTokenFor(USER, 1);
+    expect(v1).not.toBe(calendarTokenFor(USER));
+    expect(v1.split(".")).toHaveLength(3);
+    expect(parseCalendarTokenVersioned(v1)).toEqual({ userId: USER, version: 1 });
+  });
+
+  it("номер версии подделать нельзя: он входит в подпись", () => {
+    const [id, , signature] = calendarTokenFor(USER, 1).split(".");
+    expect(parseCalendarTokenVersioned(`${id}.2.${signature}`)).toBeNull();
+    // и версию 0 со старой подписью из версии 1 не выдать
+    expect(parseCalendarTokenVersioned(`${id}.${signature}`)).toBeNull();
+    expect(parseCalendarTokenVersioned(`${id}.0.${signature}`)).toBeNull();
+    expect(parseCalendarTokenVersioned(`${id}.x.${signature}`)).toBeNull();
   });
 });

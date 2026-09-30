@@ -1,7 +1,9 @@
 "use client";
 
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+
+import { regenerateCalendarLinkAction } from "@/app/actions/calendar";
 
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +17,9 @@ import { Button } from "@/components/ui/button";
 export function CalendarSubscription({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   if (!open) {
     return (
@@ -57,6 +62,38 @@ export function CalendarSubscription({ url }: { url: string }) {
         подписку по ссылке — встречи появятся сами и будут обновляться.
         Ссылка личная, не пересылайте её.
       </p>
+      {confirming ? (
+        <div className="space-y-2 rounded-md border border-destructive/40 p-2">
+          <p className="text-xs">
+            Прежняя ссылка перестанет работать, а подписку в календаре придётся добавить заново. Обновить?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await regenerateCalendarLinkAction();
+                  setMessage(result.ok ?? result.error ?? null);
+                  setConfirming(false);
+                })
+              }
+            >
+              {pending ? "Обновляем…" : "Да, обновить"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+              Отмена
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+          Обновить ссылку
+        </Button>
+      )}
+      {message && <p className="text-xs text-muted-foreground">{message}</p>}
     </div>
   );
 }

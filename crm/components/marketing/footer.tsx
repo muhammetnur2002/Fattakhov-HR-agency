@@ -51,7 +51,7 @@ export function MarketingFooter() {
         className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
       />
 
-      <div className="relative mx-auto max-w-6xl px-5 py-14">
+      <div className="relative mx-auto max-w-[2200px] px-5 md:px-8 xl:px-14 py-14">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Logo variant="lockup" tone="light" className="h-8" />

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { visibleVacanciesFilter, type Actor } from "@/lib/access";
-import { buildCalendar, parseCalendarToken } from "@/lib/calendar/ical";
+import { buildCalendar, parseCalendarTokenVersioned } from "@/lib/calendar/ical";
 import { prisma } from "@/lib/db/prisma";
 import { link, resolveLink } from "@/lib/notifications/links";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
@@ -29,15 +29,16 @@ export async function GET(
   }
 
   const { token } = await params;
-  const userId = parseCalendarToken(token.replace(/\.ics$/, ""));
+  const parsed = parseCalendarTokenVersioned(token.replace(/\.ics$/, ""));
 
-  if (!userId) {
+  if (!parsed) {
     return new NextResponse("Ссылка недействительна", { status: 404 });
   }
 
   const user = await prisma.user.findFirst({
-    where: { id: userId, isActive: true },
+    where: { id: parsed.userId, isActive: true },
     select: {
+      calendarTokenVersion: true,
       id: true,
       organizationId: true,
       role: true,
@@ -45,7 +46,10 @@ export async function GET(
       fullName: true,
     },
   });
-  if (!user) return new NextResponse("Не найдено", { status: 404 });
+  // Ссылку обновили — прежняя перестаёт работать
+  if (!user || user.calendarTokenVersion !== parsed.version) {
+    return new NextResponse("Ссылка недействительна", { status: 404 });
+  }
 
   const actor: Actor = {
     id: user.id,

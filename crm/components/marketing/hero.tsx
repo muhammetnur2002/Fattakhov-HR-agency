@@ -34,7 +34,7 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(8,12,16,0.94)_0%,rgba(8,12,16,0.85)_46%,rgba(8,12,16,0.72)_100%)]"
       />
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12 lg:py-28">
+      <div className="relative mx-auto grid max-w-[2200px] items-center gap-10 px-5 md:px-8 xl:px-14 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12 lg:py-28">
         <div>
           <div className="text-sm font-medium tracking-[0.14em] text-white/65 uppercase">
             Внешняя функция найма
@@ -44,11 +44,11 @@ export function Hero() {
               хуже: он фиксировал первую строку, браузер добивал остаток
               по ширине, и последним словом на отдельной строке висело
               «нанимать.» Балансировщик распределяет ровнее сам */}
-          <h1 className="mt-5 text-4xl leading-[1.08] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl lg:text-[4.25rem]">
+          <h1 className="mt-5 text-4xl leading-[1.08] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl lg:text-[4.25rem] xl:text-[5rem] 2xl:text-[6rem]">
             Отдел найма, который не нужно нанимать.
           </h1>
 
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 md:text-xl">
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 md:text-xl xl:max-w-2xl xl:text-2xl">
             Выделенная команда из трёх человек, 30+ источников поиска
             и прозрачная воронка. Без найма, адаптации и постоянных расходов.
           </p>

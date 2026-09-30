@@ -35,9 +35,7 @@ export function SectionHead({
   const center = align === "center";
 
   return (
-    <Reveal
-      className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}
-    >
+    <Reveal className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
       {eyebrow && (
         <div
           className={
@@ -102,8 +100,8 @@ export function Section({
     width === "narrow"
       ? "max-w-3xl"
       : width === "wide"
-        ? "max-w-7xl"
-        : "max-w-6xl";
+        ? "max-w-[2200px]"
+        : "max-w-[2200px]";
 
   const padding =
     pad === "tight"
@@ -120,7 +118,9 @@ export function Section({
           className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
         />
       )}
-      <div className={`relative mx-auto ${maxW} px-5 ${padding}`}>
+      <div
+        className={`relative mx-auto ${maxW} ${maxW === "max-w-3xl" ? "px-5" : "px-5 md:px-8 xl:px-14"} ${padding}`}
+      >
         {children}
       </div>
     </section>
@@ -140,25 +140,27 @@ export function Facts() {
 
   return (
     <div className="border-y bg-card">
-      <Stagger className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-border px-0 lg:grid-cols-4">
-        {facts.map((f) => (
-          <StaggerItem key={f.label} className="bg-card px-5 py-7">
-            <div className="text-4xl font-semibold tracking-tight tabular-nums">
-              {f.count === null ? (
-                f.value
-              ) : (
-                <>
-                  <CountUp value={f.count} />
-                  {f.suffix}
-                </>
-              )}
-            </div>
-            <div className="mt-1.5 text-base text-muted-foreground">
-              {f.label}
-            </div>
-          </StaggerItem>
-        ))}
-      </Stagger>
+      <div className="mx-auto max-w-[2200px] md:px-3 xl:px-9">
+        <Stagger className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
+          {facts.map((f) => (
+            <StaggerItem key={f.label} className="bg-card px-5 py-7">
+              <div className="text-4xl font-semibold tracking-tight tabular-nums">
+                {f.count === null ? (
+                  f.value
+                ) : (
+                  <>
+                    <CountUp value={f.count} />
+                    {f.suffix}
+                  </>
+                )}
+              </div>
+              <div className="mt-1.5 text-base text-muted-foreground">
+                {f.label}
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </div>
     </div>
   );
 }
@@ -311,7 +313,12 @@ export function Cases() {
       task: "В одном контуре требовались разные типы сотрудников: от операционных ролей до управленцев и кандидатов для инвестиционного направления.",
       result:
         "Команда помогала закрывать позиции в нескольких проектах и дополняла подбор оценкой кандидатов, когда важно было понять подход человека к роли.",
-      roles: ["Менеджеры", "Администраторы", "Руководители", "Оценка кандидатов"],
+      roles: [
+        "Менеджеры",
+        "Администраторы",
+        "Руководители",
+        "Оценка кандидатов",
+      ],
       takeaway: "Подбор идёт под бизнес-задачу, а не под шаблон вакансии",
     },
   ];
@@ -327,9 +334,7 @@ export function Cases() {
           <Reveal key={c.name} delay={i * 0.06}>
             <article
               className={`grid gap-8 overflow-hidden rounded-2xl p-7 md:p-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 ${
-                тёмный
-                  ? "bg-brand-graphite text-white"
-                  : "border bg-card"
+                тёмный ? "bg-brand-graphite text-white" : "border bg-card"
               }`}
             >
               <div>
@@ -419,9 +424,30 @@ export function Cases() {
  */
 export function Comparison() {
   const rows = [
-    { label: "Когда подходит", values: ["Постоянный большой объём", "Одна точечная вакансия", "2-5 параллельных вакансий"] },
-    { label: "Из чего стоимость", values: ["Зарплата, налоги, инструменты", "Процент или гонорар за закрытие", "Фиксированная сумма в месяц"] },
-    { label: "Кто управляет", values: ["Сторона компании", "По каждой роли отдельно", "Fattakhov HR Agency"] },
+    {
+      label: "Когда подходит",
+      values: [
+        "Постоянный большой объём",
+        "Одна точечная вакансия",
+        "2-5 параллельных вакансий",
+      ],
+    },
+    {
+      label: "Из чего стоимость",
+      values: [
+        "Зарплата, налоги, инструменты",
+        "Процент или гонорар за закрытие",
+        "Фиксированная сумма в месяц",
+      ],
+    },
+    {
+      label: "Кто управляет",
+      values: [
+        "Сторона компании",
+        "По каждой роли отдельно",
+        "Fattakhov HR Agency",
+      ],
+    },
   ];
   const cols = ["Штатный рекрутер", "Разовый подбор", "Команда по подписке"];
 
@@ -492,7 +518,10 @@ export function Faq() {
   return (
     <div className="mt-12 divide-y overflow-hidden rounded-xl border bg-card">
       {items.map((it) => (
-        <details key={it.q} className="group px-5 py-4 [&_summary::-webkit-details-marker]:hidden">
+        <details
+          key={it.q}
+          className="group px-5 py-4 [&_summary::-webkit-details-marker]:hidden"
+        >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-medium">
             {it.q}
             <span

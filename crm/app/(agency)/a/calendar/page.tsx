@@ -5,12 +5,11 @@ import { CalendarView } from "@/components/interviews/calendar-view";
 import { Button } from "@/components/ui/button";
 import { canDo } from "@/lib/access";
 import { requireAgencyActor } from "@/lib/auth/session";
-import { calendarTokenFor } from "@/lib/calendar/ical";
+import { calendarFeedUrl } from "@/lib/calendar/feed";
 import {
   listInterviews,
   listUnratedInterviews,
 } from "@/lib/services/interviews";
-import { appOrigin } from "@/lib/urls";
 
 export const metadata = { title: "Календарь" };
 
@@ -49,8 +48,7 @@ export default async function AgencyCalendarPage({
       : Promise.resolve([]),
   ]);
 
-  const baseUrl = appOrigin();
-  const feedUrl = `${baseUrl}/api/calendar/${calendarTokenFor(actor.id)}.ics`;
+  const feedUrl = await calendarFeedUrl(actor.id);
 
   return (
     <div className="space-y-6">
