@@ -88,7 +88,7 @@ export async function PATCH(request: Request) {
     const name = studentName(updated);
     if (name !== session.name) {
       const next: SessionUser = { ...session, name };
-      cookies().set(SESSION_COOKIE, await signSession(next), sessionCookieOptions);
+      (await cookies()).set(SESSION_COOKIE, await signSession(next), sessionCookieOptions);
     }
 
     await audit(
@@ -150,7 +150,7 @@ export async function DELETE(request: Request) {
     // Куку снимаем здесь же: сессия ссылается на учётную запись,
     // которой больше нет, и без этого следующий переход упёрся бы
     // в «профиль не найден» вместо чистого выхода.
-    cookies().delete(SESSION_COOKIE);
+    (await cookies()).delete(SESSION_COOKIE);
 
     return ok({ deleted: true });
   });

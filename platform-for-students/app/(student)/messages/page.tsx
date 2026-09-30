@@ -9,11 +9,12 @@ import { requireStudentPage } from '@/lib/security/guards';
 export const metadata: Metadata = { title: 'Сообщения' };
 export const dynamic = 'force-dynamic';
 
-export default async function MessagesPage({
-  searchParams,
-}: {
-  searchParams: { thread?: string };
-}) {
+export default async function MessagesPage(
+  props: {
+    searchParams: Promise<{ thread?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const { student } = await requireStudentPage('/messages');
   const viewer = { role: 'STUDENT' as const, profileId: student.id };
   const threads = await listThreads(viewer);

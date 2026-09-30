@@ -5,12 +5,13 @@ import { assertServiceAuth } from '@/lib/security/service-auth';
 
 export const runtime = 'nodejs';
 
-type Params = { params: { employerId: string } };
+type Params = { params: Promise<{ employerId: string }> };
 
 const bodySchema = z.object({ crmClientId: z.string().trim().min(1) });
 
 /** Одобрение заявки: компания получает crmClientId и входит как клиент CRM. */
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const { crmClientId } = bodySchema.parse(await request.json());

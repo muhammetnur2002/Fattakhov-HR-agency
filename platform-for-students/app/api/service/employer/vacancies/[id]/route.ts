@@ -17,7 +17,7 @@ import {
 
 export const runtime = 'nodejs';
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 const actorSchema = z.object({ actor: z.string().trim().min(1).max(200) });
 const crmClientIdSchema = z.object({ crmClientId: z.string().trim().min(1) });
@@ -36,7 +36,8 @@ async function ownVacancy(id: string, crmClientId: unknown) {
 }
 
 /** Карточка вакансии — для формы правки в CRM. */
-export async function GET(request: Request, { params }: Params) {
+export async function GET(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const crmClientId = new URL(request.url).searchParams.get('crmClientId');
@@ -45,7 +46,8 @@ export async function GET(request: Request, { params }: Params) {
   });
 }
 
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const body: unknown = await request.json();
@@ -94,7 +96,8 @@ export async function PATCH(request: Request, { params }: Params) {
   });
 }
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const body: unknown = await request.json();

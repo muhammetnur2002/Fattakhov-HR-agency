@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const session: SessionUser = { accountId: account.id, role: account.role, profileId, name };
-    cookies().set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
+    (await cookies()).set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
     await store.accounts.touchLogin(account.id);
     await audit(session, { action: 'auth.login', entity: 'Account', entityId: account.id }, request.headers);
 

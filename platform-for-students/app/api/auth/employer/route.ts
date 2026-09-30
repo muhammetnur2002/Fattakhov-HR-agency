@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       name: employer?.companyName ?? 'Работодатель',
     };
 
-    cookies().set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
+    (await cookies()).set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
     await store.accessCodes.markUsed(record.id);
     await store.accounts.touchLogin(account.id);
     await audit(session, { action: 'auth.employer', entity: 'Employer', entityId: employer?.id ?? null }, request.headers);

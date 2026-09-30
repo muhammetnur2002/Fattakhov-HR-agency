@@ -5,7 +5,7 @@ import { Logo } from '@/components/brand/Logo';
 import { LegalDocumentView } from '@/components/legal/LegalDocumentView';
 import { LEGAL_DOCUMENTS, type LegalDocument } from '@/lib/legal';
 
-type Props = { params: { slug: string } };
+type Props = { params: Promise<{ slug: string }> };
 
 function findDocument(slug: string): LegalDocument | null {
   // hasOwnProperty, а не LEGAL_DOCUMENTS[slug]: иначе /legal/constructor
@@ -19,7 +19,8 @@ export function generateStaticParams() {
   return Object.keys(LEGAL_DOCUMENTS).map((slug) => ({ slug }));
 }
 
-export function generateMetadata({ params }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   return { title: findDocument(params.slug)?.title ?? 'Документ не найден' };
 }
 
@@ -35,7 +36,8 @@ const NAV: Array<{ slug: LegalDocument['slug']; label: string }> = [
  * регистрации. Постоянный адрес нужен, чтобы на документ можно было
  * сослаться: в письме, в ответе на запрос, из подвала сайта.
  */
-export default function LegalPage({ params }: Props) {
+export default async function LegalPage(props: Props) {
+  const params = await props.params;
   const doc = findDocument(params.slug);
   if (!doc) notFound();
 

@@ -19,7 +19,7 @@ const RULES: Array<{ prefix: string; roles: Role[] }> = [
   { prefix: '/admin', roles: ['ADMIN'] },
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const rule = RULES.find((r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`));
 

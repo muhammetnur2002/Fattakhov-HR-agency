@@ -8,7 +8,8 @@ import { agencySiteUrl } from '@/lib/agency';
 
 export const metadata: Metadata = { title: 'Вход' };
 
-export default function LoginPage({ searchParams }: { searchParams: { role?: string } }) {
+export default async function LoginPage(props: { searchParams: Promise<{ role?: string }> }) {
+  const searchParams = await props.searchParams;
   // Работодатель на платформе не входит: его кабинет — в CRM. Сюда его
   // приводят закладки и старые письма со ссылкой на вход компании
   const agency = agencySiteUrl();

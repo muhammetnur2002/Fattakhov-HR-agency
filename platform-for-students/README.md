@@ -4,7 +4,7 @@
 Свайп вправо — отклик уходит работодателю в ту же секунду; влево — вакансия
 уходит в «Пропущенные», откуда её можно вернуть.
 
-Next.js 14 (App Router) · TypeScript · Prisma / PostgreSQL · Redis · framer-motion · JWT · bcrypt
+Next.js 16 (App Router) · TypeScript · Prisma / PostgreSQL · Redis · framer-motion · JWT · bcrypt
 
 ---
 
@@ -245,7 +245,7 @@ lib/
 **Сессии.** JWT в httpOnly-куке, подпись HS256 через `jose` — тот же код
 работает и в роутах, и в middleware на edge. Пароли — bcrypt, cost 12.
 
-**Разграничение доступа — два рубежа.** `middleware.ts` закрывает разделы по
+**Разграничение доступа — два рубежа.** `proxy.ts` закрывает разделы по
 URL до рендера; `lib/security/guards.ts` проверяет роль в каждом роуте, потому
 что middleware знает путь, но не знает, чьи данные запрошены. Файлы (фото,
 резюме) лежат вне `public/` и раздаются роутом, который на каждый запрос

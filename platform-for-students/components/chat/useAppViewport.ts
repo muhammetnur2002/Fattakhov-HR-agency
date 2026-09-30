@@ -15,7 +15,7 @@ const DESKTOP_QUERY = '(min-width: 1024px)';
  * прокрутки просто снимается при уходе — ничего не «запоминаем и возвращаем»,
  * иначе при быстрой смене экранов она залипала на других страницах.
  */
-export function useAppViewport(ref: RefObject<HTMLElement>) {
+export function useAppViewport(ref: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;

@@ -81,7 +81,7 @@ export async function PATCH(request: Request) {
     const displayName = updated.companyName || 'Новая компания';
     if (displayName !== session.name) {
       const next: SessionUser = { ...session, name: displayName };
-      cookies().set(SESSION_COOKIE, await signSession(next), sessionCookieOptions);
+      (await cookies()).set(SESSION_COOKIE, await signSession(next), sessionCookieOptions);
     }
 
     await audit(

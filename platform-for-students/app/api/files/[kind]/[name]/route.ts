@@ -22,8 +22,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { kind: string; name: string } },
+  props: { params: Promise<{ kind: string; name: string }> }
 ) {
+  const params = await props.params;
   return handle(async () => {
     // CRM читает файлы модерации и справок своим сервером — там больше нет
     // сотрудника с сессией здесь, а решения по компаниям, вакансиям и

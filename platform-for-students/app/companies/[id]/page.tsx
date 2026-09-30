@@ -12,9 +12,10 @@ import { EMPLOYMENT_TYPE_LABEL } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const company = await getCompanyPublic(params.id);
   return { title: company ? company.companyName : 'Компания не найдена' };
 }
@@ -31,7 +32,8 @@ const isHttp = (url: string) => /^https?:\/\//i.test(url);
  * Компания на модерации отдаёт 404, как несуществующая: по разнице
  * ответов нельзя было бы перебирать, кто зарегистрировался.
  */
-export default async function CompanyPage({ params }: Props) {
+export default async function CompanyPage(props: Props) {
+  const params = await props.params;
   const company = await getCompanyPublic(params.id);
   if (!company) notFound();
 

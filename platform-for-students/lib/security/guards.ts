@@ -11,7 +11,7 @@ import { clientIp } from './rate-limit';
 
 /** Текущая сессия из httpOnly-куки. null — гость. */
 export async function getSession(): Promise<SessionUser | null> {
-  return verifySession(cookies().get(SESSION_COOKIE)?.value);
+  return verifySession((await cookies()).get(SESSION_COOKIE)?.value);
 }
 
 /**
@@ -195,7 +195,7 @@ export async function audit(
 ): Promise<void> {
   try {
     const store = await getStore();
-    const h = requestHeaders ?? headers();
+    const h = requestHeaders ?? (await headers());
     await store.audit.log({
       accountId: session?.accountId ?? null,
       actorLabel: session ? `${session.role}:${session.name || session.accountId}` : 'ANONYMOUS',
@@ -221,7 +221,7 @@ export async function audit(
 export async function auditService(actorLabel: string, input: AuditInput, requestHeaders?: Headers): Promise<void> {
   try {
     const store = await getStore();
-    const h = requestHeaders ?? headers();
+    const h = requestHeaders ?? (await headers());
     await store.audit.log({
       accountId: null,
       actorLabel: `CRM:${actorLabel}`,

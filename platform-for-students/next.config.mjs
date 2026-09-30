@@ -6,14 +6,9 @@ const nextConfig = {
   // dev-зависимости и Prisma CLI. На `next dev` и `next start` не влияет.
   output: 'standalone',
   poweredByHeader: false,
-  eslint: { ignoreDuringBuilds: true },
-  experimental: {
-    // Prisma и ioredis тянут нативные бинарники — они не должны попадать
-    // в бандл серверных компонентов.
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
-    // Включает instrumentation.ts — проверку конфигурации при старте
-    instrumentationHook: true,
-  },
+  // Prisma и ioredis тянут нативные бинарники — они не должны попадать
+  // в бандл серверных компонентов.
+  serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
 };
 
 export default nextConfig;

@@ -12,7 +12,7 @@ import { messageSchema } from '@/lib/validation';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Params = { params: { applicationId: string } };
+type Params = { params: Promise<{ applicationId: string }> };
 
 const scopeSchema = z.object({
   crmClientId: z.string().trim().min(1),
@@ -20,7 +20,8 @@ const scopeSchema = z.object({
 });
 
 /** Ветка целиком. Чужая и несуществующая — 404, как и на /api/messages. */
-export async function GET(request: Request, { params }: Params) {
+export async function GET(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const crmClientId = new URL(request.url).searchParams.get('crmClientId');
@@ -32,7 +33,8 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 /** Сообщение студенту от имени клиента. */
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const raw: unknown = await request.json();
@@ -70,7 +72,8 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 /** Отметка «прочитано» для сообщений студента. */
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertServiceAuth(request);
     const { crmClientId } = scopeSchema.pick({ crmClientId: true }).parse(await request.json());

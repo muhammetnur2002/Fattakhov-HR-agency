@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         profileId: student.id,
         name: input.fullName,
       };
-      cookies().set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
+      (await cookies()).set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
 
       await audit(
         session,

@@ -15,10 +15,11 @@ import { messageSchema } from '@/lib/validation';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Params = { params: { applicationId: string } };
+type Params = { params: Promise<{ applicationId: string }> };
 
 /** Ветка целиком. 404 и «чужая ветка» намеренно неразличимы. */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(_request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     const viewer = viewerFromSession(await getSession());
     if (!viewer) return fail(401, 'Требуется вход в систему', 'UNAUTHORIZED');
@@ -30,7 +31,8 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 /** Отправка сообщения. */
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertSameOrigin(request);
     const session = await getSession();
@@ -81,7 +83,8 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 /** Отметка «прочитано» для сообщений противоположной стороны. */
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertSameOrigin(request);
     const viewer = viewerFromSession(await getSession());

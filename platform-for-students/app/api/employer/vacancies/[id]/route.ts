@@ -21,7 +21,7 @@ import {
 
 export const runtime = 'nodejs';
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 /**
  * Своя вакансия, заведённая в кабинете.
@@ -43,7 +43,8 @@ async function ownVacancy(id: string) {
 }
 
 /** Правка вакансии. Опубликованная после правки уходит на повторную проверку. */
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertSameOrigin(request);
     const { session, employer, store, vacancy } = await ownVacancy(params.id);
@@ -96,7 +97,8 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 /** Действие над вакансией: отправить на проверку, снять или удалить. */
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertSameOrigin(request);
     const { session, employer, store, vacancy } = await ownVacancy(params.id);

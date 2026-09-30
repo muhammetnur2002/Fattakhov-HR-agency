@@ -49,7 +49,7 @@ async function signInStaff(request: Request, ticket: StaffTicket): Promise<NextR
     name: ticket.name,
     permissions: ticket.permissions,
   };
-  cookies().set(SESSION_COOKIE, await signSession(session, STAFF_SESSION_SECONDS), {
+  (await cookies()).set(SESSION_COOKIE, await signSession(session, STAFF_SESSION_SECONDS), {
     ...sessionCookieOptions,
     maxAge: STAFF_SESSION_SECONDS,
   });
@@ -91,7 +91,7 @@ async function signInClient(request: Request, ticket: ClientTicket): Promise<Nex
     profileId: employer.id,
     name: employer.companyName,
   };
-  cookies().set(SESSION_COOKIE, await signSession(session, STAFF_SESSION_SECONDS), {
+  (await cookies()).set(SESSION_COOKIE, await signSession(session, STAFF_SESSION_SECONDS), {
     ...sessionCookieOptions,
     maxAge: STAFF_SESSION_SECONDS,
   });

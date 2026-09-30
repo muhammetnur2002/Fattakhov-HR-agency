@@ -12,9 +12,10 @@ import { getInstitutionPublic, getInstitutionRating } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { slug: string } };
+type Props = { params: Promise<{ slug: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const institution = await getInstitutionPublic(params.slug);
   return { title: institution ? institutionLabel(institution) : 'Учебное заведение не найдено' };
 }
@@ -27,7 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * подтверждённой учёбой: по небольшому колледжу число уже почти указывает
  * на конкретных людей.
  */
-export default async function InstitutionPage({ params }: Props) {
+export default async function InstitutionPage(props: Props) {
+  const params = await props.params;
   const institution = await getInstitutionPublic(params.slug);
   if (!institution) notFound();
 

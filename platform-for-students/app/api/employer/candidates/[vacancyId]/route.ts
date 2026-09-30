@@ -7,10 +7,11 @@ import { rateLimit } from '@/lib/security/rate-limit';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Params = { params: { vacancyId: string } };
+type Params = { params: Promise<{ vacancyId: string }> };
 
 /** Кандидаты на вакансию — колода для раздела «Кандидаты». */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(_request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     const { employer } = await requireEmployer();
     const result = await listCandidatesForVacancy(employer.id, params.vacancyId);
@@ -22,7 +23,8 @@ export async function GET(_request: Request, { params }: Params) {
 const inviteSchema = z.object({ studentId: z.string().min(1) });
 
 /** Свайп вправо — пригласить кандидата на эту вакансию. */
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request, props: Params) {
+  const params = await props.params;
   return handle(async () => {
     assertSameOrigin(request);
     const { employer } = await requireEmployer();

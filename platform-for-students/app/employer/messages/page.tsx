@@ -9,11 +9,12 @@ import { buildEmployerBoard } from '@/lib/services';
 export const metadata: Metadata = { title: 'Сообщения · кабинет работодателя' };
 export const dynamic = 'force-dynamic';
 
-export default async function EmployerMessagesPage({
-  searchParams,
-}: {
-  searchParams: { thread?: string };
-}) {
+export default async function EmployerMessagesPage(
+  props: {
+    searchParams: Promise<{ thread?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const { employer } = await requireEmployerPage('/employer/messages');
   const viewer = { role: 'EMPLOYER' as const, profileId: employer.id };
 

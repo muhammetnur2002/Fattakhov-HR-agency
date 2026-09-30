@@ -13,9 +13,10 @@ import { skipsModeration, vacancyToForm } from '@/lib/vacancy';
 export const metadata: Metadata = { title: 'Вакансия' };
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
-export default async function EditVacancyPage({ params }: Props) {
+export default async function EditVacancyPage(props: Props) {
+  const params = await props.params;
   const { employer } = await requireEmployerPage(`/employer/vacancies/${params.id}`);
   // Чужая вакансия — 404, как несуществующая
   const vacancy = await getEmployerVacancy(employer.id, params.id);

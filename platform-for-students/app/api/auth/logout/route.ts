@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   return handle(async () => {
     assertSameOrigin(request);
     const session = await getSession();
-    cookies().delete(SESSION_COOKIE);
+    (await cookies()).delete(SESSION_COOKIE);
     if (session) await audit(session, { action: 'auth.logout' }, request.headers);
     return ok({ redirectTo: '/' });
   });
