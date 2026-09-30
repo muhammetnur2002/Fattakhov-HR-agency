@@ -11,6 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EraseButton } from "@/components/pdn/erase-button";
+import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { APPLICATION_OUTCOME_LABELS, CANDIDATE_SOURCE_LABELS } from "@/lib/labels";
 import { getCandidate } from "@/lib/services/candidates";
@@ -37,6 +39,9 @@ export default async function CandidatePage({
 
   const candidate = await getCandidate(actor, id);
   if (!candidate) notFound();
+
+  // Удалять данные кандидата может только владелец (BR-35)
+  const canErase = canDo(actor, "pdn.auditLog");
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -123,6 +128,25 @@ export default async function CandidatePage({
           )}
         </CardContent>
       </Card>
+
+      {canErase && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Удаление данных</CardTitle>
+            <CardDescription>
+              Например, для тестовой или ошибочной записи. Контакты и профиль стираются, участие в воронках
+              остаётся обезличенным.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EraseButton
+              candidateId={candidate.id}
+              candidateName={candidate.fullName}
+              activeApplications={candidate.applications.filter((a) => a.outcome === "IN_PROGRESS").length}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

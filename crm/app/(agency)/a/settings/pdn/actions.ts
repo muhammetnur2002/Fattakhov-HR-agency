@@ -37,6 +37,7 @@ export async function erasePersonalDataAction(
     const { erasedFiles } = await erasePersonalData(actor, candidateId);
 
     revalidatePath("/a/settings/pdn");
+    revalidatePath("/a/candidates");
     return {
       ok:
         erasedFiles > 0
