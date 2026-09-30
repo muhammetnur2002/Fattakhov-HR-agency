@@ -91,6 +91,14 @@ COPY --chown=worker:nodejs prisma ./prisma
 COPY --chown=worker:nodejs jobs ./jobs
 COPY --chown=worker:nodejs lib ./lib
 
+# Первая настройка боевой базы: организация и приглашение владельцу
+# (служба owner-bootstrap в docker-compose сервера вызывает `ensure`).
+# Только этот файл, не вся папка: setup-real.ts стирает базу целиком,
+# а test-accounts.ts заводит временные учётки — на системе с
+# персональными данными им делать нечего. dotenv в боевой образ не
+# попадает, настройки приходят переменными окружения.
+COPY --chown=worker:nodejs scripts/bootstrap-owner.ts ./scripts/bootstrap-owner.ts
+
 USER worker
 
 # Команда задаётся при запуске: миграции или планировщик
