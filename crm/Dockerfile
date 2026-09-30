@@ -16,7 +16,11 @@ WORKDIR /app
 # Ставим по локу, а не по package.json: в проде версии обязаны быть
 # ровно те, на которых прогнаны тесты
 COPY package.json package-lock.json ./
-RUN npm ci
+# postinstall (prisma generate) нужен Vercel, а здесь на этом шаге ещё нет
+# схемы — установка падала бы. Клиент Prisma генерируется ниже, в builder,
+# отдельной командой. Скрипт убирается только из копии внутри образа:
+# в builder и tools package.json приходит заново из репозитория.
+RUN npm pkg delete scripts.postinstall && npm ci
 
 # ============ Сборка ============
 FROM node:24-alpine AS builder
@@ -36,6 +40,19 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Корневой сертификат облака: им подписан сертификат управляемой базы
+# Postgres в Яндекс Облаке (внутренний CA Яндекса). Его нет ни в публичных
+# наборах, ни во встроенном хранилище Node, а системное хранилище Node не
+# читает — без этого файла подключение с sslmode=verify-full падает с
+# ошибкой сертификата, и единственный обход — проверку отключить.
+# --chmod обязателен: ADD по URL кладёт файл правами 0600 от root, и
+# процесс от nextjs его бы не прочитал. Сумма зафиксирована: подмена файла
+# в сети сорвёт сборку. Сертификат действует до 20.06.2027 — меняя его,
+# обновить и сумму. Так же сделано в CRM агентства.
+ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
+    https://storage.yandexcloud.net/cloud-certs/CA.pem /etc/ssl/certs/yandex-cloud-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/yandex-cloud-ca.pem
 
 # Не от root: если приложение скомпрометируют, злоумышленник
 # получит права обычного пользователя, а не хозяина контейнера
@@ -59,7 +76,8 @@ CMD ["node", "server.js"]
 FROM node:24-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Без postinstall — по той же причине, что в deps
+RUN npm pkg delete scripts.postinstall && npm ci --omit=dev
 
 # ============ Инструменты: миграции и фоновые задачи ============
 #
@@ -81,6 +99,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Тот же сертификат облака, что в runner: миграции и фоновые задачи
+# ходят в ту же управляемую базу.
+ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
+    https://storage.yandexcloud.net/cloud-certs/CA.pem /etc/ssl/certs/yandex-cloud-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/yandex-cloud-ca.pem
+
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 worker
 
@@ -90,6 +114,14 @@ COPY --chown=worker:nodejs package.json prisma.config.ts tsconfig.json ./
 COPY --chown=worker:nodejs prisma ./prisma
 COPY --chown=worker:nodejs jobs ./jobs
 COPY --chown=worker:nodejs lib ./lib
+
+# Первая настройка боевой базы: организация и приглашение владельцу
+# (служба owner-bootstrap в docker-compose сервера вызывает `ensure`).
+# Только этот файл, не вся папка: setup-real.ts стирает базу целиком,
+# а test-accounts.ts заводит временные учётки — на системе с
+# персональными данными им делать нечего. dotenv в боевой образ не
+# попадает, настройки приходят переменными окружения.
+COPY --chown=worker:nodejs scripts/bootstrap-owner.ts ./scripts/bootstrap-owner.ts
 
 USER worker
 
