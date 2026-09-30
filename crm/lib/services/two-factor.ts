@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { generateSecret, matchTotpStep, otpauthUrl, verifyTotp } from "@/lib/auth/totp";
+import { needsSealing, openTotpSecret, sealTotpSecret } from "@/lib/auth/totp-secret";
 import { prisma } from "@/lib/db/prisma";
 
 export class TwoFactorError extends Error {}
@@ -73,7 +74,7 @@ export async function startTwoFactorSetup(params: {
 
   await prisma.user.update({
     where: { id: params.userId },
-    data: { totpSecret: secret },
+    data: { totpSecret: sealTotpSecret(secret) },
   });
 
   return {
@@ -108,7 +109,8 @@ export async function confirmTwoFactor(params: {
     throw new TwoFactorError("Двухфакторная аутентификация уже включена");
   }
 
-  if (!verifyTotp(user.totpSecret, params.code)) {
+  const plainSecret = openTotpSecret(user.totpSecret);
+  if (!plainSecret || !verifyTotp(plainSecret, params.code)) {
     throw new TwoFactorError(
       "Код не подошёл. Проверьте, что время на телефоне выставлено автоматически",
     );
@@ -209,8 +211,13 @@ export async function verifySecondFactor(params: {
   });
   if (!user?.totpEnabledAt || !user.totpSecret) return false;
 
-  const step = matchTotpStep(user.totpSecret, clean);
+  const plainSecret = openTotpSecret(user.totpSecret);
+  const step = plainSecret ? matchTotpStep(plainSecret, clean) : null;
   if (step !== null) {
+    // Старый секрет открытым текстом — при первом успешном входе пересохраняем зашифрованным
+    if (plainSecret && needsSealing(user.totpSecret)) {
+      await prisma.user.update({ where: { id: params.userId }, data: { totpSecret: sealTotpSecret(plainSecret) } });
+    }
     // Шаг принимаем один раз: условие в самом UPDATE, чтобы два одновременных входа
     // с одним кодом не прошли оба
     const taken = await prisma.user.updateMany({
