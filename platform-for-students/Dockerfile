@@ -23,6 +23,14 @@ FROM ${NODE_IMAGE} AS base
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+# Корневой сертификат Яндекс Облака — в системное хранилище: им подписан
+# сертификат управляемой базы Postgres, а движок Prisma проверяет его по
+# системному набору (sslmode=require&sslaccept=strict). Без него остаётся
+# только шифрование без проверки, с кем говоришь. Сумма зафиксирована:
+# подмена файла в сети сорвёт сборку. Действует до 20.06.2027.
+ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
+    https://storage.yandexcloud.net/cloud-certs/CA.pem /usr/local/share/ca-certificates/yandex-cloud-ca.crt
+RUN update-ca-certificates
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
