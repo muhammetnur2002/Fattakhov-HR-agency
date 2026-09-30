@@ -31,16 +31,17 @@ export interface LegalDocument {
 
 /**
  * Реквизиты оператора персональных данных. null — ещё не прислали.
- * ОГРН — единственное поле, которого пока нет: не блокирует остальные,
- * появится отдельно позже (см. LEGAL_REQUISITES_PENDING ниже).
+ * Оператор — индивидуальный предприниматель, поэтому номер — ОГРНИП.
  */
 export const OPERATOR = {
   brand: 'Fattakhov HR Agency',
-  legalName: 'Индивидуальный предприниматель Фаттахова Полина Сергеевна' as string | null,
-  inn: '561012725710' as string | null,
-  ogrn: null as string | null,
-  address:
-    'Республика Башкортостан, Куюргазинский р-н, с. Ермолаево, ул. Дружбы, д. 68' as string | null,
+  // ИП Фаттахов Т. А. — решение заказчика 30.09.2026, на него выписан
+  // исправленный комплект документов юриста. Реквизиты ИП Фаттаховой П. С.
+  // были из первого, ошибочного комплекта.
+  legalName: 'Индивидуальный предприниматель Фаттахов Тимур Айратович' as string | null,
+  inn: '160402219594' as string | null,
+  ogrn: '321169000137246' as string | null,
+  address: 'Республика Татарстан, г. Казань, ул. Агрономическая, д. 18' as string | null,
   email: 'privacy@fattakhovhr.ru' as string | null,
 };
 
@@ -50,12 +51,12 @@ export const HOSTING = {
   address: null as string | null,
 };
 
-/** Только ОГРН ещё не пришёл — имя, ИНН, адрес и почта уже настоящие, не черновик. */
+/** Без имени, ИНН, адреса или почты документы говорят «реквизиты позже», а не показывают выдуманное. */
 export const LEGAL_REQUISITES_PENDING = !OPERATOR.legalName || !OPERATOR.inn || !OPERATOR.address || !OPERATOR.email;
 
-export const STUDENT_CONSENT_VERSION = '2026-09-23';
-export const COMPANY_CONSENT_VERSION = '2026-09-23';
-export const TERMS_VERSION = '2026-09-23';
+export const STUDENT_CONSENT_VERSION = '2026-09-30';
+export const COMPANY_CONSENT_VERSION = '2026-09-30';
+export const TERMS_VERSION = '2026-09-30';
 
 const LATER = 'будут указаны до запуска платформы';
 
@@ -63,7 +64,7 @@ function operatorLine(): string {
   if (LEGAL_REQUISITES_PENDING) {
     return `${OPERATOR.brand}. Полное наименование, ИНН, ОГРН и адрес оператора ${LATER}.`;
   }
-  const ogrn = OPERATOR.ogrn ? `, ОГРН ${OPERATOR.ogrn}` : '';
+  const ogrn = OPERATOR.ogrn ? `, ОГРНИП ${OPERATOR.ogrn}` : '';
   return `${OPERATOR.legalName} (${OPERATOR.brand}), ИНН ${OPERATOR.inn}${ogrn}, адрес: ${OPERATOR.address}.`;
 }
 
