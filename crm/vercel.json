@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK=1 npm run build"
+  "buildCommand": "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK=1 npm run vercel-build"
 }
