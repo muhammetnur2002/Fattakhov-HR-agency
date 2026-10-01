@@ -3,22 +3,10 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { MarketingMobileMenu } from "./mobile-menu";
 import { PHONE_DISPLAY, PHONE_HREF } from "@/lib/contacts";
+import { MARKETING_LINKS } from "@/lib/marketing/nav";
 import { appUrl, studentsUrl } from "@/lib/urls";
-
-/**
- * Ссылки абсолютные, а не якорные.
- *
- * «#model» работает только на самой главной, а шапка стоит и на
- * аудите: оттуда такая ссылка прокручивает в никуда. «/#model»
- * уводит на главную и доводит до раздела с любой страницы сайта.
- */
-const LINKS = [
-  { href: "/#how", label: "Как работаем" },
-  { href: "/cases", label: "Кейсы" },
-  { href: "/tariffs", label: "Тарифы" },
-  { href: "/audit", label: "Аудит найма" },
-];
 
 /**
  * Шапка лендинга.
@@ -36,12 +24,12 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[2200px] items-center gap-6 px-5 md:px-8 xl:px-14">
-        <Link href="/" aria-label="Fattakhov HR Agency">
+        <Link href="/" aria-label="Fattakhov HR Agency" className="flex shrink-0 items-center">
           <Logo variant="lockup" className="h-7" priority />
         </Link>
 
         <nav className="ml-4 hidden items-center gap-6 lg:flex">
-          {LINKS.map((l) => (
+          {MARKETING_LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -75,7 +63,7 @@ export function MarketingHeader() {
             asChild
             variant="ghost"
             size="icon-sm"
-            className="size-11 lg:hidden"
+            className="size-11 max-sm:hidden lg:hidden"
           >
             <a href={PHONE_HREF} aria-label={`Позвонить: ${PHONE_DISPLAY}`}>
               <Phone className="size-4" />
@@ -93,22 +81,30 @@ export function MarketingHeader() {
             </a>
           </Button>
 
-          <Button asChild variant="ghost" size="sm">
-            {/* Полная подпись не помещается рядом с телефоном на узких
-                экранах, а путь ко входу убирать нельзя: им пользуются
-                действующие клиенты */}
-            <a href={appUrl("/login")}>
-              <span className="sm:hidden">Войти</span>
-              <span className="hidden sm:inline">Войти в кабинет</span>
-            </a>
+          {/* На телефоне вход живёт в меню: рядом с логотипом, главным
+              действием и кнопкой меню ему не хватает места (замер на 320) */}
+          <Button asChild variant="ghost" size="sm" className="max-sm:hidden">
+            <a href={appUrl("/login")}>Войти в кабинет</a>
           </Button>
           {/* h-11 — минимальная зона касания (44px). На телефоне это
               единственное конверсионное действие в шапке, ужимать его
               до тех же 28px, что у второстепенных кнопок рядом, не
               стоит. От lg возвращается к обычному размеру кнопки. */}
           <Button asChild size="sm" className="h-11 lg:h-7">
-            <Link href="/#diagnostic">Обсудить найм</Link>
+            {/* Короткая подпись на телефоне: полная рядом с логотипом
+                и кнопкой меню не помещается на 320 */}
+            <Link href="/#diagnostic">
+              <span className="sm:hidden">Обсудить</span>
+              <span className="hidden sm:inline">Обсудить найм</span>
+            </Link>
           </Button>
+          <MarketingMobileMenu
+            phoneHref={PHONE_HREF}
+            phoneDisplay={PHONE_DISPLAY}
+            loginHref={appUrl("/login")}
+            registerHref="/#diagnostic"
+            studentsHref={students}
+          />
         </div>
       </div>
     </header>

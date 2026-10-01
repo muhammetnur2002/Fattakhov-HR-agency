@@ -7,6 +7,7 @@ import type { UserRole } from "@/lib/generated/prisma/enums";
 import { ROLE_LABELS } from "@/lib/labels";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { appUrl } from "@/lib/urls";
+import { brandedEmail } from "@/lib/notifications/email-brand";
 
 /** Срок жизни ссылки-приглашения. */
 const INVITE_TTL_DAYS = 7;
@@ -151,9 +152,10 @@ async function sendInvitationMail(token: string): Promise<void> {
   const from = invite.invitedByName ? `${invite.invitedByName} приглашает вас` : "Вас приглашают";
   const link = appUrl(`/invite/${token}`);
 
+  const subject = `Приглашение ${place}`;
   await getEmailTransport().send({
     to: invite.email,
-    subject: `Приглашение ${place}`,
+    subject,
     text: [
       `${from} ${place} — роль «${ROLE_LABELS[invite.role]}».`,
       "",
@@ -163,6 +165,17 @@ async function sendInvitationMail(token: string): Promise<void> {
       "Если вы не ожидали этого приглашения, просто не переходите по ссылке" +
         " и сообщите тому, кто его прислал.",
     ].join("\n"),
+    html: brandedEmail({
+      title: subject,
+      preview: `${from} ${place}`,
+      heading: "Приглашение в Fattakhov HR",
+      paragraphs: [`${from} ${place} — роль «${ROLE_LABELS[invite.role]}».`],
+      action: { href: link, label: "Принять приглашение" },
+      note:
+        `Ссылка действует ${INVITE_TTL_DAYS} дней и открывается один раз. ` +
+        "Если вы не ожидали этого приглашения, просто не переходите по ней" +
+        " и сообщите тому, кто его прислал.",
+    }),
   });
 }
 

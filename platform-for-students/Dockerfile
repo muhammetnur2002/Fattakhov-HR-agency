@@ -47,6 +47,18 @@ RUN npx prisma generate
 # ---------- Сборка ----------
 FROM deps AS build
 COPY . .
+# Адреса нужны уже при сборке: часть страниц статические и запоминают адрес
+# навсегда. Передаются так:
+#   docker build --build-arg AGENCY_SITE_URL=https://my.example.ru ...
+ARG AGENCY_SITE_URL=""
+ARG APP_URL=""
+ENV AGENCY_SITE_URL=$AGENCY_SITE_URL
+ENV APP_URL=$APP_URL
+# Номер счётчика Яндекс.Метрики вшивается в код при сборке (NEXT_PUBLIC_*).
+# По умолчанию — счётчик сайта; другой номер — параметром сборки, пустой — счётчик выключен:
+#   docker build --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID=12345678 ...
+ARG NEXT_PUBLIC_YANDEX_METRIKA_ID="95422358"
+ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
 ENV NODE_ENV=production
 RUN npm run build
 

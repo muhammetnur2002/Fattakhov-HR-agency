@@ -12,6 +12,8 @@ import { Reveal, Stagger } from '@/components/motion/Reveal';
 import { SplitText, SplitTextInView } from '@/components/motion/SplitText';
 import { useCurtainNav } from '@/components/motion/RouteCurtain';
 import { DemoDeck } from './DemoDeck';
+import { CookieSettingsLink } from '@/components/analytics/CookieBanner';
+import { GOALS, reachGoal } from '@/components/analytics/YandexMetrika';
 import { durations, easeOutExpo, fadeUp } from '@/lib/motion';
 import type { VacancyDTO } from '@/lib/types';
 
@@ -56,7 +58,7 @@ export function Landing({
 
   return (
     <div className="relative">
-      <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-7xl items-center justify-between">
+      <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-[2200px] items-center justify-between">
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -83,7 +85,7 @@ export function Landing({
       </header>
 
       {/* ---------- ПЕРВЫЙ ЭКРАН ---------- */}
-      <section className="page-x mx-auto grid min-h-dvh max-w-7xl grid-cols-1 items-center gap-14 pb-20 pt-[calc(var(--header-h)+4.5rem)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pt-[var(--header-h)]">
+      <section className="page-x mx-auto grid min-h-dvh max-w-[2200px] grid-cols-1 items-center gap-14 pb-20 pt-[calc(var(--header-h)+4.5rem)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pt-[var(--header-h)]">
         <div className="relative z-10">
           <motion.p
             initial={{ opacity: 0, y: 10 }}
@@ -96,7 +98,7 @@ export function Landing({
 
           <SplitText
             text="Работа, которая помещается между парами"
-            className="mt-7 max-w-[15ch] text-display-lg"
+            className="mt-7 max-w-[15ch] text-display-lg xl:text-[4.75rem] 2xl:text-[5.5rem]"
             wordClassName="text-gradient"
             delay={0.22}
           />
@@ -121,11 +123,18 @@ export function Landing({
                 на витрине попадал только в подвал и на закрытый /employer.
                 Два равных входа сразу под заголовком снимают вопрос «а где
                 тут для компании», не заставляя искать его внизу страницы. */}
-            <Button size="lg" onClick={() => navigate('/register')} iconRight={<ArrowRight />}>
+            <Button
+              size="lg"
+              onClick={() => {
+                reachGoal(GOALS.ctaStudent);
+                navigate('/register');
+              }}
+              iconRight={<ArrowRight />}
+            >
               Я студент
             </Button>
             {employerRegisterUrl && (
-              <a href={employerRegisterUrl}>
+              <a href={employerRegisterUrl} onClick={() => reachGoal(GOALS.ctaEmployer)}>
                 <Button size="lg" variant="outline">
                   Я работодатель
                 </Button>
@@ -170,7 +179,7 @@ export function Landing({
       </section>
 
       {/* ---------- ЦИФРЫ ---------- */}
-      <section className="page-x mx-auto max-w-7xl py-16">
+      <section className="page-x mx-auto max-w-[2200px] py-16">
         <Stagger className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-[var(--hairline)] bg-[var(--hairline)] md:grid-cols-4">
           <Metric value={860} suffix="+" label="студентов в базе" />
           <Metric value={48} label="компаний-партнёров" />
@@ -180,7 +189,7 @@ export function Landing({
       </section>
 
       {/* ---------- КАК ЭТО РАБОТАЕТ ---------- */}
-      <section className="page-x mx-auto max-w-7xl py-16 sm:py-24">
+      <section className="page-x mx-auto max-w-[2200px] py-16 sm:py-24">
         <SplitTextInView
           text="Три шага вместо трёх недель"
           className="max-w-[14ch] text-display-lg"
@@ -211,7 +220,7 @@ export function Landing({
 
       {/* ---------- КОМПАНИИ ---------- */}
       <section className="overflow-hidden py-10">
-        <p className="page-x mx-auto max-w-7xl text-eyebrow uppercase text-paper-faint">
+        <p className="page-x mx-auto max-w-[2200px] text-eyebrow uppercase text-paper-faint">
           Кто уже ищет студентов
         </p>
         <div className="relative mt-6">
@@ -235,7 +244,7 @@ export function Landing({
       </section>
 
       {/* ---------- ЗАКЛЮЧИТЕЛЬНЫЙ ПРИЗЫВ ---------- */}
-      <section className="page-x mx-auto max-w-7xl py-20 sm:py-28">
+      <section className="page-x mx-auto max-w-[2200px] py-20 sm:py-28">
         <div className="glass relative overflow-hidden rounded-4xl px-7 py-16 text-center sm:px-16 sm:py-24">
           <div
             aria-hidden
@@ -266,7 +275,7 @@ export function Landing({
         </div>
       </section>
 
-      <footer className="page-x mx-auto max-w-7xl border-t border-[var(--hairline)] py-10">
+      <footer className="page-x mx-auto max-w-[2200px] border-t border-[var(--hairline)] py-10">
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <Logo href={null} />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-paper-faint">
@@ -294,6 +303,7 @@ export function Landing({
             <Link href="/help" className="transition-colors hover:text-paper">
               Помощь
             </Link>
+            <CookieSettingsLink className="transition-colors hover:text-paper" />
           </div>
           <div className="flex items-center gap-2">
             <Tag>ПДн шифруются</Tag>

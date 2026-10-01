@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { appUrl } from "@/lib/urls";
+import { brandedEmail } from "@/lib/notifications/email-brand";
 
 export class PasswordError extends Error {}
 
@@ -110,6 +111,16 @@ export async function requestPasswordReset(params: {
       "",
       "Если вы этого не делали, просто удалите письмо. Пароль останется прежним.",
     ].join("\n"),
+    html: brandedEmail({
+      title: "Восстановление доступа к платформе",
+      preview: "Ссылка для смены пароля",
+      heading: "Смена пароля",
+      paragraphs: [`${user.fullName}, вы запросили смену пароля.`],
+      action: { href: link, label: "Задать новый пароль" },
+      note:
+        `Ссылка действует ${RESET_TTL_MINUTES} минут и открывается один раз. ` +
+        "Если вы этого не делали, просто удалите письмо — пароль останется прежним.",
+    }),
   });
 }
 

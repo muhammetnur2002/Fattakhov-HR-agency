@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { REGISTRATION_CONSENT_VERSION } from "@/lib/legal/registration-consent";
 import { getEmailTransport } from "@/lib/notifications/channels";
+import { brandedEmail } from "@/lib/notifications/email-brand";
 
 export class RegistrationError extends Error {}
 
@@ -89,6 +90,16 @@ export async function requestCompanyRegistration(params: {
       "",
       "Если вы не запрашивали регистрацию, просто удалите письмо.",
     ].join("\n"),
+    html: brandedEmail({
+      title: "Код подтверждения регистрации",
+      preview: `Код для завершения регистрации: ${code}`,
+      heading: "Код подтверждения",
+      paragraphs: ["Код для завершения регистрации в CRM Fattakhov HR:"],
+      code,
+      note:
+        `Код действует ${CODE_TTL_MINUTES} минут. ` +
+        "Если вы не запрашивали регистрацию, просто удалите письмо.",
+    }),
   });
 }
 

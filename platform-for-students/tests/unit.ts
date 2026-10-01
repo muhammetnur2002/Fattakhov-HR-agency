@@ -24,6 +24,7 @@ import { isCodeShape, maskEmail, normalizeCode, resendWaitSeconds } from '../lib
 import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, passwordResetMail } from '../lib/mail/templates';
 import { emailCodeSchema, registrationSteps } from '../lib/validation';
 import { safeNext } from '../lib/security/safe-next';
+import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent';
 
 let passed = 0;
 const failures: string[] = [];
@@ -346,6 +347,21 @@ test('адрес возврата после входа — только пут�
   assert.equal(safeNext('javascript:alert(1)'), null);
   assert.equal(safeNext('/a\nb'), null);
   assert.equal(safeNext(null), null);
+});
+
+test('выбор по аналитике: согласие засчитывается только текущей версии текста', () => {
+  const stored = (choice: string, version: string) => JSON.stringify({ choice, version, at: '2026-10-01T00:00:00.000Z' });
+  assert.equal(isAccepted(null), false);
+  assert.equal(isAnswered(null), false);
+  assert.equal(isAccepted(stored('accepted', BANNER_VERSION)), true);
+  assert.equal(isAnswered(stored('rejected', BANNER_VERSION)), true);
+  assert.equal(isAccepted(stored('rejected', BANNER_VERSION)), false);
+  // старая версия текста — баннер должен показаться снова
+  assert.equal(isAnswered(stored('accepted', '2000-01-01')), false);
+  assert.equal(isAccepted(stored('accepted', '2000-01-01')), false);
+  // мусор вместо выбора страницу не роняет
+  assert.equal(isAccepted('не json'), false);
+  assert.equal(isAnswered('{"choice":"maybe","version":"' + BANNER_VERSION + '"}'), false);
 });
 
 console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);

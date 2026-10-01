@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Aurora } from '@/components/layout/Aurora';
 import { SplashScreen } from '@/components/layout/SplashScreen';
+import { AnalyticsGate } from '@/components/analytics/AnalyticsGate';
 import { RouteCurtain } from '@/components/motion/RouteCurtain';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </ToastProvider>
           <ThemeToggle />
           <SplashScreen />
+          <AnalyticsGate />
         </ThemeProvider>
       </body>
     </html>

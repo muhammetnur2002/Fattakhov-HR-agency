@@ -12,6 +12,7 @@ import {
   type EventCode,
 } from "./events";
 import { appOrigin } from "@/lib/urls";
+import { brandedEmail } from "./email-brand";
 
 /**
  * Окно схлопывания (BR-30).
@@ -238,6 +239,14 @@ async function sendToChannels(
       to: user.email,
       subject: content.title,
       text: [content.body, url].filter(Boolean).join("\n\n"),
+      html: brandedEmail({
+        title: content.title,
+        preview: content.body ?? content.title,
+        heading: content.title,
+        paragraphs: content.body ? [content.body] : [],
+        action: url ? { href: url, label: "Открыть в кабинете" } : undefined,
+        note: "Какие уведомления приходят на почту, можно выбрать в кабинете, в разделе «Настройки».",
+      }),
     });
     sent.sentEmailAt = new Date();
   }

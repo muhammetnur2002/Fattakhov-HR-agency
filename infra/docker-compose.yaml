@@ -1,0 +1,131 @@
+# Состав сервера.
+#
+# Имена образов подставляются при сборке конфигурации из переменных:
+# держать их здесь строкой значит править файл при каждой выкатке.
+#
+# Секреты живут в /etc/fhr.env, он кладётся на машину отдельно
+# и доступен только root.
+
+services:
+  # Миграции накатываются до старта приложения и завершаются.
+  #
+  # Отдельным шагом, а не внутри приложения: два экземпляра
+  # приложения, стартующие одновременно, попытались бы мигрировать
+  # базу вдвоём. Здесь же шаг один и выполняется до всего остального.
+  #
+  # environment здесь обязателен, как у app и worker: DATABASE_URL базы
+  # CRM приходит в var.runtime_env и перекрывает строку из /etc/fhr.env,
+  # которая указывает на прежнюю базу hr_platform (архив нашей версии CRM
+  # до 30.09.2026). Без этой строки миграции новой CRM ушли бы в архив.
+  migrate:
+    image: TOOLS_IMAGE_PLACEHOLDER
+    restart: "no"
+    env_file: /etc/fhr.env
+    environment: RUNTIME_ENV_PLACEHOLDER
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  # Первый владелец на пустой базе: организация и приглашение для
+  # profattakhov@gmail.com, письмо со ссылкой — один раз (факт отправки
+  # записан в базе, повторные запуски ничего не повторяют; см.
+  # scripts/bootstrap-owner.ts в репозитории CRM). Входа по SSH на
+  # сервер нет, поэтому это служба, а не ручная команда.
+  owner-bootstrap:
+    image: TOOLS_IMAGE_PLACEHOLDER
+    restart: "no"
+    env_file: /etc/fhr.env
+    environment: RUNTIME_ENV_PLACEHOLDER
+    command: ["npx", "tsx", "scripts/bootstrap-owner.ts", "ensure"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    image: APP_IMAGE_PLACEHOLDER
+    restart: always
+    env_file: /etc/fhr.env
+    # Переменные, которые меняются обычным apply (var.runtime_env)
+    environment: RUNTIME_ENV_PLACEHOLDER
+    expose:
+      - "3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Фоновые задачи: напоминания, контроль сроков, сводки.
+  worker:
+    image: TOOLS_IMAGE_PLACEHOLDER
+    restart: always
+    env_file: /etc/fhr.env
+    environment: RUNTIME_ENV_PLACEHOLDER
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Студенческая платформа — своя база (fhr_students), свой бакет,
+  # свои секреты (var.students_runtime_env, отдельно от var.runtime_env
+  # у CRM: у обоих DATABASE_URL — одно имя переменной, но разные строки
+  # подключения). Метки подстановки здесь только в самих полях, не
+  # в комментариях: подстановка — поиск строки (см. compute.tf). env_file у нас нет
+  # намеренно: /etc/fhr.env — секреты CRM, студенческой платформе они
+  # не нужны и не должны быть видны.
+  students-migrate:
+    image: __STUDENTS_TOOLS_IMAGE__
+    restart: "no"
+    environment: __STUDENTS_ENV__
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  students:
+    image: __STUDENTS_APP_IMAGE__
+    restart: always
+    environment: __STUDENTS_ENV__
+    expose:
+      - "3000"
+    depends_on:
+      students-migrate:
+        condition: service_completed_successfully
+    # Свой HEALTHCHECK у них уже в образе (их Dockerfile — Debian
+    # slim, ни curl, ни wget нет, проверка через node -e fetch(...)).
+    # Здесь не переопределять чужой правильный на наш wget-вариант —
+    # он в этом образе просто не найдётся, и проверка всегда будет
+    # падать. Замечено при пробной сборке 28.09.2026.
+
+  # Замена суточного крона Vercel (vercel.json): раз в день дёргает
+  # /api/cron/notify с CRON_SECRET из окружения платформы.
+  # busybox crond, не самодельный цикл со сном — расписание и часовой
+  # пояс (образ и так в UTC) у него уже решены, у ручного sleep-цикла
+  # были бы свои особые случаи.
+  students-cron:
+    image: alpine:3.20
+    restart: always
+    environment: __STUDENTS_ENV__
+    depends_on:
+      - students
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache curl >/dev/null
+        echo "0 6 * * * curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://students:3000/api/cron/notify" > /etc/crontabs/root
+        crond -f -l 2
+
+volumes:
+  caddy_data:
+  caddy_config:

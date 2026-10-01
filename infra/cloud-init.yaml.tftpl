@@ -1,0 +1,29 @@
+#cloud-config
+# Подготовка машины.
+#
+# Вход по SSH снаружи не открывается: группа безопасности пускает
+# только 80 и 443. Административный доступ - через Serial Console
+# облака, у неё своя аутентификация и свой журнал.
+#
+# Файл с секретами кладётся правами 600 и владельцем root: внутри
+# контейнера он появляется только как переменные окружения, наружу
+# не отдаётся.
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "50m", "max-file": "3" }
+      }
+
+  - path: /etc/caddy/Caddyfile
+    permissions: "0644"
+    content: |
+      ${CADDYFILE_INDENTED}
+
+  - path: /etc/fhr.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      ${ENVFILE_INDENTED}

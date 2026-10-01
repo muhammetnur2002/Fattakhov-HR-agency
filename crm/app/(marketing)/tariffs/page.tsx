@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BeyondSalary } from "@/components/marketing/beyond-salary";
-import { CostComparison } from "@/components/marketing/cost-comparison";
+import { CostCalculator } from "@/components/marketing/cost-calculator";
 import { Pricing } from "@/components/marketing/pricing";
 import { Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     locale: "ru_RU",
     title: "Тарифы: от 100 000 ₽ в месяц за вакансию в работе",
     description:
-      "Пять конфигураций, открытые цены и честное сравнение со своим отделом найма за 590 000 ₽ в месяц.",
+      "Пять конфигураций, открытые цены и калькулятор: сравните подписку с расходами на свой отдел найма на своих цифрах.",
   },
 };
 
@@ -81,10 +81,10 @@ export default function TariffsPage() {
         <SectionHead
           eyebrow="С чем сравнивать"
           title="Отдел найма в штате и команда по подписке."
-          lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Цифры для рынка Казани и Москвы, под ваш город пересчитаем на диагностике."
+          lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Оклады у всех разные, поэтому цифры здесь ваши: подставьте свои и сравните с подпиской."
         />
         <div className="mt-12">
-          <CostComparison />
+          <CostCalculator />
           <BeyondSalary />
         </div>
       </Section>

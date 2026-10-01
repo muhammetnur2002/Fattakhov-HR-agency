@@ -35,6 +35,7 @@ import { randomBytes } from "node:crypto";
 import { createTransport } from "nodemailer";
 
 import { prismaRaw as db } from "../lib/db/prisma";
+import { brandedEmail } from "../lib/notifications/email-brand";
 import { appOrigin } from "../lib/urls";
 
 const ORG_NAME = "Fattakhov HR Agency";
@@ -177,6 +178,21 @@ async function send(dryRun: boolean): Promise<boolean> {
       to: OWNER_EMAIL,
       subject,
       text: body(link),
+      html: brandedEmail({
+        title: subject,
+        preview: "Кабинет Fattakhov HR запущен — вы в нём владелец",
+        heading: "Кабинет Fattakhov HR запущен",
+        paragraphs: [
+          "Здравствуйте!",
+          "Вы в нём владелец. Чтобы войти, откройте ссылку, укажите своё имя и придумайте пароль.",
+        ],
+        action: { href: link, label: "Войти в кабинет" },
+        note:
+          `Ссылка одноразовая, действует до ${moscow.format(invite.expiresAt)} по московскому времени. ` +
+          "Она даёт полный доступ к кабинету, поэтому никому её не пересылайте.\n" +
+          `Потом входить нужно по адресу ${appOrigin()}/login с этой почтой и вашим паролем. ` +
+          "Если вы не ждали это письмо, просто не открывайте ссылку.",
+      }),
     });
     if (info.accepted.length === 0 || info.rejected.length > 0) {
       throw new Error(

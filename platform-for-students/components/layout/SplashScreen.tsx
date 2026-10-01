@@ -30,7 +30,10 @@ export function SplashScreen() {
       /* приватный режим — просто не повторяем показ в течение вкладки на глаз */
     }
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (shown || reduceMotion) return;
+    // Заставка — только для компьютеров и планшетов: на телефоне она закрывала бы
+    // экран и задерживала вход, а страница там и так открывается сразу
+    const phone = window.matchMedia('(max-width: 767px)').matches;
+    if (shown || reduceMotion || phone) return;
 
     try {
       sessionStorage.setItem(STORAGE_KEY, '1');
@@ -78,7 +81,7 @@ export function SplashScreen() {
         playsInline
         onEnded={dismiss}
         onError={dismiss}
-        className="h-full w-full object-contain"
+        className="w-[min(56vw,640px)] max-h-[60vh] object-contain"
       />
     </div>
   );

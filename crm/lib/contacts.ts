@@ -13,5 +13,5 @@ export const PHONE_HREF = "tel:+79375711877";
 export const TELEGRAM_DISPLAY = "@goalkeeperka";
 export const TELEGRAM_HREF = "https://t.me/goalkeeperka";
 
-export const EMAIL_DISPLAY = "profattakhov@gmail.com";
-export const EMAIL_HREF = "mailto:profattakhov@gmail.com";
+export const EMAIL_DISPLAY = "info@fattakhovhr.ru";
+export const EMAIL_HREF = "mailto:info@fattakhovhr.ru";

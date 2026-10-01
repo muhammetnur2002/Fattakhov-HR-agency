@@ -3,7 +3,6 @@ import Link from "next/link";
 import { BeyondSalary } from "@/components/marketing/beyond-salary";
 import { Button } from "@/components/ui/button";
 import { CostCalculator } from "@/components/marketing/cost-calculator";
-import { CostComparison } from "@/components/marketing/cost-comparison";
 import { Hero } from "@/components/marketing/hero";
 import { LeadForm } from "@/components/marketing/lead-form";
 import { PlatformPreview } from "@/components/marketing/platform-preview";
@@ -60,13 +59,13 @@ export default function LandingPage() {
         <SectionHead
           eyebrow="Сколько это стоит на самом деле"
           title="Отдел найма в штате и команда по подписке."
-          lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Цифры для рынка Казани и Москвы, а свои можно подставить прямо здесь."
+          lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Оклады у всех разные, поэтому цифры здесь ваши: подставьте свои и сразу увидите разницу с подпиской."
         />
         <div className="mt-12">
-          <CostComparison />
-          {/* Разбор выше — общий довод, калькулятор — тот же расчёт
-              на числах читателя. Без него у человека из другого города
-              оставалось «это ваши оклады, а не мои» */}
+          {/* Единственный расчёт на странице, и считает он по цифрам
+              читателя. Готовых окладов агентства здесь нет: подтвердить
+              их нечем, а «это ваши оклады, а не мои» человек из другого
+              города скажет сразу */}
           <CostCalculator />
           <BeyondSalary />
         </div>

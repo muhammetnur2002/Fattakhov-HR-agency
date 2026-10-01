@@ -29,6 +29,26 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Адреса нужны уже при сборке: часть страниц (сайт, ссылки «Студентам»)
+# собирается статически и запоминает адрес навсегда. Передаются так:
+#   docker build --build-arg STUDENTS_URL=https://students.example.ru ...
+# SITE_URL — адрес сайта (fattakhovhr.ru): без него ссылки-оригиналы
+# (canonical) и карта сайта в готовых страницах указывали бы на кабинет.
+ARG STUDENTS_URL=""
+ARG APP_URL=""
+ARG SITE_URL=""
+ENV STUDENTS_URL=$STUDENTS_URL
+ENV APP_URL=$APP_URL
+ENV SITE_URL=$SITE_URL
+
+# Номер счётчика Яндекс.Метрики. Переменная NEXT_PUBLIC_* вшивается в код при сборке,
+# поэтому задать её в /etc/fhr.env на сервере уже поздно: передаётся только так:
+#   docker build --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID=12345678 ...
+# По умолчанию — боевой счётчик сайта. Другой номер — параметром сборки;
+# пустой (--build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID=) отключает счётчик.
+ARG NEXT_PUBLIC_YANDEX_METRIKA_ID="95422358"
+ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
+
 # Клиент Prisma генерируется до сборки: Next собирает серверные
 # компоненты, которые его импортируют
 RUN npx prisma generate
