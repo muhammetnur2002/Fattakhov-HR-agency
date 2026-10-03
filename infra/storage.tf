@@ -26,12 +26,6 @@ resource "yandex_iam_service_account" "storage" {
   description = "Доступ приложения к бакету с файлами. Больше ничего."
 }
 
-resource "yandex_resourcemanager_folder_iam_member" "storage_editor" {
-  folder_id = var.folder_id
-  role      = "storage.editor"
-  member    = "serviceAccount:${yandex_iam_service_account.storage.id}"
-}
-
 # Право расшифровывать объекты бакета. Без него приложение положит
 # файл, но прочитать его обратно не сможет
 resource "yandex_kms_symmetric_key_iam_binding" "storage" {
@@ -95,4 +89,14 @@ resource "yandex_storage_bucket" "files" {
       days = 30
     }
   }
+}
+
+# Права на бакет CRM — только у аккаунта CRM и только на этот бакет.
+# Раньше вместо этого стояла роль storage.editor на весь каталог
+# (folder_iam_member), и ключ любого из двух приложений открывал оба бакета
+# — вопреки тому, что написано в начале файла. Проверено 04.10.2026.
+resource "yandex_storage_bucket_iam_binding" "files_editor" {
+  bucket  = yandex_storage_bucket.files.bucket
+  role    = "storage.editor"
+  members = ["serviceAccount:${yandex_iam_service_account.storage.id}"]
 }

@@ -34,12 +34,6 @@ resource "yandex_iam_service_account" "students_storage" {
   description = "Доступ студенческой платформы к её бакету. Больше ничего."
 }
 
-resource "yandex_resourcemanager_folder_iam_member" "students_storage_editor" {
-  folder_id = var.folder_id
-  role      = "storage.editor"
-  member    = "serviceAccount:${yandex_iam_service_account.students_storage.id}"
-}
-
 # Роль на ключ шифрования для этого аккаунта — в общей привязке ключа
 # (storage.tf): вторая авторитетная привязка той же роли снимала бы права
 # у CRM. Прежний ресурс забыт без удаления, чтобы роль не отозвалась.
@@ -98,4 +92,12 @@ resource "yandex_storage_bucket" "students_files" {
       days = 30
     }
   }
+}
+
+# Права на бакет платформы — только у её аккаунта и только на этот бакет
+# (см. комментарий у yandex_storage_bucket_iam_binding.files_editor в storage.tf)
+resource "yandex_storage_bucket_iam_binding" "students_files_editor" {
+  bucket  = yandex_storage_bucket.students_files.bucket
+  role    = "storage.editor"
+  members = ["serviceAccount:${yandex_iam_service_account.students_storage.id}"]
 }
