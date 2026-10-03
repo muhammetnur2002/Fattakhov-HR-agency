@@ -1,0 +1,77 @@
+# Конфиг Yandex Unified Agent для машин fhr-app и fhr-students.
+# Подставляется templatefile из agent.tf; в compose попадает переменной
+# окружения UA_CONFIG и записывается в файл при старте контейнера.
+#
+# Метрики: память и диск машины (процессор и сеть Monitoring знает сам).
+# Логи: все контейнеры машины, из json-файлов Docker, в Cloud Logging.
+# Агент ходит в облако под аккаунтом машины (cloud_meta), ключей в конфиге нет.
+
+status:
+  port: "16241"
+  host: null
+
+agent_log:
+  priority: NOTICE
+
+storages:
+  - name: metrics
+    plugin: fs
+    config:
+      directory: /var/lib/yandex/unified_agent/metrics
+      max_partition_size: 50mb
+      max_segment_size: 10mb
+  - name: logs
+    plugin: fs
+    config:
+      directory: /var/lib/yandex/unified_agent/logs
+      max_partition_size: 200mb
+      max_segment_size: 10mb
+
+channels:
+  - name: cloud_monitoring
+    channel:
+      pipe:
+        - storage_ref:
+            name: metrics
+      output:
+        plugin: yc_metrics
+        config:
+          url: https://monitoring.api.cloud.yandex.net/monitoring/v2/data/write
+          folder_id: ${folder_id}
+          iam:
+            cloud_meta: {}
+  - name: cloud_logging
+    channel:
+      pipe:
+        - storage_ref:
+            name: logs
+      output:
+        plugin: yc_logs
+        config:
+          log_group_id: ${log_group_id}
+          iam:
+            cloud_meta: {}
+
+routes:
+  - input:
+      plugin: linux_metrics
+      config:
+        namespace: sys
+        poll_period: 60s
+        proc_directory: /ua_proc
+        resources:
+          memory: basic
+          storage: basic
+    channel:
+      channel_ref:
+        name: cloud_monitoring
+
+  - input:
+      plugin: file_input
+      config:
+        path: /docker_logs/*/*-json.log
+        multi_file: true
+        state_directory: /var/lib/yandex/unified_agent/logs-state
+    channel:
+      channel_ref:
+        name: cloud_logging

@@ -75,6 +75,9 @@ locals {
     students_env_json    = jsonencode(local.students_env)
     enable_caddy         = var.students_vm_caddy
     enable_cron          = var.students_vm_cron
+
+    unified_agent_image       = var.unified_agent_image
+    unified_agent_config_json = jsonencode(local.unified_agent_config)
   })
 }
 

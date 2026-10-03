@@ -18,6 +18,9 @@ import index  # noqa: E402
 CPU = next(c for c in index.CHECKS if c["name"] == "Процессор fhr-app")
 MEM = next(c for c in index.CHECKS if c["name"].startswith("Память базы"))
 DISK = next(c for c in index.CHECKS if c["name"].startswith("Диск базы"))
+VM_MEM = next(c for c in index.CHECKS if c["name"] == "Память fhr-students (свободно)")
+VM_DISK = next(c for c in index.CHECKS if c["name"] == "Диск fhr-app (занято)")
+VM_IDS = '{"fhr-app": "fhmAPP", "fhr-students": "fhmSTUD"}'
 NAN = math.nan
 
 
@@ -91,6 +94,62 @@ class Buckets(unittest.TestCase):
     def test_floor_to_bucket(self):
         moment = datetime(2026, 10, 4, 12, 37, 45, tzinfo=timezone.utc)
         self.assertEqual(index.floor_to_bucket(moment), datetime(2026, 10, 4, 12, 30, tzinfo=timezone.utc))
+
+
+class VmChecks(unittest.TestCase):
+    """Память и диск машин: метрики агента с меткой host = id машины."""
+
+    def test_vm_memory_alarms_when_free_memory_is_low(self):
+        self.assertEqual(index.level_of(40, VM_MEM), 0)
+        self.assertEqual(index.level_of(15, VM_MEM), 1)
+        self.assertEqual(index.level_of(7, VM_MEM), 2)
+
+    def test_vm_disk_thresholds(self):
+        self.assertEqual(index.level_of(74.9, VM_DISK), 0)
+        self.assertEqual(index.level_of(75, VM_DISK), 1)
+        self.assertEqual(index.level_of(90, VM_DISK), 2)
+
+    def test_query_gets_the_machine_id(self):
+        with mock.patch.dict(os.environ, {"VM_IDS": VM_IDS}):
+            query = index.resolve_query(VM_MEM["query"])
+            total = index.resolve_query(VM_MEM["total_query"])
+        self.assertIn('host="fhmSTUD"', query)
+        self.assertIn('host="fhmSTUD"', total)
+        self.assertNotIn("<vm:", query + total)
+
+    def test_every_vm_check_resolves_for_known_machines(self):
+        with mock.patch.dict(os.environ, {"VM_IDS": VM_IDS}):
+            for check in index.CHECKS:
+                for key in ("query", "total_query"):
+                    if key in check:
+                        self.assertNotIn("<vm:", index.resolve_query(check[key]))
+
+    def test_unknown_machine_is_an_error_not_an_unfiltered_query(self):
+        with mock.patch.dict(os.environ, {"VM_IDS": '{"fhr-app": "fhmAPP"}'}):
+            with self.assertRaises(KeyError):
+                index.resolve_query(VM_MEM["query"])
+
+    def test_free_memory_percent_is_computed_from_total(self):
+        def fake_series(token, folder, query, agg, now):
+            if "MemTotal" in query:
+                return [[4000.0, 4000.0, 4000.0]]
+            return [[1000.0, 600.0, 200.0]]  # свободно 25% -> 15% -> 5%
+
+        with mock.patch.object(index, "read_series", fake_series):
+            values = index.check_values("t", "f", VM_MEM, datetime.now(timezone.utc))
+        self.assertEqual([round(v) for v in values], [25, 15, 5])
+        self.assertEqual(index.level_of(values[-1], VM_MEM), 2)
+
+    def test_disk_percent_uses_used_over_size(self):
+        def fake_series(token, folder, query, agg, now):
+            if "SizeB" in query:
+                return [[20.0, 20.0]]
+            return [[10.0, 18.5]]
+
+        with mock.patch.object(index, "read_series", fake_series):
+            values = index.check_values("t", "f", VM_DISK, datetime.now(timezone.utc))
+        self.assertEqual([round(v, 1) for v in values], [50.0, 92.5])
+        self.assertEqual(index.level_of(values[-1], VM_DISK), 2)
 
 
 class Run(unittest.TestCase):

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { HttpError } from '@/lib/security/guards';
+import { formatWait } from '@/lib/wait-format';
 
 /** Единый конверт ответа: клиент всегда знает, где искать ошибку. */
 export interface ApiError {
@@ -49,7 +50,7 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
 export function tooManyRequests(retryAfter: number) {
   return NextResponse.json<ApiError>(
     {
-      error: `Слишком много попыток. Повторите через ${retryAfter} с.`,
+      error: `Слишком много попыток. Повторите через ${formatWait(retryAfter)}.`,
       code: 'RATE_LIMITED',
     },
     { status: 429, headers: { 'Retry-After': String(retryAfter) } },

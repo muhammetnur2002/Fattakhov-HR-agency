@@ -6,6 +6,16 @@
 # Секреты живут в /etc/fhr.env, он кладётся на машину отдельно
 # и доступен только root.
 
+# Логи всех контейнеров: тот же ротационный предел, что в daemon.json, плюс
+# имя службы compose в каждой строке (поле attrs) — по нему в Cloud Logging
+# видно, чей это лог (агент `ua` ниже читает файлы Docker, а в них только id).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+    labels: "com.docker.compose.service"
+
 services:
   # Миграции накатываются до старта приложения и завершаются.
   #
@@ -20,6 +30,7 @@ services:
   migrate:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: "no"
+    logging: *logging
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     command: ["npx", "prisma", "migrate", "deploy"]
@@ -32,6 +43,7 @@ services:
   owner-bootstrap:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: "no"
+    logging: *logging
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     command: ["npx", "tsx", "scripts/bootstrap-owner.ts", "ensure"]
@@ -42,6 +54,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: always
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
@@ -55,6 +68,7 @@ services:
   app:
     image: APP_IMAGE_PLACEHOLDER
     restart: always
+    logging: *logging
     env_file: /etc/fhr.env
     # Переменные, которые меняются обычным apply (var.runtime_env)
     environment: RUNTIME_ENV_PLACEHOLDER
@@ -74,6 +88,7 @@ services:
   worker:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: always
+    logging: *logging
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     depends_on:
@@ -86,6 +101,29 @@ services:
   # (как --remove-orphans), поэтому копия и её крон уходят отсюда сразу,
   # без пересоздания машины и без двойных напоминаний.
 
+  # Агент метрик и логов (память и диск машины -> Monitoring, логи -> Cloud
+  # Logging). Подробности — agent.tf. Лёгкий: потолок памяти 256 МБ.
+  ua:
+    image: UA_IMAGE_PLACEHOLDER
+    restart: always
+    logging: *logging
+    uts: host
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      UA_CONFIG: UA_CONFIG_PLACEHOLDER
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /etc/yandex/unified_agent
+        printf '%s' "$$UA_CONFIG" > /etc/yandex/unified_agent/config.yml
+        exec /usr/bin/unified_agent --config /etc/yandex/unified_agent/config.yml
+    volumes:
+      - /proc:/ua_proc:ro
+      - /var/lib/docker/containers:/docker_logs:ro
+      - ua_data:/var/lib/yandex/unified_agent
+
 volumes:
+  ua_data:
   caddy_data:
   caddy_config:

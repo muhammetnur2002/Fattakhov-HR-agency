@@ -161,6 +161,8 @@ yc iam key create --service-account-name fhr-ci-images-prod --output /dev/stdout
 | диск базы, занято | ≥ 70% | ≥ 85% |
 | память базы, свободно | ≤ 15% | ≤ 7% |
 | процессор базы, свободно | ≤ 30% | ≤ 15% |
+| память `fhr-app`, `fhr-students`, свободно (минимум за 10 мин) | ≤ 15% | ≤ 7% |
+| диск `fhr-app`, `fhr-students`, занято (максимум за 10 мин) | ≥ 75% | ≥ 90% |
 
 Письмо приходит, когда показатель вышел за порог или ухудшился, раз в час
 напоминает, пока проблема держится, и пишет «в норме», когда всё вернулось.
@@ -173,3 +175,37 @@ yc iam key create --service-account-name fhr-ci-images-prod --output /dev/stdout
 `POST https://functions.yandexcloud.net/<id>?integration=raw` с телом
 `{"test": true}` шлёт проверочное письмо, с пустым `{}` — настоящий запуск
 (ответ `{"events": [], "errors": []}` значит, что метрики прочитаны и всё в норме).
+
+## Метрики и логи машин
+
+На каждой машине (`fhr-app`, `fhr-students`) рядом с остальными работает
+контейнер `ua` — официальный Yandex Unified Agent (`agent.tf`, конфиг
+`unified-agent.yml.tftpl`, образ закреплён по хэшу переменной
+`unified_agent_image`). Потолок памяти агента 256 МБ. Он ходит в облако под
+аккаунтом машины (`fhr-vm`): ему выданы `monitoring.editor` и `logging.writer`
+на каталог, больше ничего.
+
+- **Метрики** — память и диск машины раз в минуту, `service=custom`, метка
+  `host` = идентификатор машины (`terraform output students_vm_id`; у `fhr-app`
+  — в консоли). Имена: `sys.memory.MemAvailable`, `sys.memory.MemTotal`,
+  `sys.filesystem.UsedB`, `sys.filesystem.SizeB` (диск — `mountpoint="/"`).
+  Проверки на них — в `fhr-metrics` (раздел выше).
+- **Логи** — всё, что контейнеры пишут в stdout/stderr (crm, worker, students,
+  caddy, migrate…), в группу Cloud Logging `fhr-logs`, хранение 7 суток.
+  Каждая запись — строка JSON из файла Docker: сам текст в поле `log`, имя
+  службы — в `"com.docker.compose.service":"<имя>"`.
+
+**Как посмотреть логи в консоли:** console.yandex.cloud → каталог `fhr-prod` →
+Cloud Logging → группа `fhr-logs` → вкладка «Записи». Вверху выбрать период
+(например, «1 час») и в строке фильтра ввести, например:
+
+- `message: "ERROR"` — все ошибки;
+- `message: "compose.service\":\"students"` — только студенческая платформа
+  (вместо `students`: `app`, `worker`, `caddy`, `students-migrate`, `ua`).
+
+**Как посмотреть память и диск:** Monitoring → «Метрики» → в запросе
+`"sys.memory.MemAvailable"{service="custom"}` (или `"sys.filesystem.UsedB"{...}`).
+
+Состав контейнеров обновляется обычным `apply`; правка логирования или агента
+пересоздаёт контейнеры машины (несколько секунд простоя), поэтому делайте её
+ночью и сначала на `fhr-students`.

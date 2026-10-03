@@ -4,17 +4,27 @@
 # намеренно: платформа получает только свои секреты, секреты CRM ей не нужны.
 # Caddy и крон включаются переключателями students_vm_caddy и students_vm_cron.
 
+# Логи контейнеров с именем службы в каждой строке — см. docker-compose.yaml.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+    labels: "com.docker.compose.service"
+
 services:
   # Миграции базы: идемпотентны, повторный запуск ничего не ломает.
   students-migrate:
     image: ${students_tools_image}
     restart: "no"
+    logging: *logging
     environment: ${students_env_json}
     command: ["npx", "prisma", "migrate", "deploy"]
 
   students:
     image: ${students_app_image}
     restart: always
+    logging: *logging
     environment: ${students_env_json}
     expose:
       - "3000"
@@ -22,11 +32,34 @@ services:
       students-migrate:
         condition: service_completed_successfully
     # Проверка здоровья уже есть в образе платформы (node -e fetch), не переопределяем.
+
+  # Агент метрик и логов (память и диск машины -> Monitoring, логи -> Cloud
+  # Logging). Подробности — agent.tf. Лёгкий: потолок памяти 256 МБ.
+  ua:
+    image: ${unified_agent_image}
+    restart: always
+    logging: *logging
+    uts: host
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      UA_CONFIG: ${unified_agent_config_json}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /etc/yandex/unified_agent
+        printf '%s' "$$UA_CONFIG" > /etc/yandex/unified_agent/config.yml
+        exec /usr/bin/unified_agent --config /etc/yandex/unified_agent/config.yml
+    volumes:
+      - /proc:/ua_proc:ro
+      - /var/lib/docker/containers:/docker_logs:ro
+      - ua_data:/var/lib/yandex/unified_agent
 %{ if enable_caddy }
 
   caddy:
     image: caddy:2-alpine
     restart: always
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
@@ -44,6 +77,7 @@ services:
   students-cron:
     image: alpine:3.20
     restart: always
+    logging: *logging
     environment: ${students_env_json}
     depends_on:
       - students
@@ -56,5 +90,6 @@ services:
 %{ endif }
 
 volumes:
+  ua_data:
   caddy_data:
   caddy_config:

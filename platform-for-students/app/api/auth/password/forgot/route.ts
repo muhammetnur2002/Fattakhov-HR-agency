@@ -5,6 +5,7 @@ import { blindIndex } from '@/lib/security/crypto';
 import { assertSameOrigin, audit } from '@/lib/security/guards';
 import { clientIp, rateLimit } from '@/lib/security/rate-limit';
 import { forgotPasswordSchema } from '@/lib/validation';
+import { formatWait } from '@/lib/wait-format';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
         });
       case 'WAIT':
         return NextResponse.json<ApiError>(
-          { error: `Письмо уже отправлено. Новое можно запросить через ${result.retryAfter} с.`, code: 'WAIT' },
+          { error: `Письмо уже отправлено. Новое можно запросить через ${formatWait(result.retryAfter)}.`, code: 'WAIT' },
           { status: 429, headers: { 'Retry-After': String(result.retryAfter) } },
         );
       case 'MAIL_FAILED':

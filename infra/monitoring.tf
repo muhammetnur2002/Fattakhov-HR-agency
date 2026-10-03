@@ -108,6 +108,11 @@ variable "metrics_alert_extra_emails" {
 locals {
   metrics_env = {
     FOLDER_ID        = var.folder_id
+    # Идентификаторы машин: память и диск пишет агент (agent.tf) с меткой host = id
+    VM_IDS = jsonencode({
+      "fhr-app"      = yandex_compute_instance.app.id
+      "fhr-students" = yandex_compute_instance.students.id
+    })
     EXTRA_RECIPIENTS = join(",", var.metrics_alert_extra_emails)
     SMTP_URL         = local.uptime_env.SMTP_URL
     SMTP_FROM        = local.uptime_env.SMTP_FROM
@@ -138,7 +143,7 @@ resource "yandex_resourcemanager_folder_iam_member" "metrics_viewer" {
 
 resource "yandex_function" "metrics" {
   name               = "fhr-metrics"
-  description        = "Оповещения по ресурсам: процессор машин, диск, память и процессор базы"
+  description        = "Оповещения по ресурсам: процессор, память и диск машин; диск, память и процессор базы"
   runtime            = "python312"
   entrypoint         = "index.handler"
   memory             = 128

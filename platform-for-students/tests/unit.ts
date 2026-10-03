@@ -25,6 +25,7 @@ import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, p
 import { emailCodeSchema, registrationSteps } from '../lib/validation';
 import { safeNext } from '../lib/security/safe-next';
 import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent';
+import { formatWait } from '../lib/wait-format';
 import { vapidProblem } from '../lib/push/config';
 import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
 import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
@@ -455,6 +456,15 @@ test('пуш: отпечаток адреса стабилен, имя служ�
   assert.equal(pushServiceName('https://fcm.googleapis.com/fcm/send/abc'), 'Google');
   assert.equal(pushServiceName('https://web.push.apple.com/abc'), 'Apple');
   assert.equal(pushServiceName('https://updates.push.services.mozilla.com/x'), 'Mozilla');
+});
+
+test('время ожидания: секунды до минуты, дальше минуты вверх', () => {
+  assert.equal(formatWait(1), '1 с');
+  assert.equal(formatWait(59), '59 с');
+  assert.equal(formatWait(60), '1 мин');
+  assert.equal(formatWait(61), '2 мин');
+  assert.equal(formatWait(1324), '23 мин');
+  assert.equal(formatWait(0), '1 с');
 });
 
 console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);

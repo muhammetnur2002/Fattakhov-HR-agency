@@ -1,5 +1,5 @@
-"""Оповещения по метрикам: процессор машин, диск, память и процессор базы
-(облачная функция, см. infra/monitoring.tf).
+"""Оповещения по метрикам: процессор, память и диск машин; диск, память и
+процессор базы (облачная функция, см. infra/monitoring.tf).
 
 Зачем не алерты Monitoring. В публичном API нет ни алертов, ни каналов
 уведомлений: их заводят руками в консоли, там же они и живут, вне
@@ -51,6 +51,12 @@ LOCAL_TZ = timezone(timedelta(hours=5))
 
 API = "https://monitoring.api.cloud.yandex.net/monitoring/v2/data/read"
 
+# Память и диск машин пишет агент на самой машине (infra/agent.tf, метрики
+# sys.memory.* и sys.filesystem.*). У них метка host — идентификатор машины,
+# а не имя: в запросах пишется <vm:имя>, подставляется из переменной VM_IDS
+# (JSON {"fhr-app": "fhm…", ...}, её задаёт monitoring.tf).
+VM_TOKEN = "<vm:"
+
 LEVEL_NAMES = {0: "норма", 1: "предупреждение", 2: "ТРЕВОГА"}
 
 # unit: «percent» — 0..100; «ratio_percent» — доля от второго запроса в процентах.
@@ -77,6 +83,57 @@ CHECKS = [
         "alarm": 90,
         "unit": "percent",
         "hint": "Машина студенческой платформы упирается в процессор.",
+    },
+    {
+        "name": "Память fhr-app (свободно)",
+        "query": '"sys.memory.MemAvailable"{service="custom", host="<vm:fhr-app>"}',
+        "total_query": '"sys.memory.MemTotal"{service="custom", host="<vm:fhr-app>"}',
+        "agg": "MIN",
+        "direction": "lt",
+        "warn": 15,
+        "alarm": 7,
+        "unit": "ratio_percent",
+        "hint": "На машине с CRM почти не осталось памяти: контейнеры могут начать "
+        "падать. Логи — в консоли Cloud Logging (группа fhr-logs); при постоянной "
+        "нехватке поднимите память машины в Terraform (resources.memory).",
+    },
+    {
+        "name": "Память fhr-students (свободно)",
+        "query": '"sys.memory.MemAvailable"{service="custom", host="<vm:fhr-students>"}',
+        "total_query": '"sys.memory.MemTotal"{service="custom", host="<vm:fhr-students>"}',
+        "agg": "MIN",
+        "direction": "lt",
+        "warn": 15,
+        "alarm": 7,
+        "unit": "ratio_percent",
+        "hint": "На машине студенческой платформы почти не осталось памяти. Логи — "
+        "в Cloud Logging (группа fhr-logs); при постоянной нехватке поднимите "
+        "students_vm_memory в Terraform.",
+    },
+    {
+        "name": "Диск fhr-app (занято)",
+        "query": '"sys.filesystem.UsedB"{service="custom", host="<vm:fhr-app>", mountpoint="/"}',
+        "total_query": '"sys.filesystem.SizeB"{service="custom", host="<vm:fhr-app>", mountpoint="/"}',
+        "agg": "MAX",
+        "direction": "gt",
+        "warn": 75,
+        "alarm": 90,
+        "unit": "ratio_percent",
+        "hint": "Диск машины с CRM заполняется (образы Docker, логи). Старые образы "
+        "чистятся раз в сутки; если место не освобождается — увеличьте диск "
+        "(boot_disk.size в compute.tf).",
+    },
+    {
+        "name": "Диск fhr-students (занято)",
+        "query": '"sys.filesystem.UsedB"{service="custom", host="<vm:fhr-students>", mountpoint="/"}',
+        "total_query": '"sys.filesystem.SizeB"{service="custom", host="<vm:fhr-students>", mountpoint="/"}',
+        "agg": "MAX",
+        "direction": "gt",
+        "warn": 75,
+        "alarm": 90,
+        "unit": "ratio_percent",
+        "hint": "Диск машины студенческой платформы заполняется (образы Docker, логи). "
+        "Если место не освобождается — увеличьте students_vm_disk_gb в Terraform.",
     },
     {
         "name": "Диск базы данных (занято)",
@@ -127,6 +184,23 @@ def floor_to_bucket(moment: datetime) -> datetime:
     return datetime.fromtimestamp(seconds - seconds % BUCKET_SECONDS, tz=timezone.utc)
 
 
+def resolve_query(query: str) -> str:
+    """Подставить идентификаторы машин: <vm:fhr-app> -> id из VM_IDS.
+
+    Неизвестное имя — ошибка (её увидит письмо «не удалось прочитать
+    метрики»), а не запрос без фильтра, который показал бы чужие машины.
+    """
+    while VM_TOKEN in query:
+        start = query.index(VM_TOKEN)
+        end = query.index(">", start)
+        name = query[start + len(VM_TOKEN) : end]
+        ids = json.loads(os.environ.get("VM_IDS", "{}"))
+        if name not in ids:
+            raise KeyError(f"нет идентификатора машины {name} в VM_IDS")
+        query = query[:start] + ids[name] + query[end + 1 :]
+    return query
+
+
 def read_series(token: str, folder_id: str, query: str, agg: str, now: datetime) -> list[list[float]]:
     """Ряды по запросу: на каждый ряд (хост, диск) — список значений по отрезкам.
 
@@ -136,7 +210,7 @@ def read_series(token: str, folder_id: str, query: str, agg: str, now: datetime)
     end = floor_to_bucket(now)
     start = end - timedelta(seconds=BUCKET_SECONDS * BUCKETS)
     body = {
-        "query": query,
+        "query": resolve_query(query),
         "fromTime": start.isoformat().replace("+00:00", "Z"),
         "toTime": end.isoformat().replace("+00:00", "Z"),
         "downsampling": {"gridInterval": BUCKET_SECONDS * 1000, "gridAggregation": agg},
