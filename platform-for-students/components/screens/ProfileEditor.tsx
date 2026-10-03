@@ -1,6 +1,8 @@
 'use client';
 
 import { NotificationToggle } from '@/components/account/NotificationToggle';
+import { PushToggle } from '@/components/account/PushToggle';
+import { forgetThisDevice } from '@/lib/push/client';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -655,6 +657,7 @@ export function ProfileEditor({
               адрес нужно изменить.
             </p>
             <NotificationToggle audience="student" />
+            <PushToggle audience="student" />
             <div className="flex items-start gap-2.5 border-t border-[var(--hairline)] pt-4 text-paper-faint">
               <ShieldCheck className="mt-px size-4 shrink-0" aria-hidden />
               <span>
@@ -787,6 +790,8 @@ function LogoutSection() {
 
   async function logout() {
     setPending(true);
+    // Пока сессия жива: после выхода сервер уже не примет отписку
+    await forgetThisDevice();
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     router.push('/');
     router.refresh();

@@ -317,6 +317,19 @@ export interface StudentNotificationRecord {
   createdAt: Date;
 }
 
+/** Устройство с пуш-уведомлениями. Адрес подписки уникален: устройство — у одного человека. */
+export interface PushSubscriptionRecord {
+  id: string;
+  accountId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent: string | null;
+  createdAt: Date;
+  lastSuccessAt: Date | null;
+  failureCount: number;
+}
+
 export interface NewStudentInput {
   email: string;
   password: string;
@@ -514,6 +527,29 @@ export interface DataStore {
     listByStudent(studentId: string, limit: number): Promise<StudentNotificationRecord[]>;
     countUnread(studentId: string): Promise<number>;
     markAllRead(studentId: string): Promise<void>;
+  };
+
+  /** Устройства с пуш-уведомлениями (см. PushSubscription в schema.prisma). */
+  pushSubscriptions: {
+    /**
+     * Сохранить подписку за учётной записью. Адрес уникален: если устройство уже
+     * числилось за другим человеком, подписка переезжает к последнему подписавшемуся.
+     * Сверх `maxPerAccount` вытесняются самые старые.
+     */
+    save(
+      accountId: string,
+      input: { endpoint: string; p256dh: string; auth: string; userAgent: string | null },
+      maxPerAccount: number,
+    ): Promise<PushSubscriptionRecord>;
+    listByAccount(accountId: string): Promise<PushSubscriptionRecord[]>;
+    /** Отписать устройство. Только своё: чужая подписка по адресу не находится. Сколько удалено. */
+    deleteByEndpoint(accountId: string, endpoint: string): Promise<number>;
+    /** Отписать все устройства, кроме указанного. Сколько удалено. */
+    deleteOthers(accountId: string, keepEndpoint?: string): Promise<number>;
+    deleteById(id: string): Promise<void>;
+    recordSuccess(id: string): Promise<void>;
+    /** Отказ подряд; возвращает обновлённую запись или null, если её уже удалили. */
+    recordFailure(id: string): Promise<PushSubscriptionRecord | null>;
   };
 
   notifications: {

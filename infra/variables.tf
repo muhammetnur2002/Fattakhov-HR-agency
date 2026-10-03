@@ -1,6 +1,9 @@
 variable "service_account_key_file" {
   description = "Путь к авторизованному ключу сервисного аккаунта. В репозиторий не попадает."
   type        = string
+  # Без ключа провайдер берёт токен из YC_TOKEN — так можно работать
+  # от своей учётной записи: export YC_TOKEN=$(yc iam create-token)
+  default = null
 }
 
 variable "folder_id" {

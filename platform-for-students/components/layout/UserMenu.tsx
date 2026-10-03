@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { TourController } from '@/components/onboarding/Tour';
 import { springSnappy } from '@/lib/motion';
 import { TOUR_START_EVENT } from '@/lib/tour';
+import { forgetThisDevice } from '@/lib/push/client';
 import { cn } from '@/lib/utils';
 
 /**
@@ -66,6 +67,8 @@ export function UserMenu({
 
   async function logout() {
     setPending(true);
+    // Пока сессия жива: после выхода сервер уже не примет отписку
+    await forgetThisDevice();
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     router.push('/');
     router.refresh();

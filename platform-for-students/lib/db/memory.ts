@@ -30,6 +30,7 @@ import type {
   EventRecord,
   InstitutionRecord,
   MessageRecord,
+  PushSubscriptionRecord,
   StudentNotificationRecord,
   NewEmployerInput,
   NewStudentInput,
@@ -68,6 +69,7 @@ interface Tables {
   authTokens: AuthTokenRecord[];
   notificationLog: Array<{ accountId: string; key: string; createdAt: Date }>;
   studentNotifications: StudentNotificationRecord[];
+  pushSubscriptions: PushSubscriptionRecord[];
   staffTickets: string[];
 }
 
@@ -115,6 +117,7 @@ async function seed(): Promise<Tables> {
     authTokens: [],
     notificationLog: [],
     studentNotifications: [],
+    pushSubscriptions: [],
     staffTickets: [],
   };
 
@@ -684,6 +687,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           t.studentNotifications = t.studentNotifications.filter((n) => n.studentId !== student.id);
           t.students = t.students.filter((s) => s.id !== student.id);
         }
+        t.pushSubscriptions = t.pushSubscriptions.filter((p) => p.accountId !== accountId);
         t.accounts = t.accounts.filter((a) => a.id !== accountId);
         // Журнал аудита переживает удаление, как и в базе: запись остаётся,
         // ссылка на учётную запись обнуляется
@@ -1305,6 +1309,59 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async markAllRead(studentId) {
         for (const n of t.studentNotifications) if (n.studentId === studentId && !n.readAt) n.readAt = now();
+      },
+    },
+
+    pushSubscriptions: {
+      async save(accountId, input, maxPerAccount) {
+        let row = t.pushSubscriptions.find((p) => p.endpoint === input.endpoint);
+        if (row) {
+          Object.assign(row, { ...input, accountId, failureCount: 0 });
+        } else {
+          row = { id: randomUUID(), accountId, ...input, createdAt: now(), lastSuccessAt: null, failureCount: 0 };
+          t.pushSubscriptions.push(row);
+        }
+        const saved = row;
+        const overflow = t.pushSubscriptions
+          .filter((p) => p.accountId === accountId && p.id !== saved.id)
+          .sort((a, b) => +b.createdAt - +a.createdAt)
+          .slice(Math.max(maxPerAccount - 1, 0));
+        const drop = new Set(overflow.map((p) => p.id));
+        t.pushSubscriptions = t.pushSubscriptions.filter((p) => !drop.has(p.id));
+        return clone(saved);
+      },
+      async listByAccount(accountId) {
+        return clone(
+          t.pushSubscriptions.filter((p) => p.accountId === accountId).sort((a, b) => +a.createdAt - +b.createdAt),
+        );
+      },
+      async deleteByEndpoint(accountId, endpoint) {
+        const before = t.pushSubscriptions.length;
+        t.pushSubscriptions = t.pushSubscriptions.filter((p) => !(p.accountId === accountId && p.endpoint === endpoint));
+        return before - t.pushSubscriptions.length;
+      },
+      async deleteOthers(accountId, keepEndpoint) {
+        const before = t.pushSubscriptions.length;
+        t.pushSubscriptions = t.pushSubscriptions.filter(
+          (p) => !(p.accountId === accountId && p.endpoint !== keepEndpoint),
+        );
+        return before - t.pushSubscriptions.length;
+      },
+      async deleteById(id) {
+        t.pushSubscriptions = t.pushSubscriptions.filter((p) => p.id !== id);
+      },
+      async recordSuccess(id) {
+        const row = t.pushSubscriptions.find((p) => p.id === id);
+        if (row) {
+          row.lastSuccessAt = now();
+          row.failureCount = 0;
+        }
+      },
+      async recordFailure(id) {
+        const row = t.pushSubscriptions.find((p) => p.id === id);
+        if (!row) return null;
+        row.failureCount += 1;
+        return clone(row);
       },
     },
 

@@ -24,6 +24,7 @@ import {
 } from '@/lib/mail/templates';
 import { sendMail } from '@/lib/mail/transport';
 import { notifyCrm } from '@/lib/notify-crm';
+import { sendPushToAccount, type PushMessage } from '@/lib/push/send';
 import { decryptSafe } from '@/lib/security/crypto';
 import { buildStudyState, listWaitingSwipes } from '@/lib/services';
 import { pendingExpiresAt } from '@/lib/study';
@@ -39,7 +40,10 @@ import { CLOSED_VACANCY_AUTO_DELETE_DAYS, CLOSED_VACANCY_REMINDER_DAYS } from '@
  * профиле.
  *
  * Ни одна функция не бросает: письмо не должно отменять решение HR или
- * смену статуса отклика. SMS добавится отдельным каналом рядом с deliver.
+ * смену статуса отклика. Рядом с почтой и колокольчиком — пуш на устройства
+ * (lib/push/send.ts): те же поводы, но текст только нейтральный, без имён
+ * компаний и названий вакансий, — он виден на экране блокировки. Человек
+ * включает его сам на каждом устройстве (переключатель в профиле).
  */
 
 type MailKind = 'decision' | 'reminder';
@@ -57,6 +61,24 @@ async function deliver(accountId: string, content: MailContent, kind: MailKind):
     console.error('[уведомление] не отправлено:', error);
     return false;
   }
+}
+
+/** Пуш на устройства человека. Не бросает и ничего не ждёт от результата. */
+async function pushAccount(accountId: string, message: PushMessage): Promise<void> {
+  try {
+    await sendPushToAccount(accountId, message);
+  } catch (error) {
+    console.error('[уведомление] пуш не отправлен:', error);
+  }
+}
+
+/**
+ * Пуш работодателю. Клиентам CRM пуш приходит из самой CRM (их кабинет там);
+ * здесь — только самостоятельным компаниям, у которых кабинет на платформе.
+ */
+async function pushEmployer(employer: EmployerRecord, message: PushMessage): Promise<void> {
+  if (employer.crmClientId) return;
+  await pushAccount(employer.accountId, message);
 }
 
 /**
@@ -93,6 +115,23 @@ async function pushStudent(
     });
   } catch (error) {
     console.error('[уведомление] колокольчик студента не обновлён:', error);
+  }
+
+  // Тот же повод — пуш на устройства. Только заголовок: тело колокольчика
+  // содержит компанию и вакансию, а пуш виден на экране блокировки
+  try {
+    const student = await (await getStore()).students.findById(studentId);
+    if (student) {
+      await pushAccount(student.accountId, {
+        title: item.title,
+        url: item.href,
+        // Тот же ярлык заменяет прежнее уведомление об этом же, а не ложится рядом
+        tag: `${item.kind}:${item.href}`,
+        urgency: item.kind === 'reminder' ? 'low' : 'high',
+      });
+    }
+  } catch (error) {
+    console.error('[уведомление] пуш студенту не отправлен:', error);
   }
 }
 
@@ -135,6 +174,11 @@ export async function notifyCompanyDecision(employer: EmployerRecord, approved: 
     companyDecisionMail({ company: employer.companyName, approved, note, url: employerLink(employer, '/employer/company', '/students') }),
     'decision',
   );
+  await pushEmployer(employer, {
+    title: approved ? 'Компания проверена' : 'Компания не прошла проверку',
+    url: '/employer/company',
+    tag: 'company-decision',
+  });
 }
 
 export async function notifyVacancyDecision(vacancy: VacancyRecord, approved: boolean, note: string | null): Promise<void> {
@@ -158,6 +202,11 @@ export async function notifyVacancyDecision(vacancy: VacancyRecord, approved: bo
         vacancyDecisionMail({ title: vacancy.title, approved, note, url: employerLink(employer, '/employer/vacancies', '/students') }),
         'decision',
       );
+      await pushEmployer(employer, {
+        title: approved ? 'Вакансия опубликована' : 'Вакансия отклонена',
+        url: '/employer/vacancies',
+        tag: `vacancy-decision:${vacancy.id}`,
+      });
     }
   } catch (error) {
     console.error('[уведомление] решение по вакансии не отправлено:', error);
@@ -219,6 +268,11 @@ export async function notifyNewApplications(applicationIds: string[]): Promise<v
           newApplicationMail({ title: vacancy.title, url: employerLink(employer, '/employer', '/students/applications') }),
           'decision',
         );
+        await pushEmployer(employer, {
+          title: 'Новый отклик студента',
+          url: '/employer',
+          tag: `new-application:${vacancy.id}`,
+        });
       }
     } catch (error) {
       console.error('[уведомление] новый отклик не отправлен:', error);
@@ -375,8 +429,8 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
 
 /**
  * Студент написал работодателю — колокольчик в CRM у людей клиента. Письма-сводки
- * идут отдельно (runNotificationJobs). Самостоятельным компаниям не шлём: у них
- * своего кабинета в CRM нет.
+ * идут отдельно (runNotificationJobs). Самостоятельным компаниям колокольчика нет
+ * (у них нет кабинета в CRM), им уходит пуш на устройства.
  */
 export async function notifyEmployerNewMessage(applicationId: string): Promise<void> {
   try {
@@ -384,7 +438,12 @@ export async function notifyEmployerNewMessage(applicationId: string): Promise<v
     const application = await store.applications.findById(applicationId);
     const vacancy = application ? await store.vacancies.findById(application.vacancyId) : null;
     const employer = vacancy ? await store.employers.findById(vacancy.employerId) : null;
-    if (!vacancy || !employer?.crmClientId) return;
+    if (!vacancy || !employer) return;
+    if (!employer.crmClientId) {
+      // Самостоятельная компания: письмо-сводка идёт отдельно, а пуш — сразу
+      await pushEmployer(employer, { title: 'Новое сообщение от студента', url: '/employer/messages', tag: `message:${applicationId}` });
+      return;
+    }
     await notifyCrm('message', 'Новое сообщение от студента', vacancy.title, `message:${applicationId}`, employer.crmClientId);
   } catch (error) {
     console.error('[уведомление] сообщение студента не передано в CRM:', error);

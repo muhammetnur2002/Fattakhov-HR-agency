@@ -156,12 +156,13 @@ model Account {
   notifyEmail        Boolean   @default(true)
   createdAt          DateTime  @default(now())
 
-  student       Student?
-  employer      Employer?
-  accessCodes   AccessCode[]
-  auditLogs     AuditLog[]
-  authTokens    AuthToken[]
-  notifications NotificationLog[]
+  student           Student?
+  employer          Employer?
+  accessCodes       AccessCode[]
+  auditLogs         AuditLog[]
+  authTokens        AuthToken[]
+  notifications     NotificationLog[]
+  pushSubscriptions PushSubscription[]
 
   @@index([role])
 }
@@ -644,6 +645,29 @@ model StudentNotification {
 
   @@index([studentId, createdAt])
   @@index([studentId, readAt])
+}
+
+/// Устройства, на которые приходят пуш-уведомления (Web Push). Одно устройство —
+/// одна строка: адрес подписки уникален, и когда устройством начинает пользоваться
+/// другой человек, подписка переезжает к нему, а не двоится.
+model PushSubscription {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  /// Адрес службы уведомлений браузера (Google, Apple, Mozilla)
+  endpoint  String  @unique
+  /// Ключи шифрования содержимого из PushSubscription.toJSON()
+  p256dh    String
+  auth      String
+  userAgent String?
+
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  /// Отказы подряд; успешная доставка обнуляет
+  failureCount  Int       @default(0)
+
+  @@index([accountId])
 }
 
 /// Попытки для ограничителя частоты, когда общего Redis нет (сервер без состояния — Vercel):

@@ -72,6 +72,9 @@ export const RATE_LIMITS = {
   registerConfirmEmail: { limit: 10, windowSeconds: 900 },
   // Приглашения кандидатов: живой работодатель зовёт десятки, а не сотни в час
   invite: { limit: 60, windowSeconds: 3600 },
+  // Подписка на пуш каждый раз шлёт проверочное уведомление на чужую службу: без лимита
+  // это способ заставить сервер стучаться куда угодно
+  pushSubscribe: { limit: 20, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /**

@@ -1834,6 +1834,34 @@ async function main() {
   check('настройка напоминаний сохраняется', (await student.request('/api/account/notifications')).body?.email === false);
   await student.patch('/api/account/notifications', { email: true });
 
+  // ---------- Пуш-уведомления ----------
+  console.log('\nПуш-уведомления');
+  const pushGuest = await new Session().request('/api/account/push');
+  check('пуш: без входа состояние не отдаётся', pushGuest.status === 401, pushGuest.body);
+  const pushState = await student.request('/api/account/push');
+  check('пуш: состояние канала отдаётся', pushState.status === 200 && typeof pushState.body?.configured === 'boolean', pushState.body);
+  const goodKeys = { p256dh: 'B' + 'A'.repeat(86), auth: 'A'.repeat(22) };
+  if (pushState.body?.configured) {
+    check(
+      'пуш: открытый ключ отдаётся браузеру, устройств ещё нет',
+      typeof pushState.body.publicKey === 'string' && pushState.body.publicKey.length > 80 && pushState.body.devices.length === 0,
+      pushState.body,
+    );
+    const internalPush = await student.post('/api/account/push', { endpoint: 'https://169.254.169.254/latest', keys: goodKeys });
+    check('пуш: адрес из внутренней сети не принимается', internalPush.status === 400 && internalPush.body?.code === 'BAD_SUBSCRIPTION', internalPush.body);
+    const plainHttpPush = await student.post('/api/account/push', { endpoint: 'http://fcm.googleapis.com/x', keys: goodKeys });
+    check('пуш: адрес без https не принимается', plainHttpPush.status === 400, plainHttpPush.body);
+    const badKeysPush = await student.post('/api/account/push', { endpoint: 'https://fcm.googleapis.com/x', keys: { p256dh: 'x', auth: 'y' } });
+    check('пуш: испорченные ключи подписки не принимаются', badKeysPush.status === 400, badKeysPush.body);
+  } else {
+    const offPush = await student.post('/api/account/push', { endpoint: 'https://fcm.googleapis.com/x', keys: goodKeys });
+    check('пуш: без настройки на сервере подписка отклоняется', offPush.status === 503 && offPush.body?.code === 'PUSH_OFF', offPush.body);
+  }
+  const pushDelete = await student.delete('/api/account/push', { endpoint: 'https://fcm.googleapis.com/нет-такой' });
+  check('пуш: отписка от неизвестного адреса безвредна', pushDelete.status === 200, pushDelete.body);
+  check('пуш: отписка без адреса отвергается', (await student.delete('/api/account/push', {})).status === 400);
+  check('пуш: воркер отдаётся без входа', (await new Session().request('/push-sw.js')).status === 200);
+
   // ---------- Восстановление пароля ----------
   console.log('\nВосстановление пароля');
   check('страница «забыли пароль» открывается', (await new Session().request('/forgot')).status === 200);

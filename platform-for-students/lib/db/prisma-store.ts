@@ -696,6 +696,54 @@ export function createPrismaStore(): DataStore {
       },
     },
 
+    pushSubscriptions: {
+      async save(accountId, input, maxPerAccount) {
+        const saved = await prisma.pushSubscription.upsert({
+          where: { endpoint: input.endpoint },
+          create: { accountId, ...input },
+          update: { accountId, ...input, failureCount: 0 },
+        });
+        // Сверх потолка вытесняем самые старые, кроме только что сохранённой
+        const overflow = await prisma.pushSubscription.findMany({
+          where: { accountId, id: { not: saved.id } },
+          orderBy: { createdAt: 'desc' },
+          skip: Math.max(maxPerAccount - 1, 0),
+          select: { id: true },
+        });
+        if (overflow.length > 0) {
+          await prisma.pushSubscription.deleteMany({ where: { id: { in: overflow.map((r) => r.id) } } });
+        }
+        return saved;
+      },
+      async listByAccount(accountId) {
+        return prisma.pushSubscription.findMany({ where: { accountId }, orderBy: { createdAt: 'asc' } });
+      },
+      async deleteByEndpoint(accountId, endpoint) {
+        const { count } = await prisma.pushSubscription.deleteMany({ where: { accountId, endpoint } });
+        return count;
+      },
+      async deleteOthers(accountId, keepEndpoint) {
+        const { count } = await prisma.pushSubscription.deleteMany({
+          where: { accountId, ...(keepEndpoint && { endpoint: { not: keepEndpoint } }) },
+        });
+        return count;
+      },
+      async deleteById(id) {
+        await prisma.pushSubscription.deleteMany({ where: { id } });
+      },
+      async recordSuccess(id) {
+        await prisma.pushSubscription.updateMany({ where: { id }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
+      },
+      async recordFailure(id) {
+        try {
+          return await prisma.pushSubscription.update({ where: { id }, data: { failureCount: { increment: 1 } } });
+        } catch {
+          // Подписку могли удалить параллельно — отмечать уже нечего
+          return null;
+        }
+      },
+    },
+
     notifications: {
       async claim(accountId, key) {
         try {

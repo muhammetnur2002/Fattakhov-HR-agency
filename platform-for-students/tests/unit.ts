@@ -25,6 +25,9 @@ import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, p
 import { emailCodeSchema, registrationSteps } from '../lib/validation';
 import { safeNext } from '../lib/security/safe-next';
 import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent';
+import { vapidProblem } from '../lib/push/config';
+import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
+import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
 
 let passed = 0;
 const failures: string[] = [];
@@ -197,6 +200,30 @@ test('письмо с кодом: код в теме, тексте и HTML', () 
   assert.ok(mail.text.includes('Код: 042917'));
   assert.ok(mail.html.includes('042917'));
 });
+test('письмо с кодом: превью с кодом, код раньше срока и оговорки', () => {
+  const mail = emailCodeMail({ code: '042917', minutes: 30 });
+  assert.ok(mail.html.includes('Код 042917 — действует 30 минут'));
+  assert.ok(mail.html.indexOf('>042917<') < mail.html.indexOf('Код действует 30 минут'));
+  assert.ok(mail.text.indexOf('Код: 042917') < mail.text.indexOf('Код действует 30 минут'));
+});
+test('HTML письма — в стиле платформы: тёмное полотно, белый знак, без перекраски клиентом', () => {
+  const mail = emailCodeMail({ code: '042917', minutes: 30 });
+  assert.ok(mail.html.includes('/brand/logo-light.png'));
+  assert.ok(mail.html.includes('<meta name="color-scheme" content="dark light">'));
+  assert.ok(mail.html.includes('bgcolor="#000000"'));
+  assert.ok(mail.html.includes('Fattakhov Students'));
+});
+test('кавычки в стилях писем не рвут атрибут style', () => {
+  // Двойная кавычка внутри style="…" (например, "Segoe UI" в стеке шрифтов)
+  // закрывает атрибут раньше времени: остаток стиля превращается в мусорные
+  // атрибуты тега, и кнопка становится синей подчёркнутой ссылкой
+  for (const mail of [
+    emailCodeMail({ code: '042917', minutes: 30 }),
+    passwordResetMail({ url: 'https://students.example.org/reset/abc', minutes: 60 }),
+  ]) {
+    assert.ok(!/style="[^"]*"[^\s>/]/.test(mail.html), mail.subject);
+  }
+});
 test('HTML письма экранирует текст', () => {
   assert.equal(escapeHtml('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');
   const mail = messagesDigestMail({ count: 2, title: '<script>alert(1)</script>', url: 'https://example.org/messages' });
@@ -362,6 +389,72 @@ test('выбор по аналитике: согласие засчитывае�
   // мусор вместо выбора страницу не роняет
   assert.equal(isAccepted('не json'), false);
   assert.equal(isAnswered('{"choice":"maybe","version":"' + BANNER_VERSION + '"}'), false);
+});
+
+// ---------- Пуш-уведомления ----------
+
+test('пуш: адрес подписки — только https-служба с именем, не внутренняя сеть', () => {
+  assert.equal(isAcceptablePushEndpoint('https://fcm.googleapis.com/fcm/send/abc'), true);
+  assert.equal(isAcceptablePushEndpoint('https://updates.push.services.mozilla.com/wpush/v2/abc'), true);
+  assert.equal(isAcceptablePushEndpoint('https://web.push.apple.com/abc'), true);
+  assert.equal(isAcceptablePushEndpoint('http://fcm.googleapis.com/x'), false); // не https
+  assert.equal(isAcceptablePushEndpoint('https://169.254.169.254/latest'), false); // метаданные облака
+  assert.equal(isAcceptablePushEndpoint('https://10.10.0.5/x'), false);
+  assert.equal(isAcceptablePushEndpoint('https://[::1]/x'), false);
+  assert.equal(isAcceptablePushEndpoint('https://localhost/x'), false);
+  assert.equal(isAcceptablePushEndpoint('https://db.internal/x'), false);
+  assert.equal(isAcceptablePushEndpoint('https://fcm.googleapis.com:8443/x'), false); // нестандартный порт
+  assert.equal(isAcceptablePushEndpoint('https://user:pass@fcm.googleapis.com/x'), false);
+  assert.equal(isAcceptablePushEndpoint('не адрес'), false);
+});
+
+test('пуш: сервер не ходит на закрытые адреса и принимает публичные', () => {
+  for (const address of ['10.10.0.4', '127.0.0.1', '169.254.169.254', '172.16.0.1', '192.168.1.1', '100.64.0.1', '::1', 'fe80::1', 'fd00::1', '::ffff:10.0.0.1', 'не-адрес']) {
+    assert.equal(isPublicAddress(address), false, address);
+  }
+  for (const address of ['142.250.74.10', '17.253.144.10', '2a00:1450:4010:c0e::5f']) {
+    assert.equal(isPublicAddress(address), true, address);
+  }
+});
+
+test('пуш: ключи подписки проверяются по длине, лишнее «=» отбрасывается', () => {
+  const p256dh = 'B' + 'A'.repeat(86); // 65 байт в base64url: 87 символов
+  const auth = 'A'.repeat(22); // 16 байт
+  assert.equal(base64UrlByteLength(p256dh), 65);
+  assert.equal(base64UrlByteLength(auth), 16);
+  const ok = pushSubscriptionSchema.safeParse({ endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: p256dh + '=', auth } });
+  assert.equal(ok.success, true);
+  if (ok.success) assert.equal(ok.data.keys.p256dh.endsWith('='), false);
+  assert.equal(pushSubscriptionSchema.safeParse({ endpoint: 'https://fcm.googleapis.com/x', keys: { p256dh: 'коротко', auth } }).success, false);
+  assert.equal(pushSubscriptionSchema.safeParse({ endpoint: 'https://fcm.googleapis.com/x', keys: { p256dh, auth: 'AAAA' } }).success, false);
+  assert.equal(pushSubscriptionSchema.safeParse({ endpoint: 'https://10.0.0.1/x', keys: { p256dh, auth } }).success, false);
+});
+
+test('пуш: настройка VAPID — все три значения, ключи из одной пары', () => {
+  const ecdh = crypto.createECDH('prime256v1');
+  ecdh.generateKeys();
+  const good = {
+    publicKey: ecdh.getPublicKey().toString('base64url'),
+    privateKey: ecdh.getPrivateKey().toString('base64url'),
+    subject: 'mailto:info@fattakhovhr.ru',
+  };
+  assert.equal(vapidProblem(good), null);
+  assert.equal(vapidProblem({ ...good, subject: 'https://fattakhovhr.ru' }), null);
+  assert.match(vapidProblem({ ...good, subject: '' }) ?? '', /три переменные/);
+  assert.match(vapidProblem({ ...good, subject: 'info@fattakhovhr.ru' }) ?? '', /VAPID_SUBJECT/);
+  assert.match(vapidProblem({ ...good, publicKey: 'коротко' }) ?? '', /открытый ключ/);
+  assert.match(vapidProblem({ ...good, privateKey: 'AAAA' }) ?? '', /закрытый ключ/);
+  const other = crypto.createECDH('prime256v1');
+  other.generateKeys();
+  assert.match(vapidProblem({ ...good, publicKey: other.getPublicKey().toString('base64url') }) ?? '', /разных пар/);
+});
+
+test('пуш: отпечаток адреса стабилен, имя службы понятно человеку', () => {
+  assert.equal(endpointHash('https://fcm.googleapis.com/x'), endpointHash('https://fcm.googleapis.com/x'));
+  assert.notEqual(endpointHash('https://fcm.googleapis.com/x'), endpointHash('https://fcm.googleapis.com/y'));
+  assert.equal(pushServiceName('https://fcm.googleapis.com/fcm/send/abc'), 'Google');
+  assert.equal(pushServiceName('https://web.push.apple.com/abc'), 'Apple');
+  assert.equal(pushServiceName('https://updates.push.services.mozilla.com/x'), 'Mozilla');
 });
 
 console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);
