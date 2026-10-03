@@ -83,3 +83,98 @@ resource "yandex_function_trigger" "uptime" {
 
   depends_on = [yandex_function_iam_binding.uptime]
 }
+
+# ---------------------------------------------------------------------
+# Оповещения по ресурсам: процессор машин, диск/память/процессор базы
+# ---------------------------------------------------------------------
+#
+# Алерты и каналы уведомлений Monitoring в публичном API не заведены: их
+# создают руками в консоли, и живут они вне репозитория. Поэтому та же
+# работа сделана кодом — по образцу проверки «сайт жив» выше. Функция
+# fhr-metrics раз в 10 минут читает метрики (Monitoring API, право
+# monitoring.viewer на каталог) и пишет на ящик сбоев через почту reg.ru.
+# Пороги и подсказки — в functions/metrics/index.py (CHECKS); как работает
+# и когда пишет — в docstring там же.
+#
+# Проверить доставку: yc serverless function invoke --name fhr-metrics
+# --data '{"test": true}'
+
+variable "metrics_alert_extra_emails" {
+  description = "Дополнительные получатели оповещений по ресурсам (кроме ALERT_EMAIL из prod.env)."
+  type        = list(string)
+  default     = []
+}
+
+locals {
+  metrics_env = {
+    FOLDER_ID        = var.folder_id
+    EXTRA_RECIPIENTS = join(",", var.metrics_alert_extra_emails)
+    SMTP_URL         = local.uptime_env.SMTP_URL
+    SMTP_FROM        = local.uptime_env.SMTP_FROM
+    ALERT_EMAIL      = local.uptime_env.ALERT_EMAIL
+  }
+}
+
+data "archive_file" "metrics" {
+  type        = "zip"
+  source_dir  = "${path.module}/functions/metrics"
+  output_path = "${path.module}/.build/metrics.zip"
+  # Проверки логики нужны разработчику, в облаке им делать нечего
+  excludes = ["test_metrics.py", "__pycache__"]
+}
+
+# Аккаунт, от имени которого функция читает метрики: только чтение метрик
+# каталога, ничего изменить он не может
+resource "yandex_iam_service_account" "metrics" {
+  name        = "fhr-metrics${var.sa_suffix}"
+  description = "Читает метрики для оповещений по ресурсам. Только чтение."
+}
+
+resource "yandex_resourcemanager_folder_iam_member" "metrics_viewer" {
+  folder_id = var.folder_id
+  role      = "monitoring.viewer"
+  member    = "serviceAccount:${yandex_iam_service_account.metrics.id}"
+}
+
+resource "yandex_function" "metrics" {
+  name               = "fhr-metrics"
+  description        = "Оповещения по ресурсам: процессор машин, диск, память и процессор базы"
+  runtime            = "python312"
+  entrypoint         = "index.handler"
+  memory             = 128
+  execution_timeout  = "120"
+  user_hash          = data.archive_file.metrics.output_sha256
+  service_account_id = yandex_iam_service_account.metrics.id
+
+  content {
+    zip_filename = data.archive_file.metrics.output_path
+  }
+
+  environment = local.metrics_env
+
+  depends_on = [yandex_resourcemanager_folder_iam_member.metrics_viewer]
+}
+
+# Запускает тот же таймерный аккаунт, что и проверку «сайт жив»: у него
+# по-прежнему единственное право — вызывать функции из этого файла
+resource "yandex_function_iam_binding" "metrics" {
+  function_id = yandex_function.metrics.id
+  role        = "functions.functionInvoker"
+  members     = ["serviceAccount:${yandex_iam_service_account.uptime.id}"]
+}
+
+resource "yandex_function_trigger" "metrics" {
+  name        = "fhr-metrics-every-10m"
+  description = "Оповещения по ресурсам раз в 10 минут"
+
+  timer {
+    cron_expression = "*/10 * ? * * *"
+  }
+
+  function {
+    id                 = yandex_function.metrics.id
+    service_account_id = yandex_iam_service_account.uptime.id
+  }
+
+  depends_on = [yandex_function_iam_binding.metrics]
+}

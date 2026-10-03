@@ -40,29 +40,10 @@ fattakhovhr.ru, www.fattakhovhr.ru, my.fattakhovhr.ru {
   }
 }
 
-# Студенческая платформа — отдельный блок, а не третий хост в списке
-# выше: отдельный сертификат (не задевает лимит на существующий у
-# fattakhovhr.ru/www/my — это разные наборы имён), и приложение внутри
-# другое (students:3000, не app:3000).
-students.fattakhovhr.ru {
-  encode zstd gzip
-
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    X-Frame-Options "DENY"
-    ?Referrer-Policy "same-origin"
-    -Server
-  }
-
-  # flush_interval -1: чат платформы получает новые сообщения потоком
-  # (SSE, /api/messages/stream) — ответ отдаётся сразу, без буфера Caddy
-  reverse_proxy students:3000 {
-    flush_interval -1
-    header_up X-Forwarded-For {remote_host}
-    header_up X-Real-IP {remote_host}
-  }
-}
+# Студенческая платформа — на своей машине fhr-students (Caddyfile.students),
+# запись students ведёт туда с 03.10.2026. Блок убран отсюда 04.10.2026;
+# у работающей машины он остаётся до её пересоздания (Caddyfile читается
+# только при первой загрузке) — безвредно: трафика туда нет.
 
 # Блока на :80 здесь намеренно нет.
 #

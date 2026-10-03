@@ -61,14 +61,11 @@ locals {
 
   # JSON — корректный YAML, поэтому словарь переменных встаёт
   # в `environment:` как есть, без ручной сборки отступов
-  docker_compose = replace(replace(replace(replace(replace(replace(
+  docker_compose = replace(replace(replace(
     file("${path.module}/docker-compose.yaml"),
     "APP_IMAGE_PLACEHOLDER", var.app_image),
     "TOOLS_IMAGE_PLACEHOLDER", var.tools_image),
-    "RUNTIME_ENV_PLACEHOLDER", jsonencode(local.crm_env)),
-    "__STUDENTS_APP_IMAGE__", var.students_app_image),
-    "__STUDENTS_TOOLS_IMAGE__", var.students_tools_image),
-  "__STUDENTS_ENV__", jsonencode(local.students_env))
+  "RUNTIME_ENV_PLACEHOLDER", jsonencode(local.crm_env))
 }
 
 resource "yandex_compute_instance" "app" {

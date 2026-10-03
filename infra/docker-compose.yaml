@@ -80,51 +80,11 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # Студенческая платформа — своя база (fhr_students), свой бакет,
-  # свои секреты (var.students_runtime_env, отдельно от var.runtime_env
-  # у CRM: у обоих DATABASE_URL — одно имя переменной, но разные строки
-  # подключения). Метки подстановки здесь только в самих полях, не
-  # в комментариях: подстановка — поиск строки (см. compute.tf). env_file у нас нет
-  # намеренно: /etc/fhr.env — секреты CRM, студенческой платформе они
-  # не нужны и не должны быть видны.
-  students-migrate:
-    image: __STUDENTS_TOOLS_IMAGE__
-    restart: "no"
-    environment: __STUDENTS_ENV__
-    command: ["npx", "prisma", "migrate", "deploy"]
-
-  students:
-    image: __STUDENTS_APP_IMAGE__
-    restart: always
-    environment: __STUDENTS_ENV__
-    expose:
-      - "3000"
-    depends_on:
-      students-migrate:
-        condition: service_completed_successfully
-    # Свой HEALTHCHECK у них уже в образе (их Dockerfile — Debian
-    # slim, ни curl, ни wget нет, проверка через node -e fetch(...)).
-    # Здесь не переопределять чужой правильный на наш wget-вариант —
-    # он в этом образе просто не найдётся, и проверка всегда будет
-    # падать. Замечено при пробной сборке 28.09.2026.
-
-  # Замена суточного крона Vercel (vercel.json): раз в день дёргает
-  # /api/cron/notify с CRON_SECRET из окружения платформы.
-  # busybox crond, не самодельный цикл со сном — расписание и часовой
-  # пояс (образ и так в UTC) у него уже решены, у ручного sleep-цикла
-  # были бы свои особые случаи.
-  students-cron:
-    image: alpine:3.20
-    restart: always
-    environment: __STUDENTS_ENV__
-    depends_on:
-      - students
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        apk add --no-cache curl >/dev/null
-        echo "0 6 * * * curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://students:3000/api/cron/notify" > /etc/crontabs/root
-        crond -f -l 2
+  # Студенческая платформа здесь больше не живёт: с 04.10.2026 она на своей
+  # машине fhr-students (students_vm.tf) — шаг 3 переезда. Агент COI при
+  # обновлении состава удаляет контейнеры сервисов, которых нет в файле
+  # (как --remove-orphans), поэтому копия и её крон уходят отсюда сразу,
+  # без пересоздания машины и без двойных напоминаний.
 
 volumes:
   caddy_data:
