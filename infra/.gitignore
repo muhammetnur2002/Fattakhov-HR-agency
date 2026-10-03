@@ -13,3 +13,6 @@ tfplan
 *.tfvars
 !example.tfvars
 crash.log
+
+# Архив кода облачной функции — собирается при plan (monitoring.tf)
+.build/

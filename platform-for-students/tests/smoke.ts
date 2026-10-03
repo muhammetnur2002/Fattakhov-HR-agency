@@ -1838,9 +1838,15 @@ async function main() {
   console.log('\nВосстановление пароля');
   check('страница «забыли пароль» открывается', (await new Session().request('/forgot')).status === 200);
   const forgotUnknown = await new Session().post('/api/auth/password/forgot', { email: `nobody-${Date.now()}@demo.ru` });
-  check('на незнакомую почту ответ тот же, что на свою', forgotUnknown.status === 200 && forgotUnknown.body?.sent === true, forgotUnknown.body);
+  check(
+    'на незнакомую почту форма говорит, что аккаунта нет',
+    forgotUnknown.status === 404 && forgotUnknown.body?.code === 'NO_ACCOUNT' && !!forgotUnknown.body?.fields?.email,
+    forgotUnknown.body,
+  );
   const forgot = await new Session().post('/api/auth/password/forgot', { email });
   check('запрос ссылки сброса принят', forgot.status === 200 && forgot.body?.sent === true, forgot.body);
+  const forgotAgain = await new Session().post('/api/auth/password/forgot', { email });
+  check('повторный запрос сразу просит подождать', forgotAgain.status === 429 && forgotAgain.body?.code === 'WAIT', forgotAgain.body);
   const resetMail = await lastMail(email, 'Восстановление пароля');
   const resetToken = resetMail?.text.match(/\/reset\/([A-Za-z0-9_-]{20,})/)?.[1];
   check('письмо со ссылкой сброса пришло', !!resetToken, resetMail?.subject);

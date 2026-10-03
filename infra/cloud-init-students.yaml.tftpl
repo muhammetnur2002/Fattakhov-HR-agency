@@ -1,0 +1,54 @@
+#cloud-config
+# Подготовка машины студенческой платформы.
+#
+# Вход по SSH снаружи не открывается: группа безопасности пускает только 80 и 443.
+# Административный доступ — через Serial Console облака (включается переменной
+# serial_console только на время разбора).
+#
+# Секретов здесь нет: переменные окружения платформы приходят через метаданные
+# docker-compose, а не файлом на диске.
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "50m", "max-file": "3" }
+      }
+
+  - path: /etc/caddy/Caddyfile
+    permissions: "0644"
+    content: |
+      ${CADDYFILE_INDENTED}
+
+  # Старые образы после выкаток копятся на диске: раз в сутки ночью удаляются
+  # образы старше недели, которыми не пользуется ни один контейнер
+  - path: /etc/systemd/system/fhr-image-prune.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: удалить неиспользуемые образы Docker старше недели
+      Requires=docker.service
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/env docker image prune --all --force --filter until=168h
+
+  - path: /etc/systemd/system/fhr-image-prune.timer
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: раз в сутки ночью удалять старые образы Docker
+
+      [Timer]
+      OnCalendar=*-*-* 21:30:00
+      RandomizedDelaySec=15min
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, fhr-image-prune.timer]

@@ -1,0 +1,34 @@
+# Обратный прокси и автоматический HTTPS для машины студенческой платформы.
+#
+# Отступы только пробелами: файл уезжает на сервер внутри cloud-init, а тот
+# запрещает табуляцию и молча отвергает документ целиком.
+#
+# Блока на :80 нет намеренно: проверка владения доменом от Let's Encrypt приходит
+# именно на порт 80, и любой общий блок на нём сломал бы выпуск сертификата.
+#
+# Caddy на этой машине включается (students_vm_caddy) только после того, как запись
+# students на Рег.ру переключена на её адрес: до этого проверка домена не пройдёт.
+
+{
+  email profattakhov@gmail.com
+}
+
+students.fattakhovhr.ru {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    ?Referrer-Policy "same-origin"
+    -Server
+  }
+
+  # flush_interval -1: чат платформы получает новые сообщения потоком
+  # (SSE, /api/messages/stream) — ответ отдаётся сразу, без буфера Caddy
+  reverse_proxy students:3000 {
+    flush_interval -1
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Real-IP {remote_host}
+  }
+}

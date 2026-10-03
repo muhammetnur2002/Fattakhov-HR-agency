@@ -13,29 +13,36 @@ import { durations, easeOutExpo } from '@/lib/motion';
 /**
  * «Забыли пароль».
  *
- * После отправки экран одинаковый для любой почты: сказать «такой почты
- * нет» значило бы выдать, кто зарегистрирован на платформе.
+ * Если такой почты нет в базе, форма так и говорит: человек проверит адрес
+ * или зарегистрируется, а не будет ждать письмо, которое не придёт.
  */
 export function ForgotPasswordForm() {
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setPending(true);
     setError(null);
+    setErrorCode(null);
     try {
       const response = await fetch('/api/auth/password/forgot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; fields?: Record<string, string> };
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        fields?: Record<string, string>;
+      };
       if (!response.ok) {
         setError(data.fields?.email ?? data.error ?? 'Не удалось отправить письмо');
+        setErrorCode(data.code ?? null);
         return;
       }
       setSent(true);
@@ -65,7 +72,7 @@ export function ForgotPasswordForm() {
             <div className="mt-4 space-y-3 text-[14px] leading-relaxed text-paper-dim">
               <p className="flex items-start gap-2.5 text-paper">
                 <MailCheck className="mt-0.5 size-4 shrink-0 text-yes-glow" aria-hidden />
-                Если эта почта зарегистрирована, мы отправили на неё ссылку.
+                Мы отправили ссылку на {email.trim()}.
               </p>
               <p>Ссылка работает час. Письма нет — проверьте папку «Спам» или запросите ещё раз через минуту.</p>
             </div>
@@ -83,6 +90,15 @@ export function ForgotPasswordForm() {
                 error={error ?? undefined}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              {errorCode === 'NO_ACCOUNT' && (
+                <p className="text-[13px] leading-relaxed text-paper-dim">
+                  Возможно, вы регистрировались с другой почтой. Или{' '}
+                  <Link href="/register" className="text-paper underline underline-offset-4">
+                    создайте аккаунт
+                  </Link>
+                  .
+                </p>
+              )}
               <Button type="submit" size="lg" loading={pending} className="mt-2 w-full" iconRight={<ArrowRight />}>
                 Отправить ссылку
               </Button>

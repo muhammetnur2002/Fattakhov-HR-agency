@@ -13,6 +13,12 @@ terraform {
       source  = "registry.terraform.io/yandex-cloud/yandex"
       version = ">= 0.140"
     }
+    # Упаковка кода облачной функции внешней проверки (monitoring.tf).
+    # Полный адрес — по той же причине, что у yandex выше
+    archive = {
+      source  = "registry.terraform.io/hashicorp/archive"
+      version = ">= 2.4"
+    }
   }
 }
 

@@ -98,27 +98,38 @@ export async function verifyEmailCode(accountId: string, code: string): Promise<
   return { status: 'VERIFIED', released };
 }
 
+export type PasswordResetRequestResult =
+  | { status: 'SENT' }
+  | { status: 'NO_ACCOUNT' }
+  | { status: 'NO_PASSWORD' }
+  | { status: 'WAIT'; retryAfter: number }
+  | { status: 'MAIL_FAILED' };
+
 /**
  * Письмо со ссылкой сброса пароля.
  *
- * Ничего не сообщает о том, есть ли такая почта: ответ одинаковый всегда
- * (см. route.ts). Работодателю из CRM без пароля письмо не уходит: он
- * входит по коду, который выдаёт менеджер.
+ * Результат говорит, что именно произошло, и форма объясняет это человеку:
+ * раньше на любую почту отвечало «отправлено», и тот, кто ошибся адресом
+ * или регистрировался в другой системе, ждал письмо, которое не придёт.
+ * Неактивная учётка отдаётся как «нет такой» — её состояние не раскрывается.
+ * Перебор адресов по-прежнему упирается в лимиты по IP и по почте
+ * (см. route.ts), а регистрация и так сообщает о занятой почте.
  *
- * Отправка дожидается результата — раньше была void sendMail(...) без
- * await ради постоянного времени ответа, но в serverless-функции это
- * означало, что письмо могло не успеть уйти до заморозки инстанса после
- * ответа: реального выигрыша в защите от перебора адресов это не давало
- * (ранний return выше уже создаёт разницу во времени), а доставку рвало
- * почти всегда.
+ * Работодателю из CRM без пароля письмо не уходит: он входит по коду,
+ * который выдаёт менеджер, — для него отдельный ответ.
+ *
+ * Отправка дожидается результата: в serverless-функции письмо, не
+ * дождавшееся ответа, могло не успеть уйти до заморозки инстанса.
  */
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(email: string): Promise<PasswordResetRequestResult> {
   const store = await getStore();
   const account = await store.accounts.findByEmailHash(blindIndex(email));
-  if (!account || !account.isActive || !account.passwordHash) return;
+  if (!account || !account.isActive) return { status: 'NO_ACCOUNT' };
+  if (!account.passwordHash) return { status: 'NO_PASSWORD' };
 
   const last = await store.authTokens.latest(account.id, 'PASSWORD_RESET');
-  if (resendWaitSeconds(last?.createdAt ?? null) > 0) return;
+  const wait = resendWaitSeconds(last?.createdAt ?? null);
+  if (wait > 0) return { status: 'WAIT', retryAfter: wait };
 
   const token = generateResetToken();
   await store.authTokens.issue({
@@ -127,10 +138,11 @@ export async function requestPasswordReset(email: string): Promise<void> {
     tokenHash: hashResetToken(token),
     expiresAt: minutesAfter(new Date(), PASSWORD_RESET_TTL_MINUTES),
   });
-  await sendMail({
+  const delivered = await sendMail({
     to: decryptSafe(account.emailEnc),
     ...passwordResetMail({ url: appUrl(`/reset/${token}`), minutes: PASSWORD_RESET_TTL_MINUTES }),
   });
+  return delivered ? { status: 'SENT' } : { status: 'MAIL_FAILED' };
 }
 
 export type ResetTokenState = 'VALID' | 'INVALID' | 'EXPIRED';

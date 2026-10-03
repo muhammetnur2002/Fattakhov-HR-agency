@@ -43,6 +43,15 @@ data "yandex_compute_image" "container_optimized" {
 # подчёркиваниях, а проверка у ресурса ниже не пропустит план, если после
 # подстановки осталась хоть одна метка.
 locals {
+  # Ключи бакета CRM — из ресурса (storage.tf), а не из /etc/fhr.env:
+  # так ключ меняется обычным apply (-replace ключа), без пересоздания
+  # машины. Значения в /etc/fhr.env устарели 01.10.2026 и перекрываются
+  # этими — environment в compose сильнее env_file.
+  crm_env = merge(var.runtime_env, {
+    S3_ACCESS_KEY_ID     = yandex_iam_service_account_static_access_key.storage.access_key
+    S3_SECRET_ACCESS_KEY = yandex_iam_service_account_static_access_key.storage.secret_key
+  })
+
   # Ключи бакета — из ресурсов студенческой платформы (students.tf), а не
   # из prod.tfvars: создаются тем же apply, заранее их не вписать
   students_env = merge(var.students_runtime_env, {
@@ -56,7 +65,7 @@ locals {
     file("${path.module}/docker-compose.yaml"),
     "APP_IMAGE_PLACEHOLDER", var.app_image),
     "TOOLS_IMAGE_PLACEHOLDER", var.tools_image),
-    "RUNTIME_ENV_PLACEHOLDER", jsonencode(var.runtime_env)),
+    "RUNTIME_ENV_PLACEHOLDER", jsonencode(local.crm_env)),
     "__STUDENTS_APP_IMAGE__", var.students_app_image),
     "__STUDENTS_TOOLS_IMAGE__", var.students_tools_image),
   "__STUDENTS_ENV__", jsonencode(local.students_env))
@@ -135,13 +144,18 @@ resource "yandex_compute_instance" "app" {
     # даже по ключу
     enable-oslogin = var.serial_console ? "true" : "false"
 
-    user-data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
+    # sensitive: внутри /etc/fhr.env — пароль базы, AUTH_SECRET, ключи
+    # хранилища, SMTP, токен бота. Без него план печатал user-data
+    # целиком при каждом пересоздании машины и правке prod.env — все
+    # секреты на экране и в любом сохранённом выводе плана. Значение
+    # то же, скрыт только вывод
+    user-data = sensitive(templatefile("${path.module}/cloud-init.yaml.tftpl", {
       # Отступ в шесть пробелов: содержимое вставляется внутрь
       # блока content: | и обязано быть с ним выровнено, иначе
       # cloud-init молча пропустит файл
       CADDYFILE_INDENTED = indent(6, file("${path.module}/Caddyfile"))
       ENVFILE_INDENTED   = indent(6, file(var.env_file))
-    })
+    }))
   }
 
   scheduling_policy {

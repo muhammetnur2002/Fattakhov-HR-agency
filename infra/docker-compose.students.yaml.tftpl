@@ -1,0 +1,60 @@
+# Состав машины студенческой платформы. Подставляется templatefile из students_vm.tf.
+#
+# Образы и переменные окружения те же, что у платформы на fhr-app; env_file нет
+# намеренно: платформа получает только свои секреты, секреты CRM ей не нужны.
+# Caddy и крон включаются переключателями students_vm_caddy и students_vm_cron.
+
+services:
+  # Миграции базы: идемпотентны, повторный запуск ничего не ломает.
+  students-migrate:
+    image: ${students_tools_image}
+    restart: "no"
+    environment: ${students_env_json}
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  students:
+    image: ${students_app_image}
+    restart: always
+    environment: ${students_env_json}
+    expose:
+      - "3000"
+    depends_on:
+      students-migrate:
+        condition: service_completed_successfully
+    # Проверка здоровья уже есть в образе платформы (node -e fetch), не переопределяем.
+%{ if enable_caddy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - students
+%{ endif }
+%{ if enable_cron }
+
+  # Ежедневные напоминания, 09:00 по Москве (06:00 UTC). Включать только когда
+  # такой же контейнер на fhr-app остановлен: иначе напоминания уйдут дважды.
+  students-cron:
+    image: alpine:3.20
+    restart: always
+    environment: ${students_env_json}
+    depends_on:
+      - students
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache curl >/dev/null
+        echo "0 6 * * * curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://students:3000/api/cron/notify" > /etc/crontabs/root
+        crond -f -l 2
+%{ endif }
+
+volumes:
+  caddy_data:
+  caddy_config:

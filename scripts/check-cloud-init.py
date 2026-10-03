@@ -51,4 +51,13 @@ for f in doc["write_files"]:
     if not f.get("content", "").strip():
         sys.exit(f"файл {f['path']} пустой")
 
+# Таймер без включения лежит мёртвым файлом: systemd его не запустит,
+# и никто не заметит. Каждый .timer из write_files обязан включаться в runcmd
+commands = [" ".join(map(str, c)) if isinstance(c, list) else str(c) for c in doc.get("runcmd", [])]
+for path in paths:
+    if path.endswith(".timer"):
+        unit = path.rsplit("/", 1)[1]
+        if not any("enable" in c and unit in c for c in commands):
+            sys.exit(f"таймер {unit} не включается в runcmd")
+
 print(f"cloud-init в порядке: {len(paths)} файла — " + ", ".join(paths))
