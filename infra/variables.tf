@@ -115,7 +115,7 @@ variable "runtime_env" {
 }
 
 variable "crm_db_password" {
-  description = "Пароль пользователя базы CRM (версия Мухаммеда, crm.tf). Задаётся переменной окружения TF_VAR_crm_db_password из ~/.fhr/crm_db_password, в файлы не пишется."
+  description = "Пароль пользователя базы CRM (crm.tf). Задаётся переменной окружения TF_VAR_crm_db_password из ~/.fhr/crm_db_password, в файлы не пишется."
   type        = string
   sensitive   = true
 }
