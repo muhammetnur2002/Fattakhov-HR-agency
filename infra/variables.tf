@@ -38,6 +38,10 @@ variable "db_password" {
 variable "env_file" {
   description = "Путь к файлу боевых настроек. Содержимое уезжает в метаданные ВМ; в репозиторий файл не попадает."
   type        = string
+  # У каждого оператора свой путь (Mac, Windows), а prod.tfvars с 04.10.2026
+  # общий — поэтому путь не в нём, а здесь: ~ разворачивается в домашнюю
+  # папку на любой машине (pathexpand). Лежит иначе — TF_VAR_env_file.
+  default = "~/.fhr/prod.env"
 }
 
 variable "app_image" {

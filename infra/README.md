@@ -34,13 +34,12 @@
 ```bash
 cd infra
 source ~/.fhr/tfstate.env                 # доступ к бакету состояния
-export YC_TOKEN=$(yc iam create-token)    # или ключ fhr-terraform в prod.tfvars
-export TF_VAR_db_password=$(cat ~/.fhr/db_password)
-export TF_VAR_students_db_password=$(cat ~/.fhr/students_db_password)
-export TF_VAR_crm_db_password=$(cat ~/.fhr/crm_db_password)
+export YC_TOKEN=$(yc iam create-token)    # или ключ: TF_VAR_service_account_key_file
 
-terraform plan -var-file=prod.tfvars -out=prod.plan
-terraform apply prod.plan
+./tfvars.sh pull                          # общие prod.tfvars и prod.env (пароли баз — в них)
+terraform plan -var-file=prod.tfvars -out=prod.tfplan
+terraform apply prod.tfplan
+./tfvars.sh push                          # если меняли значения
 ```
 
 - Сначала план, потом apply сохранённого плана. Читать строку `Plan:`
@@ -69,28 +68,56 @@ terraform apply prod.plan
    (раздел ниже), затем `terraform plan -var-file=prod.tfvars` —
    он обязан показать `No changes`. Если нет — ничего не применять.
 
-### prod.tfvars
+### Общие настройки: prod.tfvars и prod.env (с 04.10.2026)
 
-В git его нет, у каждого оператора своя копия, и теги образов в них
-обязаны совпадать с тем, что выкачено, — иначе apply одного откатит
-выкатку другого. Что выкачено сейчас, показывает само общее состояние —
-ему, а не памяти или таблице в документе, и верить:
+Копия одна на всех, в том же бакете, что и состояние (закрыт, шифрован,
+с историей версий):
+
+| В бакете | У себя | Что внутри |
+| --- | --- | --- |
+| `prod/prod.tfvars` | `infra/prod.tfvars` | теги образов, переменные, **пароли баз** (`db_password`, `crm_db_password`, `students_db_password`) |
+| `prod/prod.env` | `~/.fhr/prod.env` (или `TF_VAR_env_file`) | настройки сервера кабинета, уходят в cloud-init |
+
+Раньше у каждого оператора были свои копии, и за одни сутки они разошлись
+трижды: теги образов, ключи пуш-уведомлений платформы и пароли баз. Apply
+со своей копией откатывал чужую выкатку, стирал чужие переменные — а со
+старыми паролями оставил бы приложения без доступа к базам.
 
 ```bash
-terraform output images
+cd infra
+source ~/.fhr/tfstate.env      # или: export YC_TOKEN=$(yc iam create-token)
+./tfvars.sh pull               # перед каждым планом
+./tfvars.sh diff               # чем свои отличаются от общих (только имена, без значений)
+./tfvars.sh push               # сразу после apply, если меняли значения
 ```
 
-Перед своим планом сверить с ним `app_image`, `tools_image`,
-`students_app_image`, `students_tools_image` в своём `prod.tfvars`.
-В плане чужая выкатка видна так: `images` меняется на старый тег.
-Выкатили новый тег — сообщить второму оператору.
+- `pull` сохраняет свои прежние файлы копиями `*.local-<время>`, если они
+  отличались, — ничего не теряется молча.
+- `push` не перезапишет чужую правку: если общий файл менялся после вашего
+  `pull`, загрузка остановится целиком — `pull`, перенести правку, apply,
+  `push`.
+- Пароли баз — строками в общем `prod.tfvars`, а не `TF_VAR_*_password`
+  из своих файлов: сменил один — увидели все.
+- На Windows — Git Bash (bash и curl 7.76+), на Mac работает и системный
+  bash 3.2.
+
+Своё у каждого — не в файлах, а в окружении:
+
+| Что | Как |
+| --- | --- |
+| Путь к `prod.env` | по умолчанию `~/.fhr/prod.env` на любой машине; лежит иначе — `TF_VAR_env_file` |
+| Доступ к облаку | `export YC_TOKEN=$(yc iam create-token)` или ключ: `TF_VAR_service_account_key_file` |
+
+Строк `env_file` и `service_account_key_file` в общем `prod.tfvars` быть
+не должно: путь у каждого свой.
+
+Что выкачено, по-прежнему показывает само состояние —
+`terraform output images`. Сразу после `pull` план обязан показать
+`No changes`; иначе — ничего не применять, сначала разобраться.
 
 Переключатели машины платформы: `students_vm_caddy = true`,
 `students_vm_cron = true` — с шага 3 переезда (04.10.2026) напоминания
 студентам идут с `fhr-students`, копии платформы на `fhr-app` больше нет.
-
-Сразу после перехода `terraform plan` обязан показать `No changes`.
-Иначе — ничего не применять, сверить `prod.tfvars`.
 
 ### Как это создано (вне состояния, вручную через yc)
 
@@ -122,6 +149,14 @@ Object Storage → бакет → «Версии»). Скачать нужную
 `terraform state push <файл>` — только когда никто не запускает
 Terraform. Копии на момент перехода — у владельца в
 `~/.fhr/terraform.tfstate.bak-20261004-*`.
+
+## Проверки на GitHub
+
+На каждый PR и на каждый push в main — `.github/workflows/checks.yml`:
+типы, линтер и тесты кабинета (с временной базой Postgres), то же для
+студенческой платформы, формат и корректность Terraform, разметка
+cloud-init. Секретов не нужно, серверы не трогаются. Красная проверка
+в PR — сначала починить, потом сливать.
 
 ## Сборка образов на GitHub
 

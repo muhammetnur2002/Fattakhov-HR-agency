@@ -153,7 +153,7 @@ resource "yandex_compute_instance" "app" {
       # блока content: | и обязано быть с ним выровнено, иначе
       # cloud-init молча пропустит файл
       CADDYFILE_INDENTED = indent(6, file("${path.module}/Caddyfile"))
-      ENVFILE_INDENTED   = indent(6, file(var.env_file))
+      ENVFILE_INDENTED   = indent(6, file(pathexpand(var.env_file)))
     }))
   }
 

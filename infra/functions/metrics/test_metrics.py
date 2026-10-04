@@ -152,6 +152,70 @@ class VmChecks(unittest.TestCase):
         self.assertEqual(index.level_of(values[-1], VM_DISK), 2)
 
 
+class Telegram(unittest.TestCase):
+    ENV = {"TELEGRAM_BOT_TOKEN": "123:abc", "TELEGRAM_CHAT_IDS": "111, 222"}
+
+    def test_chats_come_from_env_and_need_a_token(self):
+        with mock.patch.dict(os.environ, self.ENV):
+            self.assertEqual(index.telegram_chats(), ["111", "222"])
+        with mock.patch.dict(os.environ, {"TELEGRAM_CHAT_IDS": "111"}, clear=True):
+            self.assertEqual(index.telegram_chats(), [])
+
+    def test_without_telegram_only_mail_is_sent(self):
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(index, "send_mail") as mail, mock.patch.object(
+            index, "send_telegram"
+        ) as tg:
+            index.notify("тема", "текст")
+        mail.assert_called_once()
+        tg.assert_not_called()
+
+    def test_both_channels_are_used(self):
+        with mock.patch.dict(os.environ, self.ENV), mock.patch.object(index, "send_mail") as mail, mock.patch.object(
+            index, "send_telegram"
+        ) as tg:
+            index.notify("тема", "текст")
+        mail.assert_called_once_with("тема", "текст")
+        tg.assert_called_once_with("тема", "текст")
+
+    def test_telegram_failure_does_not_cancel_mail(self):
+        with mock.patch.dict(os.environ, self.ENV), mock.patch.object(index, "send_mail") as mail, mock.patch.object(
+            index, "send_telegram", side_effect=RuntimeError("403")
+        ):
+            index.notify("тема", "текст")  # без исключения
+        mail.assert_called_once()
+
+    def test_mail_failure_does_not_cancel_telegram(self):
+        with mock.patch.dict(os.environ, self.ENV), mock.patch.object(
+            index, "send_mail", side_effect=OSError("smtp")
+        ), mock.patch.object(index, "send_telegram") as tg:
+            index.notify("тема", "текст")
+        tg.assert_called_once()
+
+    def test_error_only_when_nothing_was_delivered(self):
+        with mock.patch.dict(os.environ, self.ENV), mock.patch.object(
+            index, "send_mail", side_effect=OSError("smtp")
+        ), mock.patch.object(index, "send_telegram", side_effect=RuntimeError("403")):
+            with self.assertRaises(RuntimeError):
+                index.notify("тема", "текст")
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(index, "send_mail", side_effect=OSError("smtp")):
+            with self.assertRaises(RuntimeError):
+                index.notify("тема", "текст")
+
+    def test_sends_to_every_chat_and_hides_token_in_errors(self):
+        calls = []
+
+        def fake_urlopen(request, timeout=0):
+            calls.append((request.full_url, request.data))
+            raise index.urllib.error.HTTPError(request.full_url, 403, "Forbidden", {}, None)
+
+        with mock.patch.dict(os.environ, self.ENV), mock.patch.object(index.urllib.request, "urlopen", fake_urlopen):
+            with self.assertRaises(RuntimeError) as ctx:
+                index.send_telegram("тема", "текст")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("111: HTTP 403", str(ctx.exception))
+        self.assertNotIn("123:abc", str(ctx.exception))
+
+
 class Run(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 10, 4, 12, 5, tzinfo=timezone.utc)  # в окне напоминаний

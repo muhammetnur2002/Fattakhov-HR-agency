@@ -19,7 +19,7 @@ locals {
   # Почта и ящик сбоев — из того же prod.env, что уходит на сервер:
   # второй копии пароля почты нигде нет. Кавычки вокруг значения
   # (у SMTP_FROM они есть) снимаются
-  prod_env = file(var.env_file)
+  prod_env = file(pathexpand(var.env_file))
 
   uptime_env = {
     URLS = jsonencode([
@@ -105,15 +105,24 @@ variable "metrics_alert_extra_emails" {
   default     = []
 }
 
+variable "metrics_telegram_chat_ids" {
+  description = "Чаты Telegram для оповещений по ресурсам (числовые chat_id; получатель должен нажать «Старт» у бота). Токен бота берётся из TELEGRAM_BOT_TOKEN в prod.env. Пусто — только почта."
+  type        = list(string)
+  default     = []
+}
+
 locals {
   metrics_env = {
-    FOLDER_ID        = var.folder_id
+    FOLDER_ID = var.folder_id
     # Идентификаторы машин: память и диск пишет агент (agent.tf) с меткой host = id
     VM_IDS = jsonencode({
       "fhr-app"      = yandex_compute_instance.app.id
       "fhr-students" = yandex_compute_instance.students.id
     })
     EXTRA_RECIPIENTS = join(",", var.metrics_alert_extra_emails)
+    # Токен бота — из того же prod.env, что уходит на сервер; без чатов не используется
+    TELEGRAM_BOT_TOKEN = sensitive(trim(trimspace(regex("(?m)^TELEGRAM_BOT_TOKEN=(.*)$", local.prod_env)[0]), "\"'"))
+    TELEGRAM_CHAT_IDS  = join(",", var.metrics_telegram_chat_ids)
     SMTP_URL         = local.uptime_env.SMTP_URL
     SMTP_FROM        = local.uptime_env.SMTP_FROM
     ALERT_EMAIL      = local.uptime_env.ALERT_EMAIL

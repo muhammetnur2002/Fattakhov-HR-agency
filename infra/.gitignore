@@ -5,6 +5,7 @@
 # Обычный поиск по файлу их не находит, и это делает утечку тихой.
 tfplan
 *.tfplan
+*.plan
 
 *.tfstate
 *.tfstate.*
@@ -16,3 +17,9 @@ crash.log
 
 # Архив кода облачной функции — собирается при plan (monitoring.tf)
 .build/
+
+# Общий prod.tfvars (tfvars.sh): копия своего файла перед заменой общим
+# и отметка версии, скачанной последней. Внутри копии — те же секреты
+prod.tfvars.local-*
+.tfvars.etag
+.prodenv.etag

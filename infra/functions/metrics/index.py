@@ -361,6 +361,51 @@ def send_mail(subject: str, body: str) -> None:
         server.quit()
 
 
+def send_telegram(subject: str, body: str) -> None:
+    """То же сообщение — в чаты Telegram (бот и список чатов из окружения).
+
+    Бот должен быть открыт получателем («Старт»): иначе Telegram откажет
+    с 403. Ключ с сообщением ошибки не печатаем — в адресе запроса токен.
+    """
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    text = f"{subject}\n\n{body}"[:4000]
+    failed = []
+    for chat_id in telegram_chats():
+        data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+        request = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
+        try:
+            urllib.request.urlopen(request, timeout=20).read()
+        except urllib.error.HTTPError as error:
+            failed.append(f"{chat_id}: HTTP {error.code}")
+        except Exception as error:
+            failed.append(f"{chat_id}: {type(error).__name__}")
+    if failed:
+        raise RuntimeError("Telegram не принял: " + "; ".join(failed))
+
+
+def telegram_chats() -> list[str]:
+    if not os.environ.get("TELEGRAM_BOT_TOKEN"):
+        return []
+    return [c.strip() for c in os.environ.get("TELEGRAM_CHAT_IDS", "").split(",") if c.strip()]
+
+
+def notify(subject: str, body: str) -> None:
+    """Письмо и Telegram — независимо друг от друга: сбой одного канала не
+    отменяет другой. Ошибка, только если не дошло ни одним путём."""
+    errors = []
+    for channel, send in (("почта", send_mail), ("Telegram", send_telegram)):
+        if channel == "Telegram" and not telegram_chats():
+            continue
+        try:
+            send(subject, body)
+        except Exception as error:
+            errors.append(f"{channel}: {type(error).__name__}: {str(error)[:120]}")
+            print("не отправлено —", errors[-1])
+    attempted = 1 + (1 if telegram_chats() else 0)
+    if len(errors) >= attempted:
+        raise RuntimeError("; ".join(errors))
+
+
 def build_mail(now: datetime, events: list[tuple[dict, str, str, int]], errors: list[str]) -> tuple[str, str]:
     stamp = now.astimezone(LOCAL_TZ).strftime("%d.%m.%Y %H:%M")
     worst = 0
@@ -421,7 +466,7 @@ def handler(event, context):
 
     # Ручной запуск с {"test": true} — проверить, что письмо доходит
     if isinstance(event, dict) and event.get("test"):
-        send_mail(
+        notify(
             "Проверка мониторинга ресурсов",
             f"{now.astimezone(LOCAL_TZ).strftime('%d.%m.%Y %H:%M')} (+05). "
             "Письмо пришло — значит, о нехватке ресурсов сюда тоже придёт.",
@@ -436,7 +481,7 @@ def handler(event, context):
         errors = []
     if events or errors:
         subject, body = build_mail(now, events, errors)
-        send_mail(subject, body)
+        notify(subject, body)
 
     return {
         "statusCode": 200,
