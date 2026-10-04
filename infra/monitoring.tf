@@ -30,6 +30,9 @@ locals {
     SMTP_URL    = sensitive(trim(trimspace(regex("(?m)^SMTP_URL=(.*)$", local.prod_env)[0]), "\"'"))
     SMTP_FROM   = trim(trimspace(regex("(?m)^SMTP_FROM=(.*)$", local.prod_env)[0]), "\"'")
     ALERT_EMAIL = trim(trimspace(regex("(?m)^ALERT_EMAIL=(.*)$", local.prod_env)[0]), "\"'")
+    # Дублирование в Telegram: токен бота — из prod.env, чаты — metrics_telegram_chat_ids
+    TELEGRAM_BOT_TOKEN = sensitive(trim(trimspace(regex("(?m)^TELEGRAM_BOT_TOKEN=(.*)$", local.prod_env)[0]), "\"'"))
+    TELEGRAM_CHAT_IDS  = join(",", var.metrics_telegram_chat_ids)
   }
 }
 
@@ -37,6 +40,8 @@ data "archive_file" "uptime" {
   type        = "zip"
   source_dir  = "${path.module}/functions/uptime"
   output_path = "${path.module}/.build/uptime.zip"
+  # Проверки логики нужны разработчику, в облаке им делать нечего
+  excludes    = ["test_uptime.py", "__pycache__"]
 }
 
 resource "yandex_function" "uptime" {
