@@ -3,9 +3,10 @@
 # Сигнал о сбое из кабинета (lib/monitoring/alerts.ts) шлёт сам сервер.
 # Если он лёг целиком — машина, Docker, Caddy, — сигнала не будет никакого,
 # и о простое узнают от людей. Эта проверка живёт вне сервера: облачная
-# функция раз в 10 минут открывает сайт, кабинет и студенческую платформу
-# и, если адрес не ответил дважды подряд, пишет на ящик сбоев (ALERT_EMAIL)
-# через ту же почту reg.ru — она от нашего сервера не зависит.
+# функция раз в 10 минут открывает сайт, кабинет, студенческую платформу
+# и отметку фоновых задач кабинета и, если адрес не ответил дважды подряд,
+# пишет на ящик сбоев (ALERT_EMAIL) через ту же почту reg.ru — она от нашего
+# сервера не зависит.
 #
 # Состояния у функции нет: пока адрес лежит, письмо приходит каждые
 # 10 минут. Это намеренно — простой не та вещь, о которой достаточно
@@ -21,12 +22,22 @@ locals {
   # (у SMTP_FROM они есть) снимаются
   prod_env = file(pathexpand(var.env_file))
 
+  # Что считается «живым». Один список на двоих: его опрашивает функция
+  # fhr-uptime раз в 10 минут, и его же ждёт deploy.sh после выкатки
+  # (вывод health_urls в outputs.tf) — новый адрес не забудется ни там, ни там
+  uptime_targets = [
+    ["Сайт", "https://${var.site_domain}/"],
+    ["Кабинет", "https://${var.app_domain}/api/health"],
+    ["Студенческая платформа", "https://students.${var.site_domain}/api/health"],
+    # Фоновый процесс кабинета (письма, напоминания, очередь уничтожения
+    # ПДн): 503, если удачного прохода не было дольше 10 минут
+    # (crm/lib/monitoring/worker-heartbeat.ts). Сайт при этом открывается,
+    # и без этой строки его остановку не увидел бы никто
+    ["Фоновые задачи кабинета", "https://${var.app_domain}/api/health/worker"],
+  ]
+
   uptime_env = {
-    URLS = jsonencode([
-      ["Сайт", "https://${var.site_domain}/"],
-      ["Кабинет", "https://${var.app_domain}/api/health"],
-      ["Студенческая платформа", "https://students.${var.site_domain}/api/health"],
-    ])
+    URLS        = jsonencode(local.uptime_targets)
     SMTP_URL    = sensitive(trim(trimspace(regex("(?m)^SMTP_URL=(.*)$", local.prod_env)[0]), "\"'"))
     SMTP_FROM   = trim(trimspace(regex("(?m)^SMTP_FROM=(.*)$", local.prod_env)[0]), "\"'")
     ALERT_EMAIL = trim(trimspace(regex("(?m)^ALERT_EMAIL=(.*)$", local.prod_env)[0]), "\"'")
@@ -40,8 +51,13 @@ data "archive_file" "uptime" {
   type        = "zip"
   source_dir  = "${path.module}/functions/uptime"
   output_path = "${path.module}/.build/uptime.zip"
+  # Права файлов внутри архива — одни на всех компьютерах. Без этого Windows
+  # кладёт в архив 0666, macOS — 0644, сумма архива (user_hash) выходит разной,
+  # и каждый apply с другой системы заново выкладывает ту же функцию. 0666 —
+  # как уже выложено 04.10.2026: с этой строкой план «изменений нет» у всех
+  output_file_mode = "0666"
   # Проверки логики нужны разработчику, в облаке им делать нечего
-  excludes    = ["test_uptime.py", "__pycache__"]
+  excludes = ["test_uptime.py", "__pycache__"]
 }
 
 resource "yandex_function" "uptime" {
@@ -128,9 +144,9 @@ locals {
     # Токен бота — из того же prod.env, что уходит на сервер; без чатов не используется
     TELEGRAM_BOT_TOKEN = sensitive(trim(trimspace(regex("(?m)^TELEGRAM_BOT_TOKEN=(.*)$", local.prod_env)[0]), "\"'"))
     TELEGRAM_CHAT_IDS  = join(",", var.metrics_telegram_chat_ids)
-    SMTP_URL         = local.uptime_env.SMTP_URL
-    SMTP_FROM        = local.uptime_env.SMTP_FROM
-    ALERT_EMAIL      = local.uptime_env.ALERT_EMAIL
+    SMTP_URL           = local.uptime_env.SMTP_URL
+    SMTP_FROM          = local.uptime_env.SMTP_FROM
+    ALERT_EMAIL        = local.uptime_env.ALERT_EMAIL
   }
 }
 
@@ -138,6 +154,8 @@ data "archive_file" "metrics" {
   type        = "zip"
   source_dir  = "${path.module}/functions/metrics"
   output_path = "${path.module}/.build/metrics.zip"
+  # Права файлов в архиве — одни на всех системах (см. archive_file "uptime")
+  output_file_mode = "0666"
   # Проверки логики нужны разработчику, в облаке им делать нечего
   excludes = ["test_metrics.py", "__pycache__"]
 }

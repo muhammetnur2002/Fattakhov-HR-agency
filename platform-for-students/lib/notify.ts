@@ -63,10 +63,13 @@ async function deliver(accountId: string, content: MailContent, kind: MailKind):
   }
 }
 
+/** Вторая строка любого пуша: фирменное название, чтобы уведомление узнавалось среди остальных. */
+export const PUSH_BODY = 'Fattakhov Students · откройте платформу';
+
 /** Пуш на устройства человека. Не бросает и ничего не ждёт от результата. */
 async function pushAccount(accountId: string, message: PushMessage): Promise<void> {
   try {
-    await sendPushToAccount(accountId, message);
+    await sendPushToAccount(accountId, { body: PUSH_BODY, ...message });
   } catch (error) {
     console.error('[уведомление] пуш не отправлен:', error);
   }
@@ -124,6 +127,7 @@ async function pushStudent(
     if (student) {
       await pushAccount(student.accountId, {
         title: item.title,
+        body: PUSH_BODY,
         url: item.href,
         // Тот же ярлык заменяет прежнее уведомление об этом же, а не ложится рядом
         tag: `${item.kind}:${item.href}`,

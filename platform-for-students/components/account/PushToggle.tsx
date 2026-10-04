@@ -2,14 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/Toast';
-import {
-  applicationServerKey,
-  endpointFingerprint,
-  pushSupport,
-  registerPushWorker,
-  subscribedWithKey,
-  type PushSupport,
-} from '@/lib/push/client';
+import { endpointFingerprint, pushSupport, subscribedWithKey, type PushSupport } from '@/lib/push/client';
+import { enablePushHere } from '@/lib/push/enable';
 import { cn } from '@/lib/utils';
 
 type ServerState = { configured: boolean; publicKey: string | null; devices: { id: string; endpointHash: string }[] };
@@ -81,39 +75,9 @@ export function PushToggle({ audience, bordered = true }: { audience: 'student' 
     void refresh();
   }, [refresh]);
 
-  async function subscribe(publicKey: string, retry = true): Promise<void> {
-    const registration = await registerPushWorker();
-    if (!registration) throw new Error('Не удалось запустить службу уведомлений в этом браузере.');
-    await navigator.serviceWorker.ready;
-
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') throw new Error('Вы не разрешили уведомления в браузере.');
-
-    // Подписка на прежний ключ сервера после его смены бесполезна — заменяем
-    let subscription = await registration.pushManager.getSubscription();
-    if (subscription && !subscribedWithKey(subscription, publicKey)) {
-      await subscription.unsubscribe();
-      subscription = null;
-    }
-    subscription ??= await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: applicationServerKey(publicKey),
-    });
-
-    const response = await fetch('/api/account/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription.toJSON()),
-    });
-    const data = (await response.json().catch(() => ({}))) as { ok?: string; warning?: string; error?: string; code?: string };
-
-    // Служба уведомлений не узнала подписку: браузер держит отмершую — один раз заменяем
-    if (response.status === 409 && data.code === 'RESUBSCRIBE' && retry) {
-      await subscription.unsubscribe();
-      return subscribe(publicKey, false);
-    }
-    if (!response.ok) throw new Error(data.error ?? 'Не удалось включить уведомления.');
-    if (data.warning) toast.show({ tone: 'info', title: 'Уведомления включены', description: data.warning });
+  async function subscribe(publicKey: string): Promise<void> {
+    const { warning } = await enablePushHere(publicKey);
+    if (warning) toast.show({ tone: 'info', title: 'Уведомления включены', description: warning });
     else toast.success('Уведомления включены', 'Проверочное уведомление отправлено');
   }
 
@@ -129,6 +93,27 @@ export function PushToggle({ audience, bordered = true }: { audience: 'student' 
       await subscription.unsubscribe();
     }
     toast.success('Уведомления выключены', 'На этом устройстве больше не придут');
+  }
+
+  async function sendTest() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const response = await fetch('/api/account/push/test', { method: 'POST' });
+      const data = (await response.json().catch(() => ({}))) as { devices?: number; sent?: number; removed?: number; failed?: number };
+      if (!response.ok) throw new Error('Не удалось отправить проверочное уведомление.');
+      if (!data.devices) toast.error('Нет подписанных устройств', 'Включите уведомления на этом устройстве выключателем выше');
+      else if (data.sent) {
+        toast.success('Отправлено', `Служба уведомлений приняла сообщение для устройств: ${data.sent} из ${data.devices}. Если на экране ничего нет, проверьте разрешения браузера и системы для этого сайта.`);
+      } else {
+        toast.error('Не доставлено', 'Служба уведомлений не приняла сообщение. Отключите и включите уведомления на этом устройстве ещё раз.');
+      }
+    } catch (error) {
+      toast.error('Не получилось', error instanceof Error ? error.message : 'Попробуйте ещё раз');
+    } finally {
+      setSaving(false);
+      await refresh();
+    }
   }
 
   async function toggle() {
@@ -162,6 +147,16 @@ export function PushToggle({ audience, bordered = true }: { audience: 'student' 
         <p className="mt-1 text-[12.5px] leading-relaxed text-paper-faint">
           {view.kind === 'blocked' ? view.text : COPY[audience]}
         </p>
+        {view.kind === 'ready' && view.enabled && (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void sendTest()}
+            className="mt-2 text-[12.5px] text-paper underline underline-offset-4 disabled:opacity-50"
+          >
+            Отправить проверочное уведомление
+          </button>
+        )}
       </div>
       {view.kind === 'ready' && (
         <button

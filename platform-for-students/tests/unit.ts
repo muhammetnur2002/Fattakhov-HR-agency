@@ -25,6 +25,8 @@ import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, p
 import { emailCodeSchema, registrationSteps } from '../lib/validation';
 import { safeNext } from '../lib/security/safe-next';
 import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent';
+import bcryptjs from 'bcryptjs';
+import { hashPassword, verifyPassword } from '../lib/security/password';
 import { formatWait } from '../lib/wait-format';
 import { vapidProblem } from '../lib/push/config';
 import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
@@ -42,6 +44,23 @@ function test(name: string, fn: () => void) {
     failures.push(name);
     console.log(`  FAIL ${name} — ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** Асинхронные проверки: итог печатается после их завершения (в конце файла). */
+const pending: Promise<void>[] = [];
+function testAsync(name: string, fn: () => Promise<void>) {
+  pending.push(
+    fn().then(
+      () => {
+        passed++;
+        console.log(`  ok   ${name}`);
+      },
+      (error) => {
+        failures.push(name);
+        console.log(`  FAIL ${name} — ${error instanceof Error ? error.message : String(error)}`);
+      },
+    ),
+  );
 }
 
 console.log('Дата рождения');
@@ -467,5 +486,26 @@ test('время ожидания: секунды до минуты, дальш�
   assert.equal(formatWait(0), '1 с');
 });
 
-console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);
-if (failures.length) process.exitCode = 1;
+testAsync('пароли: хеши bcryptjs и нативного bcrypt читаются друг другом', async () => {
+  const plain = 'Совместимость-12345!';
+  // Пароль, сохранённый прежним кодом (bcryptjs), проверяется нативным модулем
+  const legacy = bcryptjs.hashSync(plain, 12);
+  assert.equal(await verifyPassword(plain, legacy), true);
+  assert.equal(await verifyPassword(plain + 'x', legacy), false);
+  // Новый хеш (нативный) проверяется и нативным кодом, и старым bcryptjs
+  const fresh = await hashPassword(plain);
+  assert.match(fresh, /^\$2[aby]\$12\$/);
+  assert.equal(await verifyPassword(plain, fresh), true);
+  assert.equal(bcryptjs.compareSync(plain, fresh), true);
+  assert.equal(bcryptjs.compareSync(plain + 'x', fresh), false);
+});
+
+testAsync('пароли: нет хеша — сравнение с заглушкой, ответ «неверно»', async () => {
+  assert.equal(await verifyPassword('любой', null), false);
+  assert.equal(await verifyPassword('любой', undefined), false);
+});
+
+void Promise.all(pending).then(() => {
+  console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);
+  if (failures.length) process.exitCode = 1;
+});

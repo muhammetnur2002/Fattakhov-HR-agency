@@ -27,6 +27,19 @@ RETRY_AFTER_SECONDS = 10
 LOCAL_TZ = timezone(timedelta(hours=5))
 
 
+def reason_from(error: urllib.error.HTTPError) -> str:
+    """Причина из ответа вида {"reason": "..."} — так отвечает
+    /api/health/worker кабинета («проходов нет», «проходы падают»), и в письме
+    сразу видно, что смотреть. Только эта строка, не тело ответа целиком:
+    чужую страницу ошибки в письмо не тащим."""
+    try:
+        data = json.loads(error.read(2000).decode("utf-8", "replace"))
+    except Exception:
+        return ""
+    reason = data.get("reason") if isinstance(data, dict) else None
+    return f" — {str(reason)[:200]}" if reason else ""
+
+
 def check(url: str) -> tuple[bool, str]:
     """Отвечает ли адрес. Любой ответ, кроме 5xx, — сервер жив."""
     request = urllib.request.Request(url, headers={"User-Agent": "fhr-uptime/1"})
@@ -34,7 +47,7 @@ def check(url: str) -> tuple[bool, str]:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             return response.status < 500, f"HTTP {response.status}"
     except urllib.error.HTTPError as error:
-        return error.code < 500, f"HTTP {error.code}"
+        return error.code < 500, f"HTTP {error.code}{reason_from(error)}"
     except Exception as error:  # таймаут, отказ соединения, ошибка TLS
         return False, f"{type(error).__name__}: {str(error)[:200]}"
 

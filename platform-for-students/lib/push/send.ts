@@ -93,15 +93,26 @@ export async function sendPushToAccount(accountId: string, message: PushMessage)
 
     const store = await getStore();
     const subscriptions = await store.pushSubscriptions.listByAccount(accountId);
-    if (subscriptions.length === 0) return NOTHING_SENT;
+    if (subscriptions.length === 0) {
+      // Видно в журнале, почему пуша нет: «никто не подписан», а не «сломалась отправка»
+      console.info(`[пуш] ${accountId.slice(0, 8)}: нет подписанных устройств — уведомление «${message.title}» ушло только в колокольчик и на почту`);
+      return NOTHING_SENT;
+    }
 
     const outcomes = await Promise.all(subscriptions.map((s) => sendPush(s, message, config)));
-    return {
+    const delivery = {
       sent: outcomes.filter((o) => o.state === 'sent').length,
       removed: outcomes.filter((o) => o.state === 'gone').length,
       failed: outcomes.filter((o) => o.state === 'rejected' || o.state === 'unreachable').length,
       outcomes,
     };
+    // Итог по каждой отправке: служба приняла (sent) — устройство получит, если оно в сети и
+    // разрешения в порядке; остальное объяснено в строках «не доставлено» выше
+    console.info(
+      `[пуш] ${accountId.slice(0, 8)}: «${message.title}» — устройств ${subscriptions.length}, принято службой ${delivery.sent}, ` +
+        `подписка погасла ${delivery.removed}, не дошло ${delivery.failed}`,
+    );
+    return delivery;
   } catch (error) {
     console.error('[пуш] сбой рассылки', error);
     return NOTHING_SENT;

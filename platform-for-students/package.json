@@ -36,7 +36,7 @@
     "@aws-sdk/client-s3": "^3.687.0",
     "@aws-sdk/s3-request-presigner": "^3.1135.0",
     "@prisma/client": "^5.22.0",
-    "bcryptjs": "^2.4.3",
+    "bcrypt": "^6.0.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.17",
     "ioredis": "^5.4.1",
@@ -52,6 +52,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.17.6",
     "@types/nodemailer": "^6.4.24",
@@ -59,6 +60,7 @@
     "@types/react-dom": "^19.3.0",
     "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
+    "bcryptjs": "^2.4.3",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.7",
     "postcss": "^8.4.49",

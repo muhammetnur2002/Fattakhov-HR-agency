@@ -1,5 +1,6 @@
 import { Logo } from '@/components/brand/Logo';
 import { EmailVerifyBanner } from '@/components/account/EmailVerifyBanner';
+import { PushPrompt } from '@/components/account/PushPrompt';
 import { NavTabs, type NavItem } from './NavTabs';
 import { UserMenu } from './UserMenu';
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -74,6 +75,9 @@ export async function AppShell({
 
       <main className={cn('page-x mx-auto w-full flex-1 pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
         {unverifiedEmail && <EmailVerifyBanner email={unverifiedEmail} />}
+        {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && (
+          <PushPrompt accountId={session.accountId} audience={session.role === 'EMPLOYER' ? 'company' : 'student'} />
+        )}
         <PageTransition>{children}</PageTransition>
       </main>
     </div>

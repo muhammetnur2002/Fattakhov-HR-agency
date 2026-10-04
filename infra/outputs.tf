@@ -66,3 +66,22 @@ output "images" {
     students_tools = var.students_tools_image
   }
 }
+
+# Адреса «жив ли» — те же, что опрашивает внешняя проверка (monitoring.tf).
+# deploy.sh после apply ждёт, пока каждый ответит 200
+output "health_urls" {
+  description = "Пары [название, адрес] для проверки после выкатки."
+  value       = local.uptime_targets
+}
+
+# Страницы, в разметке которых виден номер сборки Next (\"b\":\"…\").
+# deploy.sh запоминает его до выкатки и ждёт смены после: пока сервер
+# переключается (1–3 минуты), 200 отдаёт ещё прежняя сборка, и проверка
+# одних адресов объявила бы успех раньше времени (так было 04.10.2026)
+output "build_pages" {
+  description = "Страница с номером сборки — у кабинета и у студенческой платформы."
+  value = {
+    app      = "https://${var.app_domain}/login"
+    students = "https://students.${var.site_domain}/"
+  }
+}

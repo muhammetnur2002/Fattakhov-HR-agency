@@ -8,7 +8,7 @@ const nextConfig = {
   poweredByHeader: false,
   // Prisma и ioredis тянут нативные бинарники — они не должны попадать
   // в бандл серверных компонентов.
-  serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
+  serverExternalPackages: ['@prisma/client', 'bcrypt', 'ioredis'],
 };
 
 export default nextConfig;

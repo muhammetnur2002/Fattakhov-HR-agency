@@ -1860,6 +1860,13 @@ async function main() {
   const pushDelete = await student.delete('/api/account/push', { endpoint: 'https://fcm.googleapis.com/нет-такой' });
   check('пуш: отписка от неизвестного адреса безвредна', pushDelete.status === 200, pushDelete.body);
   check('пуш: отписка без адреса отвергается', (await student.delete('/api/account/push', {})).status === 400);
+  check('пуш: проверочное уведомление без входа недоступно', (await new Session().post('/api/account/push/test', {})).status === 401);
+  const pushTest = await student.post('/api/account/push/test', {});
+  check(
+    'пуш: проверочное уведомление отвечает, подписанных устройств нет',
+    pushTest.status === 200 && (pushTest.body?.configured === false || pushTest.body?.devices === 0),
+    pushTest.body,
+  );
   check('пуш: воркер отдаётся без входа', (await new Session().request('/push-sw.js')).status === 200);
 
   // ---------- Восстановление пароля ----------
