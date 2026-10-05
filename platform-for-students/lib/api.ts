@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
-import { HttpError } from '@/lib/security/guards';
+import { HttpError } from '@/lib/security/http-error';
 import { formatWait } from '@/lib/wait-format';
 
 /** Единый конверт ответа: клиент всегда знает, где искать ошибку. */

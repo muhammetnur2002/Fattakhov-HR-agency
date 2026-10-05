@@ -5,7 +5,7 @@ import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { countUnread } from '@/lib/chat';
 import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
-import { getSessionWithRole } from '@/lib/security/guards';
+import { getSessionWithRole, redirectIfRevoked } from '@/lib/security/guards';
 import { listWaitingSwipes } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
  * тоже его решения.
  */
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
+  await redirectIfRevoked('/feed');
   const session = await getSessionWithRole('STUDENT');
   if (!session) redirect('/login?next=/feed');
 

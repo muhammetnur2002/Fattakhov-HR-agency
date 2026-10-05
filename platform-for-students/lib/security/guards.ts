@@ -1,17 +1,63 @@
 import 'server-only';
+import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { agencySiteUrl } from '@/lib/agency';
 import { getStore } from '@/lib/db';
 import { hasCompanyProfile } from '@/lib/company';
 import type { Role, SessionUser } from '@/lib/types';
-import { SESSION_COOKIE, verifySession } from './session';
+import { SESSION_COOKIE } from './session';
+import { resolveSession, type ResolvedSession } from './session-resolve';
 import { staffCan, type StaffPermission } from '@/lib/staff-permissions';
 import { clientIp } from './rate-limit';
+import { HttpError } from './http-error';
+import { assertSameOrigin } from './origin';
 
-/** Текущая сессия из httpOnly-куки. null — гость. */
+export { HttpError, assertSameOrigin };
+
+/**
+ * Кука сессии, сверенная с учётной записью: подпись и срок, затем база — запись жива, пароль
+ * не менялся после выпуска токена (lib/security/session-resolve.ts). Один запрос по первичному
+ * ключу; cache() схлопывает повторные вызовы в пределах одного рендера страницы (шапка,
+ * гвард и страница спрашивают сессию по очереди). В маршрутах API она не запоминается:
+ * там getSession зовут один-два раза за запрос, и лишний запрос по ключу дешевле, чем
+ * отдельное хранилище на запрос.
+ */
+const loadSession = cache(async (): Promise<ResolvedSession> => {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return { user: null, account: null, revoked: false };
+  return resolveSession(token, { findById: async (id) => (await getStore()).accounts.findById(id) });
+});
+
+/** Текущая сессия из httpOnly-куки. null — гость, отозванная или истёкшая сессия. */
 export async function getSession(): Promise<SessionUser | null> {
-  return verifySession((await cookies()).get(SESSION_COOKIE)?.value);
+  return (await loadSession()).user;
+}
+
+/** Учётная запись текущей сессии, уже прочитанная при её проверке; null — гость. */
+export async function getSessionAccount() {
+  return (await loadSession()).account;
+}
+
+/**
+ * Роль и учётная запись одним чтением: сессия уже сверена с записью, вторая выборка
+ * по тому же ключу не нужна. Для горячих маршрутов вроде пульса «в сети».
+ */
+export async function requireRoleWithAccount(...roles: Role[]) {
+  const { user, account } = await loadSession();
+  if (!user || !account || !roles.includes(user.role)) {
+    throw new HttpError(401, 'Требуется вход в систему', 'UNAUTHORIZED');
+  }
+  return { session: user, account };
+}
+
+/**
+ * Серверным страницам: подпись куки верна, а сессия отозвана (учётку отключили или сменили
+ * пароль) — снять куку и отправить на вход. Просто на /login нельзя: middleware видит верную
+ * подпись, считает человека вошедшим и возвращает его обратно в раздел — получился бы круг.
+ */
+export async function redirectIfRevoked(next: string): Promise<void> {
+  if ((await loadSession()).revoked) redirect(`/logout?reason=stale&next=${encodeURIComponent(next)}`);
 }
 
 /**
@@ -27,17 +73,6 @@ export async function getSessionWithRole(...roles: Role[]): Promise<SessionUser 
   return session;
 }
 
-export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'HttpError';
-  }
-}
-
 export async function requireRole(...roles: Role[]): Promise<SessionUser> {
   const session = await getSessionWithRole(...roles);
   if (!session) throw new HttpError(401, 'Требуется вход в систему', 'UNAUTHORIZED');
@@ -47,13 +82,10 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 /**
  * Сотрудник в API панели HR. Без permission — любой, кто вошёл в панель;
  * с ним — только тот, кому раздел выдан в CRM. Отключённая учётка не проходит,
- * даже пока жива её кука.
+ * даже пока жива её кука: getSession() сверяет сессию с учётной записью для всех ролей.
  */
 export async function requireStaff(permission?: StaffPermission): Promise<SessionUser> {
   const session = await requireRole('ADMIN');
-  const store = await getStore();
-  const account = await store.accounts.findById(session.accountId);
-  if (!account || !account.isActive) throw new HttpError(401, 'Требуется вход в систему', 'UNAUTHORIZED');
   if (permission && !staffCan(session, permission)) {
     throw new HttpError(403, 'Этот раздел вам не выдан — доступы выдаёт владелец в CRM', 'FORBIDDEN');
   }
@@ -126,6 +158,7 @@ export function assertCompanyProfileComplete(employer: {
  * а страница падает на отсутствующем профиле.
  */
 export async function requireStudentPage(next = '/feed') {
+  await redirectIfRevoked(next);
   const session = await getSessionWithRole('STUDENT');
   if (!session) redirect(`/login?next=${encodeURIComponent(next)}`);
   const store = await getStore();
@@ -153,6 +186,7 @@ function crmDestination(next: string, crmClientId: string | null): string | null
 }
 
 export async function requireEmployerPage(next = '/employer') {
+  await redirectIfRevoked(next);
   const session = await getSessionWithRole('EMPLOYER');
   if (!session) redirect(`/login?role=employer&next=${encodeURIComponent(next)}`);
   const store = await getStore();
@@ -164,11 +198,9 @@ export async function requireEmployerPage(next = '/employer') {
 }
 
 export async function requireAdminPage(next = '/admin', permission?: StaffPermission) {
+  await redirectIfRevoked(next);
   const session = await getSessionWithRole('ADMIN');
   if (!session) redirect(`/login?next=${encodeURIComponent(next)}`);
-  const store = await getStore();
-  const account = await store.accounts.findById(session.accountId);
-  if (!account || !account.isActive) redirect(`/logout?reason=stale&next=${encodeURIComponent(next)}`);
   // Невыданный раздел — на панель, а не ошибкой: вкладки его и так не показывают
   if (permission && !staffCan(session, permission)) redirect('/admin');
   return session;
@@ -234,26 +266,5 @@ export async function auditService(actorLabel: string, input: AuditInput, reques
     });
   } catch (err) {
     console.error('[audit] не удалось записать событие:', err);
-  }
-}
-
-/**
- * Защита от межсайтовой отправки форм.
- *
- * Куки помечены SameSite=Lax, поэтому браузер и так не приложит их к
- * кросс-сайтовому POST. Сверка Origin — второй рубеж на случай клиента,
- * который SameSite не соблюдает.
- */
-export function assertSameOrigin(request: Request): void {
-  const origin = request.headers.get('origin');
-  if (!origin) return; // не браузерный запрос: same-origin fetch может не слать Origin
-  const host = request.headers.get('host');
-  try {
-    if (new URL(origin).host !== host) {
-      throw new HttpError(403, 'Запрос с чужого источника отклонён', 'BAD_ORIGIN');
-    }
-  } catch (err) {
-    if (err instanceof HttpError) throw err;
-    throw new HttpError(403, 'Некорректный заголовок Origin', 'BAD_ORIGIN');
   }
 }

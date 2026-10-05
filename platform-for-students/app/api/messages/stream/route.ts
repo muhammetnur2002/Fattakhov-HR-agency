@@ -1,6 +1,10 @@
 import { viewerFromSession } from '@/lib/chat';
 import { subscribeThreadEvents } from '@/lib/events';
+import { cookies } from 'next/headers';
+import { getStore } from '@/lib/db';
 import { getSession } from '@/lib/security/guards';
+import { SESSION_COOKIE } from '@/lib/security/session';
+import { createStreamGuard } from '@/lib/security/stream-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +25,7 @@ export async function GET(request: Request) {
     return new Response('Требуется вход в систему', { status: 401 });
   }
 
+  const cookieToken = (await cookies()).get(SESSION_COOKIE)?.value;
   const encoder = new TextEncoder();
   let unsubscribe: () => void = () => {};
   let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -43,7 +48,25 @@ export async function GET(request: Request) {
 
       // Прокси и балансировщики рвут молчащее соединение примерно через
       // минуту; комментарий каждые 25 секунд держит канал живым
-      heartbeat = setInterval(() => push(': keep-alive\n\n'), 25_000);
+      // Заодно раз в ~3 минуты сверяем сессию: отозванная закрывает поток
+      const token = cookieToken;
+      const guard = createStreamGuard(
+        token,
+        { findById: async (id) => (await getStore()).accounts.findById(id) },
+        () => {
+          if (heartbeat) clearInterval(heartbeat);
+          unsubscribe();
+          try {
+            controller.close();
+          } catch {
+            /* уже закрыт */
+          }
+        },
+      );
+      heartbeat = setInterval(() => {
+        push(': keep-alive\n\n');
+        void guard();
+      }, 25_000);
 
       request.signal.addEventListener('abort', () => {
         if (heartbeat) clearInterval(heartbeat);

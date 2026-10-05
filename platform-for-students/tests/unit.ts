@@ -22,12 +22,17 @@ import { fitHours, maxHoursPerWeek } from '../lib/schedule';
 import { addWorkdays, applicationsOpen, isPendingExpired, studyStatus, workdaysLeft } from '../lib/study';
 import { isCodeShape, maskEmail, normalizeCode, resendWaitSeconds } from '../lib/account-codes';
 import { applicationStatusMail, emailCodeMail, escapeHtml, messagesDigestMail, passwordResetMail } from '../lib/mail/templates';
-import { emailCodeSchema, registrationSteps } from '../lib/validation';
+import { emailCodeSchema, passwordSchema, registrationSteps } from '../lib/validation';
+import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/password-policy';
+import { commonPasswordCount, isCommonPassword } from '../lib/security/common-passwords';
+import { weakPasswordMessage } from '../lib/security/password-check';
+import { canSignInWithPassword, passwordHashForLogin } from '../lib/security/login-policy';
 import { safeNext } from '../lib/security/safe-next';
 import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent';
 import bcryptjs from 'bcryptjs';
 import { hashPassword, verifyPassword } from '../lib/security/password';
 import { formatWait } from '../lib/wait-format';
+import { PRESENCE_TICK_MS, formatPresence, presenceNow, shouldWritePresence, visibleLastSeen } from '../lib/presence';
 import { vapidProblem } from '../lib/push/config';
 import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
 import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
@@ -503,6 +508,174 @@ testAsync('пароли: хеши bcryptjs и нативного bcrypt чита
 testAsync('пароли: нет хеша — сравнение с заглушкой, ответ «неверно»', async () => {
   assert.equal(await verifyPassword('любой', null), false);
   assert.equal(await verifyPassword('любой', undefined), false);
+});
+
+// --- «В сети» и «был(а) последний раз» ---------------------------------
+// Время задаётся с явным московским смещением: иначе проверки прошли бы
+// на машине разработчика и упали на сервере в другой зоне.
+const MSK_NOW = new Date('2026-10-04T21:40:00+03:00');
+const seen = (iso: string) => formatPresence(new Date(iso), MSK_NOW);
+
+test('только что — «В сети» с зелёной точкой', () => {
+  assert.deepEqual(seen('2026-10-04T21:40:00+03:00'), { online: true, text: 'В сети' });
+});
+
+test('две минуты — ещё в сети: это один пропущенный пульс', () => {
+  assert.equal(seen('2026-10-04T21:38:00+03:00').online, true);
+});
+
+test('три минуты — уже не в сети', () => {
+  assert.deepEqual(seen('2026-10-04T21:37:00+03:00'), { online: false, text: 'был(а) 3 мин назад' });
+});
+
+test('ровно 59 минут — ещё в минутах, это верхняя граница правила', () => {
+  assert.equal(seen('2026-10-04T20:41:00+03:00').text, 'был(а) 59 мин назад');
+});
+
+test('ровно час — уже не в минутах, а со временем', () => {
+  assert.equal(seen('2026-10-04T20:40:00+03:00').text, 'был(а) сегодня в 20:40');
+});
+
+test('сегодня — со временем по Москве', () => {
+  assert.equal(seen('2026-10-04T18:40:00+03:00').text, 'был(а) сегодня в 18:40');
+});
+
+test('вчера — отдельная формулировка, а не «21 ч назад»', () => {
+  assert.equal(seen('2026-10-03T21:00:00+03:00').text, 'был(а) вчера в 21:00');
+});
+
+test('в этом году — день и месяц без времени', () => {
+  assert.equal(seen('2026-09-12T10:00:00+03:00').text, 'был(а) 12 сент.');
+});
+
+test('прошлый год — «давно», без точной даты', () => {
+  assert.equal(seen('2025-12-31T10:00:00+03:00').text, 'был(а) давно');
+});
+
+test('не заходил ни разу — «давно», а не пусто', () => {
+  assert.deepEqual(formatPresence(null, MSK_NOW), { online: false, text: 'был(а) давно' });
+});
+
+test('отметка из будущего — рассинхрон часов, а не машина времени', () => {
+  assert.equal(formatPresence(new Date('2026-10-04T21:45:00+03:00'), MSK_NOW).online, true);
+});
+
+test('сразу после московской полуночи вчерашнее становится «вчера»', () => {
+  const midnight = new Date('2026-10-05T00:10:00+03:00');
+  // Двадцать минут назад — это ещё «20 мин назад»: правило минут идёт первым
+  assert.equal(formatPresence(new Date('2026-10-04T23:50:00+03:00'), midnight).text, 'был(а) 20 мин назад');
+  // А то, что было вечером, уже вчерашнее, хотя прошло всего три часа
+  assert.equal(formatPresence(new Date('2026-10-04T21:00:00+03:00'), midnight).text, 'был(а) вчера в 21:00');
+});
+
+test('выключенный показ скрывает статус так же, как отсутствие права', () => {
+  const at = new Date('2026-10-04T21:00:00+03:00');
+  assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: false }, true), null);
+  assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: true }, false), null);
+  assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: true }, true), at);
+});
+
+test('пульс пишется не чаще раза в минуту', () => {
+  const now = new Date('2026-10-04T21:40:00+03:00');
+  assert.equal(shouldWritePresence(null, now), true);
+  assert.equal(shouldWritePresence(new Date('2026-10-04T21:39:30+03:00'), now), false);
+  assert.equal(shouldWritePresence(new Date('2026-10-04T21:39:00+03:00'), now), true);
+});
+
+
+console.log('Пароль: длина, словарь, простые шаблоны');
+test('длина — не меньше десяти символов', () => {
+  assert.equal(MIN_PASSWORD_LENGTH, 10);
+  assert.equal(passwordSchema.safeParse('Tuman-4821').success, true); // 10
+  assert.equal(passwordSchema.safeParse('Tuman-482').success, false); // 9
+  const short = passwordSchema.safeParse('abc12345');
+  assert.equal(short.success ? '' : short.error.issues[0]?.message, 'Минимум 10 символов');
+});
+test('слишком длинный пароль отвергается, а не обрезается', () => {
+  assert.equal(passwordSchema.safeParse('а1'.repeat(65)).success, false);
+});
+test('набор символов не навязывается: длинная фраза без цифр подходит', () => {
+  assert.equal(passwordSchema.safeParse('коралловый закат над морем').success, true);
+});
+test('только цифры — слабый пароль (не последовательность)', () => {
+  assert.match(passwordProblem('7391846205') ?? '', /из одних цифр/);
+});
+test('повтор одного символа и пары символов', () => {
+  assert.match(passwordProblem('aaaaaaaaaaaa') ?? '', /однообразный/);
+  assert.match(passwordProblem('abababababab') ?? '', /однообразный/);
+  assert.match(passwordProblem('1212121212') ?? '', /однообразный/);
+});
+test('последовательности: цифры, алфавиты, ряды клавиатуры обеих раскладок', () => {
+  for (const weak of ['1234567890', '12345678901', 'abcdefghijk', 'qwertyuiop', 'йцукенгшщз', 'asdfghjklzxc', 'zyxwvutsrq', 'poiuytrewq']) {
+    assert.match(passwordProblem(weak) ?? '', /последовательность/, weak);
+  }
+});
+test('регистр и пробелы по краям не прячут слабый пароль', () => {
+  assert.notEqual(passwordProblem('QWERTYUIOP'), null);
+  assert.notEqual(passwordProblem('  1234567890  '), null);
+});
+test('схема отдаёт то же сообщение, что и passwordProblem', () => {
+  const result = passwordSchema.safeParse('qwertyuiop');
+  assert.equal(result.success ? '' : result.error.issues[0]?.message, passwordProblem('qwertyuiop'));
+});
+test('пароль с частью почты слабый: локальная часть и её слова от четырёх символов', () => {
+  const ctx = { email: 'iva.petrov@mail.ru' };
+  assert.match(passwordProblem('petrov-2026-xyz', ctx) ?? '', /почт/);
+  assert.match(passwordProblem('IVA.PETROV!!2026', ctx) ?? '', /почт/);
+  assert.equal(passwordProblem('коралловый-закат-17', ctx), null);
+  // «iva» короче четырёх символов — не повод отвергать пароль
+  assert.equal(passwordProblem('iva-коралловый-закат', ctx), null);
+});
+test('хороший пароль проходит', () => {
+  for (const good of ['коралловый-закат-17', 'Tr0ub4dor&3x', 'correct horse battery staple', 'Tuman-Zakat-4821']) {
+    assert.equal(passwordProblem(good), null, good);
+  }
+});
+
+console.log('Пароль: словарь распространённых (сервер)');
+test('словарь прочитан целиком: десять тысяч слов и русское дополнение', () => {
+  assert.ok(commonPasswordCount() > 10_000, String(commonPasswordCount()));
+  assert.equal(isCommonPassword('пароль123'), true);
+});
+test('словарь не зависит от регистра и пробелов', () => {
+  assert.equal(isCommonPassword('  DRAGON '), true);
+  assert.equal(isCommonPassword('коралловый-закат-17'), false);
+});
+test('слово из словаря плюс цифры и знаки на конце — тоже слабое', () => {
+  for (const weak of ['Password2026!', 'letmein2026', 'Qwerty123456', 'PASSWORD123', 'iloveyou-2026']) {
+    assert.match(weakPasswordMessage(weak, null) ?? '', /распространённый/, weak);
+  }
+});
+test('сервер: словарь и почта в одной проверке; хороший пароль — null', () => {
+  assert.match(weakPasswordMessage('petrov-2026-xyz', 'ivan.petrov@mail.ru') ?? '', /почт/);
+  assert.equal(weakPasswordMessage('коралловый-закат-17', 'ivan.petrov@mail.ru'), null);
+  assert.equal(weakPasswordMessage('Tuman-Zakat-4821', null), null);
+});
+
+
+console.log('Вход: роли и пароль');
+test('парольный вход закрыт для ADMIN и открыт студенту и работодателю', () => {
+  assert.equal(canSignInWithPassword('ADMIN'), false);
+  assert.equal(canSignInWithPassword('STUDENT'), true);
+  assert.equal(canSignInWithPassword('EMPLOYER'), true);
+});
+test('у администратора сверка идёт с пустышкой, а не с его хешем', () => {
+  assert.equal(passwordHashForLogin({ role: 'ADMIN', passwordHash: '$2a$12$настоящий-хеш' }), null);
+  assert.equal(passwordHashForLogin({ role: 'STUDENT', passwordHash: '$2a$12$хеш' }), '$2a$12$хеш');
+  assert.equal(passwordHashForLogin(null), null);
+});
+testAsync('верный пароль администратора не проходит: сверка с пустышкой даёт «неверно»', async () => {
+  const hash = await hashPassword('Tuman-Zakat-4821');
+  assert.equal(await verifyPassword('Tuman-Zakat-4821', passwordHashForLogin({ role: 'ADMIN', passwordHash: hash })), false);
+  assert.equal(await verifyPassword('Tuman-Zakat-4821', passwordHashForLogin({ role: 'STUDENT', passwordHash: hash })), true);
+});
+
+test('строка «в сети» пересчитывается чаще раза в минуту, но не чаще раза в полминуты', () => {
+  assert.ok(PRESENCE_TICK_MS >= 30_000 && PRESENCE_TICK_MS <= 60_000);
+  const tick = (ms: number) => presenceNow(ms).getTime();
+  const base = PRESENCE_TICK_MS * 40_000_000;
+  assert.equal(tick(base), tick(base + PRESENCE_TICK_MS - 1));
+  assert.equal(tick(base + PRESENCE_TICK_MS) - tick(base), PRESENCE_TICK_MS);
 });
 
 void Promise.all(pending).then(() => {

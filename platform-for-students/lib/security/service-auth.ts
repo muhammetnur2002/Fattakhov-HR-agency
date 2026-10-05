@@ -1,6 +1,6 @@
 import 'server-only';
 import { safeEqual } from '@/lib/security/crypto';
-import { HttpError } from '@/lib/security/guards';
+import { HttpError } from '@/lib/security/http-error';
 
 /**
  * Служебный вход сервера в сервер — для CRM, а не для браузера.

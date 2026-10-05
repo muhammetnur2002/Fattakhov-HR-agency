@@ -9,10 +9,18 @@ import { durations, easeOutExpo } from '@/lib/motion';
 /**
  * Поля ввода.
  *
- * Подпись живёт внутри рамки и уезжает наверх, когда в поле что-то есть:
- * так подпись остаётся видна при заполненном поле — в отличие от
- * плейсхолдера, который исчезает ровно тогда, когда человек начинает
- * сомневаться, что он вообще вводил.
+ * Подпись живёт внутри рамки, пока поле пустое, и плавно исчезает, как
+ * только в поле появляется текст. Раньше она оставалась на месте, и в
+ * длинных подписях — «Цели и профессиональные интересы» — переносилась на
+ * две строки, а набираемый текст шёл прямо по ней.
+ *
+ * Исчезает только нарисованная подпись. Рядом всегда стоит она же,
+ * скрытая визуально, и именно её читает экранный диктор: поле не должно
+ * становиться безымянным оттого, что в нём что-то напечатали.
+ *
+ * Правило касается полей, где текст набирают руками. У списка выбора
+ * подпись остаётся: там значение подставляется само, и без подписи
+ * непонятно, что именно выбрано.
  *
  * Ошибка не подменяет подпись, а появляется под полем: подмена сбивает
  * высоту строки и дёргает всю форму.
@@ -68,21 +76,53 @@ function FieldError({ error, hint }: { error?: string; hint?: string }) {
   );
 }
 
-function FloatingLabel({ id, label, lifted }: { id: string; label: string; lifted: boolean }) {
+/**
+ * Подпись, скрытая визуально, но не от экранного диктора.
+ *
+ * Это и есть настоящая `label` поля: видимая подпись рядом — только
+ * рисунок, помеченный `aria-hidden`. Две `label` на одно поле диктор
+ * прочитал бы дважды.
+ */
+function HiddenLabel({ id, label }: { id: string; label: string }) {
   return (
-    <motion.label
-      htmlFor={id}
-      initial={false}
-      animate={
-        lifted
-          ? { y: -14, scale: 0.76, opacity: 0.7 }
-          : { y: 0, scale: 1, opacity: 0.5 }
-      }
-      transition={{ duration: durations.fast, ease: easeOutExpo }}
-      className="pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-[15px] text-paper"
-    >
+    <label htmlFor={id} className="sr-only">
       {label}
-    </motion.label>
+    </label>
+  );
+}
+
+function FloatingLabel({
+  id,
+  label,
+  lifted,
+  faded,
+}: {
+  id: string;
+  label: string;
+  lifted: boolean;
+  faded: boolean;
+}) {
+  return (
+    <>
+      <HiddenLabel id={id} label={label} />
+      <motion.span
+        aria-hidden
+        initial={false}
+        // Положение при исчезновении — то же, что у поднятой подписи:
+        // подпись гаснет на месте, а не уезжает одновременно с угасанием
+        animate={
+          faded
+            ? { y: -14, scale: 0.76, opacity: 0 }
+            : lifted
+              ? { y: -14, scale: 0.76, opacity: 0.7 }
+              : { y: 0, scale: 1, opacity: 0.5 }
+        }
+        transition={{ duration: durations.fast, ease: easeOutExpo }}
+        className="pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-[15px] text-paper"
+      >
+        {label}
+      </motion.span>
+    </>
   );
 }
 
@@ -97,12 +137,12 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const generated = useId();
   const id = props.id ?? generated;
   const [focused, setFocused] = useState(false);
-  const lifted = focused || String(value ?? '').length > 0;
+  const filled = String(value ?? '').length > 0;
 
   return (
     <div className={className}>
       <div className={shellClasses(focused, !!error)}>
-        <FloatingLabel id={id} label={label} lifted={lifted} />
+        <FloatingLabel id={id} label={label} lifted={focused || filled} faded={filled} />
         <input
           ref={ref}
           id={id}
@@ -141,12 +181,16 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
     return (
       <div className={className}>
         <div className={shellClasses(focused, !!error)}>
-          <label
-            htmlFor={id}
-            className="pointer-events-none absolute left-4 top-3 text-[12.5px] uppercase tracking-[0.1em] text-paper-faint"
+          <HiddenLabel id={id} label={label} />
+          <motion.span
+            aria-hidden
+            initial={false}
+            animate={{ opacity: length > 0 ? 0 : 1 }}
+            transition={{ duration: durations.fast, ease: easeOutExpo }}
+            className="pointer-events-none absolute left-4 right-4 top-3 text-[12.5px] uppercase tracking-[0.1em] text-paper-faint"
           >
             {label}
-          </label>
+          </motion.span>
           <textarea
             ref={ref}
             id={id}

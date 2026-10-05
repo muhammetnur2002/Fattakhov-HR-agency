@@ -14,6 +14,7 @@ import { emailCodeMail, passwordResetMail } from '@/lib/mail/templates';
 import { sendMail } from '@/lib/mail/transport';
 import { blindIndex, decryptSafe, safeEqual } from '@/lib/security/crypto';
 import { hashPassword } from '@/lib/security/password';
+import { weakPasswordMessage } from '@/lib/security/password-check';
 import { generateEmailCode, generateResetToken, hashEmailCode, hashResetToken } from '@/lib/security/tokens';
 import { releasePendingApplications } from '@/lib/services';
 import type { Role } from '@/lib/types';
@@ -78,10 +79,14 @@ export async function verifyEmailCode(accountId: string, code: string): Promise<
   const token = await store.authTokens.latest(accountId, 'EMAIL_VERIFY');
   if (!token) return { status: 'NO_CODE' };
   if (isExpired(token.expiresAt)) return { status: 'EXPIRED' };
-  if (token.attempts >= EMAIL_CODE_MAX_ATTEMPTS) return { status: 'LOCKED' };
+
+  // Попытка занимается до сверки, одним условным обновлением: если сначала сверять, а потом
+  // считать, сорок параллельных запросов успели бы все прочитать «ошибок ноль» и перебрать
+  // сорок кодов, а не пять. Пятая занятая попытка ещё сверяется — ровно пять догадок на код
+  const attempts = await store.authTokens.claimAttempt(token.id, EMAIL_CODE_MAX_ATTEMPTS);
+  if (attempts === null) return { status: 'LOCKED' };
 
   if (!safeEqual(token.tokenHash, hashEmailCode(accountId, code))) {
-    const attempts = await store.authTokens.recordFailure(token.id);
     return attempts >= EMAIL_CODE_MAX_ATTEMPTS
       ? { status: 'LOCKED' }
       : { status: 'WRONG', attemptsLeft: EMAIL_CODE_MAX_ATTEMPTS - attempts };
@@ -99,11 +104,15 @@ export async function verifyEmailCode(accountId: string, code: string): Promise<
 }
 
 export type PasswordResetRequestResult =
-  | { status: 'SENT' }
+  /**
+   * Ссылка выпущена, письмо ещё не ушло: `deliver()` отправляет его и сообщает, дошло ли.
+   * Ответ человеку не ждёт письма — иначе по времени ответа отличались бы «аккаунт есть»
+   * (идёт письмо) и «нет» (ответ сразу).
+   */
+  | { status: 'SENT'; deliver: () => Promise<boolean> }
   | { status: 'NO_ACCOUNT' }
   | { status: 'NO_PASSWORD' }
-  | { status: 'WAIT'; retryAfter: number }
-  | { status: 'MAIL_FAILED' };
+  | { status: 'WAIT'; retryAfter: number };
 
 /**
  * Письмо со ссылкой сброса пароля.
@@ -118,13 +127,16 @@ export type PasswordResetRequestResult =
  * Работодателю из CRM без пароля письмо не уходит: он входит по коду,
  * который выдаёт менеджер, — для него отдельный ответ.
  *
- * Отправка дожидается результата: в serverless-функции письмо, не
- * дождавшееся ответа, могло не успеть уйти до заморозки инстанса.
+ * Письмо отправляет вызывающий через `deliver()` уже после ответа (after() в маршруте):
+ * процесс живёт на ВМ, заморозки инстанса нет, а ждать SMTP перед ответом значило бы
+ * выдавать временем, есть ли такой аккаунт. Сбой отправки в ответ не попадает — только в журнал.
  */
 export async function requestPasswordReset(email: string): Promise<PasswordResetRequestResult> {
   const store = await getStore();
   const account = await store.accounts.findByEmailHash(blindIndex(email));
-  if (!account || !account.isActive) return { status: 'NO_ACCOUNT' };
+  // Администратор платформы входит только через CRM: пароль ему не нужен, письмо со ссылкой
+  // сброса не уходит, а о самом аккаунте ответ такой же, как о несуществующем
+  if (!account || !account.isActive || account.role === 'ADMIN') return { status: 'NO_ACCOUNT' };
   if (!account.passwordHash) return { status: 'NO_PASSWORD' };
 
   const last = await store.authTokens.latest(account.id, 'PASSWORD_RESET');
@@ -138,11 +150,9 @@ export async function requestPasswordReset(email: string): Promise<PasswordReset
     tokenHash: hashResetToken(token),
     expiresAt: minutesAfter(new Date(), PASSWORD_RESET_TTL_MINUTES),
   });
-  const delivered = await sendMail({
-    to: decryptSafe(account.emailEnc),
-    ...passwordResetMail({ url: appUrl(`/reset/${token}`), minutes: PASSWORD_RESET_TTL_MINUTES }),
-  });
-  return delivered ? { status: 'SENT' } : { status: 'MAIL_FAILED' };
+  const to = decryptSafe(account.emailEnc);
+  const mail = passwordResetMail({ url: appUrl(`/reset/${token}`), minutes: PASSWORD_RESET_TTL_MINUTES });
+  return { status: 'SENT', deliver: () => sendMail({ to, ...mail }) };
 }
 
 export type ResetTokenState = 'VALID' | 'INVALID' | 'EXPIRED';
@@ -158,6 +168,8 @@ export async function checkResetToken(token: string): Promise<ResetTokenState> {
 
 export type ResetResult =
   | { status: 'RESET'; accountId: string; role: Role }
+  /** Пароль слабый: ссылка не сгорает, человек вводит другой. message — что именно не так */
+  | { status: 'WEAK'; message: string }
   | { status: 'INVALID' }
   | { status: 'EXPIRED' };
 
@@ -168,9 +180,16 @@ export async function resetPassword(token: string, password: string): Promise<Re
   if (isExpired(record.expiresAt)) return { status: 'EXPIRED' };
 
   const account = await store.accounts.findById(record.accountId);
-  if (!account || !account.isActive) return { status: 'INVALID' };
+  if (!account || !account.isActive || account.role === 'ADMIN') return { status: 'INVALID' };
+
+  // Слабый пароль отвергается до погашения ссылки: опечатка или «слишком простой» не должны
+  // стоить человеку нового письма. Почта берётся из базы — форма сброса её не знает
+  const weak = weakPasswordMessage(password, decryptSafe(account.emailEnc));
+  if (weak) return { status: 'WEAK', message: weak };
+
   if (!(await store.authTokens.consume(record.id))) return { status: 'INVALID' };
 
+  // setPassword ставит и метку смены: сессии, выданные до сброса, перестают действовать
   await store.accounts.setPassword(account.id, await hashPassword(password));
   // Ссылка пришла на эту почту и по ней перешли — владение ящиком доказано
   await store.accounts.markEmailVerified(account.id);

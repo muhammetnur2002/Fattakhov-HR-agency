@@ -15,15 +15,15 @@ import { durations, easeOutExpo } from '@/lib/motion';
 /**
  * Вход.
  *
- * Один способ на всех: студент, компания и HR-менеджер входят по почте
- * и паролю. Раньше здесь была вторая вкладка «Код из CRM» для клиентов
+ * Студент и компания входят по почте и паролю. Сотрудник агентства (роль
+ * ADMIN) паролем не входит вовсе — только через CRM, поэтому демо-доступов
+ * администратора здесь нет. Раньше здесь была вторая вкладка «Код из CRM» для клиентов
  * агентства без своей регистрации — теперь клиент попадает в кабинет
  * прямой ссылкой из CRM (готовая сессия, вводить нечего), а код остался
  * бы дублирующим, никому не нужным путём входа.
  */
 interface DemoHint {
   student: { email: string; password: string };
-  admin: { email: string; password: string };
   employerCode: string;
 }
 
@@ -200,14 +200,6 @@ export function LoginForm({
                 >
                   Работодатель — Кофейни «Север»
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => signIn('/api/auth/login', demoHint.admin)}
-                >
-                  HR-менеджер агентства
-                </Button>
               </div>
               <div className="mt-3 space-y-1 text-[11.5px] leading-relaxed text-paper-faint">
                 <p>
@@ -215,12 +207,9 @@ export function LoginForm({
                   <code className="text-accent-200">{demoHint.student.password}</code>
                 </p>
                 <p>
-                  HR-менеджер: <code className="text-accent-200">{demoHint.admin.email}</code> ·{' '}
-                  <code className="text-accent-200">{demoHint.admin.password}</code>
-                </p>
-                <p>
                   Код работодателя: <code className="text-accent-200">{demoHint.employerCode}</code>
                 </p>
+                <p>Панель HR открывается только входом из CRM.</p>
                 <p className="pt-1">Данные живут до перезапуска сервера.</p>
               </div>
             </div>

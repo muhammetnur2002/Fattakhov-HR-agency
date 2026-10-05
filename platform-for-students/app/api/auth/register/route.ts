@@ -3,6 +3,7 @@ import { getStore } from '@/lib/db';
 import { issuePendingRegistration, type PendingStudentData } from '@/lib/pending-registration';
 import { blindIndex } from '@/lib/security/crypto';
 import { assertSameOrigin } from '@/lib/security/guards';
+import { assertStrongPassword } from '@/lib/security/password-check';
 import { clientIp, rateLimit } from '@/lib/security/rate-limit';
 import { registrationSchema } from '@/lib/validation';
 
@@ -24,6 +25,8 @@ export async function POST(request: Request) {
     if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
     const input = registrationSchema.parse(await request.json());
+    // Словарь распространённых паролей — только здесь, на сервере: в браузер он не едет
+    assertStrongPassword(input.password, input.email);
 
     // Письмо с кодом уходит на любой адрес, который назвали, — без предела по адресу форму можно
     // использовать, чтобы заваливать чужую почту. Предел стоит до любых проверок и отправки

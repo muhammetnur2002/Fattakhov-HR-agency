@@ -1,6 +1,7 @@
 import 'server-only';
 import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
+import { visibleLastSeen } from '@/lib/presence';
 import { decryptSafe } from '@/lib/security/crypto';
 import { studentFacingVacancy } from '@/lib/vacancy';
 import type { ApplicationRecord, MessageRecord } from '@/lib/db/types';
@@ -107,7 +108,13 @@ async function loadContext(applicationId: string, viewer: Viewer) {
   ]);
   if (!student || !employer) return null;
 
-  return { store, application, vacancy, student, employer };
+  // Учётка собеседника — ради «в сети». Берём её здесь, а не в вёрстке:
+  // сюда доходят только участники этого отклика (проверки выше), и
+  // показать статус постороннему отсюда технически невозможно.
+  const counterpartAccountId = viewer.role === 'STUDENT' ? employer.accountId : student.accountId;
+  const counterpartAccount = await store.accounts.findById(counterpartAccountId);
+
+  return { store, application, vacancy, student, employer, counterpartAccount };
 }
 
 type Context = NonNullable<Awaited<ReturnType<typeof loadContext>>>;
@@ -142,6 +149,17 @@ function buildSummary(
     counterpartName: counterpart.name,
     counterpartPhotoUrl: counterpart.photoUrl,
     counterpartSubtitle: counterpart.subtitle,
+    // Право видеть статус здесь уже доказано: loadContext пускает дальше
+    // только участников отклика. Остаётся учесть собственный выбор
+    // человека — выключенный показ скрывает статус и от собеседника
+    counterpartLastSeen:
+      visibleLastSeen(
+        {
+          lastSeenAt: ctx.counterpartAccount?.lastSeenAt ?? null,
+          showPresence: ctx.counterpartAccount?.showPresence ?? true,
+        },
+        true,
+      )?.toISOString() ?? null,
     status: application.status,
     lastMessageBody: last ? preview(decryptSafe(last.bodyEnc, '…')) : null,
     lastMessageAuthor: last?.author ?? null,

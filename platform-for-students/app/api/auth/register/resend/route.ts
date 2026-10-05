@@ -26,6 +26,7 @@ export async function POST(request: Request) {
         { status: 429, headers: { 'Retry-After': String(result.retryAfter) } },
       );
     }
+    if (result.status === 'LIMITED') return tooManyRequests(result.retryAfter);
     if (result.status === 'BAD_TOKEN') {
       return fail(410, 'Время на подтверждение истекло. Начните регистрацию заново.', 'CODE_EXPIRED');
     }

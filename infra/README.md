@@ -110,7 +110,7 @@ terraform apply prod.tfplan
 
 | В бакете | У себя | Что внутри |
 | --- | --- | --- |
-| `prod/prod.tfvars` | `infra/prod.tfvars` | теги образов, переменные, **пароли баз** (`db_password`, `crm_db_password`, `students_db_password`) |
+| `prod/prod.tfvars` | `infra/prod.tfvars` | теги образов, переменные, **пароли баз** (`crm_db_password`, `students_db_password`) |
 | `prod/prod.env` | `~/.fhr/prod.env` (или `TF_VAR_env_file`) | настройки сервера кабинета, уходят в cloud-init |
 
 Раньше у каждого оператора были свои копии, и за одни сутки они разошлись

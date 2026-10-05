@@ -41,6 +41,16 @@ export interface AccountRecord {
   /** Напоминания и сводки о сообщениях; письма о решениях приходят всегда */
   notifyEmail: boolean;
   createdAt: Date;
+  /** Последний пульс с открытой вкладки. Пишется не чаще раза в минуту */
+  lastSeenAt: Date | null;
+  /** «Показывать, что я в сети». Выключено — статус не отдают никому */
+  showPresence: boolean;
+  /**
+   * Когда пароль меняли в последний раз. Сессия, выпущенная раньше, недействительна:
+   * иначе сброс пароля не выбросил бы того, кто уже вошёл с украденным паролем.
+   * null — пароль не менялся с момента заведения (метка для старых записей не нужна).
+   */
+  passwordChangedAt: Date | null;
 }
 
 export interface StudentRecord extends StudentPortfolio {
@@ -502,8 +512,14 @@ export interface DataStore {
     markTourSeen(id: string): Promise<void>;
     /** Повторная отметка не сдвигает дату первого подтверждения */
     markEmailVerified(id: string): Promise<void>;
+    /** Новый пароль и метка смены: все ранее выданные сессии перестают действовать */
     setPassword(id: string, passwordHash: string): Promise<void>;
+    /** Отключить или вернуть учётную запись. Отключённая теряет сессии сразу, любая роль */
+    setActive(id: string, active: boolean): Promise<void>;
     setNotifyEmail(id: string, enabled: boolean): Promise<void>;
+    /** Отметка «был здесь». Решение, пора ли писать, принимает вызывающий */
+    setLastSeen(id: string, at: Date): Promise<void>;
+    setShowPresence(id: string, enabled: boolean): Promise<void>;
     /** Сотрудник агентства при первом входе из CRM: без пароля, почта подтверждена CRM */
     createStaff(email: string): Promise<AccountRecord>;
   };
@@ -514,8 +530,12 @@ export interface DataStore {
     /** Последний неиспользованный — для проверки кода и паузы между письмами */
     latest(accountId: string, kind: AuthTokenKind): Promise<AuthTokenRecord | null>;
     findActiveByHash(kind: AuthTokenKind, tokenHash: string): Promise<AuthTokenRecord | null>;
-    /** Неверный ввод; возвращает, сколько ошибок уже накопилось */
-    recordFailure(id: string): Promise<number>;
+    /**
+     * Занять попытку ввода — до сверки кода, одним условным обновлением: параллельные
+     * запросы не обгоняют счётчик. Возвращает номер занятой попытки (1…max) или null,
+     * если попытки кончились или код уже погашен.
+     */
+    claimAttempt(id: string, max: number): Promise<number | null>;
     /** Погасить. false — его уже погасил параллельный запрос */
     consume(id: string): Promise<boolean>;
   };

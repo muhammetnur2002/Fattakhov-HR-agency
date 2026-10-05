@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { getStore } from '@/lib/db';
-import { HttpError } from '@/lib/security/guards';
+import { HttpError } from '@/lib/security/http-error';
 
 /**
  * Кабинет клиента CRM для служебных вызовов /api/service/employer/*.

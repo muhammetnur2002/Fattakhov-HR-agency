@@ -41,9 +41,6 @@ locals {
     SMTP_URL    = sensitive(trim(trimspace(regex("(?m)^SMTP_URL=(.*)$", local.prod_env)[0]), "\"'"))
     SMTP_FROM   = trim(trimspace(regex("(?m)^SMTP_FROM=(.*)$", local.prod_env)[0]), "\"'")
     ALERT_EMAIL = trim(trimspace(regex("(?m)^ALERT_EMAIL=(.*)$", local.prod_env)[0]), "\"'")
-    # Дублирование в Telegram: токен бота — из prod.env, чаты — metrics_telegram_chat_ids
-    TELEGRAM_BOT_TOKEN = sensitive(trim(trimspace(regex("(?m)^TELEGRAM_BOT_TOKEN=(.*)$", local.prod_env)[0]), "\"'"))
-    TELEGRAM_CHAT_IDS  = join(",", var.metrics_telegram_chat_ids)
   }
 }
 
@@ -126,12 +123,6 @@ variable "metrics_alert_extra_emails" {
   default     = []
 }
 
-variable "metrics_telegram_chat_ids" {
-  description = "Чаты Telegram для оповещений по ресурсам (числовые chat_id; получатель должен нажать «Старт» у бота). Токен бота берётся из TELEGRAM_BOT_TOKEN в prod.env. Пусто — только почта."
-  type        = list(string)
-  default     = []
-}
-
 locals {
   metrics_env = {
     FOLDER_ID = var.folder_id
@@ -141,12 +132,9 @@ locals {
       "fhr-students" = yandex_compute_instance.students.id
     })
     EXTRA_RECIPIENTS = join(",", var.metrics_alert_extra_emails)
-    # Токен бота — из того же prod.env, что уходит на сервер; без чатов не используется
-    TELEGRAM_BOT_TOKEN = sensitive(trim(trimspace(regex("(?m)^TELEGRAM_BOT_TOKEN=(.*)$", local.prod_env)[0]), "\"'"))
-    TELEGRAM_CHAT_IDS  = join(",", var.metrics_telegram_chat_ids)
-    SMTP_URL           = local.uptime_env.SMTP_URL
-    SMTP_FROM          = local.uptime_env.SMTP_FROM
-    ALERT_EMAIL        = local.uptime_env.ALERT_EMAIL
+    SMTP_URL         = local.uptime_env.SMTP_URL
+    SMTP_FROM        = local.uptime_env.SMTP_FROM
+    ALERT_EMAIL      = local.uptime_env.ALERT_EMAIL
   }
 }
 

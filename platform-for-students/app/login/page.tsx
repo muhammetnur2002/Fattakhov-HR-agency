@@ -21,7 +21,6 @@ export default async function LoginPage(props: { searchParams: Promise<{ role?: 
   const demoHint = isDemoMode()
     ? {
         student: { ...DEMO_CREDENTIALS.student },
-        admin: { ...DEMO_CREDENTIALS.admin },
         employerCode: DEMO_CREDENTIALS.employerCode,
       }
     : undefined;

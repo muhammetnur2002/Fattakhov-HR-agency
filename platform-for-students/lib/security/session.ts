@@ -56,6 +56,11 @@ export async function signSession(user: SessionUser, maxAgeSeconds: number = MAX
     .sign(secret());
 }
 
+/**
+ * Только подпись и срок — без базы: так читает куку и middleware на edge. Что учётная запись
+ * ещё действует и пароль не менялся после выпуска токена, проверяет resolveSession
+ * (lib/security/session-resolve.ts), через неё же getSession() в guards.ts.
+ */
 export async function verifySession(token: string | undefined): Promise<SessionUser | null> {
   if (!token) return null;
   try {
@@ -68,6 +73,7 @@ export async function verifySession(token: string | undefined): Promise<SessionU
       profileId: payload.profileId ?? null,
       name: payload.name ?? '',
       ...(permissions ? { permissions } : {}),
+      ...(typeof payload.iat === 'number' ? { issuedAt: payload.iat } : {}),
     };
   } catch {
     return null;

@@ -4,6 +4,7 @@ import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
 import { audit, assertSameOrigin } from '@/lib/security/guards';
 import { blindIndex } from '@/lib/security/crypto';
+import { canSignInWithPassword, passwordHashForLogin } from '@/lib/security/login-policy';
 import { verifyPassword } from '@/lib/security/password';
 import { clientIp, rateLimit } from '@/lib/security/rate-limit';
 import { HOME_BY_ROLE, SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
@@ -32,15 +33,26 @@ export async function POST(request: Request) {
     const store = await getStore();
     const account = await store.accounts.findByEmailHash(emailHash);
 
+    // Администратор платформы входит только через CRM (билет, /api/auth/crm): парольный вход
+    // для роли ADMIN закрыт. Отказ тот же, что и при неверном пароле, и за то же время: сверка
+    // идёт с пустышкой, как для несуществующей почты, — по ответу не отличить «это админ» от
+    // «такой почты нет». Без этого пароль от панели HR подбирался бы той же формой, что и
+    // студенческий, мимо двухфакторной защиты CRM.
+    const adminBlocked = account ? !canSignInWithPassword(account.role) : false;
+
     // Пароль сверяется даже при отсутствии аккаунта: иначе разница во
     // времени ответа выдаёт, какие адреса зарегистрированы.
-    const passwordOk = await verifyPassword(input.password, account?.passwordHash);
+    const passwordOk = await verifyPassword(input.password, passwordHashForLogin(account));
 
     // Работодатель из CRM пароля не имеет и входит по коду — verifyPassword
     // для него вернёт false. Компания, зарегистрировавшаяся сама, пароль
     // задала и входит здесь же, как студент.
     if (!account || !passwordOk || !account.isActive) {
-      await audit(null, { action: 'auth.login.failed', meta: { emailHash } }, request.headers);
+      await audit(
+        null,
+        { action: 'auth.login.failed', meta: { emailHash, ...(adminBlocked ? { reason: 'admin-password-login' } : {}) } },
+        request.headers,
+      );
       return fail(401, 'Неверная почта или пароль', 'BAD_CREDENTIALS');
     }
 

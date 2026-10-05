@@ -23,6 +23,7 @@ import {
   type EmployerApplicationDTO,
   studyLine,
 } from '@/lib/types';
+import { PresenceLine } from '@/components/chat/PresenceLine';
 import type { EmployerBoard as BoardData } from '@/lib/services';
 
 /**
@@ -297,6 +298,13 @@ function CandidateRow({
                 )}
               </p>
               <p className="mt-1 truncate text-[13px] text-paper-faint">{student.speciality}</p>
+              {/* Статус — здесь же, где контакты: работодатель решает,
+                  звонить сейчас или писать, и «был(а) вчера» меняет это
+                  решение так же, как номер телефона */}
+              <PresenceLine
+                lastSeenAt={application.studentLastSeen}
+                className="mt-1 text-[12.5px] text-paper-faint"
+              />
             </div>
 
             <ApplicationStatusPill status={application.status} className="shrink-0" />

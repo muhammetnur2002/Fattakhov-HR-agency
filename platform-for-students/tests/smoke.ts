@@ -111,12 +111,75 @@ async function lastMail(address: string, subjectPart: string) {
   return (await mailbox(address)).filter((m) => m.subject.includes(subjectPart)).at(-1) ?? null;
 }
 
+/** Письмо уходит уже после ответа (сброс пароля): ждём его появления, а не читаем ящик один раз. */
+async function waitMail(address: string, subjectPart: string, seconds = 10) {
+  for (let i = 0; i < seconds * 4; i++) {
+    const mail = await lastMail(address, subjectPart);
+    if (mail) return mail;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return null;
+}
+
 function codeFrom(mail: { text: string } | null): string | null {
   return mail?.text.match(/Код: (\d{6})/)?.[1] ?? null;
 }
 
 async function main() {
   console.log(`Сквозная проверка ${BASE}\n`);
+
+  // ---------- Билеты входа из CRM ----------
+  // Стоят в самом начале: администратор платформы паролем не входит (парольный вход
+  // для роли ADMIN закрыт), и билет из CRM — единственный путь и в панель HR, и в
+  // кабинет компании (самостоятельная регистрация компании переехала в CRM).
+  const ssoSecret = process.env.STUDENTS_SSO_SECRET?.trim() ?? '';
+  const crmTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
+    const now = Math.floor(Date.now() / 1000);
+    const body = Buffer.from(
+      JSON.stringify({
+        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'staff', sub: 'usr_smoke', email: `smoke-${Date.now() + 4242}@demo.ru`,
+        name: 'Сотрудник Проверкин', position: 'Администратор', permissions: ['students'], iat: now, exp: now + 60,
+        jti: crypto.randomBytes(16).toString('base64url'), ...claims,
+      }),
+    ).toString('base64url');
+    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
+  };
+  const crmClientTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
+    const now = Math.floor(Date.now() / 1000);
+    const body = Buffer.from(
+      JSON.stringify({
+        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'client', sub: 'usr_smoke_client',
+        crmClientId: `crm-client-smoke-${Date.now() + 4242}`, companyName: 'Смоук-клиент CRM',
+        contactName: 'Проверкина Клиентова', contactEmail: `smoke-client-${Date.now() + 4242}@demo.ru`,
+        // Без договора по умолчанию — как у лида; кто active: true, задаёт явно
+        active: false,
+        iat: now, exp: now + 60, jti: crypto.randomBytes(16).toString('base64url'), ...claims,
+      }),
+    ).toString('base64url');
+    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
+  };
+  const enterFromCrm = async (ticket: string) => {
+    const response = await fetch(`${BASE}/api/auth/crm?ticket=${encodeURIComponent(ticket)}`, { redirect: 'manual' });
+    return {
+      status: response.status,
+      location: response.headers.get('location') ?? '',
+      cookie: (response.headers.get('set-cookie') ?? '').split(';')[0],
+    };
+  };
+  /** Сессия сотрудника агентства: вход по билету из CRM, ровно как в бою. Паролем администратор не входит. */
+  const staffSession = async (email: string, permissions: string[] = ['moderation', 'students', 'pilot']) => {
+    const entered = await enterFromCrm(crmTicket({ email, permissions }));
+    const session = new Session();
+    (session as unknown as { cookie: string }).cookie = entered.cookie;
+    return { session, entered };
+  };
+
+  if (ssoSecret.length < 32) {
+    throw new Error(
+      'STUDENTS_SSO_SECRET не задан (нужно ≥32 символов) — без него не проверить кабинет компании: ' +
+        'самостоятельная регистрация ушла в CRM, и билет из CRM теперь единственный путь туда.',
+    );
+  }
 
   // ---------- Гость ----------
   console.log('Гость');
@@ -146,7 +209,7 @@ async function main() {
     resumeUrl: null,
     resumeName: null,
     email,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     phone: '+7 900 111-22-33',
     consent: true,
     terms: true,
@@ -157,9 +220,8 @@ async function main() {
 
   // HR нужен уже здесь: учёбу нового студента подтверждает он, и до этого
   // отклики студента ждут и работодателям не уходят
-  const hr = new Session();
-  const hrLogin = await hr.post('/api/auth/login', { email: 'admin@fattakhov.ru', password: 'Admin12345!' });
-  check('HR-менеджер входит', hrLogin.status === 200, hrLogin.body);
+  const { session: hr, entered: hrEntered } = await staffSession('admin@fattakhov.ru');
+  check('HR-менеджер входит через CRM', hrEntered.cookie.startsWith('fhr_session='), hrEntered);
 
   // Почта: код нужен до создания учётной записи — аккаунта ещё нет
   check('журнал писем разработки доступен', (await fetch(`${BASE}/api/dev/outbox`)).status === 400);
@@ -236,7 +298,7 @@ async function main() {
     resumeUrl: null,
     resumeName: null,
     email: `noconsent-${Date.now()}@demo.ru`,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     phone: '',
     consent: false,
     terms: false,
@@ -248,9 +310,9 @@ async function main() {
   // значит «сможет войти снова». Ровно этот путь — выйти и войти заново —
   // не проверялся вовсе, и сломайся хеширование пароля на одной из сторон,
   // все проверки выше остались бы зелёными.
-  const relogin = await new Session().post('/api/auth/login', { email, password: 'Smoke12345!' });
+  const relogin = await new Session().post('/api/auth/login', { email, password: 'Tuman-Zakat-4821' });
   check('после регистрации можно войти заново', relogin.status === 200, relogin.body);
-  const reloginWrong = await new Session().post('/api/auth/login', { email, password: 'Smoke12345?' });
+  const reloginWrong = await new Session().post('/api/auth/login', { email, password: 'Tuman-Zakat-4822' });
   check('чужой пароль к той же почте не подходит', reloginWrong.status === 401, reloginWrong.status);
 
   // Занятая почта — это 409 с понятной причиной, а не 500: иначе студент
@@ -271,7 +333,7 @@ async function main() {
     resumeUrl: null,
     resumeName: null,
     email,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     phone: '',
     consent: true,
     terms: true,
@@ -462,18 +524,36 @@ async function main() {
 
   // ---------- Администратор ----------
   console.log('\nАдминистратор');
-  const admin = new Session();
-  const wrongPassword = await admin.post('/api/auth/login', {
+  const wrongPassword = await new Session().post('/api/auth/login', {
     email: 'admin@fattakhov.ru',
     password: 'wrong-password',
   });
   check('неверный пароль отвергнут', wrongPassword.status === 401);
 
-  const adminLogin = await admin.post('/api/auth/login', {
+  // Администратор паролем не входит вовсе — даже верным: только через CRM. Отказ тот же,
+  // что при неверном пароле, и куки не выдаётся
+  const adminByPassword = new Session();
+  const adminPasswordLogin = await adminByPassword.post('/api/auth/login', {
     email: 'admin@fattakhov.ru',
     password: 'Admin12345!',
   });
-  check('вход администратора', adminLogin.status === 200, adminLogin.body);
+  check(
+    'парольный вход администратора закрыт: верный пароль даёт тот же отказ',
+    adminPasswordLogin.status === 401 &&
+      adminPasswordLogin.body?.code === 'BAD_CREDENTIALS' &&
+      adminPasswordLogin.body?.error === wrongPassword.body?.error,
+    adminPasswordLogin.body,
+  );
+  check(
+    'после отказа админу сессия не выдана',
+    (await adminByPassword.request('/api/admin/stats')).status === 401,
+  );
+  const { session: admin, entered: adminEntered } = await staffSession('admin@fattakhov.ru');
+  check(
+    'вход администратора через CRM',
+    [303, 307].includes(adminEntered.status) && adminEntered.cookie.startsWith('fhr_session='),
+    adminEntered,
+  );
 
   const stats = await admin.request('/api/admin/stats');
   check('статистика собрана', stats.status === 200 && stats.body.stats?.students?.total > 0, stats.body?.stats?.students);
@@ -685,7 +765,7 @@ async function main() {
   const ownerStarted = await owner.post('/api/auth/register', {
     ...ownerProfile,
     email: ownerEmail,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     consent: true,
     terms: true,
   });
@@ -697,7 +777,7 @@ async function main() {
     ...ownerProfile,
     birthDate: isoYearsAgo(18, 2),
     email: `smoke-minor-${Date.now()}@demo.ru`,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     consent: true,
     terms: true,
   });
@@ -921,13 +1001,13 @@ async function main() {
   check('после удаления сессии нет', (await owner.request('/api/auth/me')).body.session === null);
   const afterErase = await new Session().post('/api/auth/login', {
     email: ownerEmail,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
   });
   check('войти в удалённый профиль нельзя', afterErase.status === 401, afterErase.status);
   const reRegisterStarted = await new Session().post('/api/auth/register', {
     ...ownerProfile,
     email: ownerEmail,
-    password: 'Smoke12345!',
+    password: 'Tuman-Zakat-4821',
     consent: true,
     terms: true,
   });
@@ -943,54 +1023,6 @@ async function main() {
     });
     check('повторная регистрация подтверждается кодом', reRegisterConfirmed.status === 201, reRegisterConfirmed.body);
     await again.delete('/api/students/me', {});
-  }
-
-  // ---------- Билеты входа из CRM ----------
-  // Вынесены сюда, перед «Компанией», а не только к «Входу из CRM» ниже:
-  // самостоятельная регистрация переехала в CRM (app/(public)/register/company
-  // там же), и с этого момента билет из CRM — единственный путь завести
-  // компанию на этой платформе вообще. Он нужен уже для бутстрапа кабинета
-  // компании чуть ниже, а не только для собственной проверки входа сотрудника
-  // и клиента CRM дальше по файлу.
-  const ssoSecret = process.env.STUDENTS_SSO_SECRET?.trim() ?? '';
-  const crmTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
-    const now = Math.floor(Date.now() / 1000);
-    const body = Buffer.from(
-      JSON.stringify({
-        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'staff', sub: 'usr_smoke', email: `smoke-${Date.now() + 4242}@demo.ru`,
-        name: 'Сотрудник Проверкин', position: 'Администратор', permissions: ['students'], iat: now, exp: now + 60,
-        jti: crypto.randomBytes(16).toString('base64url'), ...claims,
-      }),
-    ).toString('base64url');
-    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
-  };
-  const crmClientTicket = (claims: Record<string, unknown>, secret = ssoSecret) => {
-    const now = Math.floor(Date.now() / 1000);
-    const body = Buffer.from(
-      JSON.stringify({
-        v: 1, iss: 'fattakhov-crm', aud: 'fattakhov-students', kind: 'client', sub: 'usr_smoke_client',
-        crmClientId: `crm-client-smoke-${Date.now() + 4242}`, companyName: 'Смоук-клиент CRM',
-        contactName: 'Проверкина Клиентова', contactEmail: `smoke-client-${Date.now() + 4242}@demo.ru`,
-        // Без договора по умолчанию — как у лида; кто active: true, задаёт явно
-        active: false,
-        iat: now, exp: now + 60, jti: crypto.randomBytes(16).toString('base64url'), ...claims,
-      }),
-    ).toString('base64url');
-    return `${body}.${crypto.createHmac('sha256', secret || 'секрет-не-задан').update(body).digest('base64url')}`;
-  };
-  const enterFromCrm = async (ticket: string) => {
-    const response = await fetch(`${BASE}/api/auth/crm?ticket=${encodeURIComponent(ticket)}`, { redirect: 'manual' });
-    return {
-      status: response.status,
-      location: response.headers.get('location') ?? '',
-      cookie: (response.headers.get('set-cookie') ?? '').split(';')[0],
-    };
-  };
-  if (ssoSecret.length < 32) {
-    throw new Error(
-      'STUDENTS_SSO_SECRET не задан (нужно ≥32 символов) — без него не проверить кабинет компании: ' +
-        'самостоятельная регистрация ушла в CRM, и билет из CRM теперь единственный путь туда.',
-    );
   }
 
   // ---------- Компания ----------
@@ -1882,23 +1914,49 @@ async function main() {
   check('запрос ссылки сброса принят', forgot.status === 200 && forgot.body?.sent === true, forgot.body);
   const forgotAgain = await new Session().post('/api/auth/password/forgot', { email });
   check('повторный запрос сразу просит подождать', forgotAgain.status === 429 && forgotAgain.body?.code === 'WAIT', forgotAgain.body);
-  const resetMail = await lastMail(email, 'Восстановление пароля');
+  const resetMail = await waitMail(email, 'Восстановление пароля');
   const resetToken = resetMail?.text.match(/\/reset\/([A-Za-z0-9_-]{20,})/)?.[1];
   check('письмо со ссылкой сброса пришло', !!resetToken, resetMail?.subject);
-  const badReset = await new Session().post('/api/auth/password/reset', { token: 'x'.repeat(43), password: 'Newpass12345!' });
+  const badReset = await new Session().post('/api/auth/password/reset', { token: 'x'.repeat(43), password: 'Sirenevyj-Rassvet-31' });
   check('чужая ссылка сброса не работает', badReset.status === 400, badReset.body);
   if (resetToken) {
     check('страница по ссылке открывается', (await new Session().request(`/reset/${resetToken}`)).status === 200);
     const weakReset = await new Session().post('/api/auth/password/reset', { token: resetToken, password: '123' });
     check('слабый пароль по ссылке не принимается', weakReset.status === 400 && !!weakReset.body?.fields?.password, weakReset.body);
-    const reset = await new Session().post('/api/auth/password/reset', { token: resetToken, password: 'Newpass12345!' });
+    for (const weak of ['Password2026!', 'qwertyuiop', '1234567890', 'aaaaaaaaaaaa']) {
+      const weakByList = await new Session().post('/api/auth/password/reset', { token: resetToken, password: weak });
+      check(`слабый пароль «${weak}» по ссылке не принимается, ссылка цела`, weakByList.status === 400 && !!weakByList.body?.fields?.password, weakByList.body);
+    }
+    const reset = await new Session().post('/api/auth/password/reset', { token: resetToken, password: 'Sirenevyj-Rassvet-31' });
     check('пароль меняется по ссылке', reset.status === 200 && reset.body?.redirectTo === '/login?reset=1', reset.body);
     check(
       'ссылка сброса одноразовая',
-      (await new Session().post('/api/auth/password/reset', { token: resetToken, password: 'Other12345!' })).status === 400,
+      (await new Session().post('/api/auth/password/reset', { token: resetToken, password: 'Lilovyj-Rassvet-42' })).status === 400,
     );
-    check('старый пароль больше не подходит', (await new Session().post('/api/auth/login', { email, password: 'Smoke12345!' })).status === 401);
-    check('новый пароль подходит', (await new Session().post('/api/auth/login', { email, password: 'Newpass12345!' })).status === 200);
+    // Сессия, выданная до сброса, перестаёт действовать сразу, а не через две недели
+    const staleAfterReset = await student.request('/api/auth/me');
+    check('после сброса пароля прежняя сессия недействительна', staleAfterReset.status === 200 && staleAfterReset.body?.session === null, staleAfterReset.body);
+    check('после сброса пароля прежняя сессия не открывает ленту', (await student.request('/api/feed')).status === 401);
+    const staleCookie = (student as unknown as { cookie: string }).cookie;
+    // Выход работает и с отозванной сессией: кука снимается, ответ 200
+    const staleLogout = await fetch(`${BASE}/api/auth/logout`, { method: 'POST', headers: { Cookie: staleCookie, Origin: BASE } });
+    check(
+      'выход с отозванной сессией снимает куку',
+      staleLogout.status === 200 && /fhr_session=;/.test(staleLogout.headers.get('set-cookie') ?? ''),
+      [staleLogout.status, staleLogout.headers.get('set-cookie')],
+    );
+    const stalePage = await fetch(`${BASE}/feed`, { headers: { Cookie: staleCookie }, redirect: 'manual' });
+    const staleLocation = stalePage.headers.get('location') ?? '';
+    // Редирект приходит либо кодом 3xx, либо (у страниц с loading.tsx) внутри потока
+    const staleBody = stalePage.status === 200 ? await stalePage.text() : '';
+    check(
+      'страница со старой сессией снимает куку через /logout, а не гоняет по кругу',
+      (stalePage.status >= 300 && stalePage.status < 400 && staleLocation.includes('/logout?reason=stale')) ||
+        (staleBody.includes('NEXT_REDIRECT') && staleBody.includes('/logout?reason=stale')),
+      [stalePage.status, staleLocation],
+    );
+    check('старый пароль больше не подходит', (await new Session().post('/api/auth/login', { email, password: 'Tuman-Zakat-4821' })).status === 401);
+    check('новый пароль подходит', (await new Session().post('/api/auth/login', { email, password: 'Sirenevyj-Rassvet-31' })).status === 200);
   }
 
   // ---------- Перебор пароля ----------
@@ -1916,6 +1974,94 @@ async function main() {
     password: 'Demo12345!',
   });
   check('сосед по тому же адресу войти может', neighbour.status === 200, neighbour.status);
+
+  // ---------- Защита входа ----------
+  console.log('\nЗащита входа');
+
+  // IP клиента: заголовок Vercel на нашей ВМ ничего не значит. Каждый запрос подписывается
+  // «другим» адресом Vercel, но настоящий (X-Forwarded-For, его перезаписывает Caddy) один:
+  // счёт промахов не сбрасывается, и с четвёртого ответ нейтральный
+  const forgotFrom = (xff: string, fake: string, mail: string) =>
+    new Session().request('/api/auth/password/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email: mail }),
+      headers: { 'x-forwarded-for': xff, 'x-vercel-forwarded-for': fake },
+    });
+  const spoofer = '203.0.113.77';
+  const misses: Array<{ status: number; body: any }> = [];
+  for (let i = 1; i <= 5; i++) {
+    misses.push(await forgotFrom(spoofer, `6.6.6.${i}`, `nobody-${i}-${Date.now()}@demo.ru`));
+  }
+  check(
+    'подмена заголовка Vercel не сбрасывает счёт: честных ответов три',
+    misses.slice(0, 3).every((r) => r.status === 404 && r.body?.code === 'NO_ACCOUNT'),
+    misses.map((r) => r.status),
+  );
+  check(
+    'с четвёртого промаха ответ нейтральный, неотличимый от «письмо отправлено»',
+    misses.slice(3).every((r) => r.status === 200 && JSON.stringify(r.body) === JSON.stringify({ sent: true })),
+    misses.map((r) => [r.status, r.body]),
+  );
+  const otherHonest = await forgotFrom('203.0.113.78', '6.6.6.1', `nobody-other-${Date.now()}@demo.ru`);
+  check('у другого настоящего адреса свой счёт: ему снова честно', otherHonest.status === 404, otherHonest.status);
+  const neutralReal = await forgotFrom(spoofer, '6.6.6.9', email);
+  check(
+    'настоящий аккаунт отвечает той же формой, что и нейтральный ответ',
+    neutralReal.status === 200 && JSON.stringify(neutralReal.body) === JSON.stringify({ sent: true }),
+    [neutralReal.status, neutralReal.body],
+  );
+
+  // Пароль при регистрации: словарь, шаблоны, почта. Свой адрес на каждый запрос: общий лимит
+  // регистраций на адрес к концу прогона почти выбран
+  const registerFrom = (xff: string, mail: string, password: string) =>
+    new Session().request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ ...studentPayload, email: mail, password }),
+      headers: { 'x-forwarded-for': xff },
+    });
+  const pwProbe = '203.0.113.90';
+  const weakPasswords: Array<[string, string, RegExp]> = [
+    ['Password2026!', 'распространённый', /распространённый/],
+    ['qwertyuiop', 'последовательность', /последовательност/],
+    ['1234567890', 'последовательность', /последовательност/],
+    ['7391846205', 'одни цифры', /из одних цифр/],
+    ['aaaaaaaaaaaa', 'повтор', /однообразный/],
+    ['коротко1', 'короткий', /Минимум 10 символов/],
+  ];
+  for (const [weak, label, pattern] of weakPasswords) {
+    const answer = await registerFrom(pwProbe, `pw-${Date.now()}@demo.ru`, weak);
+    check(`регистрация: пароль «${label}» отвергнут с понятным текстом`, answer.status === 400 && pattern.test(answer.body?.fields?.password ?? ''), answer.body);
+  }
+  const mailLocal = `ivanovpetr${Date.now()}`;
+  const withEmail = await registerFrom(pwProbe, `${mailLocal}@demo.ru`, `${mailLocal}-2026`);
+  check('регистрация: пароль с частью почты отвергнут', withEmail.status === 400 && /почт/.test(withEmail.body?.fields?.password ?? ''), withEmail.body);
+  const goodPassword = await registerFrom(pwProbe, `pw-ok-${Date.now()}@demo.ru`, 'Коралловый-закат-17');
+  check('регистрация: длинная фраза без цифр-подгонки принимается', goodPassword.status === 201, goodPassword.body);
+
+  // Origin: изменяющий запрос без Origin и без Sec-Fetch-Site не пропускается
+  const bare = await fetch(`${BASE}/api/auth/password/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.91' },
+    body: JSON.stringify({ email: `nobody-${Date.now()}@demo.ru` }),
+  });
+  check('POST без Origin отклонён', bare.status === 403, bare.status);
+  const sameSite = await fetch(`${BASE}/api/auth/password/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-origin', 'x-forwarded-for': '203.0.113.91' },
+    body: JSON.stringify({ email: `nobody-${Date.now()}@demo.ru` }),
+  });
+  check('POST без Origin, но с Sec-Fetch-Site: same-origin принят', sameSite.status === 404, sameSite.status);
+  const foreignOrigin = await fetch(`${BASE}/api/auth/password/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example.com', 'x-forwarded-for': '203.0.113.91' },
+    body: JSON.stringify({ email: `nobody-${Date.now()}@demo.ru` }),
+  });
+  check('POST с чужим Origin отклонён', foreignOrigin.status === 403, foreignOrigin.status);
+
+  // Повтор письма с кодом: ответ про пустую квоту не зависит от того, занята ли почта
+  const resendProbe = await registerFrom('203.0.113.92', `resend-${Date.now()}@demo.ru`, 'Коралловый-закат-18');
+  const resendNow = await new Session().post('/api/auth/register/resend', { pending: resendProbe.body?.pending });
+  check('код ещё раз сразу после отправки — пауза', resendNow.status === 429 && resendNow.body?.code === 'CODE_WAIT', resendNow.body);
 
   // ---------- Итог ----------
   console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);

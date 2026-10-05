@@ -330,6 +330,15 @@ export interface EmployerApplicationDTO {
   vacancyId: string;
   vacancyTitle: string;
   student: StudentProfileDTO;
+  /**
+   * Когда студент последний раз был на платформе, ISO.
+   *
+   * Отдельным полем отклика, а не внутри `StudentProfileDTO`: тот же
+   * профиль строится и для админки, где сотрудник агентства студенту не
+   * собеседник. Поле здесь — значит, статус виден ровно тому
+   * работодателю, на вакансию которого человек откликнулся.
+   */
+  studentLastSeen: string | null;
 }
 
 export interface SkippedDTO {
@@ -346,6 +355,8 @@ export interface SessionUser {
   name: string;
   /** Разделы панели HR у сотрудника из CRM; нет — учётке открыто всё */
   permissions?: StaffPermission[];
+  /** Когда выпущен токен (секунды). Заполняет verifySession; наружу из resolveSession не уходит */
+  issuedAt?: number;
 }
 
 export interface AdminStats {
@@ -598,6 +609,14 @@ export interface ThreadSummaryDTO {
   counterpartName: string;
   counterpartPhotoUrl: string | null;
   counterpartSubtitle: string;
+  /**
+   * Когда собеседник последний раз был на платформе, ISO.
+   *
+   * `null` — и «не заходил», и «скрыл статус», и «смотрящему не положено».
+   * Три причины намеренно неразличимы: иначе по ответу можно было бы
+   * понять, что человек просто спрятался.
+   */
+  counterpartLastSeen: string | null;
   status: ApplicationStatus;
   lastMessageBody: string | null;
   lastMessageAuthor: MessageAuthor | null;

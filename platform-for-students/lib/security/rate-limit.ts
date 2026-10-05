@@ -1,4 +1,5 @@
 import 'server-only';
+import { isIP } from 'node:net';
 import { getRedis } from './redis';
 import { prisma } from '@/lib/db/prisma-client';
 
@@ -76,11 +77,24 @@ export const RATE_LIMITS = {
   // Ввод кода регистрации по адресу: перебор шести цифр не должен зависеть от того, сколько
   // раз атакующий запросил новый токен (счётчик попыток внутри токена он просто обнуляет)
   registerConfirmEmail: { limit: 10, windowSeconds: 900 },
+  // «Отправить код ещё раз» при регистрации: письмо уходит на адрес из билета, а билет подписан,
+  // но не привязан к человеку — старый билет можно предъявлять снова и снова. Поэтому предел и
+  // пауза держатся на сервере и считаются по адресу, а не по метке времени внутри билета
+  registerResendEmail: { limit: 3, windowSeconds: 3600 },
+  registerResendPause: { limit: 1, windowSeconds: 60 },
+  // Честные ответы «такого аккаунта нет» / «вход по коду» при сбросе пароля — только первые три
+  // промаха с одного адреса за час, дальше ответ нейтральный (lib/security/reset-hints.ts)
+  passwordResetMiss: { limit: 3, windowSeconds: 3600 },
   // Приглашения кандидатов: живой работодатель зовёт десятки, а не сотни в час
   invite: { limit: 60, windowSeconds: 3600 },
   // Подписка на пуш каждый раз шлёт проверочное уведомление на чужую службу: без лимита
   // это способ заставить сервер стучаться куда угодно
   pushSubscribe: { limit: 20, windowSeconds: 3600 },
+  // Пульс «я тут» раз в минуту с каждой открытой вкладки. Лимит на учётную
+  // запись, а не на адрес: за одним адресом сидит общежитие целиком.
+  // Считается только на настоящие записи (не чаще одной в минуту, то есть 60 в час),
+  // а тысяча — страховка от сломанного клиента, не рабочий предел
+  presence: { limit: 1000, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /**
@@ -104,6 +118,9 @@ const SHARED_COUNT: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
   'support',
   'registerEmail',
   'registerConfirmEmail',
+  'registerResendEmail',
+  'registerResendPause',
+  'passwordResetMiss',
   'invite',
 ]);
 
@@ -152,6 +169,15 @@ export async function rateLimit(
   }
 }
 
+/**
+ * Параметры транзакции счётчика. По умолчанию Prisma ждёт соединения из пула 2 секунды, а
+ * при всплеске запросов по одному ключу часть транзакций стоит в очереди за замком и держит
+ * соединения: очередь не успевала, транзакции падали с «Unable to start a transaction»,
+ * и эти запросы уходили на счёт в памяти — то есть мимо общего предела. Ждать можно дольше:
+ * сама транзакция — несколько миллисекунд.
+ */
+const TX_OPTIONS = { maxWait: 10_000, timeout: 10_000 };
+
 /** Общий счёт в базе. null — база недоступна: тогда работает счёт в памяти, вход не закрываем всем. */
 async function databaseLimit(
   key: string,
@@ -161,11 +187,15 @@ async function databaseLimit(
 ): Promise<RateLimitResult | null> {
   try {
     const since = new Date(windowStart);
-    const [, , count] = await prisma.$transaction([
-      prisma.rateLimitHit.deleteMany({ where: { key, at: { lt: since } } }),
-      prisma.rateLimitHit.create({ data: { key } }),
-      prisma.rateLimitHit.count({ where: { key, at: { gte: since } } }),
-    ]);
+    // Замок на ключ до подсчёта: без него сорок одновременных запросов каждый видел бы в счёте
+    // только уже сохранённые чужие попытки и проходил бы под лимит. С замком запросы по одному
+    // ключу идут по очереди, и счёт точный. Замок снимается сам при конце транзакции
+    const count = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+      await tx.rateLimitHit.deleteMany({ where: { key, at: { lt: since } } });
+      await tx.rateLimitHit.create({ data: { key } });
+      return tx.rateLimitHit.count({ where: { key, at: { gte: since } } });
+    }, TX_OPTIONS);
 
     // Ключи, к которым больше не возвращаются, чистим изредка и разом: не на каждый запрос
     if (Math.random() < 0.02) {
@@ -188,6 +218,37 @@ async function databaseLimit(
     return { ok: true, remaining: rule.limit - count, retryAfter: 0 };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Исчерпан ли лимит — без новой попытки в журнале. Для решений вроде «пора отвечать
+ * нейтрально»: сам запрос квоту не тратит. Недоступное хранилище — «не исчерпан».
+ */
+export async function rateLimitExhausted(name: RateLimitName, identifier: string): Promise<boolean> {
+  const rule = RATE_LIMITS[name];
+  const key = `rl:${name}:${identifier}`;
+  const now = Date.now();
+  const windowStart = now - rule.windowSeconds * 1000;
+
+  const redis = getRedis();
+  if (!redis) {
+    if (SHARED_COUNT.has(name) && process.env.DATABASE_URL) {
+      try {
+        const count = await prisma.rateLimitHit.count({ where: { key, at: { gte: new Date(windowStart) } } });
+        return count >= rule.limit;
+      } catch {
+        /* база недоступна — смотрим счёт в памяти */
+      }
+    }
+    return (memoryLog.get(key) ?? []).filter((t) => t > windowStart).length >= rule.limit;
+  }
+
+  try {
+    await redis.zremrangebyscore(key, 0, windowStart);
+    return (await redis.zcard(key)) >= rule.limit;
+  } catch {
+    return (memoryLog.get(key) ?? []).filter((t) => t > windowStart).length >= rule.limit;
   }
 }
 
@@ -218,13 +279,33 @@ function memoryLimit(
   return { ok: true, remaining: rule.limit - hits.length, retryAfter: 0 };
 }
 
-/** IP из заголовков прокси. Без него лимит был бы общим на всех. */
+/**
+ * Адрес клиента — для лимитов и журнала аудита.
+ *
+ * На доверии к заголовкам держится весь счёт «попыток с одного адреса», поэтому правило такое:
+ *
+ *  - `x-vercel-forwarded-for` — только если процесс работает на Vercel (задан `VERCEL`): там его
+ *    ставит сама платформа и клиентский запрос не доходит до приложения в обход неё. На нашей ВМ
+ *    перед приложением стоит Caddy, он этот заголовок не трогает — любой клиент подставил бы
+ *    в него что угодно и обошёл бы все лимиты по адресу (и записал бы чужой адрес в аудит).
+ *  - `x-forwarded-for` — дальше. Caddy (infra/Caddyfile.students) не дописывает в него, а
+ *    ПЕРЕЗАПИСЫВАЕТ настоящим адресом соединения (`header_up X-Forwarded-For {remote_host}`),
+ *    поэтому клиентские значения до приложения не доходят. Порт приложения наружу не торчит —
+ *    иначе доверие к этому заголовку теряло бы смысл. Берём первый адрес списка.
+ *  - `x-real-ip` — тем же способом ставит Caddy; запасной вариант.
+ *  - 127.0.0.1 — запасной: без прокси (локальная разработка) счёт общий на всех.
+ *
+ * Значение, не похожее на IP-адрес, пропускается: в ключ лимита и журнал не должен попадать мусор.
+ */
 export function clientIp(headers: Headers): string {
-  // На Vercel этот заголовок ставит сама платформа, и подделать его клиент не может — в отличие
-  // от x-forwarded-for, куда клиентский запрос может добавить свои адреса
-  const platform = headers.get('x-vercel-forwarded-for');
-  if (platform) return platform.split(',')[0].trim();
-  const forwarded = headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return headers.get('x-real-ip') ?? '127.0.0.1';
+  const candidates = [
+    process.env.VERCEL ? headers.get('x-vercel-forwarded-for') : null,
+    headers.get('x-forwarded-for'),
+    headers.get('x-real-ip'),
+  ];
+  for (const raw of candidates) {
+    const first = raw?.split(',')[0]?.trim();
+    if (first && isIP(first) !== 0) return first;
+  }
+  return '127.0.0.1';
 }

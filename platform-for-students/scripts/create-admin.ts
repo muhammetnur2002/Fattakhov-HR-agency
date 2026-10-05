@@ -1,39 +1,22 @@
-import readline from 'node:readline';
 import { PrismaClient } from '@prisma/client';
 import { blindIndex, encrypt } from '../lib/security/crypto';
-import { hashPassword } from '../lib/security/password';
-import { emailSchema, passwordSchema } from '../lib/validation';
+import { emailSchema } from '../lib/validation';
 
 /**
- * Завести HR-менеджера (роль ADMIN).
+ * Завести (или вернуть) учётную запись сотрудника агентства — роль ADMIN.
  *
  *   npm run admin:create -- hr@fattakhov.ru
  *
- * Нужен потому, что `db:seed` создаёт демонстрационного админа с
- * заранее известным паролем, а сменить его в интерфейсе негде. На бою
- * сеять демо-данные нельзя — заводите учётную запись этой командой.
+ * Пароля у такой учётки нет и быть не может: администратор платформы входит
+ * только через CRM (билет на /api/auth/crm), а парольный вход для роли ADMIN
+ * закрыт в app/api/auth/login/route.ts. Раньше команда спрашивала пароль, и
+ * пароль от панели HR подбирался той же формой, что и студенческий, мимо защиты
+ * CRM (двухфакторный вход, отключение сотрудника в одном месте).
  *
- * Повторный запуск с той же почтой меняет пароль: это же и способ его
- * сбросить, если он потерян.
+ * Команда нужна редко: учётка сотрудника и так заводится сама при первом входе
+ * из CRM. Она остаётся для случая «завести заранее» и для возврата отключённой
+ * учётной записи (isActive = true). Права на разделы выдаёт CRM в билете.
  */
-
-function askHidden(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const mute = () => {
-      readline.moveCursor(process.stdout, -1000, 0);
-      readline.clearLine(process.stdout, 1);
-      process.stdout.write(question);
-    };
-    process.stdin.on('data', mute);
-    rl.question(question, (answer) => {
-      process.stdin.off('data', mute);
-      rl.close();
-      process.stdout.write('\n');
-      resolve(answer);
-    });
-  });
-}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -57,27 +40,9 @@ async function main() {
   }
   const email = parsedEmail.data;
 
-  const password = (await askHidden(`Пароль для ${email}: `)).trim();
-  const repeat = (await askHidden('Повторите пароль: ')).trim();
-
-  if (password !== repeat) {
-    console.error('Пароли не совпали.');
-    process.exitCode = 1;
-    return;
-  }
-  // Та же схема, что и на регистрации: у администратора требования
-  // к паролю не могут быть мягче, чем у студента
-  const parsedPassword = passwordSchema.safeParse(password);
-  if (!parsedPassword.success) {
-    console.error(`Пароль слабый: ${parsedPassword.error.issues[0]?.message}`);
-    process.exitCode = 1;
-    return;
-  }
-
   const prisma = new PrismaClient();
   try {
     const emailHash = blindIndex(email);
-    const passwordHash = await hashPassword(password);
     const existing = await prisma.account.findUnique({ where: { emailHash } });
 
     if (existing && existing.role !== 'ADMIN') {
@@ -88,11 +53,16 @@ async function main() {
 
     await prisma.account.upsert({
       where: { emailHash },
-      update: { passwordHash, isActive: true },
-      create: { role: 'ADMIN', emailEnc: encrypt(email), emailHash, passwordHash, emailVerifiedAt: new Date() },
+      update: { isActive: true },
+      create: { role: 'ADMIN', emailEnc: encrypt(email), emailHash, emailVerifiedAt: new Date() },
     });
 
-    console.log(existing ? `\nПароль для ${email} обновлён.\n` : `\nHR-менеджер ${email} создан.\n`);
+    console.log(
+      existing
+        ? `\nУчётная запись ${email} включена.`
+        : `\nУчётная запись сотрудника ${email} создана — без пароля.`,
+    );
+    console.log('Входить в панель — только через CRM (вход по билету). Права на разделы выдаёт CRM.\n');
   } finally {
     await prisma.$disconnect();
   }

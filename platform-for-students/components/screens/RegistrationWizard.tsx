@@ -20,6 +20,7 @@ import { ConsentChecks } from '@/components/legal/ConsentChecks';
 import { useCurtainNav } from '@/components/motion/RouteCurtain';
 import { durations, easeOutExpo, springSoft, stepVariants } from '@/lib/motion';
 import { PILOT_CITY } from '@/lib/pilot';
+import { passwordProblem } from '@/lib/password-policy';
 import { registrationSteps } from '@/lib/validation';
 import {
   GENDERS,
@@ -158,14 +159,23 @@ export function RegistrationWizard() {
   function validate(): boolean {
     const schema = registrationSteps[meta.key] as z.ZodTypeAny;
     const result = schema.safeParse(stepPayload);
-    if (result.success) {
+    const next: Record<string, string> = {};
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = issue.path.join('.') || '_';
+        if (!next[key]) next[key] = issue.message;
+      }
+    }
+    // Пароль с частью почты схема шага не ловит (она видит только пароль) — проверяем здесь,
+    // чтобы не отправлять форму ради очевидной ошибки. Словарь распространённых паролей
+    // проверит сервер: в браузер он не едет
+    if (meta.key === 'account' && !next.password) {
+      const problem = passwordProblem(form.password, { email: form.email });
+      if (problem) next.password = problem;
+    }
+    if (result.success && Object.keys(next).length === 0) {
       setErrors({});
       return true;
-    }
-    const next: Record<string, string> = {};
-    for (const issue of result.error.issues) {
-      const key = issue.path.join('.') || '_';
-      if (!next[key]) next[key] = issue.message;
     }
     setErrors(next);
     return false;
@@ -456,7 +466,7 @@ export function RegistrationWizard() {
               autoComplete="new-password"
               value={form.password}
               error={errors.password}
-              hint="Минимум 8 символов, буквы и цифры"
+              hint="От 10 символов. Удобнее всего фраза из нескольких слов"
               onChange={(e) => patch({ password: e.target.value })}
             />
             <TextField

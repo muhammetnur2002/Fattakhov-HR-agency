@@ -20,6 +20,9 @@ export async function POST(request: Request) {
     const { token, password } = resetPasswordSchema.parse(await request.json());
     const result = await resetPassword(token, password);
 
+    if (result.status === 'WEAK') {
+      return fail(400, 'Проверьте заполнение полей', 'VALIDATION', { password: result.message });
+    }
     if (result.status === 'EXPIRED') return fail(410, 'Ссылка устарела — запросите новую', 'TOKEN_EXPIRED');
     if (result.status === 'INVALID') {
       return fail(400, 'Ссылка недействительна или уже использована — запросите новую', 'BAD_TOKEN');

@@ -61,6 +61,10 @@ ARG NEXT_PUBLIC_YANDEX_METRIKA_ID="95422358"
 ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
 ENV NODE_ENV=production
 RUN npm run build
+# Словарь распространённых паролей читается с диска, а не импортируется — трассировка
+# кладёт его в standalone только благодаря outputFileTracingIncludes в next.config.mjs.
+# Без файла проверка пароля молча слабеет до урезанного списка, поэтому сборка падает здесь
+RUN test -s .next/standalone/lib/security/common-passwords.txt
 
 # ---------- Рабочий образ ----------
 FROM base AS runner

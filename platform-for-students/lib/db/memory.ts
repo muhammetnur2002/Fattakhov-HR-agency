@@ -140,6 +140,9 @@ async function seed(): Promise<Tables> {
         tourSeenAt: null,
         emailVerifiedAt: now(),
         notifyEmail: true,
+        lastSeenAt: null,
+        showPresence: true,
+        passwordChangedAt: null,
         createdAt: now(),
       };
       t.accounts.push(account);
@@ -202,6 +205,9 @@ async function seed(): Promise<Tables> {
     tourSeenAt: null,
     emailVerifiedAt: now(),
     notifyEmail: true,
+    lastSeenAt: null,
+    showPresence: true,
+    passwordChangedAt: null,
     createdAt: now(),
   };
   t.accounts.push(adminAccount);
@@ -228,6 +234,9 @@ async function seed(): Promise<Tables> {
     tourSeenAt: null,
     emailVerifiedAt: now(),
     notifyEmail: true,
+    lastSeenAt: null,
+    showPresence: true,
+    passwordChangedAt: null,
     createdAt: now(),
   };
   t.accounts.push(studentAccount);
@@ -296,6 +305,9 @@ async function seed(): Promise<Tables> {
       tourSeenAt: null,
       emailVerifiedAt: now(),
       notifyEmail: true,
+      lastSeenAt: null,
+      showPresence: true,
+      passwordChangedAt: null,
       createdAt: now(),
     };
     t.accounts.push(acc);
@@ -479,11 +491,26 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async setPassword(id, passwordHash) {
         const acc = t.accounts.find((a) => a.id === id);
-        if (acc) acc.passwordHash = passwordHash;
+        if (acc) {
+          acc.passwordHash = passwordHash;
+          acc.passwordChangedAt = now();
+        }
+      },
+      async setActive(id, active) {
+        const acc = t.accounts.find((a) => a.id === id);
+        if (acc) acc.isActive = active;
       },
       async setNotifyEmail(id, enabled) {
         const acc = t.accounts.find((a) => a.id === id);
         if (acc) acc.notifyEmail = enabled;
+      },
+      async setLastSeen(id, at) {
+        const acc = t.accounts.find((a) => a.id === id);
+        if (acc) acc.lastSeenAt = at;
+      },
+      async setShowPresence(id, enabled) {
+        const acc = t.accounts.find((a) => a.id === id);
+        if (acc) acc.showPresence = enabled;
       },
       async createStaff(email) {
         const emailHash = blindIndex(email);
@@ -502,6 +529,9 @@ export async function createMemoryStore(): Promise<DataStore> {
           tourSeenAt: null,
           emailVerifiedAt: now(),
           notifyEmail: true,
+          lastSeenAt: null,
+          showPresence: true,
+          passwordChangedAt: null,
           createdAt: now(),
         };
         t.accounts.push(account);
@@ -529,6 +559,9 @@ export async function createMemoryStore(): Promise<DataStore> {
           tourSeenAt: null,
           emailVerifiedAt: null,
           notifyEmail: true,
+          lastSeenAt: null,
+          showPresence: true,
+          passwordChangedAt: null,
           createdAt: now(),
         };
         const student: StudentRecord = {
@@ -747,6 +780,9 @@ export async function createMemoryStore(): Promise<DataStore> {
           tourSeenAt: null,
           emailVerifiedAt: null,
           notifyEmail: true,
+          lastSeenAt: null,
+          showPresence: true,
+          passwordChangedAt: null,
           createdAt: now(),
         };
         const employer: EmployerRecord = {
@@ -818,6 +854,9 @@ export async function createMemoryStore(): Promise<DataStore> {
           tourSeenAt: null,
           emailVerifiedAt: now(),
           notifyEmail: true,
+          lastSeenAt: null,
+          showPresence: true,
+          passwordChangedAt: null,
           createdAt: now(),
         };
         const employer: EmployerRecord = {
@@ -968,6 +1007,9 @@ export async function createMemoryStore(): Promise<DataStore> {
               tourSeenAt: null,
               emailVerifiedAt: now(),
               notifyEmail: true,
+              lastSeenAt: null,
+              showPresence: true,
+              passwordChangedAt: null,
               createdAt: now(),
             };
             t.accounts.push(account);
@@ -1278,9 +1320,11 @@ export async function createMemoryStore(): Promise<DataStore> {
       async findActiveByHash(kind, tokenHash) {
         return clone(t.authTokens.find((x) => x.kind === kind && x.tokenHash === tokenHash && !x.usedAt) ?? null);
       },
-      async recordFailure(id) {
+      async claimAttempt(id, max) {
+        // Проверка и приращение — в одном синхронном шаге: между ними нет await,
+        // параллельный запрос в них не вклинится (как условный UPDATE в базе)
         const row = t.authTokens.find((x) => x.id === id);
-        if (!row) return 0;
+        if (!row || row.usedAt || row.attempts >= max) return null;
         row.attempts += 1;
         return row.attempts;
       },

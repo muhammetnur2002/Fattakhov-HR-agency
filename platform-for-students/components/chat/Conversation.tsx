@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { Composer, ComposerLocked } from './Composer';
 import { DaySeparator, MessageBubble } from './MessageBubble';
+import { PresenceLine } from './PresenceLine';
 import { durations, easeOutExpo } from '@/lib/motion';
 import { cn, dayLabel, formatDate, isSameBurst } from '@/lib/utils';
 import { APPLICATION_STATUS_LABEL, type ApplicationStatus, type MessageDTO, type ThreadDTO } from '@/lib/types';
@@ -119,6 +120,10 @@ export function Conversation({
           <p className="truncate text-[12.5px] text-paper-faint">
             {thread.vacancyTitle} · {thread.counterpartSubtitle}
           </p>
+          {/* Отдельной строкой, а не в хвосте предыдущей: там уже две
+              склеенные подписи, и на узком экране статус терялся бы
+              первым. Строки нет вовсе, когда статус показывать нечего */}
+          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="text-[11.5px] text-paper-faint" />
         </div>
         <ApplicationStatusPill status={thread.status} className="shrink-0" />
       </header>
@@ -195,6 +200,7 @@ export function ThreadRow({
     applicationId: string;
     counterpartName: string;
     counterpartPhotoUrl: string | null;
+    counterpartLastSeen: string | null;
     vacancyTitle: string;
     status: ApplicationStatus;
     lastMessageBody: string | null;
@@ -248,7 +254,20 @@ export function ThreadRow({
             </span>
           )}
         </div>
-        <p className="truncate text-[12px] text-paper-faint">{thread.vacancyTitle}</p>
+        {/* Статус — в одной строке с вакансией: четвёртая строка раздула бы
+            карточку, а строк в списке много. Название ужимается первым,
+            статус короткий и остаётся читаемым */}
+        <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-paper-faint">
+          <span className="truncate">{thread.vacancyTitle}</span>
+          {thread.counterpartLastSeen && (
+            <>
+              <span aria-hidden className="shrink-0">
+                ·
+              </span>
+              <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="shrink-0" />
+            </>
+          )}
+        </div>
         <p className={cn('mt-0.5 truncate text-[12.5px]', previewTone)}>
           {preview ?? 'Переписки ещё не было'}
         </p>

@@ -77,16 +77,22 @@ resource "yandex_mdb_postgresql_cluster" "main" {
   }
 }
 
-resource "yandex_mdb_postgresql_database" "main" {
-  cluster_id = yandex_mdb_postgresql_cluster.main.id
-  name       = "hr_platform"
-  owner      = yandex_mdb_postgresql_user.app.name
-  lc_collate = "ru_RU.UTF-8"
-  lc_type    = "ru_RU.UTF-8"
+# Архивная база прежней версии кабинета (hr_platform, пользователь hr_app)
+# удалена 05.10.2026 в консоли облака: нынешний кабинет живёт в fhr_crm
+# (crm.tf), платформа — в fhr_students (students.tf). Блоки removed убирают
+# их из состояния и НИЧЕГО не удаляют в облаке (там их уже нет); без них
+# Terraform пытался бы создать пустую hr_platform заново. После apply,
+# который их отработает, блоки можно удалить из кода.
+removed {
+  from = yandex_mdb_postgresql_database.main
+  lifecycle {
+    destroy = false
+  }
 }
 
-resource "yandex_mdb_postgresql_user" "app" {
-  cluster_id = yandex_mdb_postgresql_cluster.main.id
-  name       = "hr_app"
-  password   = var.db_password
+removed {
+  from = yandex_mdb_postgresql_user.app
+  lifecycle {
+    destroy = false
+  }
 }

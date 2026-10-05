@@ -29,12 +29,6 @@ variable "app_domain" {
   default     = "my.fattakhovhr.ru"
 }
 
-variable "db_password" {
-  description = "Пароль пользователя базы. Задаётся переменной окружения, в файлы не пишется."
-  type        = string
-  sensitive   = true
-}
-
 variable "env_file" {
   description = "Путь к файлу боевых настроек. Содержимое уезжает в метаданные ВМ; в репозиторий файл не попадает."
   type        = string

@@ -8,9 +8,15 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
   return handle(async () => {
     assertSameOrigin(request);
-    const session = await getSession();
+    // Куку снимаем первой: выход обязан работать и при сбое базы. getSession ходит в базу
+    // (сверяет сессию с учётной записью), и упавшая база не должна оставлять человека вошедшим
     (await cookies()).delete(SESSION_COOKIE);
-    if (session) await audit(session, { action: 'auth.logout' }, request.headers);
+    try {
+      const session = await getSession();
+      if (session) await audit(session, { action: 'auth.logout' }, request.headers);
+    } catch {
+      /* запись в журнал — по возможности, выход уже состоялся */
+    }
     return ok({ redirectTo: '/' });
   });
 }

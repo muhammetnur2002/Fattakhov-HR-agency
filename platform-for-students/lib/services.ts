@@ -1,8 +1,9 @@
 import 'server-only';
 import { getStore } from '@/lib/db';
 import { scoreMatch, studentName, toStudentDTO, toVacancyDTO } from '@/lib/db/mappers';
+import { visibleLastSeen } from '@/lib/presence';
 import { decryptSafe } from '@/lib/security/crypto';
-import { HttpError } from '@/lib/security/guards';
+import { HttpError } from '@/lib/security/http-error';
 import type { EmployerRecord, InstitutionRecord, StudentRecord, SwipeRecord, VacancyRecord } from '@/lib/db/types';
 import { isVacancyVisible, studentFacingVacancy, type CompanyAddress } from '@/lib/vacancy';
 import { NEXT_STEP_STATUSES, track } from '@/lib/analytics';
@@ -201,6 +202,7 @@ export async function buildEmployerBoard(employerId: string): Promise<EmployerBo
 
   const students = new Map<string, StudentRecord>();
   const emails = new Map<string, string>();
+  const lastSeen = new Map<string, string | null>();
   for (const application of applications) {
     if (students.has(application.studentId)) continue;
     const student = await store.students.findById(application.studentId);
@@ -208,6 +210,16 @@ export async function buildEmployerBoard(employerId: string): Promise<EmployerBo
     students.set(student.id, student);
     const account = await store.accounts.findById(student.accountId);
     emails.set(student.id, account ? decryptSafe(account.emailEnc) : '');
+    // Статус берём из той же учётки, что и почту: лишних запросов нет.
+    // Основание показать его — то же, что и у контактов: студент сам
+    // откликнулся на вакансию этой компании, они собеседники
+    lastSeen.set(
+      student.id,
+      visibleLastSeen(
+        { lastSeenAt: account?.lastSeenAt ?? null, showPresence: account?.showPresence ?? true },
+        true,
+      )?.toISOString() ?? null,
+    );
   }
 
   const vacancyById = new Map(vacancies.map((v) => [v.id, v]));
@@ -225,6 +237,7 @@ export async function buildEmployerBoard(employerId: string): Promise<EmployerBo
         vacancyId: vacancy.id,
         vacancyTitle: vacancy.title,
         student: toStudentDTO(student, emails.get(student.id) ?? '', { includeContacts: true }),
+        studentLastSeen: lastSeen.get(student.id) ?? null,
       },
     ];
   });

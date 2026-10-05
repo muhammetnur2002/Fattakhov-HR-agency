@@ -2,6 +2,7 @@ import readline from 'node:readline';
 import { PrismaClient } from '@prisma/client';
 import { blindIndex, decryptSafe } from '../lib/security/crypto';
 import { hashPassword } from '../lib/security/password';
+import { weakPasswordMessage } from '../lib/security/password-check';
 import { emailSchema, passwordSchema } from '../lib/validation';
 
 /**
@@ -88,6 +89,17 @@ async function main() {
       return;
     }
 
+    // Администратор платформы входит только через CRM (билет): парольный вход для роли ADMIN
+    // закрыт в app/api/auth/login/route.ts, и заданный здесь пароль ничего бы не открыл
+    if (account.role === 'ADMIN') {
+      console.error(
+        'Это сотрудник агентства — он входит на платформу через CRM, пароля у него нет.\n' +
+          'Доступ выдаётся и отзывается в CRM («Сотрудники»).',
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     // Клиент из CRM входит по коду: пароль ему не нужен, и заданный здесь
     // открыл бы второй, никем не учтённый вход в кабинет
     if (account.role === 'EMPLOYER' && account.employer?.crmClientId) {
@@ -119,18 +131,21 @@ async function main() {
       return;
     }
 
-    // Та же схема, что и на регистрации: пароль, заданный поддержкой,
-    // не может быть слабее того, который человек задал бы себе сам
+    // Те же правила, что и на регистрации (длина, шаблоны, словарь, почта): пароль, заданный
+    // поддержкой, не может быть слабее того, который человек задал бы себе сам
     const parsedPassword = passwordSchema.safeParse(password);
-    if (!parsedPassword.success) {
-      console.error(`Пароль слабый: ${parsedPassword.error.issues[0]?.message}`);
+    const weak = parsedPassword.success ? weakPasswordMessage(password, email) : null;
+    if (!parsedPassword.success || weak) {
+      console.error(`Пароль слабый: ${parsedPassword.success ? weak : parsedPassword.error.issues[0]?.message}`);
       process.exitCode = 1;
       return;
     }
 
+    // passwordChangedAt гасит уже выданные сессии: смена пароля поддержкой — это, как правило,
+    // «человек потерял доступ или его пароль утёк», и открытые входы должны закрыться
     await prisma.account.update({
       where: { id: account.id },
-      data: { passwordHash: await hashPassword(password), isActive: true },
+      data: { passwordHash: await hashPassword(password), passwordChangedAt: new Date(), isActive: true },
     });
 
     await prisma.auditLog.create({
@@ -144,7 +159,7 @@ async function main() {
       },
     });
 
-    console.log(`\nПароль для ${email} изменён. Войти можно сразу.\n`);
+    console.log(`\nПароль для ${email} изменён. Войти можно сразу; прежние входы закрыты.\n`);
   } finally {
     await prisma.$disconnect();
   }

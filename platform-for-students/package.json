@@ -25,6 +25,7 @@
     "smoke": "tsx tests/smoke.ts",
     "test:unit": "tsx tests/unit.ts",
     "test:push": "node --conditions=react-server --import tsx tests/push-store.ts",
+    "test:security": "node --conditions=react-server --import tsx tests/security.ts",
     "db:connect": "node scripts/db-connect.mjs",
     "employer:code": "node --conditions=react-server --import tsx scripts/issue-access-code.ts",
     "institutions:load": "node --conditions=react-server --import tsx scripts/load-institutions.ts",

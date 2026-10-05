@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isCodeShape, normalizeCode } from '@/lib/account-codes';
 import { MAX_AGE, MIN_AGE, fullYears, parseIsoDate, todayInMoscow } from '@/lib/age';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_MESSAGES, passwordProblem } from '@/lib/password-policy';
 import { lookingForSchema, portfolioSchema } from '@/lib/portfolio';
 import { MAX_HOURS_PER_WEEK, MIN_HOURS_PER_WEEK, maxHoursPerWeek } from '@/lib/schedule';
 import { STUDY_FILE_PATTERN } from '@/lib/study';
@@ -36,12 +37,31 @@ export const emailSchema = z
   .max(254)
   .transform((v) => v.toLowerCase());
 
+/**
+ * Пароль: длина и простые шаблоны (lib/password-policy.ts). Словарь
+ * распространённых паролей схема не знает — она едет и в браузер; его
+ * добавляет сервер там, где пароль задаётся (lib/security/password-check.ts).
+ * Набор символов не навязывается: длинная фраза надёжнее «Parol123!».
+ */
 export const passwordSchema = z
   .string()
-  .min(8, 'Минимум 8 символов')
-  .max(128, 'Слишком длинный пароль')
-  .regex(/[a-zа-яё]/i, 'Добавьте хотя бы одну букву')
-  .regex(/\d/, 'Добавьте хотя бы одну цифру');
+  .min(MIN_PASSWORD_LENGTH, `Минимум ${MIN_PASSWORD_LENGTH} символов`)
+  .max(MAX_PASSWORD_LENGTH, 'Слишком длинный пароль')
+  .superRefine((value, ctx) => {
+    const problem = passwordProblem(value);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  });
+
+/**
+ * Пароль не должен содержать почту того же человека. Схема пароля почты не
+ * знает, поэтому проверка висит на объекте, где они приходят вместе.
+ * Сообщение — у поля пароля, где человек его и исправит.
+ */
+function passwordVersusEmailRule(value: { email: string; password: string }, ctx: z.RefinementCtx) {
+  if (passwordProblem(value.password, { email: value.email }) === PASSWORD_MESSAGES.email) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: PASSWORD_MESSAGES.email });
+  }
+}
 
 const PHONE_PATTERN = /^\+?[\d\s()-]{10,20}$/;
 
@@ -218,7 +238,8 @@ export const registrationSchema = registrationSteps.identity
   .merge(registrationSteps.skills)
   .merge(registrationSteps.account)
   .superRefine(scheduleRule)
-  .superRefine(studyLevelRule);
+  .superRefine(studyLevelRule)
+  .superRefine(passwordVersusEmailRule);
 
 export type RegistrationInput = z.infer<typeof registrationSchema>;
 
@@ -266,6 +287,9 @@ export const resetPasswordSchema = z.object({
 });
 
 export const notificationSettingsSchema = z.object({ email: z.boolean() });
+
+/** «Показывать, что я в сети» */
+export const presenceSettingsSchema = z.object({ show: z.boolean() });
 
 export const employerCodeSchema = z.object({
   code: z

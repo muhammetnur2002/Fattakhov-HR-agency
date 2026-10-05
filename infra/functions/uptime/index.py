@@ -3,8 +3,7 @@
 Сигнал о сбое из кабинета (lib/monitoring/alerts.ts) шлёт сам сервер, и если
 он лёг целиком, сигнала нет. Эта функция живёт вне сервера: открывает адреса
 и, если какой-то не ответил дважды подряд, пишет на ящик сбоев через ту же
-почту reg.ru, которая от сервера не зависит, и дублирует в Telegram (если
-заданы чаты).
+почту reg.ru, которая от сервера не зависит.
 
 Только стандартная библиотека Python: у функции нет сборки зависимостей,
 и чем меньше в ней частей, тем меньше причин не сработать в нужный момент.
@@ -93,45 +92,9 @@ def send_mail(subject: str, body: str) -> None:
         server.quit()
 
 
-def telegram_chats() -> list[str]:
-    if not os.environ.get("TELEGRAM_BOT_TOKEN"):
-        return []
-    return [c.strip() for c in os.environ.get("TELEGRAM_CHAT_IDS", "").split(",") if c.strip()]
-
-
-def send_telegram(subject: str, body: str) -> None:
-    """То же сообщение — в чаты Telegram. Токен в ошибках не печатаем."""
-    token = os.environ["TELEGRAM_BOT_TOKEN"]
-    text = f"{subject}{chr(10)}{chr(10)}{body}"[:4000]
-    failed = []
-    for chat_id in telegram_chats():
-        data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-        request = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
-        try:
-            urllib.request.urlopen(request, timeout=20).read()
-        except urllib.error.HTTPError as error:
-            failed.append(f"{chat_id}: HTTP {error.code}")
-        except Exception as error:
-            failed.append(f"{chat_id}: {type(error).__name__}")
-    if failed:
-        raise RuntimeError("Telegram не принял: " + "; ".join(failed))
-
-
 def notify(subject: str, body: str) -> None:
-    """Письмо и Telegram — независимо: сбой одного канала не отменяет другой.
-    Ошибка, только если не дошло ни одним путём."""
-    errors = []
-    channels = [("почта", send_mail)]
-    if telegram_chats():
-        channels.append(("Telegram", send_telegram))
-    for channel, send in channels:
-        try:
-            send(subject, body)
-        except Exception as error:
-            errors.append(f"{channel}: {type(error).__name__}: {str(error)[:120]}")
-            print("не отправлено —", errors[-1])
-    if len(errors) >= len(channels):
-        raise RuntimeError("; ".join(errors))
+    """Оповещение уходит письмом на ящик сбоев."""
+    send_mail(subject, body)
 
 
 def handler(event, context):

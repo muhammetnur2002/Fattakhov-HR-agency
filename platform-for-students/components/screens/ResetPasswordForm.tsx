@@ -86,7 +86,7 @@ export function ResetPasswordForm({ token, state }: { token: string; state: 'VAL
                   required
                   value={password}
                   error={errors.password}
-                  hint="Не короче 8 символов"
+                  hint="От 10 символов. Удобнее всего фраза из нескольких слов"
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <TextField

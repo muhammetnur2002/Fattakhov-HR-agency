@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { UPLOAD_LIMITS, type UploadKind } from '@/lib/validation';
-import { HttpError } from '@/lib/security/guards';
+import { HttpError } from '@/lib/security/http-error';
 
 /**
  * Хранилище загруженных файлов.

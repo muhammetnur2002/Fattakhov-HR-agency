@@ -80,14 +80,32 @@ export async function confirmPendingRegistration<T>(
 export type ResendResult =
   | { status: 'SENT'; token: string; delivered: boolean; retryAfter: number }
   | { status: 'WAIT'; retryAfter: number }
+  /** Больше трёх писем в час на этот адрес */
+  | { status: 'LIMITED'; retryAfter: number }
   | { status: 'BAD_TOKEN' };
 
+/**
+ * «Отправить код ещё раз».
+ *
+ * Метка `sentAt` в билете паузе не защита: билет подписан, но им можно пользоваться снова и
+ * снова — достаточно прислать тот же старый. Поэтому и пауза в минуту, и предел в три письма
+ * в час считаются на сервере и по адресу, через общий лимитер. Ответ от того, есть ли уже
+ * учётная запись с этой почтой, не зависит: адрес в билете назвал сам пользователь, и по
+ * ответу на повтор узнать о чужом адресе ничего нельзя.
+ */
 export async function resendPendingRegistration(kind: PendingKind, token: string): Promise<ResendResult> {
   const claims = await verifyPendingRegistration(token);
   if (!claims || claims.kind !== kind) return { status: 'BAD_TOKEN' };
 
   const wait = resendWaitSeconds(new Date(claims.sentAt));
   if (wait > 0) return { status: 'WAIT', retryAfter: wait };
+
+  // Пауза идёт первой: нетерпеливый повтор не должен тратить часовую квоту
+  const emailKey = blindIndex(claims.email);
+  const pause = await rateLimit('registerResendPause', emailKey);
+  if (!pause.ok) return { status: 'WAIT', retryAfter: pause.retryAfter };
+  const hourly = await rateLimit('registerResendEmail', emailKey);
+  if (!hourly.ok) return { status: 'LIMITED', retryAfter: hourly.retryAfter };
 
   const code = generateEmailCode();
   const refreshed = await signPendingRegistration({

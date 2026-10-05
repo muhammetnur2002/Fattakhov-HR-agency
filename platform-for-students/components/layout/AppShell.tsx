@@ -1,5 +1,6 @@
 import { Logo } from '@/components/brand/Logo';
 import { EmailVerifyBanner } from '@/components/account/EmailVerifyBanner';
+import { PresencePulse } from '@/components/account/PresencePulse';
 import { PushPrompt } from '@/components/account/PushPrompt';
 import { NavTabs, type NavItem } from './NavTabs';
 import { UserMenu } from './UserMenu';
@@ -8,7 +9,7 @@ import { maskEmail } from '@/lib/account-codes';
 import { agencySiteUrl } from '@/lib/agency';
 import { getStore } from '@/lib/db';
 import { decryptSafe } from '@/lib/security/crypto';
-import { getSession } from '@/lib/security/guards';
+import { getSession, getSessionAccount } from '@/lib/security/guards';
 import type { SessionUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -78,6 +79,10 @@ export async function AppShell({
         {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && (
           <PushPrompt accountId={session.accountId} audience={session.role === 'EMPLOYER' ? 'company' : 'student'} />
         )}
+        {/* Пульс «я на платформе» — в каркасе, а не на экране переписки:
+            человек может сидеть в ленте, пока собеседник смотрит на его
+            статус в диалоге. Ничего не рисует */}
+        {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && <PresencePulse />}
         <PageTransition>{children}</PageTransition>
       </main>
     </div>
@@ -87,7 +92,7 @@ export async function AppShell({
 /** Почта студента или компании, которую ещё нужно подтвердить, — маской; null — нечего. */
 async function pendingEmail(session: SessionUser | null): Promise<string | null> {
   if (!session || session.role === 'ADMIN') return null;
-  const account = await (await getStore()).accounts.findById(session.accountId);
+  const account = await getSessionAccount();
   if (!account || account.emailVerifiedAt) return null;
   return maskEmail(decryptSafe(account.emailEnc));
 }

@@ -85,10 +85,19 @@ export function createPrismaStore(): DataStore {
         await prisma.account.updateMany({ where: { id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
       },
       async setPassword(id, passwordHash) {
-        await prisma.account.update({ where: { id }, data: { passwordHash } });
+        await prisma.account.update({ where: { id }, data: { passwordHash, passwordChangedAt: new Date() } });
+      },
+      async setActive(id, active) {
+        await prisma.account.update({ where: { id }, data: { isActive: active } });
       },
       async setNotifyEmail(id, enabled) {
         await prisma.account.update({ where: { id }, data: { notifyEmail: enabled } });
+      },
+      async setLastSeen(id, at) {
+        await prisma.account.update({ where: { id }, data: { lastSeenAt: at } });
+      },
+      async setShowPresence(id, enabled) {
+        await prisma.account.update({ where: { id }, data: { showPresence: enabled } });
       },
       createStaff: (email) =>
         prisma.account.create({
@@ -665,9 +674,15 @@ export function createPrismaStore(): DataStore {
       latest: (accountId, kind) =>
         prisma.authToken.findFirst({ where: { accountId, kind, usedAt: null }, orderBy: { createdAt: 'desc' } }),
       findActiveByHash: (kind, tokenHash) => prisma.authToken.findFirst({ where: { kind, tokenHash, usedAt: null } }),
-      async recordFailure(id) {
-        const row = await prisma.authToken.update({ where: { id }, data: { attempts: { increment: 1 } } });
-        return row.attempts;
+      async claimAttempt(id, max) {
+        // Один условный UPDATE: проверка предела и приращение не разделены, поэтому сорок
+        // параллельных запросов получат ровно max попыток, а не по одной каждый
+        const rows = await prisma.$queryRaw<Array<{ attempts: number }>>`
+          UPDATE "AuthToken"
+          SET "attempts" = "attempts" + 1
+          WHERE "id" = ${id} AND "usedAt" IS NULL AND "attempts" < ${max}
+          RETURNING "attempts"`;
+        return rows[0]?.attempts ?? null;
       },
       async consume(id) {
         // Условие usedAt: null в самом запросе: два одновременных ввода

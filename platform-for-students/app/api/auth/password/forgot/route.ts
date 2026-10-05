@@ -1,26 +1,32 @@
-import { NextResponse } from 'next/server';
-import { fail, handle, ok, tooManyRequests, type ApiError } from '@/lib/api';
+import { after, NextResponse } from 'next/server';
+import { handle, tooManyRequests } from '@/lib/api';
 import { requestPasswordReset } from '@/lib/account-email';
 import { blindIndex } from '@/lib/security/crypto';
 import { assertSameOrigin, audit } from '@/lib/security/guards';
 import { clientIp, rateLimit } from '@/lib/security/rate-limit';
+import { answerHonestly, resetReply } from '@/lib/security/reset-hints';
 import { forgotPasswordSchema } from '@/lib/validation';
-import { formatWait } from '@/lib/wait-format';
 
 export const runtime = 'nodejs';
 
 /**
  * «Забыли пароль»: письмо со ссылкой.
  *
- * Ответ честный: нет такой учётки — так и говорим, чтобы человек проверил
- * адрес, а не ждал письмо, которое не придёт. Подбор адресов ограничен
- * лимитами по IP и по почте ниже.
+ * Ответ честный, но не безграничный: нет такой учётки — так и говорим, чтобы человек проверил
+ * адрес, а не ждал письмо, которое не придёт. Однако только на первые три промаха с одного адреса
+ * за час (lib/security/reset-hints.ts); с четвёртого на всё отвечаем одинаково и нейтрально —
+ * иначе форма годилась бы для проверки списка адресов. Адрес — настоящий, из clientIp():
+ * заголовки от клиента счёт не обнуляют. Лимиты по IP и по почте ниже стоят дополнительно.
+ *
+ * Письмо уходит после ответа (after): если ждать SMTP, время ответа выдавало бы, что аккаунт
+ * есть. Сбой отправки наружу не показывается вовсе — только в журнал сервера и аудита.
  */
 export async function POST(request: Request) {
   return handle(async () => {
     assertSameOrigin(request);
 
-    const byIp = await rateLimit('passwordResetIp', clientIp(request.headers));
+    const ip = clientIp(request.headers);
+    const byIp = await rateLimit('passwordResetIp', ip);
     if (!byIp.ok) return tooManyRequests(byIp.retryAfter);
 
     const { email } = forgotPasswordSchema.parse(await request.json());
@@ -35,24 +41,22 @@ export async function POST(request: Request) {
       request.headers,
     );
 
-    switch (result.status) {
-      case 'SENT':
-        return ok({ sent: true });
-      case 'NO_ACCOUNT':
-        return fail(404, 'Аккаунта с такой почтой нет. Проверьте адрес на опечатки или зарегистрируйтесь.', 'NO_ACCOUNT', {
-          email: 'Аккаунта с такой почтой нет. Проверьте адрес на опечатки.',
-        });
-      case 'NO_PASSWORD':
-        return fail(409, 'У этого аккаунта нет пароля: вход по коду. Новый код выдаёт ваш менеджер агентства.', 'NO_PASSWORD', {
-          email: 'У этого аккаунта нет пароля: вход по коду от менеджера.',
-        });
-      case 'WAIT':
-        return NextResponse.json<ApiError>(
-          { error: `Письмо уже отправлено. Новое можно запросить через ${formatWait(result.retryAfter)}.`, code: 'WAIT' },
-          { status: 429, headers: { 'Retry-After': String(result.retryAfter) } },
-        );
-      case 'MAIL_FAILED':
-        return fail(502, 'Не удалось отправить письмо. Попробуйте позже или напишите в поддержку.', 'MAIL_FAILED');
+    if (result.status === 'SENT') {
+      const { deliver } = result;
+      after(async () => {
+        const delivered = await deliver().catch(() => false);
+        if (!delivered) {
+          console.error('[сброс пароля] письмо не отправлено', { emailHash });
+          await audit(null, { action: 'auth.password.reset_mail_failed', meta: { emailHash } }, request.headers);
+        }
+      });
     }
+
+    // Нейтральный ответ неотличим от настоящего «письмо отправлено» — и текстом, и формой
+    const reply = resetReply(result, await answerHonestly(ip, result.status));
+    return NextResponse.json(reply.body, {
+      status: reply.status,
+      ...(reply.retryAfter ? { headers: { 'Retry-After': String(reply.retryAfter) } } : {}),
+    });
   });
 }
