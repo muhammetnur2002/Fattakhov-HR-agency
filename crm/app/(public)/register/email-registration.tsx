@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -12,21 +12,45 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PRIVACY_POLICY_PATH } from "@/lib/legal/consent-texts";
-import { REGISTRATION_CONSENT_TEXT } from "@/lib/legal/registration-consent";
+import { cn } from "@/lib/utils";
 
 type Contact = { email: string; phone: string; password: string };
 
-function SubmitButton({ pendingLabel, label }: { pendingLabel: string; label: string }) {
+function SubmitButton({
+  pendingLabel,
+  label,
+  dimmed = false,
+}: {
+  pendingLabel: string;
+  label: string;
+  /** Блеклая, пока нет согласия: нажать можно — подсветится галочка. */
+  dimmed?: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" className={cn("w-full", dimmed && "opacity-50")} disabled={pending}>
       {pending ? pendingLabel : label}
     </Button>
   );
 }
 
-export function CompanyRegisterForm() {
+/**
+ * Вкладка «Почта» на /register: почта, телефон и пароль → код из письма →
+ * вход (lib/services/registration.ts). Прежняя форма /register/company,
+ * та же логика и те же действия; галочка согласия теперь общая на все
+ * способы и приходит от страницы (consentBox), как у телефона.
+ */
+export function EmailRegistration({
+  consent,
+  consentBox,
+  onNeedsConsent,
+}: {
+  consent: boolean;
+  /** Галочка согласия — между полями и кнопкой, как у остальных способов. */
+  consentBox: ReactNode;
+  /** Нажали «Получить код» до согласия — страница подсветит галочку. */
+  onNeedsConsent: () => void;
+}) {
   // Данные первого экрана живут в состоянии на этой же странице: второй
   // экран — тот же компонент, а не отдельный маршрут. Пароль здесь нужен
   // только на один вызов входа после подтверждения кода, второй раз
@@ -100,17 +124,21 @@ export function CompanyRegisterForm() {
   }
 
   return (
-    <form action={requestAction} className="space-y-4">
+    <form
+      action={requestAction}
+      className="space-y-4"
+      onSubmit={(e) => {
+        // Поля проверяет браузер раньше этого обработчика: с пустой
+        // почтой согласие ничего не решит, а ошибка должна стоять у поля
+        if (!consent) {
+          e.preventDefault();
+          onNeedsConsent();
+        }
+      }}
+    >
       <div className="space-y-2">
         <Label htmlFor="email">Рабочая почта</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          autoFocus
-        />
+        <Input id="email" name="email" type="email" autoComplete="email" required />
       </div>
 
       <div className="space-y-2">
@@ -141,26 +169,7 @@ export function CompanyRegisterForm() {
         </p>
       </div>
 
-      <label htmlFor="consent" className="flex cursor-pointer gap-3 pt-1">
-        <input
-          id="consent"
-          name="consent"
-          type="checkbox"
-          required
-          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-brand-graphite"
-        />
-        <span className="text-xs leading-relaxed text-muted-foreground">
-          {REGISTRATION_CONSENT_TEXT}{" "}
-          <a
-            href={PRIVACY_POLICY_PATH}
-            target="_blank"
-            className="underline underline-offset-2 hover:text-foreground"
-          >
-            Политика обработки персональных данных
-          </a>
-          .
-        </span>
-      </label>
+      {consentBox}
 
       {requestState.error && (
         <Alert variant="destructive">
@@ -168,7 +177,11 @@ export function CompanyRegisterForm() {
         </Alert>
       )}
 
-      <SubmitButton pendingLabel="Отправляем код…" label="Получить код на почту" />
+      <SubmitButton
+        pendingLabel="Отправляем код…"
+        label="Получить код на почту"
+        dimmed={!consent}
+      />
     </form>
   );
 }

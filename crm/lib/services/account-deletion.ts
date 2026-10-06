@@ -38,7 +38,13 @@ export async function anonymizeUser(userId: string): Promise<void> {
       phone: null,
       position: null,
       avatarUrl: null,
-      telegramChatId: null,
+      // Страница ВКонтакте указывает на конкретного человека — те же ПДн
+      vkUserId: null,
+      // Проверенный телефон — тоже персональные данные, и он
+      // уникален: оставь его, и человек не смог бы зарегистрироваться
+      // тем же способом заново — место занято обезличенной записью
+      phoneVerified: null,
+      pendingEmail: null,
       passwordHash: null,
       totpSecret: null,
       totpEnabledAt: null,
@@ -52,6 +58,14 @@ export async function anonymizeUser(userId: string): Promise<void> {
   // Коды восстановления и сбросы пароля без пользователя бессмысленны и не должны жить дольше него
   await prisma.recoveryCode.deleteMany({ where: { userId } });
   await prisma.passwordReset.deleteMany({ where: { userId } });
+  // Пуш-подписки — его устройства: адрес подписки указывает на конкретный
+  // браузер конкретного человека. Строка обезличивается, а не удаляется,
+  // так что каскад по внешнему ключу здесь не сработает — удаляем сами
+  await prisma.pushSubscription.deleteMany({ where: { userId } });
+  // Черновики сообщений студентам — недописанная переписка конкретного
+  // человека: тоже ПДн, и по той же причине (строка пользователя остаётся,
+  // каскад не сработает) удаляются явно
+  await prisma.studentMessageDraft.deleteMany({ where: { userId } });
 }
 
 /**

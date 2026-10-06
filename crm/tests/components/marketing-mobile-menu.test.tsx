@@ -8,6 +8,8 @@
  * же списка, что и в широкой шапке; в ней есть то, что ушло из узкой
  * шапки, — телефон и вход; переход по пункту закрывает шторку.
  */
+import { readFileSync } from "node:fs";
+
 import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -45,7 +47,7 @@ function renderMenu(studentsHref: string | null = null) {
       phoneHref="tel:+79375711877"
       phoneDisplay="+7 (937) 571-18-77"
       loginHref="https://my.fattakhovhr.ru/login"
-      registerHref="/#diagnostic"
+      registerHref="https://my.fattakhovhr.ru/register"
       studentsHref={studentsHref}
     />,
   );
@@ -97,10 +99,23 @@ describe("меню сайта на узком экране", () => {
 });
 
 describe("«Обсудить найм» в меню", () => {
-  it("ведёт к форме «перезвоните мне» на главной", () => {
+  it("ведёт туда, куда передала шапка, — на регистрацию в кабинете", () => {
     const menu = renderMenu();
     const link = within(menu).getByRole("link", { name: "Обсудить найм" });
-    expect(link.getAttribute("href")).toBe("/#diagnostic");
+    expect(link.getAttribute("href")).toBe("https://my.fattakhovhr.ru/register");
+  });
+});
+
+describe("«Обсудить найм» в шапке сайта", () => {
+  // Решение владельца (21.09.2026, подтверждено 04.10.2026): кнопка ведёт
+  // на регистрацию компании, а форма «перезвоните мне» остаётся на главной
+  // для тех, кто не готов заводить кабинет. Шапка — серверный компонент,
+  // адрес берёт из окружения, поэтому проверяется её исходник
+  it("и кнопка, и меню ведут на регистрацию, а не к форме на главной", () => {
+    const header = readFileSync("components/marketing/header.tsx", "utf8");
+    expect(header).toMatch(/<a href=\{appUrl\("\/register"\)\}>/);
+    expect(header).toMatch(/registerHref=\{appUrl\("\/register"\)\}/);
+    expect(header).not.toMatch(/"\/#diagnostic"/);
   });
 });
 

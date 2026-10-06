@@ -138,6 +138,77 @@ describe("повторное приглашение", () => {
   });
 });
 
+describe("чужие приглашения не раскрываются (BR-28)", () => {
+  const STARFISH_ADMIN = "usr_cl_admin";
+  const TECHNOPARK_ADMIN = "usr_cl2_admin";
+
+  async function inviteError(params: Parameters<typeof createInvitation>[0]) {
+    return createInvitation(params).then(
+      () => null,
+      (error: Error) => error,
+    );
+  }
+
+  it("администратор другой компании не узнаёт, что адрес уже позвали", async () => {
+    const email = free("foreign");
+    await createInvitation({
+      organizationId: ORG,
+      email,
+      role: "CLIENT_HIRING",
+      clientId: CLIENT,
+      createdById: STARFISH_ADMIN,
+    });
+
+    const error = await inviteError({
+      organizationId: ORG,
+      email,
+      role: "CLIENT_HIRING",
+      clientId: "cl_technopark",
+      createdById: TECHNOPARK_ADMIN,
+    });
+    expect(error).toBeInstanceOf(InviteError);
+    // Тот же ответ, что на занятый чужой адрес: ни «кто», ни «приглашение»
+    expect(error?.message).toContain("адрес недоступен");
+    expect(error?.message).not.toMatch(/приглашени/);
+  });
+
+  it("своей компании — прямо: приглашение уже ждёт принятия", async () => {
+    const email = free("own");
+    const params = {
+      organizationId: ORG,
+      email,
+      role: "CLIENT_HIRING" as const,
+      clientId: CLIENT,
+      createdById: STARFISH_ADMIN,
+    };
+    await createInvitation(params);
+
+    const error = await inviteError(params);
+    expect(error?.message).toMatch(/действующее приглашение/);
+    expect(error?.message).toContain("«Ждут принятия»");
+  });
+
+  it("агентству — прямо, какой бы компании ни было приглашение", async () => {
+    const email = free("agency-sees");
+    await createInvitation({
+      organizationId: ORG,
+      email,
+      role: "CLIENT_HIRING",
+      clientId: CLIENT,
+      createdById: STARFISH_ADMIN,
+    });
+
+    const error = await inviteError({
+      organizationId: ORG,
+      email,
+      role: "CLIENT_HIRING",
+      clientId: "cl_technopark",
+      createdById: AUTHOR,
+    });
+    expect(error?.message).toMatch(/действующее приглашение/);
+  });
+});
+
 describe("свободный адрес", () => {
   it("приглашение выдаётся и читается по токену", async () => {
     const email = free("ok");

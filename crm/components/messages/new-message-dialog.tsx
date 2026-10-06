@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { describeUser } from "./direct-conversation-list";
+import { PresenceLabel } from "@/components/presence/presence-label";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,6 +93,12 @@ export function NewMessageDialog({
                   {describeUser(c.role as UserRole, c.clientName)}
                   {c.position ? ` · ${c.position}` : ""}
                 </div>
+                {c.presence && (
+                  <PresenceLabel
+                    lastSeenAt={c.presence.lastSeenAt}
+                    className="flex text-xs text-muted-foreground"
+                  />
+                )}
               </button>
             ))
           )}

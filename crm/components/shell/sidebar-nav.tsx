@@ -11,16 +11,12 @@ import type { NavItem } from "@/lib/nav";
 /**
  * Пункты приходят уже отфильтрованными по правам с сервера —
  * здесь только подсветка активного раздела.
+ *
+ * Только компьютер (≥ xl, см. AppShell). На планшете тот же список
+ * показывает IconRail, на телефоне — BottomTabs; прежнего бургера
+ * с этим же меню в шторке больше нет.
  */
-export function SidebarNav({
-  items,
-  onNavigate,
-}: {
-  items: NavItem[];
-  /** Закрыть мобильное меню при переходе: сайдбар живёт в layout и не
-      перемонтируется между страницами, поэтому Sheet сам не закроется. */
-  onNavigate?: () => void;
-}) {
+export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
   return (
@@ -35,7 +31,6 @@ export function SidebarNav({
           <Link
             key={item.href}
             href={item.href}
-            onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
               // Активный пункт отмечен вертикальной засечкой слева, а не

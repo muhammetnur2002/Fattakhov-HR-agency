@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authConfig } from "@/auth.config";
-import { AGENCY_HOME, CLIENT_HOME, homePathFor } from "@/lib/nav";
+import { AGENCY_HOME, CLIENT_HOME, homePathFor, TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
 import { appOrigin, siteHost, siteOrigin } from "@/lib/urls";
 
 const { auth } = NextAuth(authConfig);
@@ -55,9 +55,19 @@ const PUBLIC_PREFIXES = [
   // и ограничение частоты в самих действиях
   "/forgot",
   "/reset",
+  // Подтверждение рабочей почты по ссылке из письма: письмо читают и на
+  // телефоне, где кабинет не открыт. Защита — подпись в самой ссылке
+  // (lib/services/email-confirmation.ts), а подключает адрес кнопка
+  // на странице, не переход: почтовые сканеры открывают ссылки сами
+  "/confirm-email",
   "/invite",
   "/schedule",
   "/consent",
+  // Подтверждение передачи данных конкретному работодателю (§4.2
+  // согласия). Как и /consent: аккаунта у кандидата нет, защита —
+  // одноразовый токен со сроком, он проверяется в самом обработчике
+  // (getDisclosureRequest / giveDisclosure), плюс лимит частоты
+  "/disclosure",
   // Экспресс-аудит открыт всем, включая вошедших: его проходят
   // до всякого договора, и заставлять человека выйти из кабинета,
   // чтобы посмотреть свой же лид-магнит, бессмысленно
@@ -90,6 +100,11 @@ const PUBLIC_PREFIXES = [
   // бы установку невозможной. Иконки (public/, app/apple-icon.png) под
   // редирект и так не попадают — их расширения исключены матчером ниже
   "/manifest.webmanifest",
+  // Воркер пуш-уведомлений (public/push-sw.js). Браузер перепроверяет его
+  // сам, когда захочет, — в том числе с давно истёкшей сессией, — а для
+  // скрипта воркера редирект на /login означает «обновить не удалось».
+  // Внутри нет ничего, кроме показа уведомления: открывать нечего
+  "/push-sw.js",
 ];
 
 /**
@@ -160,6 +175,11 @@ export default auth((req) => {
   if (pathname === LANDING_PATH) {
     return NextResponse.redirect(new URL(home, req.nextUrl));
   }
+
+  // Экран обязательной настройки 2FA — не часть кабинета /a (иначе макет
+  // кабинета гонял бы человека по кругу), но агентству открыт. Клиенту его
+  // страница сама ответит 404: настройка там только для сотрудников
+  if (pathname === TWO_FACTOR_SETUP_PATH) return NextResponse.next();
 
   if (isAgencyUser && !wantsAgency) {
     return NextResponse.redirect(new URL(AGENCY_HOME, req.nextUrl));

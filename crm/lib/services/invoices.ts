@@ -48,6 +48,8 @@ export async function listBillableHires(
       organizationId: actor.organizationId,
       outcome: "HIRED",
       hiredAt: { not: null },
+      // Замена по гарантии бесплатна: за подбор заплачено исходным наймом
+      replacementForId: null,
       ...(clientId && { vacancy: { clientId } }),
     },
     orderBy: { hiredAt: "desc" },

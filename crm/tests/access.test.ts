@@ -197,6 +197,20 @@ describe("матрица прав ТЗ 3.2", () => {
     expectAllowedOnly("pdn.auditLog", ["OWNER"]);
   });
 
+  it("журнал входов — только владелец", () => {
+    expectAllowedOnly("auth.log", ["OWNER"]);
+  });
+
+  it("сброс 2FA сотруднику — только владелец, даже с доступом staff.manage", () => {
+    expectAllowedOnly("staff.resetTwoFactor", ["OWNER"]);
+    expect(
+      canDo(
+        { id: "u", organizationId: "o", role: "HEAD", clientId: null, grants: ["staff.manage"] },
+        "staff.resetTwoFactor",
+      ),
+    ).toBe(false);
+  });
+
   it("условия сотрудничества принимает подписант — админ клиента", () => {
     // Агентство их предлагает и подтверждает (agreement.manage),
     // но не «принимает» за клиента

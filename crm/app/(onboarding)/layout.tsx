@@ -1,11 +1,15 @@
 import { logout } from "@/app/actions/auth";
 import { Logo } from "@/components/brand/logo";
+import { CABINET_METADATA } from "@/lib/cabinet-metadata";
 import { Button } from "@/components/ui/button";
 
 /**
  * Онбординг живёт вне кабинета клиента намеренно: навигация по разделам
  * тут только отвлекает — до выбора условий работать всё равно не с чем.
  */
+// Установка на экран «Домой» и цифры без автоссылок — см. lib/cabinet-metadata.ts
+export const metadata = CABINET_METADATA;
+
 export default function OnboardingLayout({
   children,
 }: {

@@ -9,8 +9,8 @@ import { fetchCrmLinkRequests, fetchModerationQueue, fetchPendingStudyReview } f
 export const metadata = { title: "Студенческая платформа" };
 
 /**
- * Проверки студенческой платформы — компании, вакансии, справки студентов
- * и метрики пилота решаются здесь, без перехода на тот сайт. Каждый
+ * Проверки студенческой платформы — компании, вакансии, справки студентов,
+ * метрики пилота и поиск студентов для подбора решаются здесь, без перехода на тот сайт. Каждый
  * раздел — по своему доступу (owner выдаёт их в «Сотрудниках»), поэтому
  * список карточек собирается по факту выданных прав, а не показывает
  * то, чего у человека нет.
@@ -47,6 +47,12 @@ export default async function ReviewsPage() {
       description: "Числа с доски пилота: регистрации, отклики, публикации, конверсии.",
       count: null,
     },
+    grants.includes("students.search") && {
+      href: "/a/reviews/students",
+      title: "Студенты",
+      description: "Поиск студентов платформы для подбора: вуз, специальность, курс, навыки, возраст, статус.",
+      count: null,
+    },
   ].filter(Boolean) as Array<{ href: string; title: string; description: string; count: number | null }>;
 
   return (
@@ -81,7 +87,7 @@ export default async function ReviewsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           {cards.map((card) => (
             <Link key={card.href} href={card.href}>
               <Card className="h-full transition-colors hover:border-primary/40">

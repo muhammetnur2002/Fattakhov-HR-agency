@@ -618,6 +618,64 @@ export async function createMemoryStore(): Promise<DataStore> {
       async list() {
         return clone([...t.students].sort((a, b) => +b.createdAt - +a.createdAt));
       },
+      async search(filter, page) {
+        const has = (value: string | null, part: string) =>
+          (value ?? '').toLowerCase().includes(part.toLowerCase());
+        const accountOf = (accountId: string) => t.accounts.find((a) => a.id === accountId);
+        const matched = t.students.filter((s) => {
+          if (filter.university && !has(s.university, filter.university)) return false;
+          if (filter.speciality && !has(s.speciality, filter.speciality)) return false;
+          if (filter.city && !has(s.city, filter.city)) return false;
+          if (filter.studyYear !== undefined && s.studyYear !== filter.studyYear) return false;
+          if (filter.gender && s.gender !== filter.gender) return false;
+          if (filter.birthYearFrom !== undefined && s.birthYear < filter.birthYearFrom) return false;
+          if (filter.birthYearTo !== undefined && s.birthYear > filter.birthYearTo) return false;
+          if (filter.study === 'VERIFIED' && !s.studyVerified) return false;
+          if (filter.study === 'PENDING' && (s.studyVerified || !s.studyDocUrl)) return false;
+          if (filter.study === 'NONE' && (s.studyVerified || s.studyDocUrl)) return false;
+          if (filter.status === 'ACTIVE' && s.status !== 'ACTIVE' && s.status !== 'IN_PROGRESS') return false;
+          if (filter.status === 'PAUSED' && s.status !== 'PAUSED') return false;
+          if (filter.status === 'PLACED' && s.status !== 'PLACED') return false;
+          if (filter.onlineSince) {
+            const account = accountOf(s.accountId);
+            if (!account?.showPresence || !account.lastSeenAt || account.lastSeenAt < filter.onlineSince) return false;
+          }
+          return true;
+        });
+        const byNew = (a: StudentRecord, b: StudentRecord) => +b.createdAt - +a.createdAt || a.id.localeCompare(b.id);
+        matched.sort(
+          page.order === 'university'
+            ? (a, b) =>
+                a.university.localeCompare(b.university, 'ru') ||
+                a.speciality.localeCompare(b.speciality, 'ru') ||
+                byNew(a, b)
+            : byNew,
+        );
+        const rows = matched.slice(page.skip, page.skip + page.take).map((s) => {
+          const account = accountOf(s.accountId);
+          return {
+            id: s.id,
+            fullNameEnc: s.fullNameEnc,
+            gender: s.gender,
+            birthYear: s.birthYear,
+            birthDateEnc: s.birthDateEnc,
+            university: s.university,
+            speciality: s.speciality,
+            studyYear: s.studyYear,
+            studyLevel: s.studyLevel,
+            city: s.city,
+            skills: [...s.skills],
+            about: s.about,
+            status: s.status,
+            studyVerified: s.studyVerified,
+            studyPending: !s.studyVerified && !!s.studyDocUrl,
+            createdAt: s.createdAt,
+            lastSeenAt: account?.lastSeenAt ?? null,
+            showPresence: account?.showPresence ?? true,
+          };
+        });
+        return { rows, total: matched.length };
+      },
       async setStatus(id, status) {
         const s = t.students.find((x) => x.id === id);
         if (s) {
@@ -1434,6 +1492,12 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
       async list(limit) {
         return clone([...t.audit].sort((a, b) => +b.createdAt - +a.createdAt).slice(0, limit));
+      },
+      async recentExists({ actorLabel, action, entityId, withinMs }) {
+        const since = +now() - withinMs;
+        return t.audit.some(
+          (e) => e.actorLabel === actorLabel && e.action === action && e.entityId === entityId && +e.createdAt >= since,
+        );
       },
     },
 

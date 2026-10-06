@@ -10,13 +10,40 @@
 #
 # Оба домена ведут в одно приложение: разделение сайта и кабинета
 # делает прокси приложения по имени хоста, а не веб-сервер.
+#
+# Как файл попадает на машину: Terraform склеивает его с maintenance.caddy и
+# отдаёт контейнеру caddy переменной окружения CADDYFILE (docker-compose.yaml),
+# то есть через метаданные docker-compose, а не cloud-init. Правка этого файла
+# доезжает обычным apply (контейнер caddy пересоздаётся за секунды), машину
+# пересоздавать не нужно. Копия в /etc/caddy/Caddyfile из cloud-init осталась
+# для справки и ничем не читается.
 
 {
   email profattakhov@gmail.com
+
+  # Защита от медленных и раздутых запросов. Таймаут записи (write) не ставим
+  # намеренно: он оборвал бы потоки SSE. Лимиты соединений на клиента в самом
+  # Caddy нет (нужен сборочный плагин), поэтому ограничены размеры, время
+  # чтения и число соединений к приложению (ниже, в reverse_proxy).
+  servers {
+    max_header_size 32KB
+    timeouts {
+      read_header 15s
+      read_body 10m
+      idle 5m
+    }
+  }
 }
 
 fattakhovhr.ru, www.fattakhovhr.ru, my.fattakhovhr.ru {
   encode zstd gzip
+
+  # Потолок тела запроса: файлы в кабинете до 20 МБ (MAX_FILE_SIZE в
+  # lib/storage) плюс служебные поля формы. Больше — сразу 413, до приложения
+  # не доходит.
+  request_body {
+    max_size 25MB
+  }
 
   # Заголовки безопасности. Строгий транспорт обязателен: без него
   # первый запрос по HTTP можно перехватить
@@ -34,9 +61,25 @@ fattakhovhr.ru, www.fattakhovhr.ru, my.fattakhovhr.ru {
     -Server
   }
 
+  # Страница «технические работы» (maintenance.caddy, склеивается с этим файлом
+  # в Terraform). Плановый режим — MAINTENANCE_MODE=on: страница всем, кроме
+  # /api/health* и запросов с X-Maintenance-Bypass. Автоматический — когда
+  # приложение не ответило (502/503/504). Стоят до reverse_proxy намеренно.
+  import maintenance_gate "Fattakhov HR" "HR-агентство"
+  import maintenance_errors "Fattakhov HR" "HR-агентство"
+
   reverse_proxy app:3000 {
     header_up X-Forwarded-For {remote_host}
     header_up X-Real-IP {remote_host}
+
+    # Не больше 256 одновременных соединений к приложению: при наплыве
+    # лишние ждут в очереди, а не раздувают память Node. Долгие потоки (SSE)
+    # тоже считаются, запас на это есть.
+    transport http {
+      dial_timeout 5s
+      response_header_timeout 120s
+      max_conns_per_host 256
+    }
   }
 }
 

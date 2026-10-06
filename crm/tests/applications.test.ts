@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Actor } from "@/lib/access";
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { markDisclosureManually } from "@/lib/services/disclosure-consent";
 import {
   addToVacancy,
   ApplicationError,
@@ -37,6 +38,17 @@ const PREFIX = "test_app_";
 let candidateId: string;
 let stages: { id: string; code: string; order: number }[];
 
+/**
+ * Подтверждение передачи данных этому работодателю (§4.2 согласия).
+ *
+ * Без него представление не проходит — это отдельная проверка ниже.
+ * Здесь берём ручной путь: он не требует ни ссылки, ни браузера,
+ * а проверяем мы не способ получения, а саму блокировку.
+ */
+async function allowDisclosure(applicationId: string) {
+  await markDisclosureManually(recruiter, applicationId, "VIA_AGENCY");
+}
+
 async function cleanup() {
   const candidates = await db.candidate.findMany({
     where: { id: { startsWith: PREFIX } },
@@ -62,6 +74,9 @@ async function cleanup() {
     where: { comment: { applicationId: { in: appIds } } },
   });
   await db.comment.deleteMany({ where: { applicationId: { in: appIds } } });
+  await db.disclosureConsent.deleteMany({
+    where: { candidateId: { in: ids } },
+  });
   await db.personalDataAccessLog.deleteMany({
     where: { candidateId: { in: ids } },
   });
@@ -271,9 +286,36 @@ describe("представление клиенту (BR-4, BR-33)", () => {
     ).rejects.toThrow(/согласия/);
   });
 
+  it("без подтверждения передачи этому работодателю не представляется", async () => {
+    // §4.2 согласия: общего согласия мало, нужно отдельное подтверждение
+    // на конкретного работодателя и конкретную вакансию
+    const { id } = await addToVacancy(recruiter, VACANCY, candidateId);
+    await markConsentGiven(recruiter, candidateId);
+    await db.attachment.create({
+      data: {
+        organizationId: ORG,
+        kind: "RESUME",
+        fileName: "resume.pdf",
+        fileSize: 1000,
+        mimeType: "application/pdf",
+        storageKey: `${PREFIX}disclosure`,
+        candidateId,
+        uploadedById: recruiter.id,
+      },
+    });
+
+    await expect(
+      presentToClient(recruiter, id, {
+        presentationSummary: summary,
+        salaryExpectation: 120_000,
+      }),
+    ).rejects.toThrow(/подтверждения/);
+  });
+
   it("без резюме не представляется", async () => {
     const { id } = await addToVacancy(recruiter, VACANCY, candidateId);
     await markConsentGiven(recruiter, candidateId);
+    await allowDisclosure(id);
 
     await expect(
       presentToClient(recruiter, id, {
@@ -299,6 +341,7 @@ describe("представление клиенту (BR-4, BR-33)", () => {
       },
     });
 
+    await allowDisclosure(id);
     await presentToClient(recruiter, id, {
       presentationSummary: summary,
       salaryExpectation: 120_000,
@@ -336,6 +379,7 @@ describe("представление клиенту (BR-4, BR-33)", () => {
       },
     });
 
+    await allowDisclosure(id);
     await presentToClient(recruiter, id, {
       presentationSummary: summary,
       salaryExpectation: 145_000,
@@ -406,6 +450,7 @@ describe("порог видимости через сервис (BR-3)", () => {
 
     expect(await getApplication(starfishAdmin, id)).toBeNull();
 
+    await allowDisclosure(id);
     await presentToClient(recruiter, id, {
       presentationSummary: summary,
       salaryExpectation: 120_000,
@@ -421,6 +466,7 @@ describe("порог видимости через сервис (BR-3)", () => {
     const { id } = await addToVacancy(recruiter, VACANCY, candidateId);
     await markConsentGiven(recruiter, candidateId);
     await addResume();
+    await allowDisclosure(id);
     await presentToClient(recruiter, id, {
       presentationSummary: summary,
       salaryExpectation: 120_000,
@@ -479,6 +525,7 @@ describe("решения клиента (BR-12, BR-13, BR-14)", () => {
         uploadedById: recruiter.id,
       },
     });
+    await allowDisclosure(id);
     await presentToClient(recruiter, id, {
       presentationSummary: summary,
       salaryExpectation: 120_000,

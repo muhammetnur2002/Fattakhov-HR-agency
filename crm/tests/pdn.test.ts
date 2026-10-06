@@ -309,7 +309,7 @@ describe("сроки хранения (BR-34)", () => {
     expect(list.map((c) => c.id)).toContain(candidateId);
   });
 
-  it("ничего не удаляется само — только помечается", async () => {
+  it("пометка истечения сама ничего не удаляет", async () => {
     await db.candidate.update({
       where: { id: candidateId },
       data: {
@@ -320,7 +320,9 @@ describe("сроки хранения (BR-34)", () => {
 
     await expireConsents();
 
-    // Кандидат на месте, данные на месте: удаляет человек, не таймер
+    // Кандидат на месте, данные на месте: expireConsents только помечает.
+    // Блокировка и уничтожение по сроку — отдельный контур
+    // (runErasureQueue, tests/erasure.test.ts), и не сразу, а через 30 дней
     const candidate = await db.candidate.findUnique({
       where: { id: candidateId },
       select: { fullName: true, phone: true },

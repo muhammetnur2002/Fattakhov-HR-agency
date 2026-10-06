@@ -59,7 +59,7 @@ export default async function DocumentsPage() {
             <CardTitle className="text-base">Оформить договор</CardTitle>
             <CardDescription>
               Скачайте шаблон, подпишите и пришлите нам скан или фото. Агентство проверит и подтвердит договор — после
-              этого откроются заявки на подбор, кандидаты, календарь, аналитика и переписка с командой.
+              этого откроются заявки на подбор, кандидаты, календарь, аналитика.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">

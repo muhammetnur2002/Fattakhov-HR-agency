@@ -75,7 +75,7 @@ export function CandidatesList({ vacancyId, candidates }: { vacancyId: string; c
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Имя, вуз, специальность или навык"
           aria-label="Поиск студентов"
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none touch:text-base placeholder:text-muted-foreground"
         />
       </div>
 

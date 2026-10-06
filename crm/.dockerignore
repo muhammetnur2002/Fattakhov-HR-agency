@@ -14,3 +14,7 @@ docs
 !README.md
 .claude
 coverage
+# Клиент Prisma генерируется внутри сборки (этапы prisma-client и builder).
+# Свой, локальный и, возможно, устаревший, в образ попадать не должен:
+# в tools «COPY lib» перезаписал бы им свежий
+lib/generated

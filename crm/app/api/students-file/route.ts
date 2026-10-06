@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { canDo, effectiveGrants } from "@/lib/access";
 import { requireActor } from "@/lib/auth/session";
+import { recordStudentFileRead, studentFileIdFromPath } from "@/lib/services/student-file-audit";
 import { fetchStudentsFile } from "@/lib/students-service";
 
 /** Картинка компании (логотип, обложка вакансии): не персональные данные, её видит любой студент. */
@@ -18,6 +19,11 @@ const REVIEW_FILE_PATH = /^\/api\/files\/(photo|study|company)\/[0-9a-f-]{36}\.[
  * Справка студента и фото на модерации — персональные данные, право смотреть
  * их не шире права их проверять. Картинки компании (обложка вакансии в форме
  * клиента) доступны и клиенту со студенческой платформой.
+ *
+ * Каждое чтение справки или фото студента пишется в журнал доступа к ПДн
+ * (lib/services/student-file-audit.ts): без записи сотрудник открывал бы
+ * любой документ без следа. Картинки компании — не персональные данные,
+ * их в журнал не пишем. Запись идёт в фоне и выдачу файла не задерживает.
  */
 export async function GET(request: NextRequest) {
   const actor = await requireActor();
@@ -39,6 +45,13 @@ export async function GET(request: NextRequest) {
   const upstream = await fetchStudentsFile(path);
   if (!upstream.ok || !upstream.body) {
     return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
+  }
+
+  const studentFileId = studentFileIdFromPath(path);
+  if (studentFileId) {
+    const kind = path.startsWith("/api/files/study/") ? "study" : "photo";
+    // Сама функция не бросает; catch — страховка, чтобы журнал ни при каких условиях не уронил выдачу
+    recordStudentFileRead(actor, { kind, objectId: studentFileId }, request.headers).catch(() => {});
   }
 
   return new NextResponse(upstream.body, {

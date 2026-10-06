@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 
+import { useScrollActiveIntoView } from "@/lib/hooks/use-scroll-active-into-view";
 import { cn } from "@/lib/utils";
 
 /** Разделы студенческой платформы внутри CRM: вакансии, отклики, кандидаты, сообщения. */
@@ -14,6 +16,9 @@ export function StudentsTabs({
   unreadMessages: number;
 }) {
   const pathname = usePathname();
+  // На телефоне ряд шире экрана: при заходе активная вкладка должна быть на виду
+  const navRef = useRef<HTMLElement>(null);
+  useScrollActiveIntoView(navRef, pathname);
   const onApplications = pathname.startsWith("/students/applications");
   const onCandidates = pathname.startsWith("/students/candidates");
   const onMessages = pathname.startsWith("/students/messages");
@@ -26,7 +31,7 @@ export function StudentsTabs({
   ];
 
   return (
-    <nav className="flex gap-2 overflow-x-auto">
+    <nav ref={navRef} className="pill-scroller flex gap-2">
       {tabs.map((tab) => (
         <Link
           key={tab.href}

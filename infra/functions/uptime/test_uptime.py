@@ -18,9 +18,9 @@ import index  # noqa: E402
 class Check(unittest.TestCase):
     """Причина в письме: «HTTP 503» само по себе не говорит, что смотреть."""
 
-    def _check_with(self, code, body):
+    def _check_with(self, code, body, headers=None):
         def fake_urlopen(request, timeout=0):
-            raise index.urllib.error.HTTPError(request.full_url, code, "x", {}, io.BytesIO(body))
+            raise index.urllib.error.HTTPError(request.full_url, code, "x", headers or {}, io.BytesIO(body))
 
         with mock.patch.object(index.urllib.request, "urlopen", fake_urlopen):
             return index.check("https://my.example.ru/api/health/worker")
@@ -34,6 +34,22 @@ class Check(unittest.TestCase):
         ok, detail = self._check_with(502, b"<html><body>Bad Gateway</body></html>")
         self.assertFalse(ok)
         self.assertEqual(detail, "HTTP 502")
+
+    def test_planned_maintenance_is_not_a_failure(self):
+        """Страница плановых работ (503 + X-Maintenance: planned) — штатно."""
+        ok, detail = self._check_with(503, b"<html></html>", {"X-Maintenance": "planned"})
+        self.assertTrue(ok)
+        self.assertEqual(detail, "HTTP 503 — плановые работы")
+
+    def test_automatic_maintenance_page_is_still_a_failure(self):
+        """Та же страница при настоящем сбое (auto) — простой, письмо нужно."""
+        ok, detail = self._check_with(503, b"<html></html>", {"X-Maintenance": "auto"})
+        self.assertFalse(ok)
+        self.assertEqual(detail, "HTTP 503")
+
+    def test_planned_header_on_other_status_is_still_a_failure(self):
+        ok, _ = self._check_with(502, b"", {"X-Maintenance": "planned"})
+        self.assertFalse(ok)
 
     def test_4xx_is_still_alive(self):
         ok, _ = self._check_with(404, b"")

@@ -9,36 +9,21 @@ import { siteOrigin } from "@/lib/urls";
  * а не по привычке ставить всем единицу: главная продаёт, аудит
  * приводит людей из поиска по запросам про найм, политика нужна
  * для доверия и для закона, но в выдаче ей делать нечего.
+ *
+ * Даты изменения нет намеренно: карта готовится при сборке образа,
+ * и «дата» была бы моментом сборки — при каждой выкатке все страницы
+ * выглядели бы обновлёнными. Робот, которого так обманули несколько
+ * раз, перестаёт верить этой дате. Честной даты у страниц нет, и лучше
+ * не указывать никакой.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteOrigin();
-  const now = new Date();
 
   return [
-    { url: base, lastModified: now, changeFrequency: "monthly", priority: 1 },
-    {
-      url: `${base}/audit`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${base}/tariffs`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${base}/cases`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${base}/privacy`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.2,
-    },
+    { url: base, changeFrequency: "monthly", priority: 1 },
+    { url: `${base}/audit`, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${base}/tariffs`, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${base}/cases`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }

@@ -212,13 +212,11 @@ export async function buildEmployerBoard(employerId: string): Promise<EmployerBo
     emails.set(student.id, account ? decryptSafe(account.emailEnc) : '');
     // Статус берём из той же учётки, что и почту: лишних запросов нет.
     // Основание показать его — то же, что и у контактов: студент сам
-    // откликнулся на вакансию этой компании, они собеседники
+    // откликнулся на вакансию этой компании, они собеседники. Скрыть статус
+    // студент не может — сохранённое showPresence не читается
     lastSeen.set(
       student.id,
-      visibleLastSeen(
-        { lastSeenAt: account?.lastSeenAt ?? null, showPresence: account?.showPresence ?? true },
-        true,
-      )?.toISOString() ?? null,
+      visibleLastSeen({ lastSeenAt: account?.lastSeenAt ?? null }, true)?.toISOString() ?? null,
     );
   }
 

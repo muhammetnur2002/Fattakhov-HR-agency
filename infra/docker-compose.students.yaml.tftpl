@@ -18,6 +18,17 @@ services:
     image: ${students_tools_image}
     restart: "no"
     logging: *logging
+    # Потолки ресурсов: машина 2 ядра / 4 ГБ (students_vm_memory), система и
+    # Docker забирают ~0,5 ГБ. Работающие службы: students 1536 + caddy 128 +
+    # cron 64 + ua 256 = 1984 МБ. Загрузки до 50 МБ платформа читает в память,
+    # поэтому students с запасом. Перед снижением посмотрите память в Monitoring.
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment: ${students_env_json}
     command: ["npx", "prisma", "migrate", "deploy"]
 
@@ -25,6 +36,13 @@ services:
     image: ${students_app_image}
     restart: always
     logging: *logging
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment: ${students_env_json}
     expose:
       - "3000"
@@ -60,11 +78,32 @@ services:
     image: caddy:2-alpine
     restart: always
     logging: *logging
+    # Прокси: см. docker-compose.yaml.
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     ports:
       - "80:80"
       - "443:443"
+    # Конфигурация — переменной CADDYFILE, а не файлом из cloud-init: см.
+    # docker-compose.yaml и maintenance.tf.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '%s' "$$CADDYFILE" > /tmp/Caddyfile
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    environment:
+      CADDYFILE: ${caddyfile_json}
+      # Плановые работы (maintenance_mode, maintenance_bypass в prod.tfvars)
+      MAINTENANCE_MODE: ${maintenance_mode_json}
+      MAINTENANCE_BYPASS: ${maintenance_bypass_json}
     volumes:
-      - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -78,6 +117,13 @@ services:
     image: alpine:3.20
     restart: always
     logging: *logging
+    # Лимиты и no-new-privileges; cap_drop не ставим: apk add под root при
+    # старте и crond используют возможности root (проверить без них нельзя).
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
     environment: ${students_env_json}
     depends_on:
       - students

@@ -29,6 +29,32 @@ export type LeadCreateInput = Omit<LeadInput, "consent">;
 export async function createLead(
   input: LeadCreateInput,
   meta: { ip?: string | null; userAgent?: string | null } = {},
+  options: {
+    /**
+     * Компания, зарегистрировавшаяся сама. Заявка связывается с ней,
+     * чтобы после анкеты дописать название и вакансию (completeLeadFromBrief).
+     */
+    clientId?: string;
+    /**
+     * Оповещать ли агентство сейчас. Регистрация заводит заявку в момент
+     * согласия — тогда же нужны его момент, адрес и браузер, — но
+     * оповещать ей пока нечем: ни компании, ни вакансии. Оповещение
+     * уходит после анкеты, с тем, что уже можно разбирать.
+     */
+    notify?: boolean;
+    /**
+     * Версия показанного текста, если это не галочка формы заявки сайта:
+     * регистрация показывает свой текст (lib/legal/registration-consent.ts),
+     * и доказывать нужно именно его.
+     */
+    consentVersion?: string;
+    /**
+     * Когда поставили галочку, если раньше, чем заводится заявка:
+     * регистрация по почте спрашивает согласие на первом экране,
+     * а компания появляется только после кода из письма.
+     */
+    consentAt?: Date;
+  } = {},
 ): Promise<{ id: string }> {
   const organization = await prisma.organization.findFirst({
     select: { id: true },
@@ -50,27 +76,76 @@ export async function createLead(
       // Доказательство согласия: версия текста и момент. Сам факт
       // галочки уже проверен схемой, до сюда заявка без него
       // не доходит
-      consentVersion: CONSENT_VERSION,
-      consentAt: new Date(),
+      consentVersion: options.consentVersion ?? CONSENT_VERSION,
+      consentAt: options.consentAt ?? new Date(),
       marketingConsent: input.marketingConsent,
       marketingConsentAt: input.marketingConsent ? new Date() : null,
 
       ip: meta.ip ?? null,
       userAgent: meta.userAgent?.slice(0, 400) ?? null,
+      clientId: options.clientId ?? null,
     },
     select: { id: true },
   });
 
-  await notify({
-    organizationId: organization.id,
-    userIds: await intakeRecipients(organization.id),
-    event: "LEAD_RECEIVED",
-    title: `Заявка с сайта: ${input.name}${input.company ? `, ${input.company}` : ""}`,
-    body: [input.vacancies, input.contact].filter(Boolean).join(". "),
-    linkUrl: "/a/leads",
-  });
+  if (options.notify !== false) {
+    await notifyLeadReceived(organization.id, input);
+  }
 
   return lead;
+}
+
+async function notifyLeadReceived(
+  organizationId: string,
+  lead: { name: string; company?: string | null; vacancies?: string | null; contact: string },
+): Promise<void> {
+  await notify({
+    organizationId,
+    userIds: await intakeRecipients(organizationId),
+    event: "LEAD_RECEIVED",
+    title: `Заявка с сайта: ${lead.name}${lead.company ? `, ${lead.company}` : ""}`,
+    body: [lead.vacancies, lead.contact].filter(Boolean).join(". "),
+    linkUrl: "/a/leads",
+  });
+}
+
+/**
+ * Дописать заявку самостоятельной регистрации после анкеты и оповестить
+ * агентство — теперь есть что разбирать: компания, контакт, вакансия.
+ *
+ * Согласие не трогаем: его момент, версия, адрес и браузер — от запроса
+ * регистрации, когда галочку и поставили.
+ */
+export async function completeLeadFromBrief(
+  clientId: string,
+  data: { name: string; company: string; contact: string; note: string },
+): Promise<void> {
+  const lead = await prisma.lead.findFirst({
+    where: { clientId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  const organization = await prisma.organization.findFirst({ select: { id: true } });
+  if (!organization) return;
+
+  if (lead) {
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: {
+        name: data.name,
+        company: data.company,
+        contact: data.contact,
+        note: data.note,
+      },
+    });
+  }
+
+  await notifyLeadReceived(organization.id, {
+    name: data.name,
+    company: data.company,
+    vacancies: data.note,
+    contact: data.contact,
+  });
 }
 
 export type LeadView = {

@@ -53,6 +53,7 @@ export const STAFF_GRANTS = [
   "students.moderation",
   "students.study",
   "students.pilot",
+  "students.search",
 ] as const;
 
 export type StaffGrant = (typeof STAFF_GRANTS)[number];
@@ -62,6 +63,7 @@ const STUDENT_GRANTS: readonly StaffGrant[] = [
   "students.moderation",
   "students.study",
   "students.pilot",
+  "students.search",
 ];
 
 /** Минимум данных о пользователе, достаточный для решения о доступе. */
@@ -142,8 +144,10 @@ export type Action =
   | "org.manageClientUsers"
   | "clientUser.confirmDeletion"
   | "pdn.auditLog"
+  | "auth.log"
   // команда агентства и студенческая платформа
   | "staff.manage"
+  | "staff.resetTwoFactor"
   | "students.enter"
   | "students.enterAsClient";
 
@@ -388,6 +392,8 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
   // Сноска ⁵: CLIENT_ADMIN управляет только пользователями своей компании.
   "org.manageClientUsers": { OWNER: true, CLIENT_ADMIN: ownClient },
   "pdn.auditLog": { OWNER: true },
+  // Журнал входов: кто и откуда входил и не смог — тот же уровень доверия, что и журнал ПДн
+  "auth.log": { OWNER: true },
   // Клиент с договором просит удалить аккаунт — решает только владелец агентства
   "clientUser.confirmDeletion": { OWNER: true },
 
@@ -403,6 +409,13 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
     RECRUITER: granted("staff.manage"),
     ACCOUNT: granted("staff.manage"),
   },
+
+  /*
+    Сбросить 2FA сотруднику, потерявшему телефон и коды: только владелец.
+    Это снятие второго фактора с чужой учётки — тот же уровень доверия, что и
+    журнал входов, а не то, что можно раздать через staff.manage.
+  */
+  "staff.resetTwoFactor": { OWNER: true },
 
   // --- Студенческая платформа ---
   // Вход из CRM без второго пароля: владельцу всегда, сотруднику —

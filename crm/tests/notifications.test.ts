@@ -3,13 +3,18 @@
  *
  * Проверяется по состоянию в БД, а не по фактической отправке: в тестах
  * каналы работают в режиме лога, и единственный надёжный признак
- * «ушло / не ушло» — отметки sentEmailAt, sentTelegramAt и очередь
- * pendingChannels.
+ * «ушло / не ушло» — отметки sentEmailAt, sentVkAt
+ * и очередь pendingChannels.
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prismaRaw as db } from "@/lib/db/prisma";
-import { channelsForSide, plural } from "@/lib/notifications/events";
+import {
+  channelsForSide,
+  EVENTS,
+  plural,
+  type EventCode,
+} from "@/lib/notifications/events";
 import { flushCollapsed, notify } from "@/lib/notifications/notify";
 
 const ORG = "org_fattakhov";
@@ -21,15 +26,15 @@ async function cleanup() {
   // Возвращаем пользователям исходные настройки
   await db.user.updateMany({
     where: { id: { in: [RECRUITER, CLIENT_ADMIN] } },
-    data: { telegramChatId: null },
+    data: { vkUserId: null },
   });
   await db.user.update({
     where: { id: RECRUITER },
-    data: { notifyPrefs: { email: true, telegram: true } },
+    data: { notifyPrefs: { email: true, vk: true } },
   });
   await db.user.update({
     where: { id: CLIENT_ADMIN },
-    data: { notifyPrefs: { email: true, telegram: false } },
+    data: { notifyPrefs: { email: true, vk: false } },
   });
 }
 
@@ -75,8 +80,8 @@ describe("доставка", () => {
     expect(item.sentEmailAt).not.toBeNull();
   });
 
-  it("в Telegram не уходит, пока чат не привязан", async () => {
-    // Событие настроено на telegram, но слать некуда
+  it("в ВК не уходит, пока страница не привязана", async () => {
+    // Событие настроено на vk, но слать некуда
     await notify({
       organizationId: ORG,
       userIds: [RECRUITER],
@@ -85,13 +90,13 @@ describe("доставка", () => {
     });
 
     const [item] = await notificationsFor(RECRUITER);
-    expect(item.sentTelegramAt).toBeNull();
+    expect(item.sentVkAt).toBeNull();
   });
 
-  it("с привязанным чатом уходит", async () => {
+  it("с привязанной страницей уходит", async () => {
     await db.user.update({
       where: { id: RECRUITER },
-      data: { telegramChatId: "123456" },
+      data: { vkUserId: "400500600" },
     });
 
     await notify({
@@ -102,7 +107,69 @@ describe("доставка", () => {
     });
 
     const [item] = await notificationsFor(RECRUITER);
-    expect(item.sentTelegramAt).not.toBeNull();
+    expect(item.sentVkAt).not.toBeNull();
+  });
+
+  it("старая настройка telegram у пользователя просто игнорируется", async () => {
+    // Telegram-бот убран (04.10.2026); ключ в notifyPrefs у кого-то остался
+    await db.user.update({
+      where: { id: RECRUITER },
+      data: {
+        vkUserId: "400500600",
+        notifyPrefs: { email: true, telegram: false },
+      },
+    });
+
+    await notify({
+      organizationId: ORG,
+      userIds: [RECRUITER],
+      event: "INTERVIEW_SLOTS_REQUESTED",
+      title: "Нужно предложить время",
+    });
+
+    const [item] = await notificationsFor(RECRUITER);
+    expect(item.sentEmailAt).not.toBeNull();
+    // Галочки «telegram: false» ВК не касается: у него своя
+    expect(item.sentVkAt).not.toBeNull();
+  });
+
+  it("в ВК не уходит то, что не срочно", async () => {
+    await db.user.update({
+      where: { id: CLIENT_ADMIN },
+      data: { vkUserId: "400500600" },
+    });
+
+    // Счёт — только почта: в мессенджер его нет ни в каком виде
+    await notify({
+      organizationId: ORG,
+      userIds: [CLIENT_ADMIN],
+      event: "INVOICE_ISSUED",
+      title: "Счёт №1",
+    });
+
+    const [item] = await notificationsFor(CLIENT_ADMIN);
+    expect(item.sentEmailAt).not.toBeNull();
+    expect(item.sentVkAt).toBeNull();
+  });
+
+  it("выключенный ВК уважается, как и любой канал", async () => {
+    await db.user.update({
+      where: { id: RECRUITER },
+      data: {
+        vkUserId: "400500600",
+        notifyPrefs: { email: true, vk: false },
+      },
+    });
+
+    await notify({
+      organizationId: ORG,
+      userIds: [RECRUITER],
+      event: "INTERVIEW_SLOTS_REQUESTED",
+      title: "Нужно предложить время",
+    });
+
+    const [item] = await notificationsFor(RECRUITER);
+    expect(item.sentVkAt).toBeNull();
   });
 
   it("отключённый канал уважается", async () => {
@@ -248,22 +315,58 @@ describe("схлопывание (BR-30)", () => {
   });
 });
 
-describe("каналы по сторонам", () => {
-  it("агентству Telegram доступен без привязки в настройках клиента", () => {
-    expect(channelsForSide(["email", "telegram"], true, false)).toEqual([
-      "email",
-      "telegram",
-    ]);
+describe("каталог событий", () => {
+  it("почта получает все поводы без исключения", () => {
+    /*
+      Решение заказчика 21.09.2026. До него шесть событий жили только
+      в мессенджере или только в колокольчике, и человек без привязанного
+      бота их не получал нигде. Сторож ловит новое событие, которое
+      заведут мимо почты по невнимательности, — в том числе события
+      студенческой платформы и прочие, которых в CRM агентства нет.
+    */
+    const withoutEmail = (Object.keys(EVENTS) as EventCode[]).filter(
+      (code) => !(EVENTS[code].channels as readonly string[]).includes("email"),
+    );
+
+    expect(
+      withoutEmail,
+      `мимо почты: ${withoutEmail.join(", ")} — почта получает всё`,
+    ).toEqual([]);
   });
 
-  it("клиенту Telegram только по собственной привязке", () => {
-    expect(channelsForSide(["email", "telegram"], false, false)).toEqual([
-      "email",
-    ]);
-    expect(channelsForSide(["email", "telegram"], false, true)).toEqual([
-      "email",
-      "telegram",
-    ]);
+  it("решение клиента без привязанного ВК приходит письмом", async () => {
+    // Раньше — только мессенджер: рекрутер без бота не узнавал о решении
+    await notify({
+      organizationId: ORG,
+      userIds: [RECRUITER],
+      event: "CLIENT_DECISION_MADE",
+      title: "Клиент отказал по кандидату",
+    });
+
+    const [item] = await notificationsFor(RECRUITER);
+    expect(item.sentEmailAt).not.toBeNull();
+    expect(item.sentVkAt).toBeNull();
+  });
+
+  it("срочные события идут в ВК — Telegram-канала в каталоге нет", () => {
+    const channels = new Set(
+      (Object.keys(EVENTS) as EventCode[]).flatMap((code) => [
+        ...(EVENTS[code].channels as readonly string[]),
+      ]),
+    );
+    expect(channels.has("vk")).toBe(true);
+    expect(channels.has("telegram")).toBe(false);
+  });
+});
+
+describe("каналы по сторонам", () => {
+  it("агентству ВК доступен без привязки в настройках клиента", () => {
+    expect(channelsForSide(["email", "vk"], true, false)).toEqual(["email", "vk"]);
+  });
+
+  it("клиенту ВК только по собственной привязке", () => {
+    expect(channelsForSide(["email", "vk"], false, false)).toEqual(["email"]);
+    expect(channelsForSide(["email", "vk"], false, true)).toEqual(["email", "vk"]);
   });
 
   it("почта не зависит от стороны", () => {

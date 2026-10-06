@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   createClientUserAction,
   resetClientUserPasswordAction,
+  revokeClientInvitationAction,
   updateClientAction,
 } from "../actions";
 import {
@@ -13,7 +14,9 @@ import {
   TerminateAgreementButton,
 } from "@/components/clients/agreement-actions";
 import { ClientForm } from "@/components/clients/client-form";
+import { PresenceLabel } from "@/components/presence/presence-label";
 import { CreateClientUserForm } from "@/components/clients/create-user-form";
+import { RevokeInviteButton } from "@/components/settings/revoke-invite-button";
 import { ResetPasswordForm } from "@/components/shared/account-forms";
 import { withEmailOff } from "@/components/shared/email-off";
 import { Badge } from "@/components/ui/badge";
@@ -173,10 +176,13 @@ export default async function ClientPage({
                         </div>
                       </div>
                       <Badge variant="outline">{ROLE_LABELS[u.role]}</Badge>
-                      <div className="text-xs text-muted-foreground">
-                        {u.lastLoginAt
-                          ? `Заходил ${formatDate(u.lastLoginAt)}`
-                          : "Ни разу не заходил"}
+                      <div className="flex flex-col items-end text-xs text-muted-foreground">
+                        {u.presence && <PresenceLabel lastSeenAt={u.presence.lastSeenAt} />}
+                        <span>
+                          {u.lastLoginAt
+                            ? `Заходил ${formatDate(u.lastLoginAt)}`
+                            : "Ни разу не заходил"}
+                        </span>
                       </div>
                     </div>
 
@@ -204,6 +210,51 @@ export default async function ClientPage({
               )}
             </CardContent>
           </Card>
+
+          {/*
+            Кого администратор клиента позвал сам и кто ещё не принял.
+            Ссылки здесь нет и в данные страницы она не уходит (getClient
+            не берёт токен): это пропуск в кабинет клиента, а своих людей
+            клиенту агентство заводит аккаунтом. Отозвать — можно: ошибочное
+            приглашение неделю пускает по ссылке и занимает место в команде.
+          */}
+          {client.invitations.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Ждут принятия ({client.invitations.length})
+                </CardTitle>
+                <CardDescription>
+                  Коллеги, которых администратор клиента пригласил сам.
+                  Приглашение занимает место в команде из пяти и неделю
+                  пускает по ссылке — ошибочное можно отозвать.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {client.invitations.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-1"
+                  >
+                    <div className="min-w-48 flex-1 text-sm">
+                      {withEmailOff(inv.email, inv.email)}
+                    </div>
+                    <Badge variant="outline">{ROLE_LABELS[inv.role]}</Badge>
+                    <div className="text-xs text-muted-foreground">
+                      до {formatDate(inv.expiresAt)}
+                    </div>
+                    {canManage && (
+                      <RevokeInviteButton
+                        action={revokeClientInvitationAction}
+                        id={inv.id}
+                        clientId={client.id}
+                      />
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {canManage && (
             <Card>

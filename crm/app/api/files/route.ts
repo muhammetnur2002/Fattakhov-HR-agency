@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { visibleAttachmentsFilter } from "@/lib/access";
-import { getActor } from "@/lib/auth/session";
+import { getGatedActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getStorage } from "@/lib/storage/client";
 import { verifySignedUrl } from "@/lib/storage/signing";
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     return errorPage("Ссылка устарела", 403);
   }
 
-  const actor = await getActor();
+  const actor = await getGatedActor();
   if (!actor) return errorPage("Нужно войти в кабинет", 401);
 
   // Тот же фильтр видимости, что и везде: клиенту не отдаём вложения

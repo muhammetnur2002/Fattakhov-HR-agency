@@ -26,7 +26,16 @@ export function RejectionChart({
     <div className="space-y-2">
       {rejections.map((item) => (
         <div key={item.reason} className="flex items-center gap-3">
-          <div className="w-48 shrink-0 truncate text-sm">
+          {/*
+            min-w-0 вместо shrink-0: подпись задаёт желаемую ширину, но
+            уступает её, когда строка не помещается. С shrink-0 она
+            держала 12rem намертво, и на узком экране за край уезжало
+            число справа — молча, потому что обрезал его overflow
+            карточки, а не полоса прокрутки. truncate уже стоял, но без
+            min-w-0 внутри flex он не срабатывает: элемент не может стать
+            уже своего содержимого.
+          */}
+          <div className="w-48 min-w-0 truncate text-sm">
             {REJECTION_REASON_LABELS[item.reason]}
           </div>
           <div className="h-5 flex-1 rounded bg-muted">

@@ -127,7 +127,13 @@ export function Section({
   );
 }
 
-/** Полоса ключевых цифр. Отдельным блоком, а не внутри первого экрана. */
+/**
+ * Полоса ключевых цифр. Отдельным блоком, а не внутри первого экрана.
+ *
+ * Без разделителей между колонками: четыре коротких пары «число —
+ * подпись» и так читаются отдельными группами, а вертикальные линии
+ * превращали полосу в таблицу, которой здесь нечего показывать.
+ */
 export function Facts() {
   // Досчитывается только то, что действительно число. «fixed» и «2-5»
   // счётчиком не изобразить, и подделывать это анимацией было бы враньём
@@ -141,9 +147,9 @@ export function Facts() {
   return (
     <div className="border-y bg-card">
       <div className="mx-auto max-w-[2200px] md:px-3 xl:px-9">
-        <Stagger className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
+        <Stagger className="grid grid-cols-2 gap-y-2 lg:grid-cols-4">
           {facts.map((f) => (
-            <StaggerItem key={f.label} className="bg-card px-5 py-7">
+            <StaggerItem key={f.label} className="px-5 py-7">
               <div className="text-4xl font-semibold tracking-tight tabular-nums">
                 {f.count === null ? (
                   f.value
@@ -208,6 +214,10 @@ export function WhenSubscription() {
  * Подпись у шага это его собственное имя, а не «Этап 1». Слева
  * вертикальная линия, повторяющая рёбра знака: она и связывает шаги
  * в последовательность, и не требует ни стрелок, ни номеров-украшений.
+ *
+ * Точек на линии нет намеренно. Линия уже показывает последовательность,
+ * а точки добавляли ей собственный ритм — четыре отметки на пустой
+ * вертикали читались как украшение, а не как часть шагов.
  */
 export function HowItWorks() {
   const steps = [
@@ -236,18 +246,7 @@ export function HowItWorks() {
   return (
     <ol className="mt-12 space-y-0 border-l border-white/15 pl-6 md:pl-8">
       {steps.map((s) => (
-        <li key={s.name} className="relative pb-10 last:pb-0">
-          {/*
-            Смещение подобрано так, чтобы линия (border-l слева у ol,
-            1px) проходила ровно по центру точки, а не по её краю:
-            центр точки = край li (pl-6/pl-8 от линии) минус половина
-            её ширины (5px) минус половина толщины самой линии.
-            Только left/-left — top-1.5 не трогаем, вертикаль уже верна.
-          */}
-          <span
-            aria-hidden
-            className="absolute top-1.5 -left-[29px] h-2.5 w-2.5 rounded-sm bg-white/70 md:-left-[37px]"
-          />
+        <li key={s.name} className="pb-10 last:pb-0">
           <div className="text-sm font-medium tracking-[0.12em] text-white/65 uppercase">
             {s.name}
           </div>
@@ -453,8 +452,13 @@ export function Comparison() {
 
   return (
     <div className="mt-12 overflow-x-auto">
-      <div className="min-w-[680px] overflow-hidden rounded-xl border">
-        <div className="grid grid-cols-[160px_repeat(3,1fr)] gap-px bg-border">
+      {/* Ширины в rem, а не в px: текст ячеек растёт вместе с базовым
+          размером (125% с 640px, app/globals.css), а пиксельный минимум
+          таблицы — нет. На 640–768 последняя колонка не влезала в 680px
+          и молча срезалась на 14px overflow'ом рамки; теперь таблица
+          шире экрана просто прокручивается вбок, как и задумано */}
+      <div className="min-w-[42.5rem] overflow-hidden rounded-xl border">
+        <div className="grid grid-cols-[10rem_repeat(3,1fr)] gap-px bg-border">
           <div className="bg-card px-5 py-4" />
           {cols.map((c, i) => (
             <div

@@ -31,6 +31,14 @@ services:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: "no"
     logging: *logging
+    # Потолки ресурсов (машина 2 ядра / 4 ГБ, см. комментарий у app).
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     command: ["npx", "prisma", "migrate", "deploy"]
@@ -44,6 +52,13 @@ services:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: "no"
     logging: *logging
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     command: ["npx", "tsx", "scripts/bootstrap-owner.ts", "ensure"]
@@ -55,11 +70,36 @@ services:
     image: caddy:2-alpine
     restart: always
     logging: *logging
+    # Прокси: 80/443 привязываются только с NET_BIND_SERVICE, остальные
+    # возможности не нужны. Сертификаты пишутся в том caddy_data (владелец root).
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     ports:
       - "80:80"
       - "443:443"
+    # Конфигурация приходит переменной CADDYFILE (Caddyfile + maintenance.caddy,
+    # см. maintenance.tf), а не файлом из cloud-init: тот читается один раз, при
+    # первой загрузке, и правка Caddyfile или режима работ потребовала бы
+    # пересоздать машину. Контейнер кладёт текст в /tmp и запускает Caddy так же,
+    # как образ по умолчанию (caddy run --adapter caddyfile).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '%s' "$$CADDYFILE" > /tmp/Caddyfile
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    environment:
+      CADDYFILE: CADDYFILE_PLACEHOLDER
+      # Плановые работы (maintenance_mode, maintenance_bypass в prod.tfvars)
+      MAINTENANCE_MODE: MAINTENANCE_MODE_PLACEHOLDER
+      MAINTENANCE_BYPASS: MAINTENANCE_BYPASS_PLACEHOLDER
     volumes:
-      - /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -69,6 +109,19 @@ services:
     image: APP_IMAGE_PLACEHOLDER
     restart: always
     logging: *logging
+    # Потолки ресурсов: машина 2 ядра / 4 ГБ, из них система и Docker
+    # забирают ~0,5 ГБ. Сумма потолков работающих служб (app 1280 + worker 512
+    # + caddy 128 + ua 256 = 2176 МБ) оставляет запас; migrate и owner-bootstrap
+    # живут только при старте. Значения подобраны с запасом, чтобы не убить
+    # службу при всплеске: перед снижением посмотрите память в Monitoring.
+    # Node в контейнере сам берёт размер кучи из потолка памяти.
+    mem_limit: 1280m
+    cpus: 1.5
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file: /etc/fhr.env
     # Переменные, которые меняются обычным apply (var.runtime_env)
     environment: RUNTIME_ENV_PLACEHOLDER
@@ -89,6 +142,13 @@ services:
     image: TOOLS_IMAGE_PLACEHOLDER
     restart: always
     logging: *logging
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     env_file: /etc/fhr.env
     environment: RUNTIME_ENV_PLACEHOLDER
     depends_on:

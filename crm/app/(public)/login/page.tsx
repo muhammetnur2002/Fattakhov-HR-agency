@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "./login-form";
+import { QuickLogin } from "./quick-login";
 import { Button } from "@/components/ui/button";
 import { getActor } from "@/lib/auth/session";
+import { smsConfigured } from "@/lib/notifications/sms";
 import {
   Card,
   CardContent,
@@ -34,7 +36,12 @@ export default async function LoginPage({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm callbackUrl={sanitizeCallbackUrl(callbackUrl)} />
+        {/* Пароль — главный способ; телефон — запасной под ним:
+            у зарегистрированных по телефону пароля нет, и без этого способа
+            через 30 дней (срок сессии) они остались бы снаружи */}
+        <QuickLogin phoneEnabled={smsConfigured()}>
+          <LoginForm callbackUrl={sanitizeCallbackUrl(callbackUrl)} />
+        </QuickLogin>
       </CardContent>
       <CardFooter>
         {/* Ссылка на восстановление обязана быть на самой форме: человек,

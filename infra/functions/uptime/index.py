@@ -46,6 +46,12 @@ def check(url: str) -> tuple[bool, str]:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             return response.status < 500, f"HTTP {response.status}"
     except urllib.error.HTTPError as error:
+        # Плановые работы (maintenance_mode = "on", infra/maintenance.tf): прокси
+        # сам отдаёт 503 со страницей работ и этим заголовком. Это объявленная
+        # остановка, а не сбой — письма не нужны. Автоматическая страница при
+        # настоящем сбое (X-Maintenance: auto) по-прежнему считается простоем.
+        if error.code == 503 and error.headers.get("X-Maintenance") == "planned":
+            return True, "HTTP 503 — плановые работы"
         return error.code < 500, f"HTTP {error.code}{reason_from(error)}"
     except Exception as error:  # таймаут, отказ соединения, ошибка TLS
         return False, f"{type(error).__name__}: {str(error)[:200]}"

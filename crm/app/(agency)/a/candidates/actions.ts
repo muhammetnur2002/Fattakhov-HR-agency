@@ -5,12 +5,15 @@ import { redirect } from "next/navigation";
 
 import { AccessDeniedError, canDo } from "@/lib/access";
 import { authorizeOrThrow, requireAgencyActor } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
 import {
   addToVacancy,
   ApplicationError,
   markConsentGiven,
   moveStage,
   presentToClient,
+  recordGuaranteeCase,
+  recordOffer,
   rejectApplication,
 } from "@/lib/services/applications";
 import {
@@ -22,9 +25,19 @@ import {
   type DuplicateWarning,
 } from "@/lib/services/candidates";
 import { ConsentError, createConsentLink } from "@/lib/services/consent";
+import { markSourcingNotice, SourcingError } from "@/lib/services/sourcing";
+import {
+  createDisclosureLink,
+  DisclosureError,
+  markDisclosureManually,
+} from "@/lib/services/disclosure-consent";
+import { transitionVacancy } from "@/lib/services/vacancies";
+import { VacancyTransitionError } from "@/lib/services/vacancy-status";
 import { FileValidationError } from "@/lib/storage";
 import {
   candidateProfileSchema,
+  guaranteeCaseSchema,
+  offerSchema,
   presentSchema,
   quickCandidateSchema,
   rejectSchema,
@@ -69,19 +82,25 @@ export async function createCandidateAction(
     return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
   }
 
+  // Новый кандидат — сорсинг-лид: файлы только после согласия. Отказ
+  // до создания карточки, иначе человек увидел бы ошибку, а кандидат
+  // всё равно завёлся бы (форма, открытая до выкатки, ещё шлёт резюме)
+  const resume = formData.get("resume");
+  if (resume instanceof File && resume.size > 0) {
+    return {
+      error:
+        "Резюме загружается после согласия кандидата: пока его нет, храним только имя, контакты и ссылку на профиль.",
+    };
+  }
+
   let candidateId: string;
   try {
     authorizeOrThrow(actor, "application.create");
     const created = await quickCreateCandidate(actor, parsed.data);
     candidateId = created.id;
-
-    const resume = formData.get("resume");
-    if (resume instanceof File && resume.size > 0) {
-      await attachFile(actor, { candidateId, file: resume, kind: "RESUME" });
-    }
   } catch (error) {
     if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
-    if (error instanceof FileValidationError) return { error: error.message };
+    if (error instanceof SourcingError) return { error: error.message };
     throw error;
   }
 
@@ -121,6 +140,7 @@ export async function updateCandidateAction(
     if (!updated) return { error: "Кандидат не найден" };
   } catch (error) {
     if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof SourcingError) return { error: error.message };
     throw error;
   }
 
@@ -352,6 +372,100 @@ export async function createConsentLinkAction(
   }
 }
 
+/**
+ * Ссылка кандидату на подтверждение передачи конкретному работодателю.
+ *
+ * Отдельно от createConsentLinkAction, потому что это другое согласие
+ * и другая привязка: то — к кандидату, это — к паре «кандидат + вакансия».
+ */
+export async function createDisclosureLinkAction(
+  _prev: CandidateState,
+  formData: FormData,
+): Promise<CandidateState & { disclosureUrl?: string }> {
+  const actor = await requireAgencyActor();
+  const applicationId = String(formData.get("applicationId") || "");
+
+  try {
+    authorizeOrThrow(actor, "application.present");
+    const token = await createDisclosureLink(actor, applicationId);
+
+    revalidatePath(`/a/applications/${applicationId}`);
+    return {
+      ok: "Ссылка готова — отправьте кандидату",
+      disclosureUrl: `${appOrigin()}/disclosure/${token}`,
+    };
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof DisclosureError) return { error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Запасной путь: подтверждение получено вне системы.
+ *
+ * Режим контактов спрашиваем и здесь: по документу это выбор кандидата,
+ * а не наше умолчание, и «рекрутер не выбрал» не должно молча означать
+ * «можно отдавать телефон».
+ */
+export async function markDisclosureAction(
+  _prev: CandidateState,
+  formData: FormData,
+): Promise<CandidateState> {
+  const actor = await requireAgencyActor();
+  const applicationId = String(formData.get("applicationId") || "");
+  const contactMode = String(formData.get("contactMode") || "");
+
+  if (contactMode !== "DIRECT" && contactMode !== "VIA_AGENCY") {
+    return { error: "Выберите, разрешил ли кандидат передать контакты" };
+  }
+
+  try {
+    authorizeOrThrow(actor, "application.present");
+    await markDisclosureManually(actor, applicationId, contactMode);
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof DisclosureError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/a/applications/${applicationId}`);
+  return { ok: "Подтверждение отмечено" };
+}
+
+/**
+ * Отметить, что сорсинг-лида уведомили: кто мы, откуда его данные, зачем
+ * и какие у него права (ст. 18 152-ФЗ). Уведомить можно письмом, звонком
+ * или ссылкой на согласие — отметка фиксирует факт и попадает в журнал ПДн.
+ */
+export async function markSourcingNoticeAction(
+  _prev: CandidateState,
+  formData: FormData,
+): Promise<CandidateState> {
+  const actor = await requireAgencyActor();
+  const candidateId = String(formData.get("candidateId") || "");
+
+  try {
+    authorizeOrThrow(actor, "application.viewInternal");
+    const candidate = await prisma.candidate.findFirst({
+      where: { id: candidateId, organizationId: actor.organizationId },
+      select: { id: true },
+    });
+    if (!candidate) return { error: "Кандидат не найден" };
+    await markSourcingNotice({
+      candidateId,
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+    });
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    throw error;
+  }
+
+  revalidatePath(`/a/candidates/${candidateId}`);
+  return { ok: "Отмечено: кандидат уведомлён" };
+}
+
 export async function uploadResumeAction(
   _prev: CandidateState,
   formData: FormData,
@@ -370,9 +484,109 @@ export async function uploadResumeAction(
   } catch (error) {
     if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
     if (error instanceof FileValidationError) return { error: error.message };
+    if (error instanceof SourcingError) return { error: error.message };
     throw error;
   }
 
   revalidatePath(`/a/candidates/${candidateId}`);
   return { ok: "Резюме загружено" };
+}
+
+/**
+ * Внести условия оффера.
+ *
+ * Право то же, что у перевода по этапам: оффер — часть работы с воронкой,
+ * и без него кандидата нельзя перевести в «Вышел на работу» (см. moveStage).
+ */
+export async function recordOfferAction(
+  _prev: CandidateState,
+  formData: FormData,
+): Promise<CandidateState> {
+  const actor = await requireAgencyActor();
+  const applicationId = String(formData.get("applicationId") ?? "");
+
+  const parsed = offerSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
+  }
+
+  try {
+    authorizeOrThrow(actor, "application.moveStage");
+    await recordOffer(actor, applicationId, parsed.data);
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof ApplicationError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/a/applications/${applicationId}`);
+  return { ok: "Оффер сохранён — теперь кандидата можно перевести в «Вышел на работу»" };
+}
+
+/**
+ * Записать гарантийный случай и, по желанию, вернуть вакансию в работу.
+ *
+ * Возврат — отдельное право (vacancy.reactivate, владелец и руководитель
+ * подбора): закрытие уже посчитано в отчётах и в счёте. Если права нет,
+ * случай всё равно записывается, а про вакансию человек видит, к кому
+ * идти, — иначе гарантийный уход терялся бы из-за того, что его
+ * заметил рекрутер, а не руководитель.
+ */
+export async function recordGuaranteeCaseAction(
+  _prev: CandidateState,
+  formData: FormData,
+): Promise<CandidateState> {
+  const actor = await requireAgencyActor();
+  const applicationId = String(formData.get("applicationId") ?? "");
+
+  const parsed = guaranteeCaseSchema.safeParse(formToObject(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
+  }
+
+  let vacancyId: string;
+  try {
+    authorizeOrThrow(actor, "application.moveStage");
+    ({ vacancyId } = await recordGuaranteeCase(actor, applicationId, parsed.data));
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { error: "Недостаточно прав" };
+    if (error instanceof ApplicationError) return { error: error.message };
+    throw error;
+  }
+
+  /*
+    Возврат вакансии — уже после записи случая и отдельно от неё. Случай
+    к этому моменту сохранён, и отказ вакансии (нет действующего договора —
+    BR-1, гарантия нередко переживает договор) не должен выглядеть
+    ошибкой всего действия: человек решил бы, что случай не записался,
+    и записал бы его снова.
+  */
+  let reopenNote = "";
+  if (parsed.data.reopenVacancy) {
+    const vacancy = await prisma.vacancy.findFirst({
+      where: { id: vacancyId, organizationId: actor.organizationId },
+      select: { status: true },
+    });
+    if (vacancy && vacancy.status !== "ACTIVE") {
+      if (!canDo(actor, "vacancy.reactivate")) {
+        reopenNote =
+          " Вакансию вернуть в работу может владелец или руководитель подбора — сообщите им.";
+      } else {
+        try {
+          await transitionVacancy(actor, vacancyId, "ACTIVE");
+          reopenNote = " Вакансия снова в работе.";
+        } catch (error) {
+          if (!(error instanceof VacancyTransitionError)) throw error;
+          reopenNote = ` Вакансию в работу не вернули: ${error.message}.`;
+        }
+      }
+    }
+  }
+
+  revalidatePath(`/a/applications/${applicationId}`);
+  return {
+    ok:
+      "Гарантийный случай записан. Следующий найм по этой вакансии будет отмечен как замена и в счёт не попадёт." +
+      reopenNote,
+  };
 }

@@ -32,7 +32,14 @@ import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent
 import bcryptjs from 'bcryptjs';
 import { hashPassword, verifyPassword } from '../lib/security/password';
 import { formatWait } from '../lib/wait-format';
-import { PRESENCE_TICK_MS, formatPresence, presenceNow, shouldWritePresence, visibleLastSeen } from '../lib/presence';
+import {
+  PRESENCE_TICK_MS,
+  effectiveShowPresence,
+  formatPresence,
+  presenceNow,
+  shouldWritePresence,
+  visibleLastSeen,
+} from '../lib/presence';
 import { vapidProblem } from '../lib/push/config';
 import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
 import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
@@ -568,11 +575,20 @@ test('сразу после московской полуночи вчерашн
   assert.equal(formatPresence(new Date('2026-10-04T21:00:00+03:00'), midnight).text, 'был(а) вчера в 21:00');
 });
 
-test('выключенный показ скрывает статус так же, как отсутствие права', () => {
+test('статус виден всегда: сохранённое «выключено» ни на что не влияет, скрывает только отсутствие права', () => {
   const at = new Date('2026-10-04T21:00:00+03:00');
-  assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: false }, true), null);
+  // Студент и работодатель скрыть статус не могут: прежнее false из базы игнорируется
+  assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: false }, true), at);
   assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: true }, false), null);
   assert.equal(visibleLastSeen({ lastSeenAt: at, showPresence: true }, true), at);
+  assert.equal(visibleLastSeen({ lastSeenAt: null, showPresence: false }, true), null);
+});
+
+test('effectiveShowPresence: всегда true, что бы ни лежало в базе', () => {
+  assert.equal(effectiveShowPresence({ showPresence: false }), true);
+  assert.equal(effectiveShowPresence({ showPresence: true }), true);
+  assert.equal(effectiveShowPresence(null), true);
+  assert.equal(effectiveShowPresence(undefined), true);
 });
 
 test('пульс пишется не чаще раза в минуту', () => {

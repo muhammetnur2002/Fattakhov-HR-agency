@@ -1,42 +1,29 @@
 import { handle, ok } from '@/lib/api';
-import { getStore } from '@/lib/db';
-import { assertSameOrigin, audit, requireRole } from '@/lib/security/guards';
-import { presenceSettingsSchema } from '@/lib/validation';
+import { assertSameOrigin, HttpError, requireRole } from '@/lib/security/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Показывать ли собеседникам «в сети» и «был(а) …». */
+/**
+ * Показ статуса «в сети» и «был(а) …» собеседникам — всегда включён.
+ *
+ * Раньше студент и работодатель могли его выключить. Теперь скрыть статус
+ * на платформе нельзя (правило владельца проекта; в CRM его скрывает только
+ * владелец агентства): переключателя в интерфейсе нет, а эта ручка осталась
+ * лишь для вкладок, открытых до обновления, — она ничего не меняет.
+ */
 export async function GET() {
   return handle(async () => {
-    const session = await requireRole('STUDENT', 'EMPLOYER');
-    const account = await (await getStore()).accounts.findById(session.accountId);
-    return ok({ show: account?.showPresence ?? true });
+    await requireRole('STUDENT', 'EMPLOYER');
+    return ok({ show: true });
   });
 }
 
-/**
- * Включить или выключить показ.
- *
- * Выключенный показ скрывает статус полностью, а не заменяет его на
- * «был(а) недавно»: расплывчатая формулировка всё равно сообщала бы, что
- * человек заходил, и прятаться было бы не от чего.
- *
- * Пульс при этом продолжает идти: человек может снова включить показ, и
- * тогда строка должна быть честной, а не начинаться с нуля.
- */
+/** Выключить показ нельзя: отказ, в базу ничего не пишется и в журнал не попадает. */
 export async function PATCH(request: Request) {
   return handle(async () => {
     assertSameOrigin(request);
-    const session = await requireRole('STUDENT', 'EMPLOYER');
-    const { show } = presenceSettingsSchema.parse(await request.json());
-
-    await (await getStore()).accounts.setShowPresence(session.accountId, show);
-    await audit(
-      session,
-      { action: 'account.presence', entity: 'Account', entityId: session.accountId, meta: { show } },
-      request.headers,
-    );
-    return ok({ show });
+    await requireRole('STUDENT', 'EMPLOYER');
+    throw new HttpError(403, 'Статус «в сети» скрыть нельзя: он виден собеседникам всегда', 'PRESENCE_ALWAYS_ON');
   });
 }

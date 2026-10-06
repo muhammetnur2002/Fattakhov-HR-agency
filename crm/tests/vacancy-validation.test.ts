@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { BRIEF_MIN_CHARS } from "@/lib/validation/brief-limits";
 import {
   vacancyDraftSchema,
   vacancyEstimateSchema,
@@ -122,6 +123,34 @@ describe("отправка заявки в работу", () => {
         "Опыт диспетчеризации от двух лет, знание 1С, готовность к сменам.",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("сообщение называет порог, а не просто «опишите»", () => {
+    // Без числа в тексте сообщение читается как «поле пустое»: человек
+    // с коротким, но заполненным полем не понимает, чего от него хотят
+    const result = vacancySubmitSchema.safeParse({
+      title: "Логист",
+      responsibilities: "Продажи",
+      requirements: "б".repeat(40),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue.path[0]).toBe("responsibilities");
+      expect(issue.message).toContain(String(BRIEF_MIN_CHARS));
+    }
+  });
+
+  it("порог ровно на границе: 29 нет, 30 да", () => {
+    const shape = (n: number) => ({
+      title: "Логист-диспетчер",
+      responsibilities: "а".repeat(n),
+      requirements: "б".repeat(BRIEF_MIN_CHARS),
+    });
+    expect(vacancySubmitSchema.safeParse(shape(BRIEF_MIN_CHARS - 1)).success).toBe(
+      false,
+    );
+    expect(vacancySubmitSchema.safeParse(shape(BRIEF_MIN_CHARS)).success).toBe(true);
   });
 
   it("название короче трёх символов не проходит", () => {

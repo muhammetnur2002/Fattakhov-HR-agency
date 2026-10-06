@@ -1,10 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
-import { authorizeOrThrow, requireAgencyActor } from "@/lib/auth/session";
+import {
+  authorize,
+  authorizeOrThrow,
+  requireAgencyActor,
+} from "@/lib/auth/session";
 import {
   AgreementError,
   attachAgreementFile,
@@ -22,8 +26,10 @@ import {
   createClient,
   createClientUserAccount,
   resetClientUserPassword,
+  revokeClientInvitation,
   updateClient,
 } from "@/lib/services/clients";
+import { InviteError } from "@/lib/services/invitations";
 import { FileValidationError } from "@/lib/storage";
 import {
   clientSchema,
@@ -168,6 +174,41 @@ export async function resetClientUserPasswordAction(
 
   revalidatePath(`/a/clients/${clientId}`);
   return { ok: "Пароль обновлён — сообщите его клиенту лично" };
+}
+
+/**
+ * Отозвать неотвеченное приглашение, которое администратор клиента
+ * отправил коллеге. Агентство само приглашений людям клиента не шлёт
+ * (заводит аккаунт с паролем), но список ждущих видит и может убрать
+ * ошибочное — например, когда сам администратор клиента этого уже не сделает.
+ *
+ * Отказ в правах — 404, а не сообщение (BR-28). Соседние действия этого
+ * файла отвечают сообщением, и для них это верно: они про клиента,
+ * карточку которого человеку уже открыли. Здесь же в форму приходит id
+ * приглашения, и ответ «недостаточно прав» на чужой id подтверждал бы,
+ * что такое приглашение существует.
+ */
+export async function revokeClientInvitationAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const actor = await requireAgencyActor();
+  const clientId = String(formData.get("clientId") || "");
+
+  authorize(actor, "client.manage", { clientId });
+
+  try {
+    await revokeClientInvitation(actor, String(formData.get("id") || ""));
+  } catch (error) {
+    // Второй раз то же право, уже на компанию из самого приглашения,
+    // а не из формы. Сюда доходит только несовпадение этих двух
+    if (error instanceof AccessDeniedError) notFound();
+    if (error instanceof InviteError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/a/clients/${clientId}`);
+  return {};
 }
 
 export async function confirmAgreementAction(

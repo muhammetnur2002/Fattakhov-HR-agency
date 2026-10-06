@@ -103,7 +103,18 @@ export async function saveDraftAction(
   }
 }
 
-export type SubmitState = { error?: string; vacancyId?: string };
+/**
+ * Результат отправки.
+ *
+ * `field` — имя поля, на котором споткнулась проверка. Мастер по нему
+ * возвращает человека на нужный шаг: сообщение «опишите обязанности»
+ * на пятом шаге ничего не стоит, если поле живёт на втором.
+ */
+export type SubmitState = {
+  error?: string;
+  field?: string;
+  vacancyId?: string;
+};
 
 /** Отправка заявки в работу (сценарий A, шаг 6). */
 export async function submitVacancyAction(
@@ -118,7 +129,9 @@ export async function submitVacancyAction(
   // Требования к отправке жёстче, чем к черновику
   const parsed = vacancySubmitSchema.safeParse(values);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Заполните бриф" };
+    const issue = parsed.error.issues[0];
+    const field = typeof issue?.path[0] === "string" ? issue.path[0] : undefined;
+    return { error: issue?.message ?? "Заполните бриф", field };
   }
 
   try {

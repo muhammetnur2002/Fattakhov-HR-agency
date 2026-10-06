@@ -7,6 +7,7 @@ import { Hero } from "@/components/marketing/hero";
 import { LeadForm } from "@/components/marketing/lead-form";
 import { PlatformPreview } from "@/components/marketing/platform-preview";
 import { Pricing } from "@/components/marketing/pricing";
+import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { StructuredData } from "@/components/marketing/structured-data";
 import { studentsUrl } from "@/lib/urls";
 import {
@@ -130,6 +131,17 @@ export default function LandingPage() {
         </p>
       </Section>
 
+      {/* Мозаика ролей — и на главной, и на «Кейсах» (решение владельца
+          04.10.2026, как в прежней версии сайта) */}
+      <Section tone="muted">
+        <SectionHead
+          eyebrow="Кого закрываем"
+          title="От операционных ролей до тех, кого на рынке единицы."
+          lead="Одни позиции закрываются потоком, другие требуют прямого поиска и разговора с каждым. Мы ведём и те, и другие, и заранее говорим, к какому типу относится ваша."
+        />
+        <RoleMosaic />
+      </Section>
+
       {/* wide — пяти карточкам арки нужен запас по ширине, иначе цена
           с ₽ на краевых и центральной плитке переносится на вторую
           строку. У заголовка своя ширина (max-w в SectionHead), так
@@ -246,9 +258,11 @@ export default function LandingPage() {
               <h2 className="mt-3 text-2xl font-medium tracking-tight text-balance md:text-3xl">
                 Подработка под расписание учёбы.
               </h2>
+              {/* «За несколько минут», а не «за три»: на публичных
+                  страницах нет неподтверждённых чисел */}
               <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
-                Отдельная платформа агентства для студентов: профиль за три
-                минуты, вакансии проверенных компаний и отклик одним
+                Отдельная платформа агентства для студентов: профиль за
+                несколько минут, вакансии проверенных компаний и отклик одним
                 движением. Для вузов — открытый рейтинг по трудоустройству
                 студентов. Пилот идёт в Казани.
               </p>

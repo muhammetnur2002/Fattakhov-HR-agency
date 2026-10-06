@@ -31,6 +31,7 @@ const KEYS = [
   "AUTH_SECRET",
   "APP_URL",
   "AUTH_URL",
+  "TOTP_ENCRYPTION_KEY",
   "NODE_ENV",
 ] as const;
 
@@ -56,6 +57,7 @@ function configureEverything() {
   process.env.SMTP_FROM = "Платформа <noreply@example.ru>";
   process.env.AUTH_SECRET = "secret";
   process.env.APP_URL = "https://app.example.ru";
+  process.env.TOTP_ENCRYPTION_KEY = "k".repeat(40);
 }
 
 function clearAll() {
@@ -76,14 +78,14 @@ describe("настройки прода", () => {
 
   it("пустое окружение даёт замечание на каждое требование", () => {
     clearAll();
-    // Четыре блока переменных: файлы, почта, ключ подписи, адрес
-    // приложения. Плюс по замечанию на каждое согласие, которое ещё
+    // Пять блоков: файлы, почта, ключ подписи, адрес приложения и ключ
+    // шифрования секретов 2FA. Плюс по замечанию на каждое согласие, которое ещё
     // черновик (кандидата, компании при регистрации): их число — правило,
     // а не константа, иначе тест ломается в день, когда юрист дал текст
     const черновиков =
       Number(CANDIDATE_CONSENT_VERSION === DRAFT_CANDIDATE_CONSENT_VERSION) +
       Number(REGISTRATION_CONSENT_VERSION === DRAFT_REGISTRATION_CONSENT_VERSION);
-    expect(productionConfigProblems()).toHaveLength(4 + черновиков);
+    expect(productionConfigProblems()).toHaveLength(5 + черновиков);
   });
 
   /*
@@ -155,6 +157,37 @@ describe("настройки прода", () => {
     process.env.AUTH_SECRET = "   ";
 
     expect(productionConfigProblems()[0]).toContain("AUTH_SECRET");
+  });
+
+  /*
+    Двухфакторная обязательна всему агентству, а секрет без ключа в проде
+    не сохраняется (lib/auth/totp-secret.ts): без годного ключа сотрудники
+    не смогут настроить вход. Выкатка должна упасть, а не ждать первого,
+    кого не пустили.
+  */
+  it("без ключа шифрования секретов 2FA прод не стартует", () => {
+    clearAll();
+    configureEverything();
+    delete process.env.TOTP_ENCRYPTION_KEY;
+
+    const problems = productionConfigProblems().filter((p) => /TOTP_ENCRYPTION_KEY/.test(p));
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/Не заданы/);
+  });
+
+  it("ключ короче 32 символов — тоже незаданный: он тихо не применяется", () => {
+    clearAll();
+    configureEverything();
+    process.env.TOTP_ENCRYPTION_KEY = "коротко";
+
+    expect(productionConfigProblems().some((p) => /TOTP_ENCRYPTION_KEY/.test(p))).toBe(true);
+  });
+
+  it("при заданном годном ключе замечаний про него нет", () => {
+    clearAll();
+    configureEverything();
+
+    expect(productionConfigProblems().some((p) => /TOTP_ENCRYPTION_KEY/.test(p))).toBe(false);
   });
 
   it("вне прода не бросает, даже когда не задано ничего", () => {

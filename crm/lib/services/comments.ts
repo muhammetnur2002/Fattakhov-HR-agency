@@ -457,7 +457,7 @@ async function notifyAboutComment(
     body: truncateBody(params.body, 200),
     linkUrl: target,
     // Переписка в одном треде схлопывается: десять реплик подряд —
-    // не десять сообщений в Telegram
+    // не десять сообщений в ВК
     groupKey: params.applicationId ?? vacancyId,
     payload: { commentId },
   });

@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { newPasswordSchema } from "@/lib/validation/password";
+import {
+  newPasswordSchema,
+  refinePasswordAgainstEmail,
+} from "@/lib/validation/password";
 
 /** Пустую строку из формы приводим к undefined — иначе в БД лягут "" вместо NULL. */
 const optionalText = (max: number) =>
@@ -49,9 +52,29 @@ export const clientSchema = z.object({
 
 export type ClientInput = z.infer<typeof clientSchema>;
 
+/*
+  Роль пользователя клиента — одна на приглашение коллеги и на аккаунт,
+  который заводит агентство.
+
+  Свой текст, а не стандартный: zod отвечает на негодное значение
+  перечнем допустимых, а оба действия показывают первое сообщение разбора
+  дословно — и человек увидел бы "CLIENT_ADMIN"|"CLIENT_HIRING"|…
+  вместо просьбы выбрать роль. Тем же кончилась форма отказа (BR-11).
+
+  Роль «не из списка» здесь почти всегда агентская: это не опечатка,
+  а попытка завести сотрудника через форму клиента — в кабинете таких
+  ролей нет, и сказать об этом стоит прямо.
+*/
+const clientRole = z.enum(["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"], {
+  error: (issue) =>
+    issue.input
+      ? "Эта роль не для кабинета клиента — выберите из списка"
+      : "Выберите роль",
+});
+
 export const inviteUserSchema = z.object({
   email: z.email("Проверьте адрес почты").transform((v) => v.toLowerCase().trim()),
-  role: z.enum(["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"]),
+  role: clientRole,
   position: optionalText(120),
 });
 
@@ -74,8 +97,9 @@ export const createClientUserSchema = z
       .max(120, "Не длиннее 120 символов"),
     password: newPasswordSchema,
     passwordConfirm: z.string(),
-    role: z.enum(["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"]),
+    role: clientRole,
   })
+  .superRefine(refinePasswordAgainstEmail)
   .refine((v) => v.password === v.passwordConfirm, {
     message: "Пароли не совпадают",
     path: ["passwordConfirm"],

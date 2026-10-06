@@ -1,3 +1,4 @@
+import type { Instrumentation } from "next";
 import * as Sentry from "@sentry/nextjs";
 
 import { assertProductionConfig } from "@/lib/config/production-check";
@@ -5,7 +6,7 @@ import { assertProductionConfig } from "@/lib/config/production-check";
 /**
  * Точка, которую Next вызывает один раз при старте сервера, до первого
  * запроса. Здесь же — необязательный Sentry: без NEXT_PUBLIC_SENTRY_DSN
- * его просто нет, тем же приёмом, что и TELEGRAM_BOT_TOKEN в notify()
+ * его просто нет, тем же приёмом, что и VK_BOT_TOKEN в notify()
  * (см. .env.example). DSN — не секрет (это публичный идентификатор
  * приёма событий, Sentry сам объясняет это в своей документации),
  * поэтому один и тот же публичный NEXT_PUBLIC_-префикс годится и на
@@ -23,7 +24,65 @@ import { assertProductionConfig } from "@/lib/config/production-check";
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    assertProductionConfig();
+    try {
+      assertProductionConfig();
+
+      /*
+        Словарь слабых паролей должен быть прочитан целиком. Без файла
+        проверка паролей молча сужается до запасного списка из десятка слов
+        (lib/auth/common-passwords.ts) — регистрация работает, а слабые
+        пароли проходят. Для платформы с персональными данными это такая же
+        неисправность, как отсутствие SMTP: узнавать о ней нужно при выкатке.
+        Импорт динамический и внутри nodejs-ветки: модуль читает файл через
+        node:fs, которого в edge-сборке этого же register() нет.
+      */
+      if (process.env.NODE_ENV === "production") {
+        const { commonPasswordCount } = await import("@/lib/auth/common-passwords");
+        if (commonPasswordCount() <= 5000) {
+          throw new Error(
+            "Платформа не запущена: словарь слабых паролей lib/auth/common-passwords.txt " +
+              "не найден или пуст. Он должен лежать в образе рядом с приложением " +
+              "(Dockerfile, стадия runner).",
+          );
+        }
+      }
+    } catch (error) {
+      /*
+        Выходим сами, а не даём исключению уйти наверх.
+
+        Next перехватывает ошибку этого хука, пишет «Failed to prepare
+        server» — и продолжает жить: порт слушается, каждая страница
+        отдаёт 500. Процесс при этом не падает, поэтому `restart: always`
+        не срабатывает никогда, а контейнер с меткой unhealthy обычный
+        docker compose (не swarm) не перезапускает. Снаружи это выглядит
+        как «running», внутри — пятисотки на всех адресах, и настоящая
+        причина видна только в логах. Проверено на собранном образе
+        в CRM агентства, откуда это перенесено.
+
+        Явный выход превращает это в обычный crash-loop: контейнер
+        перезапускается, в `docker ps` видно, что он падает, а причина
+        лежит первой строкой в `docker logs`.
+
+        Выход здесь, а не в assertProductionConfig(): та функция обязана
+        именно бросать — на этом держится tests/production-config.test.ts,
+        и process.exit оборвал бы прогон тестов.
+
+        Пишем синхронно в stderr: у console.error вывод в конвейер
+        асинхронный, и process.exit оборвал бы сообщение — то есть ровно
+        ту диагностику, ради которой всё это и делается.
+
+        Импорт node:fs — динамический и внутри той же ветки, что и вызов.
+        Статический import наверху файла компилируется и в edge-сборку
+        этого же register() (Next собирает его на оба рантайма), а node:fs
+        там не существует: Turbopack предупреждал бы об этом при каждой
+        сборке, хотя до вызова дело не доходит благодаря проверке
+        рантайма. Динамический импорт снимает предупреждение, не меняя
+        поведение.
+      */
+      const { writeSync } = await import("node:fs");
+      writeSync(2, `${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(1);
+    }
   }
 
   if (
@@ -40,5 +99,36 @@ export async function register() {
   }
 }
 
-/** Ошибки самого запроса (не пойманные в компонентах) — тоже в Sentry, если он поднят. */
-export const onRequestError = Sentry.captureRequestError;
+/**
+ * Ошибки самого запроса, не пойманные в компонентах.
+ *
+ * Два получателя. Sentry — если он поднят (по умолчанию нет: заказчик
+ * выбрала не отправлять отчёты за границу, DSN не задаётся, и вызов
+ * ничего не делает). И сообщение о сбое (lib/monitoring/alerts.ts):
+ * письмо с разбором на ящик сбоев и короткий сигнал владельцам
+ * во ВК — без него о пятисотке узнаёшь от пострадавшего.
+ *
+ * Импорт репортёра динамический и внутри проверки рантайма по той же
+ * причине, что и node:fs выше: этот файл собирается и для edge, а туда
+ * Prisma не тянется. Статический импорт сломал бы сборку.
+ *
+ * Await обязателен: Next предупреждает, что незавершённые задачи здесь
+ * могут не доработать — процесс не ждёт висящих промисов.
+ */
+export const onRequestError: Instrumentation.onRequestError = async (
+  error,
+  request,
+  context,
+) => {
+  Sentry.captureRequestError(error, request, context);
+
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  const { reportFailure } = await import("@/lib/monitoring/alerts");
+  await reportFailure({
+    where: "запрос",
+    error,
+    // Только путь: в строке запроса бывают токены и идентификаторы
+    path: request.path?.split("?")[0],
+  });
+};

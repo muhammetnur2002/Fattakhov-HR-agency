@@ -3,10 +3,16 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 /**
  * Секрет второго фактора в базе.
  *
- * Если задан TOTP_ENCRYPTION_KEY, секрет хранится зашифрованным (AES-256-GCM), и утечка одной
- * базы не даёт вечные коды. Ключ отдельный, а не из AUTH_SECRET: смена AUTH_SECRET (она отзывает
+ * Если задан TOTP_ENCRYPTION_KEY (не короче 32 символов), секрет хранится
+ * зашифрованным (AES-256-GCM), и утечка одной базы не даёт вечные коды.
+ * Ключ отдельный, а не из AUTH_SECRET: смена AUTH_SECRET (она отзывает
  * сессии и ссылки календаря) иначе оставила бы всех с включённой 2FA без входа.
- * Без ключа — прежнее поведение. Старые открытые значения читаются всегда.
+ *
+ * В production без ключа секрет НЕ сохраняется вовсе — sealTotpSecret
+ * бросает TotpKeyMissingError (раньше молча писал открытым текстом, а теперь
+ * 2FA обязательна всему агентству, и открытыми были бы все секреты). Вне
+ * production без ключа — прежнее поведение, открытым текстом: разработка
+ * и тесты живут без ключа. Старые открытые значения читаются всегда.
  */
 const PREFIX = "enc:v1:";
 
@@ -15,9 +21,19 @@ function key(): Buffer | null {
   return raw && raw.length >= 32 ? createHash("sha256").update(raw).digest() : null;
 }
 
+/** Ключ шифрования не задан (или короче 32 символов), а он обязателен. */
+export class TotpKeyMissingError extends Error {
+  constructor() {
+    super("TOTP_ENCRYPTION_KEY не задан или короче 32 символов: секрет 2FA открытым текстом не сохраняется");
+  }
+}
+
 export function sealTotpSecret(plain: string): string {
   const k = key();
-  if (!k) return plain;
+  if (!k) {
+    if (process.env.NODE_ENV === "production") throw new TotpKeyMissingError();
+    return plain;
+  }
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", k, iv);
   const body = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);

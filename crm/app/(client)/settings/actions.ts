@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { notFound } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
-import { authorizeOrThrow, requireClientActor } from "@/lib/auth/session";
+import {
+  authorize,
+  authorizeOrThrow,
+  requireClientActor,
+} from "@/lib/auth/session";
 import { signOut } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -11,10 +16,20 @@ import {
   cancelDeletionRequest,
   deleteOwnAccount,
 } from "@/lib/services/account-deletion";
-import { listClientTeam } from "@/lib/services/clients";
+import { guardRate, rateLimitMessage } from "@/lib/security/guard";
+import { listClientTeam, revokeClientInvitation } from "@/lib/services/clients";
+import {
+  EmailConfirmError,
+  requestEmailConfirmation,
+} from "@/lib/services/email-confirmation";
 import { actOnEmployerVacancy, fetchEmployerVacancies } from "@/lib/students-service";
-import { createInvitation, InviteError } from "@/lib/services/invitations";
+import {
+  createInvitation,
+  inviteResultMessage,
+  InviteError,
+} from "@/lib/services/invitations";
 import { inviteUserSchema } from "@/lib/validation/client";
+import { workEmailSchema } from "@/lib/validation/registration";
 
 export type FormState = { error?: string; ok?: string };
 
@@ -90,7 +105,39 @@ export async function inviteTeammateAction(
   }
 
   revalidatePath("/settings");
-  return { ok: `Письмо со ссылкой отправлено на ${parsed.data.email}` };
+  return { ok: inviteResultMessage(parsed.data.email) };
+}
+
+/**
+ * Отозвать приглашение коллеги, которое ещё не приняли: опечатка в адресе,
+ * передумали звать. Освобождает и адрес, и место в команде из пяти.
+ *
+ * Тот же clientId из актора, что и при приглашении, и по той же причине:
+ * в форму приходит только id приглашения, компанию подставить нечем.
+ * Отказ — 404, а не сообщение (BR-28): «недостаточно прав» на чужой id
+ * подтвердило бы, что приглашение с таким id существует, и дало бы
+ * администратору одной компании способ проверять чужие.
+ */
+export async function revokeTeammateInvitationAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const actor = await requireClientActor();
+
+  authorize(actor, "org.manageClientUsers", { clientId: actor.clientId });
+
+  try {
+    await revokeClientInvitation(actor, String(formData.get("id") || ""));
+  } catch (error) {
+    // Сервис проверяет то же право ещё раз, уже на компанию из самого
+    // приглашения — сюда доходит только расхождение этих двух
+    if (error instanceof AccessDeniedError) notFound();
+    if (error instanceof InviteError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath("/settings");
+  return {};
 }
 
 /**
@@ -138,4 +185,37 @@ export async function cancelDeletionRequestAction(): Promise<FormState> {
   await cancelDeletionRequest(actor);
   revalidatePath("/settings");
   return { ok: "Запрос снят" };
+}
+
+/**
+ * Рабочая почта для вошедших по телефону: адрес
+ * запоминается и получает ссылку, рабочим он станет после неё
+ * (lib/services/email-confirmation.ts).
+ */
+export async function requestEmailAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const actor = await requireClientActor();
+
+  const parsed = workEmailSchema.safeParse(formData.get("email"));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Проверьте адрес почты" };
+  }
+
+  const rate = await guardRate("emailConfirm", actor.id);
+  if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
+
+  try {
+    const { sentTo } = await requestEmailConfirmation({
+      userId: actor.id,
+      organizationId: actor.organizationId,
+      email: parsed.data,
+    });
+    revalidatePath("/settings");
+    return { ok: `Ссылка отправлена на ${sentTo} — откройте письмо и подтвердите адрес` };
+  } catch (error) {
+    if (error instanceof EmailConfirmError) return { error: error.message };
+    throw error;
+  }
 }

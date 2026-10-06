@@ -25,6 +25,8 @@ model Organization {
   clients    Client[]
   candidates Candidate[]
   vacancies  Vacancy[]
+
+  disclosureConsents DisclosureConsent[]
 }
 
 enum UserRole {
@@ -58,11 +60,44 @@ model User {
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id])
 
-  telegramChatId String?
-  notifyPrefs    Json    @default("{}") // { email: true, telegram: true, digest: "instant"|"daily" }
+  /// Числовой id страницы ВКонтакте. Хранится id, а не адрес профиля:
+  /// короткое имя человек может сменить, id — нет.
+  vkUserId       String?
+  notifyPrefs    Json    @default("{}") // { email: true, vk: true, push: true, digest: "instant"|"daily" }
+
+  /// Устройства, на которых человек включил пуш-уведомления.
+  pushSubscriptions PushSubscription[]
+  studentMessageDrafts StudentMessageDraft[]
+
+  /// Проверенная личность для быстрого входа (регистрация по номеру
+  /// телефона, см. lib/services/quick-registration.ts).
+  ///
+  /// Отдельное поле, а не phone, и это не дублирование. phone — то, что
+  /// человек сам вписал в профиль: любой текст, никем не проверенный.
+  /// Если бы вход искал пользователя по phone, один человек мог бы вписать
+  /// себе чужой номер — и владелец этого номера, войдя по SMS, попал бы
+  /// в чужой кабинет. Здесь только то, что доказано кодом из SMS. Пишет
+  /// его только вход, никакая форма настроек.
+  ///
+  /// Номер в E.164 (+79991234567), подтверждённый кодом из SMS.
+  phoneVerified  String? @unique
+  /// Адрес, который человек назвал сам (анкета, настройки), — до нажатия
+  /// кнопки по ссылке из письма. Рабочим (email) становится только после
+  /// неё: на email уходят уведомления о кандидатах и ссылки сброса пароля.
+  pendingEmail   String?
 
   isActive    Boolean   @default(true)
   lastLoginAt DateTime?
+  /// Когда человек в последний раз был в кабинете — пульс открытой вкладки
+  /// (components/presence/presence-heartbeat.tsx), запись не чаще раза
+  /// в минуту (lib/services/presence.ts). Видна только тем, кто вправе ему
+  /// писать (lib/services/messages.ts), и только если статус не скрыт владельцем.
+  lastSeenAt  DateTime?
+  /// «Показывать, что я в сети»: false действует ТОЛЬКО у владельца агентства
+  /// (OWNER) — статус никому не виден, пульс не пишется, прежняя отметка
+  /// стирается. У остальных ролей значение игнорируется (effectiveShowPresence
+  /// в lib/presence.ts), в том числе сохранённое false из прошлых версий.
+  showPresence Boolean  @default(true)
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
   /// Клиент с договором просит удалить аккаунт: пока владелец агентства не
@@ -93,6 +128,11 @@ model User {
   recoveryCodes    RecoveryCode[]
   sentMessages     DirectMessage[] @relation("SentMessages")
   receivedMessages DirectMessage[] @relation("ReceivedMessages")
+
+  // Подтверждения передачи данных работодателю: кто запросил у кандидата
+  // и кто отметил вручную, без следа самого кандидата
+  disclosuresRequested DisclosureConsent[] @relation("DisclosureRequestedBy")
+  disclosuresConfirmed DisclosureConsent[] @relation("DisclosureConfirmedBy")
 
   @@unique([organizationId, email])
   @@index([clientId])
@@ -145,11 +185,24 @@ model Client {
   // рекламировать её ему незачем)
   fromStudentsPlatform Boolean @default(false)
 
+  /// Компания зарегистрировалась сама на /register — по телефону
+  /// или по почте, — а не заведена агентством. Такой анкета
+  /// после входа нужна: при регистрации спрашивается только способ входа.
+  selfRegisteredAt DateTime?
+  /// Анкета после регистрации пройдена: название, контакт, кого ищут.
+  /// Пока пусто у самостоятельно зарегистрированной компании, кабинет
+  /// уводит на /onboarding с анкетой. У заведённых агентством не
+  /// заполняется и не нужна — их данные вносит агентство.
+  briefCompletedAt DateTime?
+
   users       User[]
   agreements  Agreement[]
   vacancies   Vacancy[]
   invoices    Invoice[]
   attachments Attachment[]
+  leads       Lead[]
+
+  disclosureConsents DisclosureConsent[]
 
   @@index([organizationId, status])
 }
@@ -314,6 +367,8 @@ model Vacancy {
   comments     Comment[]
   attachments  Attachment[]
 
+  disclosureConsents DisclosureConsent[]
+
   @@unique([organizationId, number])
   @@index([clientId, status])
   @@index([leadRecruiterId, status])
@@ -401,6 +456,26 @@ model Candidate {
   consentToken          String?   @unique
   consentTokenExpiresAt DateTime?
 
+  // Сорсинг-лид (регламент юриста, lib/services/sourcing.ts): человека
+  // нашёл рекрутер, данные получены не от него. Отметка ставится при
+  // заведении; режим действует, пока согласия нет (consentStatus PENDING):
+  // только имя, контакты и ссылка на профиль, срок — 14 дней
+  sourcedAt          DateTime?
+  // Когда человека уведомили, что его данные у нас (ст. 18 152-ФЗ)
+  sourcingNoticeAt   DateTime?
+  // Напоминание заведшему о сроке уже ушло — второй раз не шлём
+  sourcingReminderAt DateTime?
+
+  /// Контур уничтожения ПДн (ст. 21 152-ФЗ). Подробности — у ErasureState.
+  erasureState       ErasureState   @default(ACTIVE)
+  erasureReason      ErasureReason?
+  /// Когда возникло основание: отзыв, истечение, требование.
+  erasureRequestedAt DateTime?
+  /// Крайний срок уничтожения по закону. По нему считается просрочка.
+  erasureDueAt       DateTime?
+  /// Когда фактически обезличено.
+  erasedAt           DateTime?
+
   createdById String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -409,8 +484,18 @@ model Candidate {
   applications Application[]
   attachments  Attachment[]
 
+  disclosureConsents DisclosureConsent[]
+
   @@index([organizationId, fullName])
   @@index([organizationId, phone])
+}
+
+/// Почему нанятый ушёл в гарантийный срок.
+enum GuaranteeBreakReason {
+  CANDIDATE_LEFT // ушёл сам
+  DISMISSED // уволил работодатель
+  PROBATION_FAILED // не прошёл испытательный срок
+  OTHER
 }
 
 enum ApplicationOutcome {
@@ -491,10 +576,18 @@ model Application {
   offerSentAt    DateTime?
   offerStartDate DateTime?
 
-  // Найм и гарантия (BR-10)
-  hiredAt           DateTime?
-  guaranteeUntil    DateTime?
-  guaranteeBrokenAt DateTime?
+  // Найм и гарантия (BR-10). Пишет moveStage при переводе в «Нанят»:
+  // от hiredAt зависят счёт и аналитика наймов, от guaranteeUntil — замена
+  hiredAt               DateTime?
+  guaranteeUntil        DateTime?
+  /// Гарантийный случай (BR-10): человек ушёл в гарантийный срок.
+  /// Дата ухода, а не дата записи: по ней решается, был ли срок.
+  guaranteeBrokenAt     DateTime?
+  guaranteeBreakReason  GuaranteeBreakReason?
+  guaranteeBreakComment String?
+  /// Этот найм — замена по гарантии для указанного найма. Замену
+  /// не выставляют в счёт: за неё уже заплачено исходным наймом.
+  replacementForId      String?
 
   ownerId  String // рекрутер, ведущий этого кандидата
   priority Int    @default(0) // сортировка в канбане
@@ -809,7 +902,11 @@ model Notification {
   readAt DateTime?
 
   sentEmailAt     DateTime?
-  sentTelegramAt  DateTime?
+  sentVkAt        DateTime?
+  /// Пуш принят службой уведомлений хотя бы одного устройства. В отличие
+  /// от остальных отметок — только по факту приёма: пуш, не дошедший
+  /// ни до одного устройства, «отправленным» не считается.
+  sentPushAt      DateTime?
   // Внешние каналы, которых это уведомление ждёт. Пустой массив —
   // уведомление только в интерфейсе
   pendingChannels String[]  @default([])
@@ -818,6 +915,54 @@ model Notification {
 
   @@index([userId, isRead, createdAt])
   @@index([userId, eventCode, groupKey, createdAt])
+}
+
+/// Пуш-подписка: один браузер на одном устройстве одного человека
+/// (lib/notifications/push.ts).
+///
+/// Серверу нужно
+/// достучаться только до службы уведомлений браузера (Google, Apple,
+/// Mozilla), а содержимое зашифровано ключами самого браузера (RFC 8291).
+model PushSubscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Адрес службы уведомлений браузера. Уникален: устройство одно,
+  /// и когда им начинает пользоваться другой человек, подписка
+  /// переезжает к нему, а не двоится.
+  endpoint  String  @unique
+  /// Ключи шифрования содержимого из PushSubscription.toJSON().
+  p256dh    String
+  auth      String
+  userAgent String?
+
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  /// Отказы подряд; успешная доставка обнуляет.
+  failureCount  Int       @default(0)
+
+  @@index([userId])
+}
+
+/// Черновик сообщения студенту (кабинет клиента, «Студенческая платформа»).
+/// Один на пару «пользователь CRM — отклик»: автосохранение поля ввода,
+/// пока человек не отправил сообщение. Студент его не видит и не получает
+/// уведомлений — это запись только на стороне CRM. Беседа без сообщений
+/// показывается в списке «Сообщения» только вместе с непустым черновиком.
+model StudentMessageDraft {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// id отклика на студенческой платформе (чужая база — внешнего ключа нет).
+  applicationId String
+  /// Текст черновика; не длиннее самого сообщения (2000 знаков, как на платформе).
+  body          String
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, applicationId])
+  @@index([userId, updatedAt])
 }
 
 model ActivityLog {
@@ -851,6 +996,113 @@ model PersonalDataAccessLog {
 
   @@index([candidateId, createdAt])
   @@index([organizationId, createdAt])
+}
+
+/// Согласие на предоставление данных конкретному работодателю.
+///
+/// Общее согласие кандидата (BR-33) разрешает обработку у нас. Передача
+/// данных клиенту — отдельное действие с отдельным получателем, и §4.2
+/// общего согласия обещает кандидату спрашивать на неё отдельно. Одна
+/// запись — один работодатель и одна вакансия: §8.1 документа прямо
+/// запрещает распространять подтверждение на другие.
+///
+/// Наименование и ИНН работодателя, а также название вакансии хранятся
+/// снимком, а не только ссылкой. Клиент может переименоваться, вакансия —
+/// смениться названием, а подтверждать потом придётся то, что кандидат
+/// видел на экране в тот момент, а не то, что лежит в справочнике сейчас.
+///
+/// Мягкого удаления нет намеренно: это доказательство волеизъявления.
+/// Запись, которую можно спрятать фильтром, доказательством быть перестаёт.
+model DisclosureConsent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  vacancyId   String
+  vacancy     Vacancy   @relation(fields: [vacancyId], references: [id])
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+
+  /// Снимок реквизитов на момент показа кандидату (§1 документа).
+  employerName String
+  employerInn  String?
+  vacancyTitle String
+
+  status      ConsentStatus          @default(PENDING)
+  /// Версия текста, под которым поставлена галочка.
+  version     String?
+  /// §4.1: прямые контакты работодателю или общение через агентство.
+  /// Пусто, пока кандидат не подтвердил: в документе ни один вариант
+  /// не отмечен заранее.
+  contactMode DisclosureContactMode?
+
+  givenAt   DateTime?
+  /// §6.1: не более 90 календарных дней с даты предоставления.
+  expiresAt DateTime?
+
+  /// Одноразовая ссылка на форму подтверждения.
+  token          String?   @unique
+  tokenExpiresAt DateTime?
+
+  /// §8.3: чем подтверждается волеизъявление.
+  ip        String?
+  userAgent String?
+
+  /// Кто из агентства запросил подтверждение.
+  createdById   String
+  createdBy     User    @relation("DisclosureRequestedBy", fields: [createdById], references: [id])
+  /// Заполнено, только если согласие отмечено рекрутером вручную —
+  /// то есть получено вне системы и подтверждённого следа у него нет.
+  confirmedById String?
+  confirmedBy   User?   @relation("DisclosureConfirmedBy", fields: [confirmedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([candidateId, vacancyId])
+  @@index([organizationId, status])
+}
+
+/// §4.1 документа: два взаимоисключающих варианта передачи контактов.
+enum DisclosureContactMode {
+  /// Телефон, почта и Telegram уходят работодателю.
+  DIRECT
+  /// Контакты не передаются, общение идёт через агентство.
+  VIA_AGENCY
+}
+
+/// Состояние кандидата в контуре уничтожения персональных данных (ст. 21 152-ФЗ).
+///
+/// Отдельно от ConsentStatus намеренно. Согласие отвечает на вопрос
+/// «можно ли обрабатывать», а это — «что мы обязаны сделать и к какому
+/// сроку». Отозванное согласие без назначенного срока уничтожения —
+/// ровно та дыра, из-за которой данные лежат годами.
+enum ErasureState {
+  /// Обычная работа.
+  ACTIVE
+  /// Обработка прекращена, данные заблокированы. Двигать по воронке,
+  /// вносить оффер и представлять клиенту нельзя, но записи ещё есть.
+  BLOCKED_FOR_ERASURE
+  /// Решение принято, стоит в очереди на уничтожение.
+  ERASURE_PENDING
+  /// Исполнено: персональных данных не осталось, заявки обезличены.
+  ANONYMIZED
+}
+
+/// Почему возникла обязанность уничтожить. Влияет на разбор обращения:
+/// по какому основанию и в какой срок оператор был обязан действовать.
+enum ErasureReason {
+  /// Кандидат отозвал согласие (ч. 5 ст. 21).
+  CONSENT_REVOKED
+  /// Срок согласия истёк и не продлён.
+  CONSENT_EXPIRED
+  /// Прямое требование субъекта об уничтожении.
+  SUBJECT_REQUEST
+  /// Цель обработки достигнута.
+  PURPOSE_ACHIEVED
+  /// Сорсинг-лид: согласие не получено за 14 дней.
+  SOURCING_EXPIRED
 }
 
 /// Заявка с лендинга.
@@ -906,7 +1158,16 @@ model Lead {
   /// человек, которого потом деактивируют, а история должна остаться.
   processedBy String?
 
+  /// Компания, которая зарегистрировалась сама. Заявка заводится
+  /// в момент регистрации — тогда же дано согласие, и его момент,
+  /// адрес и браузер должны быть того запроса, а не последующих, —
+  /// а название компании и вакансия дописываются в неё после анкеты.
+  /// Без связи дописывать было бы некуда.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
   @@index([status, createdAt])
+  @@index([clientId])
 }
 
 enum LeadStatus {
@@ -998,6 +1259,32 @@ model PendingClientRegistration {
   @@index([email, createdAt])
 }
 
+/// Код из SMS для входа и регистрации по номеру телефона.
+///
+/// Хранится HMAC от кода на AUTH_SECRET, а не сам код: шесть цифр — это
+/// миллион вариантов, и по простому хешу из утёкшей базы код подбирается
+/// мгновенно, а без секрета — нет. Попытки считаются здесь же, а не только
+/// ограничителем частоты по адресу: ограничитель обходится сменой адреса,
+/// а счётчик у самого кода — нет.
+model PhoneCode {
+  id    String @id @default(cuid())
+  /// E.164, как в User.phoneVerified.
+  phone String
+
+  codeHash  String
+  expiresAt DateTime
+  /// Неверных вводов. После пятого код больше не принимается вовсе.
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+
+  /// Откуда просили — разбирать рассылку кодов на чужие номера.
+  requestedIp String?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+}
+
 /// Неудачная попытка входа (пароль или код 2FA). Считаем по ключу «аккаунт» и «адрес»:
 /// в памяти процесса лимит на Vercel обнуляется с каждым инстансом, а здесь общий.
 model AuthFailure {
@@ -1006,5 +1293,94 @@ model AuthFailure {
   at  DateTime @default(now())
 
   @@index([key, at])
+  @@index([at])
+}
+
+/// Что случилось со входом в CRM.
+enum AuthEventKind {
+  LOGIN_OK
+  LOGIN_FAIL
+  TWO_FACTOR_FAIL
+  PASSWORD_RESET
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_RESET
+}
+
+/// Журнал входов (lib/services/auth-events.ts): кто и откуда входил,
+/// кто не смог, когда менялся пароль и включалась двухфакторная.
+///
+/// Почта хранится не открыто, а отпечатком (HMAC-SHA256 на AUTH_SECRET):
+/// по журналу можно собрать попытки на один и тот же адрес, но не узнать
+/// адрес. userId без внешнего ключа намеренно — запись о входе не должна
+/// мешать удалению учётной записи (erasure), а лежит она 90 дней.
+/// Секретов в деталях нет: ни паролей, ни кодов.
+model AuthEvent {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  kind      AuthEventKind
+  userId    String?
+  /// Организация пользователя — чтобы владелец видел события только своей
+  /// организации без выборки всех её пользователей. Пусто у событий по
+  /// неизвестным адресам: принадлежность им определить нечем.
+  organizationId String?
+  emailHash String?
+  ip        String?
+  /// Усечён до 255 символов.
+  userAgent String?
+  /// Способ входа и причина отказа, без секретов.
+  details   Json?
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+/// Отметка фонового процесса (jobs/scheduler.ts): каждый проход обновляет
+/// одну строку. По ней /api/health/worker отвечает внешней проверке
+/// (infra/functions/uptime), жив ли планировщик. Иначе его остановку
+/// не видит никто: сайт и кабинет открываются, а письма, напоминания
+/// и очередь уничтожения ПДн молча стоят.
+model WorkerHeartbeat {
+  /// Имя процесса — сейчас один: "scheduler".
+  id         String    @id
+  /// Последний проход, удачный или нет.
+  lastTickAt DateTime
+  /// Последний удачный проход. Отстаёт от lastTickAt — проходы падают.
+  lastOkAt   DateTime?
+}
+
+/// Одноразовый код привязки ВКонтакте: человек пишет его сообществу, и только
+/// тогда страница ВК становится его (User.vkUserId). Храним подпись кода, не сам код.
+model VkLinkCode {
+  id    String @id @default(cuid())
+  userId String
+
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([codeHash])
+}
+
+/// Что приходило от сообщества ВКонтакте на /api/webhooks/vk и чем закончилось.
+/// ВК присылает события только после настройки Callback API, и без журнала
+/// «бот молчит» — гадание: событий нет вообще, секрет не тот или ответ не ушёл.
+/// Хранится 30 дней. Ни текста сообщений (там коды привязки и личная переписка),
+/// ни страниц отправителей здесь нет — только тип события и исход.
+model VkEvent {
+  id String   @id @default(cuid())
+  at DateTime @default(now())
+
+  /// Тип события ВК: confirmation, message_new, message_allow и т. д.
+  type String
+  /// Чем закончилось: confirmed, linked, bad-code, not-a-code, expired, taken,
+  /// too-many-attempts, forbidden-secret, ignored, reply-failed.
+  outcome String
+  /// Код отказа ВК, если не удалось ответить человеку (901 — писать первым нельзя).
+  vkErrorCode Int?
+
   @@index([at])
 }

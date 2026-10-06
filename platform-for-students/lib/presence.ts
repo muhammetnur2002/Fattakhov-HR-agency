@@ -57,9 +57,9 @@ function moscowYear(date: Date): string {
 /**
  * Строка о последнем появлении.
  *
- * `null` — человек не появлялся ни разу либо скрыл статус; и то и другое
- * даёт «был(а) давно». Отдельного «недавно» нет намеренно: для того, кто
- * выключил показ, любая более точная формулировка выдавала бы его.
+ * `null` — человек не появлялся ни разу; это даёт «был(а) давно».
+ * Отдельного «недавно» нет намеренно: слишком расплывчатая формулировка
+ * ничего не говорит, а точная — это уже сама строка статуса.
  */
 export function formatPresence(
   lastSeenAt: Date | string | null | undefined,
@@ -92,18 +92,32 @@ export function formatPresence(
 }
 
 /**
+ * Показывается ли статус человека.
+ *
+ * Всегда: скрыть «в сети» на платформе не могут ни студент, ни работодатель
+ * (скрыть статус вправе только владелец агентства в CRM, а он на платформе
+ * не собеседник). Поле `Account.showPresence` осталось в базе, но не читается:
+ * сохранённое когда-то «выключено» ничего не значит. Единственное место, где
+ * записано это правило, — и показ (visibleLastSeen), и пульс (lib/presence-pulse.ts)
+ * живут без проверки поля. Миграции данных нет.
+ */
+export function effectiveShowPresence(_account?: { showPresence?: boolean } | null): boolean {
+  return true;
+}
+
+/**
  * Что отдавать наружу.
  *
- * Выключенный показ и отсутствие права видеть статус дают одинаковый
- * ответ — `null`. Если бы они различались, по ответу можно было бы
- * узнать, что человек просто спрятался.
+ * Статус виден всегда (effectiveShowPresence); `null` — только если
+ * смотрящему не положено его видеть или человек ещё ни разу не появлялся.
  */
 export function visibleLastSeen(
+  /** `showPresence` принимается ради старых вызовов и игнорируется. */
   account: { lastSeenAt?: Date | null; showPresence?: boolean },
   canSee: boolean,
 ): Date | null {
   if (!canSee) return null;
-  if (account.showPresence === false) return null;
+  if (!effectiveShowPresence(account)) return null;
   return account.lastSeenAt ?? null;
 }
 

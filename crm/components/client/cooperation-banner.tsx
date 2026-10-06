@@ -7,7 +7,12 @@ import { useState, useSyncExternalStore } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { isContractOnlyPath, type ContractState } from "@/lib/contract-gate";
+import {
+  availableNowText,
+  isContractOnlyPath,
+  type ContractGateAccess,
+  type ContractState,
+} from "@/lib/contract-gate";
 
 const STORAGE_KEY = "coop-banner-dismissed";
 
@@ -28,12 +33,17 @@ function subscribe(onChange: () => void) {
  * Плашка про условия сотрудничества. На открытых страницах её можно закрыть
  * (запоминается в браузере), на закрытых до договора — стоит всегда: там она
  * объясняет, почему раздел недоступен.
+ *
+ * Условия выбирает администратор компании; остальным плашка говорит, кто это
+ * делает, и обещает только то, что им правда открыто (access).
  */
 export function CooperationBanner({
   state,
+  access,
   telegramHref,
 }: {
   state: Exclude<ContractState, "active">;
+  access: ContractGateAccess;
   telegramHref: string;
 }) {
   const pathname = usePathname();
@@ -55,15 +65,21 @@ export function CooperationBanner({
   }
 
   const pending = state === "pending";
+  const availableNow = availableNowText(access);
+  const description = pending
+    ? (access.chooseTerms
+        ? "Агентство свяжется с вами и подтвердит договор — после этого откроются заявки на подбор, кандидаты, календарь, аналитика."
+        : "Агентство подтвердит договор, который выбрал администратор вашей компании, — после этого откроются заявки на подбор, кандидаты, календарь, аналитика.") +
+      (availableNow ? ` ${availableNow}` : "")
+    : access.documents
+      ? "Студенческая платформа, документы и сообщения доступны уже сейчас: в документах — шаблон договора — скачайте, подпишите и пришлите нам на проверку. Заявки на подбор, кандидаты, календарь, аналитика откроются после договора."
+      : "Условия сотрудничества выбирает администратор вашей компании. Заявки на подбор, кандидаты, календарь, аналитика откроются после договора." +
+        (availableNow ? ` ${availableNow}` : "");
   return (
     <Alert className="relative mb-4 flex flex-wrap items-center justify-between gap-3 pr-10">
       <div>
         <AlertTitle>{pending ? "Договор ещё не подтверждён" : "Условия сотрудничества ещё не выбраны"}</AlertTitle>
-        <AlertDescription>
-          {pending
-            ? "Агентство свяжется с вами и подтвердит договор — после этого откроются заявки на подбор, кандидаты, календарь, аналитика и переписка с командой. Студенческая платформа и документы доступны уже сейчас."
-            : "Студенческая платформа и документы доступны уже сейчас: там шаблон договора — скачайте, подпишите и пришлите нам на проверку. Заявки на подбор, кандидаты, календарь, аналитика и переписка с командой откроются после договора."}
-        </AlertDescription>
+        <AlertDescription>{description}</AlertDescription>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline">
@@ -71,7 +87,7 @@ export function CooperationBanner({
             Обсудить с нами
           </a>
         </Button>
-        {!pending && (
+        {!pending && access.chooseTerms && (
           <Button asChild size="sm">
             <Link href="/onboarding">Выбрать условия</Link>
           </Button>

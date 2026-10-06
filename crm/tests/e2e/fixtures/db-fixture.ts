@@ -124,6 +124,45 @@ async function run(input: Input) {
         select: { id: true },
       });
 
+      /*
+        Подтверждение передачи данных этому работодателю (§4.2 согласия) —
+        только когда общее согласие действует. Такая фикстура означает
+        «кандидат готов к представлению», и без этой записи он готовым
+        не является: presentToClient проверяет оба согласия. Фикстура
+        с истёкшим сроком (статус GIVEN, срок в прошлом) остаётся
+        заблокированной, как и задумано в тесте про блокировку.
+      */
+      if (new Date(input.consentExpiresAtIso) > new Date()) {
+        const vacancy = await prisma.vacancy.findFirstOrThrow({
+          where: { id: input.vacancyId },
+          select: {
+            title: true,
+            number: true,
+            clientId: true,
+            client: { select: { name: true, legalName: true, inn: true } },
+          },
+        });
+
+        await prisma.disclosureConsent.create({
+          data: {
+            organizationId: input.organizationId,
+            candidateId: candidate.id,
+            vacancyId: input.vacancyId,
+            clientId: vacancy.clientId,
+            // Как в createDisclosureLink: юрлицо, а если его нет — имя клиента
+            employerName: vacancy.client.legalName?.trim() || vacancy.client.name,
+            employerInn: vacancy.client.inn,
+            vacancyTitle: `№${vacancy.number} ${vacancy.title}`,
+            status: "GIVEN",
+            contactMode: "VIA_AGENCY",
+            version: "e2e",
+            givenAt: new Date(),
+            expiresAt: new Date(Date.now() + 90 * 24 * 3_600_000),
+            createdById: input.createdById,
+          },
+        });
+      }
+
       return { candidateId: candidate.id, applicationId: application.id };
     }
 
@@ -252,6 +291,12 @@ async function run(input: Input) {
     }
 
     case "cleanupCandidate": {
+      // Подтверждение передачи, созданное фикстурой, — след прогона. Мягкого
+      // удаления у этой таблицы нет (это доказательство волеизъявления),
+      // поэтому оно удаляется физически, а не копится с каждым запуском
+      await prisma.disclosureConsent.deleteMany({
+        where: { candidateId: input.candidateId },
+      });
       await prisma.attachment.deleteMany({ where: { candidateId: input.candidateId } });
       await prisma.application.deleteMany({ where: { candidateId: input.candidateId } });
       await prisma.candidate.delete({ where: { id: input.candidateId } });

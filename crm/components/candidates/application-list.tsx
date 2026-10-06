@@ -74,11 +74,21 @@ export function ApplicationList({
                 содержимым зияли провалы в сотни пикселей; страница
                 прятала это ограничением ширины, ценой неиспользованного
                 экрана справа.
+
+                Две последние колонки (ожидание и этап) — auto, а не доля
+                ширины. С долей им доставалось около 129px, а названия этапов
+                занимают до 259px («Финальный этап / тестовое»): бейдж вылезал
+                из колонки и срезался краем карточки — без многоточия, без
+                полосы прокрутки, человек видел «Интервью с кли» и не знал,
+                что текст продолжается. auto отдаёт этим колонкам ровно
+                столько, сколько нужно содержимому, а остаток делят имя
+                и вакансия. Выравнивание бейджей между карточками сохраняется:
+                они прижаты к правому краю, а он у всех карточек общий.
               */}
               <CardContent
                 className="
                   flex flex-wrap items-center gap-x-6 gap-y-2 p-4
-                  xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]
+                  xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_auto_auto]
                 "
               >
                 <div className="min-w-56 flex-1 xl:min-w-0">
@@ -117,16 +127,40 @@ export function ApplicationList({
                     на одном месте независимо от того, есть ли сосед слева */}
                 <div className="w-32 shrink-0 text-right xl:w-auto xl:shrink">
                   {waiting !== null && (
-                    <Badge variant={waiting >= 3 ? "destructive" : "outline"}>
-                      {waiting === 0
-                        ? "Ждёт решения"
-                        : `Ждёт ${waiting} ${plural(waiting)}`}
+                    <Badge
+                      variant={waiting >= 3 ? "destructive" : "outline"}
+                      className="max-w-full"
+                    >
+                      <span className="truncate">
+                        {waiting === 0
+                          ? "Ждёт решения"
+                          : `Ждёт ${waiting} ${plural(waiting)}`}
+                      </span>
                     </Badge>
                   )}
                 </div>
 
+                {/*
+                  Этап усекается многоточием, а не срезается краем карточки.
+
+                  На широком экране строка — сетка, и колонке этапа достаётся
+                  доля ширины: около 129px. Названия вроде «Финальный этап /
+                  тестовое» требуют 259px, вылезали за колонку и обрезались
+                  overflow'ом карточки — без многоточия и без полосы прокрутки,
+                  то есть человек видел «Финальный этап / те» и не знал, что
+                  текст продолжается. Отдать колонке недостающие 130px нельзя:
+                  их пришлось бы забрать у имени кандидата и вакансии.
+                  Полное название остаётся в подсказке и на карточке кандидата.
+
+                  max-w-full — самому бейджу (у него уже overflow-hidden),
+                  truncate — внутреннему span. Без min-w-0 намеренно: с ним
+                  span сжимался до нуля, и бейдж пропадал целиком. Так его
+                  минимум — самое длинное слово, а лишнее уходит в многоточие.
+                */}
                 <div className="w-32 shrink-0 text-right xl:w-auto xl:shrink">
-                  <Badge variant="secondary">{a.stage.name}</Badge>
+                  <Badge variant="secondary" className="max-w-full" title={a.stage.name}>
+                    <span className="truncate">{a.stage.name}</span>
+                  </Badge>
                 </div>
               </CardContent>
             </Card>

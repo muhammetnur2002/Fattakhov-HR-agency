@@ -3,19 +3,25 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { authConfig } from "@/auth.config";
-import { verifyPassword } from "@/lib/auth/password";
+import { PhoneFormatError } from "@/lib/auth/phone";
 import { prisma } from "@/lib/db/prisma";
 import {
-  clearLoginFailures,
-  isLoginBlocked,
-  isSecondFactorBlocked,
-  recordLoginFailure,
-  recordSecondFactorFailure,
-} from "@/lib/security/login-throttle";
+  checkPhoneCode,
+  consumePhoneCode,
+  PhoneCodeError,
+} from "@/lib/services/phone-auth";
 import {
-  requiresSecondFactor,
-  verifySecondFactor,
-} from "@/lib/services/two-factor";
+  NeedsRegistrationError,
+  ProofAlreadyUsedError,
+  resolveQuickSignIn,
+  SecondFactorNeededError,
+  SecondFactorWrongError,
+  type QuickIdentity,
+  type QuickUser,
+} from "@/lib/services/quick-registration";
+import { recordAuthEventSoon } from "@/lib/services/auth-events";
+import { authenticateWithPassword, LoginError } from "@/lib/services/credentials-login";
+import { requiresSecondFactor } from "@/lib/services/two-factor";
 import {
   consumeTicketOnce,
   crmEntrySecret,
@@ -59,6 +65,83 @@ class StudentsEntryInvalid extends CredentialsSignin {
   code = "students_entry_invalid";
 }
 
+/**
+ * Телефон подтверждён, а аккаунта нет — и согласия
+ * на обработку данных не давали (вход со страницы входа, а не
+ * регистрации). Завести человека без согласия нельзя; форма по этому
+ * коду ведёт на регистрацию.
+ */
+class NeedsRegistration extends CredentialsSignin {
+  code = "needs_registration";
+}
+
+/** Код из SMS не подошёл. Точную причину форма узнаёт раньше, до входа. */
+class PhoneCodeInvalid extends CredentialsSignin {
+  code = "phone_code_invalid";
+}
+
+function toAuthUser(user: QuickUser) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.fullName,
+    organizationId: user.organizationId,
+    role: user.role,
+    clientId: user.clientId,
+  };
+}
+
+function requestMeta(request: Request | undefined) {
+  return {
+    ip: request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    userAgent: request?.headers.get("user-agent") ?? null,
+  };
+}
+
+/**
+ * Быстрый вход: сервис решает, войти или завести, и проверяет второй
+ * фактор тем же путём и тем же счётчиком, что вход по паролю, — здесь
+ * только перевод его ошибок в коды, которые понимает форма.
+ */
+async function completeQuickSignIn(
+  identity: QuickIdentity,
+  options: {
+    consent: boolean;
+    code: string;
+    request: Request | undefined;
+    beforeEnter?: () => Promise<boolean>;
+  },
+) {
+  try {
+    const user = await resolveQuickSignIn(identity, {
+      consent: options.consent,
+      secondFactorCode: options.code,
+      meta: requestMeta(options.request),
+      beforeEnter: options.beforeEnter,
+    });
+    recordAuthEventSoon({ kind: "LOGIN_OK", userId: user.id, details: { method: "phone" } });
+    return toAuthUser(user);
+  } catch (error) {
+    if (error instanceof NeedsRegistrationError) throw new NeedsRegistration();
+    if (error instanceof SecondFactorNeededError) throw new SecondFactorRequired();
+    if (error instanceof SecondFactorWrongError) {
+      recordAuthEventSoon({
+        kind: "TWO_FACTOR_FAIL",
+        details: { method: "phone", reason: "wrong_or_blocked" },
+      });
+      throw new SecondFactorInvalid();
+    }
+    if (error instanceof ProofAlreadyUsedError) {
+      recordAuthEventSoon({
+        kind: "LOGIN_FAIL",
+        details: { method: "phone", reason: "code_already_used" },
+      });
+      throw new InvalidCredentials();
+    }
+    throw error;
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -73,61 +156,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { email, password, code } = parsed.data;
 
-        // Лимит здесь, а не только в форме: Auth.js принимает запрос и напрямую
-        if (await isLoginBlocked(email)) throw new InvalidCredentials();
-
-        const user = await prisma.user.findFirst({
-          where: { email: email.toLowerCase().trim(), isActive: true },
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            passwordHash: true,
-            organizationId: true,
-            role: true,
-            clientId: true,
-          },
-        });
-
-        // Пароль сверяем даже когда пользователь не найден — иначе разница
-        // во времени ответа выдаёт, какие email заведены в системе.
-        const hashToCheck =
-          user?.passwordHash ??
-          "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$3wRJDPBLYSMPmwLmFvxNPHFTJZFTh9tXPFmzeXKXUeQ";
-
-        const ok = await verifyPassword(hashToCheck, password);
-        if (!user || !user.passwordHash || !ok) {
-          await recordLoginFailure(email);
-          throw new InvalidCredentials();
-        }
-
-        // Второй фактор проверяется только после пароля: до этого мы
-        // не должны даже подтверждать, что такой человек есть
-        if (await requiresSecondFactor(user.id)) {
-          if (!code?.trim()) throw new SecondFactorRequired();
-          // Шесть цифр перебираются быстро, поэтому код считаем отдельно и строже пароля
-          if (await isSecondFactorBlocked(user.id)) throw new SecondFactorInvalid();
-          if (!(await verifySecondFactor({ userId: user.id, code }))) {
-            await recordSecondFactorFailure(user.id);
-            throw new SecondFactorInvalid();
+        try {
+          return await authenticateWithPassword({ email, password, code });
+        } catch (error) {
+          // Наши отказы — в коды ошибок, которые понимает форма
+          if (error instanceof LoginError) {
+            if (error.code === "second_factor_required") throw new SecondFactorRequired();
+            if (error.code === "second_factor_invalid") throw new SecondFactorInvalid();
+            throw new InvalidCredentials();
           }
+          throw error;
         }
-
-        await clearLoginFailures(email, user.id);
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        });
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.fullName,
-          organizationId: user.organizationId,
-          role: user.role,
-          clientId: user.clientId,
-        };
       },
     }),
     /**
@@ -145,20 +184,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "students-entry",
       credentials: { ticket: { type: "text" } },
       async authorize(raw) {
+        // Любой отказ с билетом — одна запись: причина в деталях, а не в ответе человеку
+        const refuse = (reason: string): never => {
+          recordAuthEventSoon({
+            kind: "LOGIN_FAIL",
+            details: { method: "students-entry", reason },
+          });
+          throw new StudentsEntryInvalid();
+        };
+
         const ticket = typeof raw?.ticket === "string" ? raw.ticket : "";
         const secret = crmEntrySecret();
-        if (!secret) throw new StudentsEntryInvalid();
+        if (!secret) return refuse("no_secret");
 
         const checked = verifyStudentsEntryTicket(ticket, secret);
-        if (!checked.ok) throw new StudentsEntryInvalid();
+        if (!checked.ok) return refuse("bad_ticket");
         if (!consumeTicketOnce(checked.ticket.jti, checked.ticket.exp)) {
-          throw new StudentsEntryInvalid();
+          return refuse("ticket_reused");
         }
 
         const client = await prisma.client.findUnique({
           where: { id: checked.ticket.crmClientId },
         });
-        if (!client) throw new StudentsEntryInvalid();
+        if (!client) return refuse("no_client");
 
         let user = await prisma.user.findFirst({
           where: { clientId: client.id, email: checked.ticket.email },
@@ -178,14 +226,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
         }
-        if (!user.isActive) throw new StudentsEntryInvalid();
+        if (!user.isActive) return refuse("inactive");
         // Билет — это вход без пароля; при включённой 2FA он не должен её обходить.
         // Такой человек входит обычной формой с кодом
-        if (await requiresSecondFactor(user.id)) throw new StudentsEntryInvalid();
+        if (await requiresSecondFactor(user.id)) return refuse("second_factor_enabled");
 
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
+        });
+        recordAuthEventSoon({
+          kind: "LOGIN_OK",
+          userId: user.id,
+          details: { method: "students-entry" },
         });
 
         return {
@@ -196,6 +249,47 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           clientId: user.clientId,
         };
+      },
+    }),
+
+    /*
+      Вход и регистрация по номеру телефона и коду из SMS.
+
+      Код проверяется без погашения, а гасится в beforeEnter — уже после
+      второго фактора (см. resolveQuickSignIn): иначе второй шаг с кодом
+      из приложения упал бы на «код использован».
+    */
+    Credentials({
+      id: "phone",
+      name: "Телефон",
+      credentials: { phone: {}, smsCode: {}, consent: {}, code: {} },
+      async authorize(raw, request) {
+        let checked: { phone: string; codeId: string };
+        try {
+          checked = await checkPhoneCode(
+            String(raw?.phone ?? ""),
+            String(raw?.smsCode ?? ""),
+          );
+        } catch (error) {
+          if (error instanceof PhoneCodeError || error instanceof PhoneFormatError) {
+            recordAuthEventSoon({
+              kind: "LOGIN_FAIL",
+              details: { method: "phone", reason: "bad_code" },
+            });
+            throw new PhoneCodeInvalid();
+          }
+          throw error;
+        }
+
+        return completeQuickSignIn(
+          { kind: "phone", phone: checked.phone },
+          {
+            consent: raw?.consent === "on",
+            code: String(raw?.code ?? "").trim(),
+            request,
+            beforeEnter: () => consumePhoneCode(checked.codeId),
+          },
+        );
       },
     }),
   ],

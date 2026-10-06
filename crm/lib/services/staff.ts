@@ -1,6 +1,7 @@
 import {
   AccessDeniedError,
   AGENCY_ROLES,
+  assertCanDo,
   canAssignStaff,
   canManageStaffMember,
   effectiveGrants,
@@ -12,6 +13,11 @@ import {
 import { hashPassword } from "@/lib/auth/password";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
+import { createInvitation } from "@/lib/services/invitations";
+import { presenceFor } from "@/lib/services/messages";
+import type { Presence } from "@/lib/presence";
+import { recordAuthEvent } from "@/lib/services/auth-events";
+import { passwordProblem } from "@/lib/validation/password";
 
 /**
  * Команда агентства: аккаунты, роли, должности и доступы.
@@ -31,7 +37,11 @@ export type StaffMember = {
   grants: StaffGrant[];
   isActive: boolean;
   lastLoginAt: Date | null;
+  /** «В сети» / «был(а)…»; null — человек скрыл статус или это сам смотрящий. */
+  presence: Presence | null;
   isSelf: boolean;
+  /** Включена ли у сотрудника 2FA (у агентства она обязательна, пока не настроена — кабинет закрыт). */
+  twoFactorEnabled: boolean;
   /** Может ли текущий пользователь менять этого сотрудника. */
   manageable: boolean;
 };
@@ -58,13 +68,23 @@ export async function listStaff(
       grants: true,
       isActive: true,
       lastLoginAt: true,
+      organizationId: true,
+      clientId: true,
+      showPresence: true,
+      lastSeenAt: true,
+      totpEnabledAt: true,
     },
     orderBy: [{ isActive: "desc" }, { fullName: "asc" }],
   });
 
   return {
-    members: users.map((user) => ({
+    members: users.map(({ organizationId, clientId, showPresence, lastSeenAt, totpEnabledAt, ...user }) => ({
       ...user,
+      twoFactorEnabled: totpEnabledAt !== null,
+      // Отключённому доступ закрыт — «в сети» у него быть не может
+      presence: user.isActive
+        ? presenceFor(actor, { id: user.id, organizationId, clientId, role: user.role, showPresence, lastSeenAt })
+        : null,
       // У владельца всё и так: в базе у него пусто, а показывать надо правду
       grants:
         user.role === "OWNER" ? [...STAFF_GRANTS] : knownGrants(user.grants),
@@ -139,7 +159,7 @@ export async function resetStaffPassword(
 ): Promise<void> {
   const target = await prisma.user.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
-    select: { id: true, role: true, grants: true },
+    select: { id: true, role: true, grants: true, email: true },
   });
   if (!target) throw new StaffError("Сотрудник не найден");
   // Новый пароль — это вход под чужой учёткой со всеми её доступами, поэтому правило то же, что
@@ -148,6 +168,10 @@ export async function resetStaffPassword(
     throw new AccessDeniedError("staff.manage");
   }
 
+  // Правило слабых паролей одно на все формы; почта сотрудника в контексте — из базы
+  const problem = passwordProblem(password, { email: target.email });
+  if (problem) throw new StaffError(problem);
+
   await prisma.user.update({
     where: { id: target.id },
     data: {
@@ -155,6 +179,13 @@ export async function resetStaffPassword(
       // Гасит все выпущенные ранее сессии этого сотрудника
       passwordChangedAt: new Date(),
     },
+  });
+
+  await recordAuthEvent({
+    kind: "PASSWORD_RESET",
+    userId: target.id,
+    email: target.email,
+    details: { method: "by_admin", by: actor.id },
   });
 }
 
@@ -217,4 +248,149 @@ export async function setStaffActive(
     throw new AccessDeniedError("staff.manage");
   }
   await prisma.user.update({ where: { id: target.id }, data: { isActive: active } });
+}
+
+// ============ ПРИГЛАШЕНИЯ ПО ССЫЛКЕ ============
+
+/**
+ * Неотвеченное приглашение в команду — как его видит тот, кто ведёт команду.
+ *
+ * `token` есть только у тех, кого смотрящий мог бы пригласить сам
+ * (canAssignStaff): ссылка — пропуск с ролью и доступами, и показать её
+ * доверенному сотруднику, у которого этих прав нет, значило бы дать ему
+ * способ выдать их кому угодно. Без права токен не уходит даже в данные
+ * страницы — не только не рисуется.
+ */
+export type StaffInvitation = {
+  id: string;
+  email: string;
+  role: UserRole;
+  position: string | null;
+  grants: StaffGrant[];
+  expiresAt: Date;
+  token: string | null;
+  /** Может ли смотрящий отозвать: та же граница, что у отключения сотрудника. */
+  revocable: boolean;
+};
+
+export async function listStaffInvitations(actor: Actor): Promise<StaffInvitation[]> {
+  assertCanDo(actor, "staff.manage");
+
+  const invitations = await prisma.invitation.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      // Приглашения в кабинеты клиентов — не команда агентства
+      clientId: null,
+      acceptedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      position: true,
+      grants: true,
+      token: true,
+      expiresAt: true,
+    },
+  });
+
+  return invitations.map((invitation) => {
+    const grants = knownGrants(invitation.grants);
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      position: invitation.position,
+      grants,
+      expiresAt: invitation.expiresAt,
+      token: canAssignStaff(actor, { role: invitation.role }, grants) ? invitation.token : null,
+      revocable: canManageStaffMember(actor, { role: invitation.role }),
+    };
+  });
+}
+
+/**
+ * Позвать сотрудника письмом со ссылкой: пароль человек задаёт сам.
+ *
+ * Рядом с созданием аккаунта, а не вместо него — у каждого пути свой
+ * случай: аккаунт с паролем нужен, когда человек рядом и войти надо
+ * сейчас, приглашение — когда пароль передать некому или незачем знать.
+ * Права те же, что у создания: роль не выше своей, доступы только свои.
+ * Письмо уходит из createInvitation; недоставленное ничего не роняет —
+ * ссылка остаётся в списке «Ждут принятия».
+ */
+export async function inviteStaff(
+  actor: Actor,
+  input: {
+    email: string;
+    role: StaffRole;
+    position?: string;
+    grants: StaffGrant[];
+  },
+): Promise<{ token: string }> {
+  if (!canAssignStaff(actor, { role: input.role }, input.grants)) {
+    throw new AccessDeniedError("staff.manage");
+  }
+
+  /*
+    clientId пустой — и это главное отличие от приглашения в кабинет
+    клиента: пользователь без clientId считается сотрудником агентства
+    и в матрице прав, и в фильтрах видимости. Из формы его не подставить —
+    такого поля в ней нет.
+  */
+  const token = await createInvitation({
+    organizationId: actor.organizationId,
+    email: input.email,
+    role: input.role,
+    clientId: null,
+    position: input.position ?? null,
+    grants: input.grants,
+    createdById: actor.id,
+  });
+
+  return { token };
+}
+
+/**
+ * Отозвать неотвеченное приглашение в команду.
+ *
+ * Нужно чаще, чем кажется: опечатка в адресе. Пока приглашение живо,
+ * повторно позвать того же человека нельзя — createInvitation отвечает
+ * «на этот адрес уже есть действующее приглашение», — а ссылка из
+ * неверного письма неделю пускает в CRM любого, кто её откроет.
+ *
+ * Граница та же, что у отключения сотрудника (canManageStaffMember):
+ * доверенный рекрутер не отзовёт приглашение руководителя подбора,
+ * которое выдал владелец. Приглашение чужой организации или в кабинет
+ * клиента не находится вовсе — ответ тот же, что на выдуманный id.
+ *
+ * Удаление физическое, и это не нарушение BR-26: мягкое удаление бережёт
+ * историю, а у непринятого приглашения её нет — по нему никто не вошёл
+ * и ссылаться на него нечему. Ссылка после этого ведёт на ту же страницу
+ * «Ссылка недействительна», что и истёкшая.
+ */
+export async function revokeStaffInvitation(
+  actor: Actor,
+  invitationId: string,
+): Promise<void> {
+  assertCanDo(actor, "staff.manage");
+
+  const invitation = await prisma.invitation.findFirst({
+    where: {
+      id: invitationId,
+      organizationId: actor.organizationId,
+      clientId: null,
+      acceptedAt: null,
+    },
+    select: { id: true, role: true },
+  });
+  if (!invitation) throw new StaffError("Приглашение не найдено");
+
+  if (!canManageStaffMember(actor, { role: invitation.role })) {
+    throw new AccessDeniedError("staff.manage");
+  }
+
+  await prisma.invitation.delete({ where: { id: invitation.id } });
 }

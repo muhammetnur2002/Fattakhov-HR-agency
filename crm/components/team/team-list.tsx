@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import type { AccountAction } from "@/components/shared/account-forms";
 import { withEmailOff } from "@/components/shared/email-off";
+import { ResetTwoFactorDialog } from "@/components/team/reset-two-factor-dialog";
 import { StaffMemberEditor, type TeamOption } from "@/components/team/staff-forms";
+import { PresenceLabel } from "@/components/presence/presence-label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ROLE_LABELS, STAFF_GRANT_LABELS } from "@/lib/labels";
@@ -19,6 +21,7 @@ export function TeamList({
   updateAction,
   activeAction,
   resetPasswordAction,
+  resetTwoFactorAction,
 }: {
   members: StaffMember[];
   roles: TeamOption[];
@@ -26,6 +29,8 @@ export function TeamList({
   updateAction: AccountAction;
   activeAction: AccountAction;
   resetPasswordAction: AccountAction;
+  /** Только у владельца: сбросить сотруднику 2FA. */
+  resetTwoFactorAction?: AccountAction;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -70,8 +75,16 @@ export function TeamList({
               </div>
               <Badge variant="outline">{ROLE_LABELS[member.role]}</Badge>
               {!member.isActive && <Badge variant="destructive">Доступ отключён</Badge>}
-              <div className="text-xs text-muted-foreground">
-                {member.lastLoginAt ? `Заходил ${formatDate(member.lastLoginAt)}` : "Ни разу не заходил"}
+              {member.isActive && !member.twoFactorEnabled && (
+                <Badge variant="outline">2FA не настроена</Badge>
+              )}
+              <div className="flex flex-col items-end text-xs text-muted-foreground">
+                {member.presence && (
+                  <PresenceLabel lastSeenAt={member.presence.lastSeenAt} />
+                )}
+                <span>
+                  {member.lastLoginAt ? `Заходил ${formatDate(member.lastLoginAt)}` : "Ни разу не заходил"}
+                </span>
               </div>
             </div>
 
@@ -98,6 +111,10 @@ export function TeamList({
                 activeAction={activeAction}
                 resetPasswordAction={resetPasswordAction}
               />
+            )}
+
+            {resetTwoFactorAction && !member.isSelf && member.twoFactorEnabled && (
+              <ResetTwoFactorDialog member={member} action={resetTwoFactorAction} />
             )}
           </div>
         ))

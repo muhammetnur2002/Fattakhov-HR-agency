@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PresenceLabel } from "@/components/presence/presence-label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ROLE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,12 @@ export function DirectConversationList({
             <div className="truncate text-xs text-muted-foreground">
               {describeUser(c.user.role as UserRole, c.user.clientName)}
             </div>
+            {c.user.presence && (
+              <PresenceLabel
+                lastSeenAt={c.user.presence.lastSeenAt}
+                className="flex text-[11px] text-muted-foreground"
+              />
+            )}
             <div className="mt-0.5 flex items-center gap-1.5">
               <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 {/* «Вы:» перед своим сообщением — иначе в списке не видно,

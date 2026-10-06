@@ -43,7 +43,7 @@ export interface AccountRecord {
   createdAt: Date;
   /** Последний пульс с открытой вкладки. Пишется не чаще раза в минуту */
   lastSeenAt: Date | null;
-  /** «Показывать, что я в сети». Выключено — статус не отдают никому */
+  /** Прежний переключатель «Показывать, что я в сети». Не читается: статус виден всегда (lib/presence.ts) */
   showPresence: boolean;
   /**
    * Когда пароль меняли в последний раз. Сессия, выпущенная раньше, недействительна:
@@ -92,6 +92,52 @@ export interface StudentRecord extends StudentPortfolio {
   updatedAt: Date;
   /** Когда студент последний раз открывал вкладку «Отклики» — см. markApplicationsViewed */
   applicationsViewedAt: Date | null;
+}
+
+/**
+ * Условия поиска студентов для сотрудников агентства. Только открытые колонки:
+ * ФИО, почта и телефон зашифрованы, искать по ним в базе нельзя — по имени
+ * фильтруют уже после расшифровки ограниченного набора (lib/staff-students.ts).
+ */
+export interface StudentSearchFilter {
+  /** Подстрока без учёта регистра */
+  university?: string;
+  speciality?: string;
+  city?: string;
+  studyYear?: number;
+  gender?: Gender;
+  /** Диапазон года рождения — грубая отсечка по возрасту; точный возраст считает вызывающий */
+  birthYearFrom?: number;
+  birthYearTo?: number;
+  /** Учёба: подтверждена / справка на проверке / ни того ни другого */
+  study?: 'VERIFIED' | 'PENDING' | 'NONE';
+  /** Ищет (ACTIVE и IN_PROGRESS) / на паузе / трудоустроен */
+  status?: 'ACTIVE' | 'PAUSED' | 'PLACED';
+  /** Только те, чей «был в сети» не раньше этого момента и кто не скрыл показ */
+  onlineSince?: Date;
+}
+
+/** Строка поиска: анкета без портфолио и без контактов, плюс отметка присутствия из учётки. */
+export interface StudentSearchRow {
+  id: string;
+  fullNameEnc: string;
+  gender: Gender;
+  birthYear: number;
+  birthDateEnc: string | null;
+  university: string;
+  speciality: string;
+  studyYear: number;
+  studyLevel: StudyLevel | null;
+  city: string | null;
+  skills: string[];
+  about: string | null;
+  status: StudentStatus;
+  studyVerified: boolean;
+  /** Справка ждёт решения (сам файл наружу не отдаётся) */
+  studyPending: boolean;
+  createdAt: Date;
+  lastSeenAt: Date | null;
+  showPresence: boolean;
 }
 
 export interface InstitutionRecord {
@@ -519,6 +565,10 @@ export interface DataStore {
     setNotifyEmail(id: string, enabled: boolean): Promise<void>;
     /** Отметка «был здесь». Решение, пора ли писать, принимает вызывающий */
     setLastSeen(id: string, at: Date): Promise<void>;
+    /**
+     * Только для проверок на старых данных: из интерфейса и API не вызывается,
+     * на показ статуса значение не влияет (скрыть его нельзя).
+     */
     setShowPresence(id: string, enabled: boolean): Promise<void>;
     /** Сотрудник агентства при первом входе из CRM: без пароля, почта подтверждена CRM */
     createStaff(email: string): Promise<AccountRecord>;
@@ -587,6 +637,15 @@ export interface DataStore {
     findByAccountId(accountId: string): Promise<StudentRecord | null>;
     findById(id: string): Promise<StudentRecord | null>;
     list(): Promise<StudentRecord[]>;
+    /**
+     * Поиск для сотрудников: условия по открытым колонкам выполняет база, а не память процесса.
+     * `order`: new — новые регистрации, university — по вузу и специальности.
+     * `total` — сколько строк подошло под условия (до skip/take).
+     */
+    search(
+      filter: StudentSearchFilter,
+      page: { order: 'new' | 'university'; skip: number; take: number },
+    ): Promise<{ rows: StudentSearchRow[]; total: number }>;
     setStatus(id: string, status: StudentStatus): Promise<void>;
     /** Отметка HR «учёба подтверждена». null — студента нет. */
     setStudyVerified(id: string, verified: boolean): Promise<StudentRecord | null>;
@@ -752,6 +811,11 @@ export interface DataStore {
   audit: {
     log(entry: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<void>;
     list(limit: number): Promise<AuditRecord[]>;
+    /**
+     * Была ли такая запись (подпись актора, действие, объект) за последние `withinMs`.
+     * Нужна, чтобы повторный просмотр одной анкеты не засорял журнал.
+     */
+    recentExists(query: { actorLabel: string; action: string; entityId: string; withinMs: number }): Promise<boolean>;
   };
 
   events: {

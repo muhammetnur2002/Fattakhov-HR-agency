@@ -1,11 +1,18 @@
-import { inviteTeammateAction } from "./actions";
+import {
+  inviteTeammateAction,
+  revokeTeammateInvitationAction,
+} from "./actions";
 import { InviteForm } from "@/components/clients/invite-form";
 import { InviteLink } from "@/components/clients/invite-link";
+import { PresenceLabel } from "@/components/presence/presence-label";
+import { EmailConnectForm } from "@/components/settings/email-connect-form";
 import { withEmailOff } from "@/components/shared/email-off";
 import { NotificationSettings } from "@/components/settings/notification-settings";
 import { DeleteAccount } from "@/components/settings/delete-account";
 import { PasswordForm } from "@/components/settings/password-form";
+import { PresenceCard } from "@/components/settings/presence-card";
 import { ProfileForm } from "@/components/settings/profile-form";
+import { RevokeInviteButton } from "@/components/settings/revoke-invite-button";
 import { TwoFactorSettings } from "@/components/settings/two-factor";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,7 +27,10 @@ import { requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import { ROLE_LABELS } from "@/lib/labels";
-import { channelStatus } from "@/lib/notifications/channels";
+import { channelStatus, vkMessageUrl } from "@/lib/notifications/channels";
+import { isDeliverableEmail } from "@/lib/notifications/deliverable";
+import { listPushDevices } from "@/lib/notifications/push";
+import { pushPublicKey } from "@/lib/notifications/push-config";
 import { isClientContracted } from "@/lib/services/account-deletion";
 import { listClientTeam } from "@/lib/services/clients";
 import { getTwoFactorStatus } from "@/lib/services/two-factor";
@@ -41,16 +51,21 @@ export default async function ClientSettingsPage() {
       select: {
         fullName: true,
         email: true,
+        pendingEmail: true,
         phone: true,
         position: true,
-        telegramChatId: true,
+        vkUserId: true,
         notifyPrefs: true,
+        showPresence: true,
         deletionRequestedAt: true,
       },
     }),
-    canManageTeam ? listClientTeam(actor.clientId!) : null,
+    canManageTeam ? listClientTeam(actor.clientId!, actor) : null,
   ]);
   const contracted = actor.clientId ? await isClientContracted(actor.clientId) : false;
+  // Ключ — на запрос, не при сборке (см. lib/notifications/push-config.ts)
+  const pushKey = pushPublicKey();
+  const pushDevices = pushKey ? await listPushDevices(actor.id) : [];
 
   const prefs =
     typeof user?.notifyPrefs === "object" && user.notifyPrefs !== null
@@ -83,6 +98,24 @@ export default async function ClientSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Вошедшим по телефону почта не нужна для входа,
+          но без неё не приходят уведомления о кандидатах */}
+      {user && !isDeliverableEmail(user.email) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Рабочая почта</CardTitle>
+            <CardDescription>
+              {user.pendingEmail
+                ? `Ждём подтверждения: ${user.pendingEmail}. Откройте письмо и перейдите по ссылке — после этого сюда начнут приходить уведомления о кандидатах.`
+                : "Вы входите по телефону, почты в кабинете пока нет. Укажите рабочую — на неё придут уведомления о кандидатах и отклики студентов. Адрес подключится, когда вы подтвердите его по ссылке из письма."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EmailConnectForm pendingEmail={user.pendingEmail} />
+          </CardContent>
+        </Card>
+      )}
+
       {/*
         Право приглашать коллег своей компании (org.manageClientUsers)
         у администратора клиента было с самого начала, но экрана для
@@ -103,6 +136,8 @@ export default async function ClientSettingsPage() {
             <CardDescription>
               Приглашённому уходит письмо со ссылкой; если не дошло — ссылку
               ниже можно скопировать и передать самому. Действует 7 дней.
+              На экране она скрыта: кто её увидел, тот и войдёт. Ошиблись
+              в адресе — отзовите приглашение и отправьте заново.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -121,10 +156,13 @@ export default async function ClientSettingsPage() {
                       </div>
                     </div>
                     <Badge variant="outline">{ROLE_LABELS[u.role]}</Badge>
-                    <div className="text-xs text-muted-foreground">
-                      {u.lastLoginAt
-                        ? `Заходил ${formatDate(u.lastLoginAt)}`
-                        : "Ни разу не заходил"}
+                    <div className="flex flex-col items-end text-xs text-muted-foreground">
+                      {u.presence && <PresenceLabel lastSeenAt={u.presence.lastSeenAt} />}
+                      <span>
+                        {u.lastLoginAt
+                          ? `Заходил ${formatDate(u.lastLoginAt)}`
+                          : "Ни разу не заходил"}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -151,7 +189,17 @@ export default async function ClientSettingsPage() {
                         до {formatDate(inv.expiresAt)}
                       </span>
                     </div>
-                    <InviteLink url={`${appOrigin()}/invite/${inv.token}`} />
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <InviteLink
+                          url={`${appOrigin()}/invite/${inv.token}`}
+                        />
+                      </div>
+                      <RevokeInviteButton
+                        action={revokeTeammateInvitationAction}
+                        id={inv.id}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -189,6 +237,8 @@ export default async function ClientSettingsPage() {
         </CardContent>
       </Card>
 
+      <PresenceCard role={actor.role} showPresence={user?.showPresence ?? true} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Уведомления</CardTitle>
@@ -200,8 +250,16 @@ export default async function ClientSettingsPage() {
         <CardContent>
           <NotificationSettings
             email={prefs.email !== false}
-            telegram={prefs.telegram === true}
-            telegramChatId={user?.telegramChatId ?? null}
+            // То же правило, что при доставке (notify.ts): включено, пока
+            // не выключили явно. С `=== true` клиент, привязавший ВК,
+            // видел бы пустую галочку, и первое же сохранение настроек
+            // молча отключало ему ВК
+            vk={prefs.vk !== false}
+            vkUserId={user?.vkUserId ?? null}
+            vkMessageUrl={vkMessageUrl()}
+            push={prefs.push !== false}
+            pushPublicKey={pushKey}
+            pushDevices={pushDevices}
             channelsConfigured={channelStatus()}
             categories={
               typeof prefs.categories === "object" && prefs.categories !== null

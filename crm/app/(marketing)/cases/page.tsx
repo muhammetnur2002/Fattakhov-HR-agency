@@ -4,6 +4,7 @@ import Link from "next/link";
 import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { Cases, Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
+import { appUrl } from "@/lib/urls";
 
 export const metadata: Metadata = {
   title: { absolute: "Кейсы подбора персонала · Fattakhov HR Agency" },
@@ -91,7 +92,8 @@ export default function CasesPage() {
         />
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg" variant="secondary">
-            <Link href="/#diagnostic">Обсудить найм</Link>
+            {/* Как в шапке: «Обсудить найм» — регистрация в кабинете */}
+            <a href={appUrl("/register")}>Обсудить найм</a>
           </Button>
           <Button
             asChild

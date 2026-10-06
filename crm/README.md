@@ -42,7 +42,59 @@ npm run dev
 оставить пустым в разработке (письма в этом случае пишутся в лог).
 
 После `db:seed` в консоли будут выведены тестовые учётки (пароль у всех
-один — `demo1234`, это dev-фикстура, а не чей-то реальный пароль).
+один — `demo1234`, это dev-фикстура, а не чей-то реальный пароль). У учёток
+агентства двухфакторная включена (она обязательна, обхода нет): добавьте
+в приложение-аутентификатор ключ `GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ` вручную
+(`prisma/dev-totp.ts`) и вводите код при входе.
+
+## Сбросить 2FA, когда потерян доступ
+
+Двухфакторная обязательна всем сотрудникам агентства и не отключается из
+кабинета. Если сотрудник потерял и телефон, и коды восстановления, **другой
+владелец** открывает «Сотрудники» → сотрудник → «Сбросить 2FA» (с
+подтверждением). Секрет и коды стираются, сессии сотрудника закрываются, при
+следующем входе он по паролю попадёт на экран настройки и подключит 2FA заново.
+Событие `TWO_FACTOR_RESET` пишется в журнал входов.
+
+Себе сбросить нельзя. **Единственный владелец, потерявший телефон и коды,
+сбрасывает вручную** — на боевой базе, с машины, откуда она доступна (из
+интернета база закрыта), подставив свою почту:
+
+```sql
+BEGIN;
+
+DELETE FROM "RecoveryCode"
+WHERE "userId" = (SELECT id FROM "User" WHERE email = 'owner@example.ru' AND "deletedAt" IS NULL);
+
+UPDATE "User"
+SET "totpSecret" = NULL,
+    "totpEnabledAt" = NULL,
+    "totpLastStep" = NULL,
+    "passwordChangedAt" = now()   -- закрывает уже выпущенные сессии
+WHERE email = 'owner@example.ru' AND "deletedAt" IS NULL;
+
+-- Сбросить счётчики попыток, если вход заблокирован после неверных кодов
+WITH u AS (SELECT id FROM "User" WHERE email = 'owner@example.ru' AND "deletedAt" IS NULL)
+DELETE FROM "AuthFailure"
+WHERE key = 'login:acct:owner@example.ru'
+   OR key IN (
+     SELECT 'login:2fa:' || id FROM u
+     UNION SELECT 'login:2fa-setup-proof:' || id FROM u
+     UNION SELECT 'login:2fa-setup-confirm:' || id FROM u
+   );
+
+-- Запись в журнал входов (необязательно, но тогда сброс виден владельцам)
+INSERT INTO "AuthEvent" (id, kind, "userId", "organizationId", details)
+SELECT 'manual-' || replace(gen_random_uuid()::text, '-', ''), 'TWO_FACTOR_RESET', id, "organizationId",
+       '{"by": "manual-sql"}'::jsonb
+FROM "User" WHERE email = 'owner@example.ru' AND "deletedAt" IS NULL;
+
+COMMIT;
+```
+
+Проверить до `COMMIT`: `UPDATE 1`, и что `SELECT "totpEnabledAt" FROM "User" WHERE email = …` пусто.
+После этого владелец входит по паролю и настраивает 2FA заново. Если не знает и
+пароля — сначала «Забыли пароль» на странице входа.
 
 ## Скрипты
 
@@ -118,7 +170,7 @@ app/
 lib/
   access/           единая матрица прав (canDo) — все проверки идут через неё
   services/         бизнес-логика, работает с Prisma напрямую
-  notifications/    email + Telegram, ссылки разводятся по получателю
+  notifications/    email + ВКонтакте + пуш, ссылки разводятся по получателю
                      (agency vs client, см. lib/notifications/links.ts)
   security/         rate-limiting для форм без сессии
 jobs/                фоновые задачи вне HTTP-цикла (напоминания, просрочки,

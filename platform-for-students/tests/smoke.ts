@@ -1846,6 +1846,39 @@ async function main() {
         `/api/service/employer/candidates?crmClientId=${serviceCrmClientId}&vacancyId=no-such-vacancy`,
       );
       check('кандидаты на чужую вакансию — 404', candMissing.status === 404, candMissing.body);
+
+      // Поиск студентов для сотрудников (раздел «Студенты» в CRM)
+      const staffActor = { 'x-crm-actor': 'smoke-staff-actor' };
+      const staffNoAuth = await fetch(`${BASE}/api/service/staff/students`);
+      check('поиск студентов без служебного секрета — отказ', staffNoAuth.status === 401 || staffNoAuth.status === 503);
+      const staffList = await serviceCall('/api/service/staff/students?pageSize=500', { headers: staffActor });
+      check(
+        'поиск студентов: список с общим числом, потолок страницы 50',
+        staffList.status === 200 && staffList.body?.total > 0 && staffList.body.pageSize === 50 && staffList.body.items.length <= 50,
+        staffList.body && { status: staffList.status, total: staffList.body.total, pageSize: staffList.body.pageSize },
+      );
+      const staffText = JSON.stringify(staffList.body);
+      check(
+        'поиск студентов: в списке нет почты, телефона и даты рождения',
+        !/"(email|phone|birthDate|photoUrl|resumeUrl)"/.test(staffText),
+      );
+      const firstStudent = staffList.body?.items?.[0];
+      const staffByName = await serviceCall(`/api/service/staff/students?q=${encodeURIComponent(String(firstStudent?.fullName ?? '').split(' ')[0])}`, { headers: staffActor });
+      check(
+        'поиск студентов: по имени находится тот же студент',
+        staffByName.status === 200 && staffByName.body.items.some((i: any) => i.id === firstStudent?.id),
+        staffByName.body && { status: staffByName.status },
+      );
+      const staffProfile = await serviceCall(`/api/service/staff/students/${firstStudent?.id}`, { headers: staffActor });
+      check('профиль студента без contacts=1 — без контактов', staffProfile.status === 200 && staffProfile.body.contacts === null, staffProfile.body);
+      const staffContacts = await serviceCall(`/api/service/staff/students/${firstStudent?.id}?contacts=1`, { headers: staffActor });
+      check(
+        'профиль студента с contacts=1 — с почтой',
+        staffContacts.status === 200 && typeof staffContacts.body.contacts?.email === 'string' && staffContacts.body.contacts.email.includes('@'),
+        staffContacts.body && { status: staffContacts.status },
+      );
+      const staffNoActor = await serviceCall(`/api/service/staff/students/${firstStudent?.id}?contacts=1`);
+      check('профиль без сотрудника в заголовке — 400', staffNoActor.status === 400, staffNoActor.body);
     }
   }
   // Ветку «секрет не задан» здесь больше не проверить: без STUDENTS_SSO_SECRET
@@ -1865,6 +1898,16 @@ async function main() {
   check('напоминания отключаются', notifyOff.status === 200 && notifyOff.body?.email === false, notifyOff.body);
   check('настройка напоминаний сохраняется', (await student.request('/api/account/notifications')).body?.email === false);
   await student.patch('/api/account/notifications', { email: true });
+
+  // ---------- Статус «в сети»: скрыть его нельзя ----------
+  console.log('\nСтатус «в сети»');
+  for (const [who, session] of [['студент', student], ['работодатель', employer]] as const) {
+    const hide = await session.patch('/api/account/presence', { show: false });
+    check(`${who} не может выключить показ статуса: 403`, hide.status === 403, hide.body);
+    const state = await session.request('/api/account/presence');
+    check(`${who}: показ статуса всегда включён`, state.status === 200 && state.body?.show === true, state.body);
+  }
+  check('гость ручку показа статуса не видит', (await new Session().patch('/api/account/presence', { show: false })).status === 401);
 
   // ---------- Пуш-уведомления ----------
   console.log('\nПуш-уведомления');

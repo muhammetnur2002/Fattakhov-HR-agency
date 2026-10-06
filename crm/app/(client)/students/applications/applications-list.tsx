@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileText, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -81,7 +82,7 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="pill-scroller flex gap-2">
         <Chip active={filter === "all"} onClick={() => setFilter("all")}>
           Все
         </Chip>
@@ -175,6 +176,13 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
                         <p className="text-xs text-muted-foreground">Учёба ещё не подтверждена агентством.</p>
                       )}
                       <div className="flex flex-wrap gap-2 pt-1">
+                        {/* Беседа появится в списке «Сообщения» после первого сообщения или с черновиком */}
+                        <Button asChild size="sm">
+                          <Link href={`/students/messages?thread=${encodeURIComponent(a.id)}`}>
+                            <MessageSquare className="size-4" aria-hidden />
+                            Написать студенту
+                          </Link>
+                        </Button>
                         {NEXT_STEPS.filter((s) => s.status !== a.status).map((s) => (
                           <Button
                             key={s.status}

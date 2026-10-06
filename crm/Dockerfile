@@ -22,6 +22,16 @@ COPY package.json package-lock.json ./
 # в builder и tools package.json приходит заново из репозитория.
 RUN npm pkg delete scripts.postinstall && npm ci
 
+# ============ Клиент базы ============
+# Отдельно от builder: образу tools нужен только сгенерированный клиент
+# Prisma, а не сборка сайта. Пока клиент брался из builder, каждая сборка
+# tools заново собирала весь Next — лишние минуты, — и ошибка в сайте
+# не давала выкатить фоновые задачи
+FROM deps AS prisma-client
+COPY prisma.config.ts ./
+COPY prisma ./prisma
+RUN npx prisma generate
+
 # ============ Сборка ============
 FROM node:24-alpine AS builder
 WORKDIR /app
@@ -54,6 +64,31 @@ ENV NEXT_PUBLIC_YANDEX_METRIKA_ID=$NEXT_PUBLIC_YANDEX_METRIKA_ID
 RUN npx prisma generate
 RUN npm run build
 
+# ============ Сторож: в готовых страницах нет localhost ============
+# Адреса сайта и кабинета (APP_URL, SITE_URL выше) вписываются в страницы
+# сайта при сборке. Сборка без --build-arg запомнила бы запасной
+# http://localhost:3000 из lib/urls.ts — в кнопке «Войти», canonical и карте
+# сайта. Сайт выглядел бы рабочим, а вёл бы в никуда; так было 19.09.2026
+# в прежней версии CRM агентства. Здесь такая сборка останавливается,
+# и образ не попадает в реестр.
+#
+# Смотрим готовые страницы, а не исходники: в серверном коде запасной
+# адрес нужен для разработки и вреда не несёт, пока адреса переданы.
+#
+# Отдельный этап, а не шаг в builder: образ tools берёт из builder
+# только клиент Prisma и собирается без адресов — сторож внутри builder
+# остановил бы и его.
+FROM builder AS checked
+RUN found=$(find .next/server/app -type f \
+      \( -name '*.html' -o -name '*.rsc' -o -name '*.body' -o -name '*.meta' \) \
+      -exec grep -l "http://localhost" {} + || true); \
+    if [ -n "$found" ]; then \
+      echo "ОШИБКА: в готовых страницах зашит localhost — образ собран без адресов." >&2; \
+      echo "Нужны --build-arg APP_URL=... SITE_URL=... STUDENTS_URL=... (как в .github/workflows/images.yml)." >&2; \
+      echo "$found" | head -20 >&2; \
+      exit 1; \
+    fi
+
 # ============ Готовый образ ============
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -79,10 +114,20 @@ ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/yandex-cloud-ca.pem
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
-# Standalone-сборка Next: только фактически используемый код
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# Standalone-сборка Next: только фактически используемый код.
+# Из checked, а не из builder: так сборка образа сайта не может
+# пройти мимо сторожа localhost
+COPY --from=checked --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=checked --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=checked --chown=nextjs:nodejs /app/public ./public
+
+# Словарь слабых паролей (lib/auth/common-passwords.ts читает его с диска по
+# пути от корня процесса). Next трассирует только то, что нашёл в импортах, а
+# текстовый файл, который читают через fs, мог бы не попасть в standalone —
+# и проверка паролей молча сузилась бы до запасного списка. Копируем явно и
+# проверяем, что он целый: десять тысяч строк, а не пустой файл
+COPY --from=checked --chown=nextjs:nodejs /app/lib/auth/common-passwords.txt ./lib/auth/common-passwords.txt
+RUN test "$(wc -l < lib/auth/common-passwords.txt)" -gt 9000
 
 USER nextjs
 
@@ -93,11 +138,12 @@ ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]
 
 # ============ Зависимости без девелоперских ============
-FROM node:24-alpine AS prod-deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-# Без postinstall — по той же причине, что в deps
-RUN npm pkg delete scripts.postinstall && npm ci --omit=dev
+# Пакеты для образа tools — те же, что в deps, без devDependencies.
+# prune убирает лишнее на месте, без второго скачивания всего дерева из
+# сети: повторный `npm ci --omit=dev` срывался на сетевых таймаутах, хотя
+# те же пакеты уже лежали в deps. Набор тот же — оба по одному локу.
+FROM deps AS prod-deps
+RUN npm prune --omit=dev
 
 # ============ Инструменты: миграции и фоновые задачи ============
 #
@@ -129,7 +175,8 @@ RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 worker
 
 COPY --from=prod-deps --chown=worker:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=worker:nodejs /app/lib/generated ./lib/generated
+# Клиент базы — из своего этапа, не из builder: tools не ждёт сборки сайта
+COPY --from=prisma-client --chown=worker:nodejs /app/lib/generated ./lib/generated
 COPY --chown=worker:nodejs package.json prisma.config.ts tsconfig.json ./
 COPY --chown=worker:nodejs prisma ./prisma
 COPY --chown=worker:nodejs jobs ./jobs

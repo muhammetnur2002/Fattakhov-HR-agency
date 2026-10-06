@@ -8,7 +8,7 @@ import { readPortfolio } from '@/lib/portfolio';
 import { readApprovedContent, readVacancyMedia } from '@/lib/vacancy';
 import { prisma } from './prisma-client';
 import { AccountExistsError } from './memory';
-import type { CrmVacancyInput, DataStore, MessageRecord, SyncOutcome } from './types';
+import type { CrmVacancyInput, DataStore, MessageRecord, StudentSearchFilter, SyncOutcome } from './types';
 
 /**
  * Студент из строки базы.
@@ -33,6 +33,29 @@ function toEmployerRecord<T extends Parameters<typeof readCompanyProfile>[0]>(ro
 function uniqueTarget(err: Prisma.PrismaClientKnownRequestError): string {
   const target = err.meta?.target;
   return Array.isArray(target) ? target.join(',') : String(target ?? '');
+}
+
+/** Условия поиска студентов (lib/staff-students.ts) в виде where для Prisma. Только открытые колонки. */
+function studentSearchWhere(filter: StudentSearchFilter): Prisma.StudentWhereInput {
+  const and: Prisma.StudentWhereInput[] = [];
+  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+  if (filter.university) and.push({ university: contains(filter.university) });
+  if (filter.speciality) and.push({ speciality: contains(filter.speciality) });
+  if (filter.city) and.push({ city: contains(filter.city) });
+  if (filter.studyYear !== undefined) and.push({ studyYear: filter.studyYear });
+  if (filter.gender) and.push({ gender: filter.gender });
+  if (filter.birthYearFrom !== undefined) and.push({ birthYear: { gte: filter.birthYearFrom } });
+  if (filter.birthYearTo !== undefined) and.push({ birthYear: { lte: filter.birthYearTo } });
+  if (filter.study === 'VERIFIED') and.push({ studyVerified: true });
+  if (filter.study === 'PENDING') and.push({ studyVerified: false, studyDocUrl: { not: null } });
+  if (filter.study === 'NONE') and.push({ studyVerified: false, studyDocUrl: null });
+  if (filter.status === 'ACTIVE') and.push({ status: { in: ['ACTIVE', 'IN_PROGRESS'] } });
+  if (filter.status === 'PAUSED') and.push({ status: 'PAUSED' });
+  if (filter.status === 'PLACED') and.push({ status: 'PLACED' });
+  if (filter.onlineSince) {
+    and.push({ account: { showPresence: true, lastSeenAt: { gte: filter.onlineSince } } });
+  }
+  return and.length ? { AND: and } : {};
 }
 
 /** Значение для JSON-колонки; undefined оставляет колонку как есть. */
@@ -171,6 +194,50 @@ export function createPrismaStore(): DataStore {
       async list() {
         const rows = await prisma.student.findMany({ orderBy: { createdAt: 'desc' } });
         return rows.map(toStudentRecord);
+      },
+      async search(filter, page) {
+        const where = studentSearchWhere(filter);
+        // Без портфолио: в списке оно не нужно, а JSON-колонки тяжёлые
+        const [rows, total] = await Promise.all([
+          prisma.student.findMany({
+            where,
+            orderBy:
+              page.order === 'university'
+                ? [{ university: 'asc' }, { speciality: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }]
+                : [{ createdAt: 'desc' }, { id: 'asc' }],
+            skip: page.skip,
+            take: page.take,
+            select: {
+              id: true,
+              fullNameEnc: true,
+              gender: true,
+              birthYear: true,
+              birthDateEnc: true,
+              university: true,
+              speciality: true,
+              studyYear: true,
+              studyLevel: true,
+              city: true,
+              skills: true,
+              about: true,
+              status: true,
+              studyVerified: true,
+              studyDocUrl: true,
+              createdAt: true,
+              account: { select: { lastSeenAt: true, showPresence: true } },
+            },
+          }),
+          prisma.student.count({ where }),
+        ]);
+        return {
+          total,
+          rows: rows.map(({ account, studyDocUrl, ...row }) => ({
+            ...row,
+            studyPending: !row.studyVerified && studyDocUrl !== null,
+            lastSeenAt: account.lastSeenAt,
+            showPresence: account.showPresence,
+          })),
+        };
       },
       async setStatus(id, status) {
         await prisma.student.update({ where: { id }, data: { status } });
@@ -803,6 +870,13 @@ export function createPrismaStore(): DataStore {
       async list(limit) {
         const rows = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
         return rows.map((r) => ({ ...r, meta: (r.meta ?? null) as Record<string, unknown> | null }));
+      },
+      async recentExists({ actorLabel, action, entityId, withinMs }) {
+        const row = await prisma.auditLog.findFirst({
+          where: { actorLabel, action, entityId, createdAt: { gte: new Date(Date.now() - withinMs) } },
+          select: { id: true },
+        });
+        return row !== null;
       },
     },
 

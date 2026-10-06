@@ -37,8 +37,10 @@ locals {
   ]
 
   uptime_env = {
-    URLS        = jsonencode(local.uptime_targets)
-    SMTP_URL    = sensitive(trim(trimspace(regex("(?m)^SMTP_URL=(.*)$", local.prod_env)[0]), "\"'"))
+    URLS = jsonencode(local.uptime_targets)
+    # Пароль почты — из prod.tfvars (students_runtime_env), а не из prod.env: правка prod.env
+    # вшивается в cloud-init и пересоздаёт машину CRM, а карта в tfvars меняется обычным apply
+    SMTP_URL    = sensitive(var.students_runtime_env["SMTP_URL"])
     SMTP_FROM   = trim(trimspace(regex("(?m)^SMTP_FROM=(.*)$", local.prod_env)[0]), "\"'")
     ALERT_EMAIL = trim(trimspace(regex("(?m)^ALERT_EMAIL=(.*)$", local.prod_env)[0]), "\"'")
   }

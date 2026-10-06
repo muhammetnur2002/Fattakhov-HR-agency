@@ -6,6 +6,9 @@
  * Сервисы покрыты отдельно (tests/contract-documents.test.ts); здесь то, что видит
  * человек: что кнопка делает, какое сообщение появляется, что закрыто и что нет.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,8 +36,14 @@ import { ContractTemplateManager } from "@/components/clients/contract-template-
 import { ContractUpload } from "@/components/client/contract-upload";
 import { ContractGate } from "@/components/client/contract-gate";
 import { CooperationBanner } from "@/components/client/cooperation-banner";
+import { isContractOnlyPath, type ContractGateAccess } from "@/lib/contract-gate";
 
 const TG = "https://t.me/example";
+
+/** Права ролей клиента на путь к договору — как их считает макет кабинета через canDo. */
+const ADMIN: ContractGateAccess = { chooseTerms: true, documents: true, students: true };
+const HIRING: ContractGateAccess = { chooseTerms: false, documents: false, students: true };
+const VIEWER: ContractGateAccess = { chooseTerms: false, documents: false, students: false };
 
 /**
  * Отправка формы событием: в jsdom обязательное файловое поле считается пустым, даже когда файл
@@ -107,7 +116,7 @@ describe("замок на разделах агентства", () => {
   it("без договора закрытый раздел размыт, а причина и кнопка на виду", () => {
     pathname.current = "/candidates";
     render(
-      <ContractGate state="none" telegramHref={TG}>
+      <ContractGate state="none" access={ADMIN} telegramHref={TG}>
         <p>Содержимое раздела</p>
       </ContractGate>,
     );
@@ -119,11 +128,11 @@ describe("замок на разделах агентства", () => {
   });
 
   it("«Документы» и студенческая платформа не закрыты", () => {
-    for (const path of ["/documents", "/students", "/settings", "/dashboard"]) {
+    for (const path of ["/documents", "/students", "/settings", "/dashboard", "/messages"]) {
       cleanup();
       pathname.current = path;
       render(
-        <ContractGate state="none" telegramHref={TG}>
+        <ContractGate state="none" access={ADMIN} telegramHref={TG}>
           <p>Открытый раздел</p>
         </ContractGate>,
       );
@@ -132,20 +141,10 @@ describe("замок на разделах агентства", () => {
     }
   });
 
-  it("«Сообщения» с командой закрыты вместо «Документов»", () => {
-    pathname.current = "/messages";
-    render(
-      <ContractGate state="none" telegramHref={TG}>
-        <p>Переписка</p>
-      </ContractGate>,
-    );
-    expect(screen.getByText("Раздел откроется после договора")).toBeInTheDocument();
-  });
-
   it("ждём подтверждения: другой текст и без кнопки выбора тарифа", () => {
     pathname.current = "/analytics";
     render(
-      <ContractGate state="pending" telegramHref={TG}>
+      <ContractGate state="pending" access={ADMIN} telegramHref={TG}>
         <p>Отчёты</p>
       </ContractGate>,
     );
@@ -153,10 +152,51 @@ describe("замок на разделах агентства", () => {
     expect(screen.queryByRole("link", { name: "Выбрать тариф" })).not.toBeInTheDocument();
   });
 
+  it("нанимающему менеджеру — без «Документов» и выбора тарифа: туда ему не войти", () => {
+    pathname.current = "/vacancies/new";
+    render(
+      <ContractGate state="none" access={HIRING} telegramHref={TG}>
+        <p>Новая заявка</p>
+      </ContractGate>,
+    );
+    expect(screen.getByText(/Договор оформляет администратор вашей компании/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Договор в «Документах»/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Выбрать тариф" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Скачайте шаблон/)).not.toBeInTheDocument();
+    expect(screen.getByText("Студенческая платформа и сообщения доступны уже сейчас.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Обсудить с нами" })).toHaveAttribute("href", TG);
+  });
+
+  it("наблюдателю не обещаны ни документы, ни студенческая платформа, только сообщения", () => {
+    pathname.current = "/candidates";
+    render(
+      <ContractGate state="pending" access={VIEWER} telegramHref={TG}>
+        <p>Кандидаты</p>
+      </ContractGate>,
+    );
+    expect(screen.getByText(/Администратор вашей компании выбрал условия/)).toBeInTheDocument();
+    // Сообщения открыты всем; студенческая платформа и документы наблюдателю не обещаны
+    expect(screen.getByText("Сообщения доступны уже сейчас: напишите команде агентства.")).toBeInTheDocument();
+    expect(screen.queryByText(/Студенческая платформа/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/«Документы»/)).not.toBeInTheDocument();
+  });
+
+  it("дашборд на подтверждении не зовёт отправить заявку, пока «Вакансии» под замком", () => {
+    // Замок закрывает новую заявку и при договоре на подтверждении…
+    expect(isContractOnlyPath("/vacancies/new")).toBe(true);
+    // …и плашка дашборда об этом же состоянии не обещает обратного
+    const dashboard = readFileSync(
+      path.join(__dirname, "..", "..", "app", "(client)", "dashboard", "page.tsx"),
+      "utf8",
+    );
+    expect(dashboard).toContain("Условия сотрудничества на подтверждении");
+    expect(dashboard).not.toMatch(/заявку[^.]{0,80}можно уже\s+сейчас/);
+  });
+
   it("с действующим договором ничего не закрыто", () => {
     pathname.current = "/vacancies";
     render(
-      <ContractGate state="active" telegramHref={TG}>
+      <ContractGate state="active" access={ADMIN} telegramHref={TG}>
         <p>Вакансии клиента</p>
       </ContractGate>,
     );
@@ -166,23 +206,40 @@ describe("замок на разделах агентства", () => {
 });
 
 describe("плашка про условия сотрудничества", () => {
+  it("не администратору — кто выбирает условия, и без кнопки выбора", () => {
+    pathname.current = "/dashboard";
+    render(<CooperationBanner state="none" access={HIRING} telegramHref={TG} />);
+    expect(
+      screen.getByText(/Условия сотрудничества выбирает администратор вашей компании/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Выбрать условия" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/документы доступны/)).not.toBeInTheDocument();
+  });
+
+  it("администратору — шаблон в «Документах» и выбор условий", () => {
+    pathname.current = "/dashboard";
+    render(<CooperationBanner state="none" access={ADMIN} telegramHref={TG} />);
+    expect(screen.getByText(/в документах — шаблон договора/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Выбрать условия" })).toHaveAttribute("href", "/onboarding");
+  });
+
   it("на открытой странице закрывается и больше не возвращается", async () => {
     pathname.current = "/students";
-    const { unmount } = render(<CooperationBanner state="none" telegramHref={TG} />);
+    const { unmount } = render(<CooperationBanner state="none" access={ADMIN} telegramHref={TG} />);
     expect(screen.getByText("Условия сотрудничества ещё не выбраны")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Скрыть" }));
     expect(screen.queryByText("Условия сотрудничества ещё не выбраны")).not.toBeInTheDocument();
 
     unmount();
-    render(<CooperationBanner state="none" telegramHref={TG} />);
+    render(<CooperationBanner state="none" access={ADMIN} telegramHref={TG} />);
     expect(screen.queryByText("Условия сотрудничества ещё не выбраны")).not.toBeInTheDocument();
   });
 
   it("на закрытой странице стоит всегда и крестика нет", () => {
     localStorage.setItem("coop-banner-dismissed", "none");
     pathname.current = "/calendar";
-    render(<CooperationBanner state="none" telegramHref={TG} />);
+    render(<CooperationBanner state="none" access={ADMIN} telegramHref={TG} />);
     expect(screen.getByText("Условия сотрудничества ещё не выбраны")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Скрыть" })).not.toBeInTheDocument();
   });

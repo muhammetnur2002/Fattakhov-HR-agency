@@ -150,16 +150,10 @@ function buildSummary(
     counterpartPhotoUrl: counterpart.photoUrl,
     counterpartSubtitle: counterpart.subtitle,
     // Право видеть статус здесь уже доказано: loadContext пускает дальше
-    // только участников отклика. Остаётся учесть собственный выбор
-    // человека — выключенный показ скрывает статус и от собеседника
+    // только участников отклика. Скрыть статус собеседник не может —
+    // сохранённое showPresence не читается (lib/presence.ts)
     counterpartLastSeen:
-      visibleLastSeen(
-        {
-          lastSeenAt: ctx.counterpartAccount?.lastSeenAt ?? null,
-          showPresence: ctx.counterpartAccount?.showPresence ?? true,
-        },
-        true,
-      )?.toISOString() ?? null,
+      visibleLastSeen({ lastSeenAt: ctx.counterpartAccount?.lastSeenAt ?? null }, true)?.toISOString() ?? null,
     status: application.status,
     lastMessageBody: last ? preview(decryptSafe(last.bodyEnc, '…')) : null,
     lastMessageAuthor: last?.author ?? null,

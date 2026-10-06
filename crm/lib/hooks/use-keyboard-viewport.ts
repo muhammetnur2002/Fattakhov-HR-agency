@@ -14,7 +14,17 @@ const MOBILE_MAX_WIDTH = 767;
  * поверх страницы и закрывает поле ввода и последние сообщения. Пока клавиатура
  * открыта, экран переписки закрепляется по видимой области (visualViewport) —
  * между верхом и клавиатурой, — а шапка кабинета скрывается, чтобы не отнимать
- * место (см. globals.css). После закрытия всё возвращается как было.
+ * место (см. globals.css). Нижняя панель разделов в это время тоже уезжает
+ * (правило про data-bottom-tabs там же): поле ввода в фокусе. После закрытия
+ * всё возвращается как было.
+ *
+ * Пока экран закреплён, его собственные отступы из обычной раскладки
+ * не действуют: отрицательные поля, которыми он гасит отступы main, у
+ * fixed-элемента с left/right/top сдвинули бы его за края экрана (на 16px
+ * влево, вправо и вверх), а отступ под полосу «Домой» оставил бы пустую
+ * полосу над клавиатурой — её и так закрывает клавиатура. Высоту под
+ * нижнюю панель экран держит своей высотой, а её здесь задаёт видимая
+ * область — двойного вычета нет.
  */
 export function useKeyboardViewport(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -22,7 +32,24 @@ export function useKeyboardViewport(ref: RefObject<HTMLElement | null>) {
     const vv = window.visualViewport;
     if (!el || !vv) return;
     const html = document.documentElement;
-    const props = ["position", "top", "left", "right", "height", "z-index", "background"];
+    const props = [
+      "position",
+      "top",
+      "left",
+      "right",
+      "height",
+      "z-index",
+      "background",
+      // Снимается и сокращённая запись, и стороны по отдельности: хранят
+      // их реализации по-разному (jsdom после removeProperty("margin")
+      // оставляет стороны, а после снятия сторон — саму запись)
+      "margin",
+      "margin-top",
+      "margin-right",
+      "margin-bottom",
+      "margin-left",
+      "padding-bottom",
+    ];
 
     function release() {
       if (!el) return;
@@ -45,6 +72,8 @@ export function useKeyboardViewport(ref: RefObject<HTMLElement | null>) {
       el.style.height = `${Math.floor(vv.height)}px`;
       el.style.zIndex = "40";
       el.style.background = "var(--background)";
+      el.style.margin = "0";
+      el.style.paddingBottom = "0";
     }
 
     vv.addEventListener("resize", sync);

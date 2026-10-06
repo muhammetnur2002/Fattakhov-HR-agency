@@ -2,6 +2,7 @@ import "server-only";
 
 import type { FunnelActivity } from "@/lib/students-funnel";
 import { prisma } from "@/lib/db/prisma";
+import { isDeliverableEmail } from "@/lib/notifications/deliverable";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import { studentsUrl } from "@/lib/urls";
 
@@ -183,6 +184,32 @@ function scopedClientId(path: string, init?: RequestInit): string | null {
 }
 
 /**
+ * Кого отдать платформе контактом компании. Платформа пишет на эту почту
+ * (отклики студентов, решения по вакансиям) и закрепляет её за компанией
+ * насовсем: повторный ensure контакт не перезаписывает. Поэтому только
+ * настоящая почта — не заглушка быстрой регистрации (…@users.invalid, вход
+ * по телефону): письма уходили бы в никуда, а в адресе
+ * заглушки ещё и цифры номера. Нет такой почты — нет и контакта.
+ */
+function studentsContact<T extends { email: string; role: string }>(users: T[]): T | null {
+  const reachable = users.filter((u) => isDeliverableEmail(u.email));
+  return reachable.find((u) => u.role === "CLIENT_ADMIN") ?? reachable[0] ?? null;
+}
+
+/**
+ * Можно ли открыть клиенту студенческий раздел: есть ли у компании
+ * рабочая почта для платформы (см. studentsContact). Пока нет, раздел
+ * просит подтвердить почту в настройках, а не падает на первом запросе.
+ */
+export async function hasStudentsContact(crmClientId: string): Promise<boolean> {
+  const users = await prisma.user.findMany({
+    where: { clientId: crmClientId, isActive: true },
+    select: { email: true, role: true },
+  });
+  return studentsContact(users) !== null;
+}
+
+/**
  * Компания клиента появлялась на платформе только при его первом входе туда
  * билетом. Теперь клиент работает из CRM и туда не заходит, поэтому первый же
  * запрос за вакансиями получал 404. Перед обращением заводим компанию сами
@@ -206,7 +233,7 @@ async function ensureEmployer(crmClientId: string): Promise<void> {
   const known = provisioned.get(crmClientId);
   if (known && known.active === active && Date.now() - known.at < PROVISION_TTL_MS) return;
 
-  const contact = client.users.find((u) => u.role === "CLIENT_ADMIN") ?? client.users[0];
+  const contact = studentsContact(client.users);
   if (!contact) return;
 
   const response = await rawCall("/api/service/employer/ensure", {
@@ -721,4 +748,135 @@ export async function inviteStudentCandidate(input: {
   const response = await call("/api/service/employer/candidates", { method: "POST", body: JSON.stringify(input) });
   if (!response.ok) return { error: await parseError(response) };
   return { invited: ((await response.json()) as { invited: boolean }).invited };
+}
+
+// ============ Раздел «Студенты» (поиск для подбора, сотрудники агентства) ============
+
+/** Строка списка — без почты, телефона, даты рождения и ссылок на файлы: их платформа не отдаёт. */
+export interface PlatformStudentItem {
+  id: string;
+  fullName: string;
+  age: number;
+  gender: "MALE" | "FEMALE" | "UNSPECIFIED";
+  university: string;
+  speciality: string;
+  studyYear: number;
+  studyLevel: string | null;
+  city: string | null;
+  skills: string[];
+  about: string | null;
+  status: "ACTIVE" | "IN_PROGRESS" | "PLACED" | "PAUSED";
+  studyVerified: boolean;
+  studyPending: boolean;
+  paused: boolean;
+  placed: boolean;
+  createdAt: string;
+  /** null — не появлялся или скрыл показ: платформа не различает */
+  lastSeenAt: string | null;
+}
+
+export interface PlatformStudentSearch {
+  items: PlatformStudentItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  /** Подсказка вместо результатов или рядом с ними: «уточните фильтры» */
+  hint: string | null;
+}
+
+export interface PlatformStudentProfile extends PlatformStudentItem {
+  institutionId: string | null;
+  workDays: string[];
+  hoursPerWeek: number | null;
+  lookingFor: string[];
+  goals: string | null;
+  projects: { title: string; description: string | null; link: string | null }[];
+  achievements: { title: string; description: string | null; year: number | null }[];
+  activities: { kind: string; title: string; description: string | null }[];
+  hobbies: string | null;
+  links: { label: string; url: string }[];
+  videoUrl: string | null;
+  hasPhoto: boolean;
+  hasResume: boolean;
+  resumeName: string | null;
+  /** Только при contacts=1 */
+  contacts: { email: string; phone: string | null } | null;
+}
+
+/** Дольше платформу не ждём: страница с поиском не должна висеть вместе с ней. */
+const STAFF_TIMEOUT_MS = 10_000;
+
+/** Платформа просит подождать: лимит запросов на сотрудника. */
+export class StudentsRateLimitedError extends StudentsServiceError {}
+
+/**
+ * Служебный вызов от имени сотрудника: платформа по x-crm-actor ведёт лимит и журнал
+ * просмотров анкет. Сеть и таймаут превращаются в StudentsServiceError, как и ответ с
+ * ошибкой, — страницы показывают «платформа не ответила», а не падают.
+ */
+async function staffCall(path: string, actorId: string): Promise<Response> {
+  let response: Response;
+  try {
+    response = await rawCall(path, {
+      headers: { "x-crm-actor": actorId },
+      signal: AbortSignal.timeout(STAFF_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error instanceof StudentsServiceError) throw error;
+    throw new StudentsServiceError("Студенческая платформа не отвечает.");
+  }
+  if (response.status === 429) {
+    throw new StudentsRateLimitedError("Слишком много запросов к студенческой платформе — подождите минуту.");
+  }
+  return response;
+}
+
+/** Страница списка студентов. Параметры уже проверены (lib/students-search-params.ts). */
+export async function searchPlatformStudents(
+  query: URLSearchParams,
+  actorId: string,
+): Promise<PlatformStudentSearch> {
+  const qs = query.toString();
+  const response = await staffCall(`/api/service/staff/students${qs ? `?${qs}` : ""}`, actorId);
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  return (await response.json()) as PlatformStudentSearch;
+}
+
+/**
+ * Профиль студента. Контакты — только при `contacts: true`: это отдельное явное действие
+ * сотрудника, и вызывающий обязан записать его в журнал доступа к ПДн. null — студента нет.
+ */
+export async function fetchPlatformStudent(
+  id: string,
+  options: { actorId: string; contacts?: boolean },
+): Promise<PlatformStudentProfile | null> {
+  const response = await staffCall(
+    `/api/service/staff/students/${segment(id)}${options.contacts ? "?contacts=1" : ""}`,
+    options.actorId,
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  return (await response.json()) as PlatformStudentProfile;
+}
+
+/**
+ * Названия вузов из справочника платформы — подсказки в фильтре. Справочник открытый, без
+ * секрета; недоступен — фильтр остаётся обычным текстовым полем.
+ */
+export async function fetchInstitutionNames(): Promise<string[]> {
+  const url = studentsUrl("/api/institutions");
+  if (!url) return [];
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(3_000), next: { revalidate: 3600 } });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { institutions?: { name: string; shortName: string | null }[] };
+    const names = new Set<string>();
+    for (const item of data.institutions ?? []) {
+      names.add(item.name);
+      if (item.shortName) names.add(item.shortName);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, "ru"));
+  } catch {
+    return [];
+  }
 }

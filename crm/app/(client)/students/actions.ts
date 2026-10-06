@@ -7,11 +7,19 @@ import { getActiveAgreement } from "@/lib/services/agreements";
 import { getCompanyProfile } from "@/lib/services/company-profile";
 import { pushCompanyProfile } from "@/lib/services/company-sync";
 import { prisma } from "@/lib/db/prisma";
+import { guardRate, rateLimitMessage } from "@/lib/security/guard";
+import {
+  DRAFT_MAX_LENGTH,
+  deleteStudentDraft,
+  getStudentDraft,
+  loadEmployerThreadList,
+  saveStudentDraft,
+} from "@/lib/services/student-drafts";
+import type { StudentThreadItem, StudentThreadView } from "@/lib/students-threads";
 import {
   actOnEmployerVacancy,
   createEmployerVacancy,
   fetchStudentThread,
-  fetchStudentThreads,
   inviteStudentCandidate,
   markEmployerApplicationViewed,
   markStudentThreadRead,
@@ -19,7 +27,6 @@ import {
   setEmployerApplicationStatus,
   updateEmployerVacancy,
   type StudentThread,
-  type StudentThreadSummary,
   type StudentsApplicationStatus,
   type VacancyFields,
 } from "@/lib/students-service";
@@ -194,28 +201,68 @@ export async function applicationAction(
   return {};
 }
 
-/** Ветка целиком — для живого обновления открытой переписки. */
-export async function loadThreadAction(applicationId: string): Promise<StudentThread | null> {
+/** Ветка целиком — для живого обновления открытой переписки; с черновиком этого пользователя. */
+export async function loadThreadAction(applicationId: string): Promise<StudentThreadView | null> {
   const actor = await requireClientActor();
   authorize(actor, "students.enterAsClient");
   if (!actor.clientId) return null;
   try {
-    return await fetchStudentThread(actor.clientId, applicationId);
+    const thread = await fetchStudentThread(actor.clientId, applicationId);
+    if (!thread) return null;
+    const draft = await getStudentDraft(actor.id, applicationId);
+    return { ...thread, draft: draft?.body ?? "" };
   } catch {
     return null;
   }
 }
 
-/** Список диалогов — то же, для опроса раз в несколько секунд. */
-export async function loadThreadsAction(): Promise<StudentThreadSummary[] | null> {
+/**
+ * Список диалогов — то же, для опроса раз в несколько секунд. Только беседы
+ * с сообщениями или с черновиком этого пользователя (см. lib/students-threads.ts).
+ */
+export async function loadThreadsAction(): Promise<StudentThreadItem[] | null> {
   const actor = await requireClientActor();
   authorize(actor, "students.enterAsClient");
   if (!actor.clientId) return null;
   try {
-    return await fetchStudentThreads(actor.clientId);
+    return (await loadEmployerThreadList(actor.id, actor.clientId)).items;
   } catch {
     return null;
   }
+}
+
+/**
+ * Автосохранение черновика сообщения студенту: пустой текст — удаление.
+ * Отклик должен принадлежать клиенту этого пользователя: платформа чужую
+ * беседу клиенту не отдаёт (404), и черновик на неё не создаётся. Проверка
+ * — один поход на платформу при первой записи; уже сохранённый черновик
+ * доказал принадлежность раньше, повторять её на каждое нажатие незачем.
+ */
+export async function saveStudentDraftAction(applicationId: string, body: string): Promise<{ error?: string }> {
+  const actor = await requireClientActor();
+  authorize(actor, "students.enterAsClient");
+  if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
+
+  const limit = await guardRate("draft", actor.id);
+  if (!limit.allowed) return { error: rateLimitMessage(limit.retryAfter) };
+
+  if (body.trim() === "") {
+    await deleteStudentDraft(actor.id, applicationId);
+    return {};
+  }
+  if (body.length > DRAFT_MAX_LENGTH) return { error: `Не длиннее ${DRAFT_MAX_LENGTH} символов` };
+
+  if (!(await getStudentDraft(actor.id, applicationId))) {
+    let thread: StudentThread | null;
+    try {
+      thread = await fetchStudentThread(actor.clientId, applicationId);
+    } catch {
+      return { error: "Не удалось проверить переписку" };
+    }
+    if (!thread) return { error: "Переписка не найдена" };
+  }
+  await saveStudentDraft(actor.id, applicationId, body);
+  return {};
 }
 
 export async function sendStudentMessageAction(applicationId: string, body: string): Promise<{ error?: string }> {
@@ -225,6 +272,8 @@ export async function sendStudentMessageAction(applicationId: string, body: stri
   const label = await actorLabel(actor.id);
   const result = await sendStudentMessage({ crmClientId: actor.clientId, actor: label, applicationId, body });
   if (result.error) return { error: result.error.fields?.body ?? result.error.error ?? "Не удалось отправить" };
+  // Ушло — черновик больше не нужен: беседа остаётся в списке уже из-за сообщения
+  await deleteStudentDraft(actor.id, applicationId);
   return {};
 }
 

@@ -41,14 +41,31 @@ function RecruiterDashboardTiles() {
   );
 }
 
+// Ряд ищем по разделителям-зазорам (gap-px), а не по числу колонок на
+// телефоне: раньше там была одна колонка, и тест находил ряд именно по
+// «grid-cols-1», а теперь на телефоне две (grid-cols-2)
+function statRow(container: HTMLElement): Element {
+  const row = container.querySelector('[class*="gap-px"]');
+  if (!row) throw new Error("ряд плиток (gap-px) не найден");
+  return row;
+}
+
 function gridColsClass(container: HTMLElement): string {
-  const row = container.querySelector('[class*="grid-cols-1"]');
-  const match = row?.className.match(/lg:grid-cols-\d/);
+  const match = statRow(container).className.match(/lg:grid-cols-\d/);
   if (!match) throw new Error("lg:grid-cols-N не найден в className ряда");
   return match[0];
 }
 
 describe("StatRow: число колонок", () => {
+  it("на телефоне — две колонки, а не по плитке в строку", () => {
+    // Одна плитка в строку — три показателя из восьми на экране телефона,
+    // остальное за двумя прокрутками (замер 22.09.2026 в CRM агентства)
+    const { container } = render(<RecruiterDashboardTiles />);
+    const classes = statRow(container).className.split(/\s+/);
+    expect(classes).toContain("grid-cols-2");
+    expect(classes).not.toContain("grid-cols-1");
+  });
+
   it("пять видимых плиток — пять колонок, а не три", () => {
     const { container } = render(<RecruiterDashboardTiles />);
     expect(gridColsClass(container)).toBe("lg:grid-cols-5");

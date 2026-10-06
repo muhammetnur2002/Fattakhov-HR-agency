@@ -39,7 +39,15 @@ export function VacancyStatusBadge({ status }: { status: VacancyStatus }) {
         ? "destructive"
         : "secondary";
 
-  return <Badge variant={variant}>{VACANCY_STATUS_LABELS[status]}</Badge>;
+  // max-w-full и truncate: в узкой колонке сетки (xl, minmax(0,1fr))
+  // длинный статус вроде «Заявка отправлена» иначе срезался бы краем
+  // карточки — без многоточия и без полосы прокрутки. Полный текст —
+  // в подсказке
+  return (
+    <Badge variant={variant} className="max-w-full" title={VACANCY_STATUS_LABELS[status]}>
+      <span className="truncate">{VACANCY_STATUS_LABELS[status]}</span>
+    </Badge>
+  );
 }
 
 export function VacancyList({
@@ -65,77 +73,102 @@ export function VacancyList({
 
   return (
     <div className="grid gap-3">
-      {vacancies.map((v) => (
-        <Link key={v.id} href={`${hrefBase}/${v.id}`}>
-          <Card className="transition-colors hover:border-primary/40">
-            {/*
-              Сетка на широком экране, перенос строк на узком.
+      {vacancies.map((v) => {
+        const location =
+          [
+            showClient ? v.client.name : v.department,
+            v.city,
+            v.headcount > 1 ? `${v.headcount} чел.` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || "Детали не заполнены";
+        const candidates =
+          v._count.applications > 0
+            ? `${v._count.applications} кандидатов`
+            : "Кандидатов нет";
 
-              Раньше строка всегда была flex-рядом с одной растягивающейся
-              колонкой — названием. Весь избыток ширины уходил в неё одну,
-              и на ноутбуке между названием и вилкой зияла пустота
-              в сотни пикселей. Ограничение max-w на странице это прятало,
-              но ценой трети неиспользованного экрана справа.
-
-              Доли вместо фиксированных ширин: избыток делится между всеми
-              колонками, а не копится в одном месте. Колонки при этом
-              по-прежнему совпадают между карточками — ради чего фиксированные
-              ширины и заводились.
-
-              Раньше вилка, срочность, число кандидатов и статус лежали
-              в одной flex-строке и появлялись через один — не у каждой
-              вакансии есть вилка, срочность высокая не у всех. Каждый
-              пропуск сдвигал всё, что после него, и колонки не совпадали
-              между карточками. Теперь у зарплаты и числа кандидатов
-              фиксированная ширина (прочерк вместо пропуска), а срочность
-              переехала под название — там ей не с чем конкурировать
-              за место в строке.
-            */}
-            <CardContent
-              className="
-                flex flex-wrap items-center gap-x-6 gap-y-2 p-4
-                xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
-              "
-            >
-              <div className="min-w-56 flex-1 xl:min-w-0">
-                <div className="font-medium">
-                  <span className="text-muted-foreground">№{v.number}</span>{" "}
-                  {v.title}
+        return (
+          <Link key={v.id} href={`${hrefBase}/${v.id}`}>
+            <Card className="transition-colors hover:border-primary/40">
+              <CardContent>
+                {/*
+                  Ниже xl — четыре строки одна под другой, каждая своя
+                  роль: номер+название, место+срочность, вилка слева и
+                  число кандидатов справа на одной строке, статус.
+                  Раньше это была одна flex-строка с переносом (ниже,
+                  под xl:grid) — на телефоне почти ничего не помещалось
+                  рядом, и то, что переносилось, сохраняло свой text-right
+                  из строчной раскладки: вилка и число кандидатов повисали
+                  по центру карточки, а не выстраивались в линию. Слова
+                  не «вразброс», а по строкам — то, что и просили.
+                */}
+                <div className="flex flex-col gap-1.5 xl:hidden">
+                  <div className="font-medium">
+                    <span className="text-muted-foreground">№{v.number}</span>{" "}
+                    {v.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {location} · {URGENCY_LABELS[v.urgency]}
+                  </div>
+                  <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
+                    <span>{formatSalary(v.salaryFrom, v.salaryTo) ?? "—"}</span>
+                    <span>{candidates}</span>
+                  </div>
+                  <div>
+                    <VacancyStatusBadge status={v.status} />
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {[
-                    showClient ? v.client.name : v.department,
-                    v.city,
-                    v.headcount > 1 ? `${v.headcount} чел.` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "Детали не заполнены"}
+
+                {/*
+                  Сетка на широком экране (xl и шире).
+
+                  Раньше строка всегда была flex-рядом с одной растягивающейся
+                  колонкой — названием. Весь избыток ширины уходил в неё одну,
+                  и на ноутбуке между названием и вилкой зияла пустота
+                  в сотни пикселей. Ограничение max-w на странице это прятало,
+                  но ценой трети неиспользованного экрана справа.
+
+                  Доли вместо фиксированных ширин: избыток делится между всеми
+                  колонками, а не копится в одном месте. Колонки при этом
+                  по-прежнему совпадают между карточками — ради чего фиксированные
+                  ширины и заводились.
+                */}
+                <div className="hidden xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] xl:items-center xl:gap-x-6">
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      <span className="text-muted-foreground">№{v.number}</span>{" "}
+                      {v.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {location}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Срочность: {URGENCY_LABELS[v.urgency]}
+                    </div>
+                  </div>
+
+                  <div className="text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground">
+                    {formatSalary(v.salaryFrom, v.salaryTo) ?? "—"}
+                  </div>
+
+                  <div className="text-right text-sm whitespace-nowrap text-muted-foreground">
+                    {candidates}
+                  </div>
+
+                  {/* Без фиксированной ширины: это настоящая grid-колонка
+                      (minmax(0,1fr)), её ширину задаёт сетка, а не контент —
+                      в отличие от прежней flex-строки, где «Закрыта без
+                      найма» и «В работе» забирали разное место и колонка
+                      зарплаты левее них гуляла между карточками. */}
+                  <div className="justify-self-end">
+                    <VacancyStatusBadge status={v.status} />
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Срочность: {URGENCY_LABELS[v.urgency]}
-                </div>
-              </div>
-
-              <div className="w-32 shrink-0 text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground xl:w-auto xl:shrink">
-                {formatSalary(v.salaryFrom, v.salaryTo) ?? "—"}
-              </div>
-
-              <div className="w-28 shrink-0 text-right text-sm whitespace-nowrap text-muted-foreground xl:w-auto xl:shrink">
-                {v._count.applications > 0
-                  ? `${v._count.applications} кандидатов`
-                  : "Кандидатов нет"}
-              </div>
-
-              {/* Тоже фиксированная ширина: «Закрыта без найма» у одной
-                  строки против «В работе» у другой иначе забирали разное
-                  место, и колонка зарплаты левее неё гуляла между карточками */}
-              <div className="w-40 shrink-0 text-right xl:w-auto xl:shrink">
-                <VacancyStatusBadge status={v.status} />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      ))}
+              </CardContent>
+            </Card>
+          </Link>
+        );
+      })}
     </div>
   );
 }

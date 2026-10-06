@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarDays,
   ChartLine,
+  CircleHelp,
   FileText,
   GraduationCap,
   Inbox,
@@ -37,6 +38,7 @@ export const NAV_ICONS = {
   GraduationCap,
   ShieldCheck,
   Settings,
+  CircleHelp,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

@@ -3,16 +3,21 @@
 import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
-import { requireAgencyActor } from "@/lib/auth/session";
+import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { inviteResultMessage, InviteError } from "@/lib/services/invitations";
+import { resetStaffTwoFactor, TwoFactorError } from "@/lib/services/two-factor";
 import {
   createStaffAccount,
+  inviteStaff,
   resetStaffPassword,
+  revokeStaffInvitation,
   setStaffActive,
   StaffError,
   updateStaff,
 } from "@/lib/services/staff";
 import {
   createStaffSchema,
+  inviteStaffSchema,
   resetStaffPasswordSchema,
   updateStaffSchema,
 } from "@/lib/validation/staff";
@@ -44,7 +49,7 @@ function explain(error: unknown): TeamFormState | null {
         "Недостаточно прав: назначать можно роли не выше своей и только те доступы, что есть у вас.",
     };
   }
-  if (error instanceof StaffError) {
+  if (error instanceof StaffError || error instanceof InviteError || error instanceof TwoFactorError) {
     return { error: error.message };
   }
   return null;
@@ -100,6 +105,31 @@ export async function resetStaffPasswordAction(
   return { ok: "Пароль обновлён — сообщите его сотруднику лично" };
 }
 
+/**
+ * Сбросить 2FA сотруднику, потерявшему телефон и коды восстановления.
+ * Только владелец и только чужой учётке (см. resetStaffTwoFactor); сотрудник
+ * при следующем входе настраивает 2FA заново.
+ */
+export async function resetStaffTwoFactorAction(
+  _prev: TeamFormState,
+  formData: FormData,
+): Promise<TeamFormState> {
+  const actor = await requireAgencyActor();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "Сотрудник не найден" };
+
+  try {
+    await resetStaffTwoFactor(actor, userId);
+  } catch (error) {
+    const known = explain(error);
+    if (known) return known;
+    throw error;
+  }
+
+  revalidatePath("/a/team");
+  return { ok: "2FA сброшена: сотрудник войдёт и настроит её заново" };
+}
+
 export async function updateStaffAction(
   _prev: TeamFormState,
   formData: FormData,
@@ -140,4 +170,62 @@ export async function setStaffActiveAction(
 
   revalidatePath("/a/team");
   return { ok: active ? "Доступ возвращён" : "Доступ отключён" };
+}
+
+/**
+ * Позвать сотрудника письмом: пароль он задаёт сам по ссылке. Рядом
+ * с созданием аккаунта, а не вместо него — права те же, роль не выше
+ * своей и доступы только свои (inviteStaff).
+ */
+export async function inviteStaffAction(
+  _prev: TeamFormState,
+  formData: FormData,
+): Promise<TeamFormState> {
+  const actor = await requireAgencyActor();
+  const parsed = inviteStaffSchema.safeParse(readForm(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+  }
+
+  try {
+    await inviteStaff(actor, parsed.data);
+  } catch (error) {
+    const known = explain(error);
+    if (known) return known;
+    throw error;
+  }
+
+  revalidatePath("/a/team");
+  return { ok: inviteResultMessage(parsed.data.email) };
+}
+
+/**
+ * Отозвать неотвеченное приглашение в команду.
+ *
+ * Без права на команду — 404 до всякого поиска (как у самой страницы).
+ * Дальше отказ звучит сообщением, как у соседних действий: приглашения
+ * своей организации на этой странице и так видны, скрывать нечего,
+ * а чужое или клиентское приглашение сервис не находит вовсе — ответ
+ * тот же, что на выдуманный id.
+ */
+export async function revokeStaffInvitationAction(
+  _prev: TeamFormState,
+  formData: FormData,
+): Promise<TeamFormState> {
+  const actor = await requireAgencyActor();
+  authorize(actor, "staff.manage");
+
+  try {
+    await revokeStaffInvitation(actor, String(formData.get("id") || ""));
+  } catch (error) {
+    if (error instanceof AccessDeniedError) {
+      return { error: "Недостаточно прав: отзывать можно приглашения на роли не выше своей." };
+    }
+    const known = explain(error);
+    if (known) return known;
+    throw error;
+  }
+
+  revalidatePath("/a/team");
+  return {};
 }

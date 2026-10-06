@@ -12,6 +12,8 @@ import {
   type Subject,
 } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
+import { TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
+import { twoFactorGate } from "@/lib/services/two-factor";
 
 /**
  * Текущий пользователь как Actor для слоя прав.
@@ -23,52 +25,98 @@ import { prisma } from "@/lib/db/prisma";
  * cache() схлопывает вызовы в пределах одного рендера, так что запрос
  * выполняется один раз, сколько бы компонентов ни спросили актора.
  */
-export const getActor = cache(async (): Promise<Actor | null> => {
-  const session = await auth();
-  if (!session?.user?.id) return null;
+const loadSession = cache(
+  async (): Promise<{ actor: Actor; twoFactor: "ok" | "setup" } | null> => {
+    const session = await auth();
+    if (!session?.user?.id) return null;
 
-  const user = await prisma.user.findFirst({
-    where: { id: session.user.id, isActive: true },
-    select: {
-      id: true,
-      organizationId: true,
-      role: true,
-      clientId: true,
-      grants: true,
-      passwordChangedAt: true,
-    },
-  });
-  if (!user) return null;
+    const user = await prisma.user.findFirst({
+      where: { id: session.user.id, isActive: true },
+      select: {
+        id: true,
+        organizationId: true,
+        role: true,
+        clientId: true,
+        grants: true,
+        passwordChangedAt: true,
+        totpEnabledAt: true,
+      },
+    });
+    if (!user) return null;
 
-  // Сессия, выпущенная до смены пароля, больше не действует. Секунда
-  // запаса: время выпуска округляется до секунды, и без неё сессия,
-  // созданная тем же запросом, что сменил пароль, погасила бы сама себя.
-  if (user.passwordChangedAt) {
-    const issuedAt = session.user.issuedAt;
-    const changedAt = Math.floor(user.passwordChangedAt.getTime() / 1000);
-    if (issuedAt === null || issuedAt === undefined || issuedAt < changedAt - 1) {
-      return null;
+    // Сессия, выпущенная до смены пароля, больше не действует. Секунда
+    // запаса: время выпуска округляется до секунды, и без неё сессия,
+    // созданная тем же запросом, что сменил пароль, погасила бы сама себя.
+    if (user.passwordChangedAt) {
+      const issuedAt = session.user.issuedAt;
+      const changedAt = Math.floor(user.passwordChangedAt.getTime() / 1000);
+      if (issuedAt === null || issuedAt === undefined || issuedAt < changedAt - 1) {
+        return null;
+      }
     }
-  }
 
-  return {
-    id: user.id,
-    organizationId: user.organizationId,
-    role: user.role,
-    clientId: user.clientId,
-    grants: user.grants,
-  };
+    return {
+      actor: {
+        id: user.id,
+        organizationId: user.organizationId,
+        role: user.role,
+        clientId: user.clientId,
+        grants: user.grants,
+      },
+      // Состояние 2FA читается тем же запросом, что и роль: лишней
+      // нагрузки ворота не добавляют (см. twoFactorGate)
+      twoFactor: twoFactorGate(user),
+    };
+  },
+);
+
+export const getActor = cache(async (): Promise<Actor | null> => {
+  return (await loadSession())?.actor ?? null;
 });
 
-/** Актор или редирект на вход. Использовать во всех защищённых страницах. */
-export async function requireActor(): Promise<Actor> {
-  const actor = await getActor();
-  if (!actor) redirect("/login");
-  return actor;
+/**
+ * Актор для маршрутов (route.ts), отдающих данные и действия кабинета.
+ *
+ * Как getActor, но сотруднику агентства без включённой 2FA — null: у
+ * маршрутов нет макета /a, который отправил бы его на настройку, и без
+ * этой проверки файлы, выгрузки и вход на студенческую платформу
+ * (students/open) оставались бы открытыми для сессии без второго фактора.
+ * Маршрутам, которым нужна голая сессия (пульс «в сети»), годится getActor;
+ * tests/route-actor-guard.test.ts следит, чтобы остальные не брали его
+ * напрямую. Страницы и действия берут актора через requireActor — там
+ * ворота уже есть.
+ */
+export const getGatedActor = cache(async (): Promise<Actor | null> => {
+  const session = await loadSession();
+  if (!session || session.twoFactor === "setup") return null;
+  return session.actor;
+});
+
+/**
+ * Актор или редирект на вход. Использовать во всех защищённых страницах.
+ *
+ * Сотрудника агентства без включённой 2FA здесь же отправляет на экран
+ * настройки: ворота стоят не только в макете /a, но и в каждом действии
+ * и странице, которые берут актора, — иначе серверные действия и маршруты,
+ * минующие макет, работали бы для сессии без второго фактора. Экран
+ * настройки и его действия просят актора с allowWithoutTwoFactor.
+ * Клиентов правило не касается.
+ */
+export async function requireActor(
+  options: { allowWithoutTwoFactor?: boolean } = {},
+): Promise<Actor> {
+  const session = await loadSession();
+  if (!session) redirect("/login");
+  if (session.twoFactor === "setup" && !options.allowWithoutTwoFactor) {
+    redirect(TWO_FACTOR_SETUP_PATH);
+  }
+  return session.actor;
 }
 
-export async function requireAgencyActor(): Promise<Actor> {
-  const actor = await requireActor();
+export async function requireAgencyActor(
+  options: { allowWithoutTwoFactor?: boolean } = {},
+): Promise<Actor> {
+  const actor = await requireActor(options);
   if (!isAgency(actor)) notFound();
   return actor;
 }

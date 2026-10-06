@@ -6,26 +6,51 @@
  * и в письмах заведётся разнобой.
  */
 
-export type Channel = "email" | "telegram";
+/*
+  "push" в определениях событий не пишется и добавляется при рассылке —
+  см. enabledChannels в notify.ts: пуш идёт на все события тем, кто включил
+  его на устройстве. Иначе каждое событие каталога пришлось бы править
+  дважды. "vk" — срочное в мессенджер, его события перечисляют сами.
+*/
+export type Channel = "email" | "vk" | "push";
+
+/*
+  Почта получает все поводы без исключения (решение заказчика 21.09.2026,
+  перенесено из CRM агентства). Раньше шесть событий жили только в мессенджере
+  или только в интерфейсе — решение клиента, комментарий, личное сообщение,
+  просьба предложить время, напоминание за час и назначение рекрутера. Бот
+  привязан не у каждого, и для такого человека эти поводы не приходили
+  никуда, кроме колокольчика.
+
+  Добавляя событие, ставь "email" — исключение нужно обосновывать, а не
+  наоборот. Тонкая настройка остаётся за человеком: категории в настройках
+  уведомлений. Сторож — tests/notifications.test.ts.
+*/
 
 /**
  * Каналы по сторонам.
  *
- * Telegram требует, чтобы человек сам запустил бота и привязал чат.
- * Для своих это нормально, а клиенту навязывать лишний шаг ради
- * доступа к кабинету — плохая сделка. Поэтому агентству по умолчанию
- * бот, клиенту почта; привязать Telegram клиент может сам в настройках,
- * и тогда он начнёт получать и туда.
+ * ВКонтакте требует, чтобы человек сам привязал страницу и разрешил
+ * сообществу писать. Для своих это нормально, а клиенту навязывать лишний
+ * шаг ради доступа к кабинету — плохая сделка. Поэтому агентству по
+ * умолчанию бот, клиенту почта; привязать ВКонтакте клиент может сам
+ * в настройках, и тогда он начнёт получать и туда.
+ *
+ * Пуш — по подписке устройства с обеих сторон: его включают на каждом
+ * устройстве отдельно, кнопкой в настройках, так что «навязать» его
+ * нельзя никому, и без подписки слать его некуда.
  */
 export function channelsForSide(
   channels: readonly Channel[],
   isAgencySide: boolean,
-  hasTelegram: boolean,
+  hasVk = false,
+  hasPush = false,
 ): Channel[] {
   return channels.filter((channel) => {
-    if (channel !== "telegram") return true;
-    // Клиенту — только если он сам привязал бота
-    return isAgencySide || hasTelegram;
+    // Клиенту мессенджер — только по его собственной привязке
+    if (channel === "vk") return isAgencySide || hasVk;
+    if (channel === "push") return hasPush;
+    return true;
   });
 }
 
@@ -72,7 +97,7 @@ export type EventDefinition = {
 export const EVENTS = {
   // --- Лендинг ---
   LEAD_RECEIVED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Новая заявка с сайта",
     category: "leads",
@@ -80,13 +105,13 @@ export const EVENTS = {
 
   // --- Вакансии ---
   VACANCY_SUBMITTED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Клиент отправил новую заявку на подбор",
     category: "vacancies",
   },
   VACANCY_ESTIMATED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Агентство назвало сроки по заявке",
     category: "vacancies",
@@ -104,7 +129,7 @@ export const EVENTS = {
     category: "vacancies",
   },
   RECRUITER_ASSIGNED: {
-    channels: [],
+    channels: ["email"],
     priority: "low",
     description: "Назначен рекрутер на вакансию",
     category: "vacancies",
@@ -112,27 +137,36 @@ export const EVENTS = {
 
   // --- Кандидаты ---
   CANDIDATE_PRESENTED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Вам представили нового кандидата",
     category: "candidates",
   },
   CLIENT_DECISION_MADE: {
-    channels: ["telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Клиент принял решение по кандидату",
     category: "candidates",
   },
   CLIENT_DECISION_OVERDUE: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "По кандидату долго нет решения",
+    category: "candidates",
+  },
+  // Сорсинг-лид без согласия: за три дня до конца срока — тому, кто его
+  // завёл (lib/services/sourcing.ts). Без напоминания данные коллеги
+  // уходили бы в уничтожение молча
+  SOURCING_EXPIRES_SOON: {
+    channels: ["email", "vk"],
+    priority: "high",
+    description: "Кандидат без согласия скоро будет удалён",
     category: "candidates",
   },
 
   // --- Обсуждение ---
   NEW_COMMENT: {
-    channels: ["telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Новый комментарий в обсуждении",
     category: "discussion",
@@ -144,12 +178,15 @@ export const EVENTS = {
     означала бы ещё один переключатель в настройках ради различия,
     которого он не проводит.
 
-    Только Telegram, как и у комментария: личное сообщение — это
-    разговор, а не документ, и письмо на каждую реплику превращает
-    почту в чат, которым она быть не должна.
+    Почта здесь была выключена нарочно: письмо на каждую реплику
+    превращает почту в чат. Решение заказчика от 21.09.2026 — почта
+    получает всё, без исключений: ВК привязан не у всех, и повод,
+    который не пришёл ни письмом, ни в бот, человек просто пропускает.
+    Поток писем сдерживает схлопывание (BR-30): за 15 минут по одному
+    ключу уходит первое письмо и одна сводка, а не реплика за репликой.
   */
   NEW_MESSAGE: {
-    channels: ["telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Личное сообщение",
     category: "discussion",
@@ -157,31 +194,31 @@ export const EVENTS = {
 
   // --- Интервью ---
   INTERVIEW_SLOTS_REQUESTED: {
-    channels: ["telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Нужно предложить время для интервью",
     category: "interviews",
   },
   INTERVIEW_CONFIRMED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Кандидат выбрал время интервью",
     category: "interviews",
   },
   INTERVIEW_REMINDER_24H: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Напоминание за сутки до интервью",
     category: "interviews",
   },
   INTERVIEW_REMINDER_1H: {
-    channels: ["telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Напоминание за час до интервью",
     category: "interviews",
   },
   INTERVIEW_RESCHEDULED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "high",
     description: "Интервью переносится",
     category: "interviews",
@@ -226,29 +263,29 @@ export const EVENTS = {
   },
 
   // --- Студенческая платформа (см. app/api/webhooks/students-event) ---
-  // Только Telegram молчал бы для всех, кто бота не привязал, — а бот
+  // Только мессенджер молчал бы для всех, кто бота не привязал, — а бот
   // для этих событий пока никто специально не настраивал. Почта здесь
   // не разговор, а очередь дел на проверку — ей самое место.
   STUDENTS_COMPANY_PENDING: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Новая компания ждёт проверки на студенческой платформе",
     category: "students",
   },
   STUDENTS_VACANCY_PENDING: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Новая вакансия ждёт проверки на студенческой платформе",
     category: "students",
   },
   STUDENTS_STUDY_PENDING: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Справка студента ждёт проверки",
     category: "students",
   },
   STUDENTS_CRM_LINK_REQUESTED: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Компания просит объединить профиль с клиентом в CRM",
     category: "students",
@@ -256,15 +293,15 @@ export const EVENTS = {
 
   // Клиенту, а не агентству: событие приходит с платформы по клиенту-получателю.
   // Письмо получает каждый сотрудник компании на свой адрес (раньше платформа слала одно
-  // письмо на единственный адрес компании); Telegram — лишь у тех, кто привязал бота
+  // письмо на единственный адрес компании); ВК — лишь у тех, кто привязал страницу
   STUDENTS_APPLICATION_NEW: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Новый отклик студента на вашу вакансию",
     category: "students",
   },
   STUDENTS_MESSAGE_NEW: {
-    channels: ["email", "telegram"],
+    channels: ["email", "vk"],
     priority: "normal",
     description: "Новое сообщение от студента",
     category: "students",

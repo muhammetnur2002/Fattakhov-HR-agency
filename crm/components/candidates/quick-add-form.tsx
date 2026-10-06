@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import type { DuplicateWarning } from "@/lib/services/candidates";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/labels";
+import { SOURCING_LEAD_TTL_DAYS } from "@/lib/sourcing";
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -35,9 +36,11 @@ function SubmitButton({ label }: { label: string }) {
 /**
  * Быстрое добавление кандидата (ТЗ 7.3.5).
  *
- * Минимум полей: заставлять рекрутера заполнять двадцать полей ради
- * одного человека — верный способ получить базу, в которую никто
- * не пишет. Остальное дозаполняется в карточке.
+ * Только имя, контакты и ссылка на профиль: новый кандидат — сорсинг-лид
+ * (lib/services/sourcing.ts), согласия у него ещё нет, а до согласия
+ * больше ничего хранить нельзя. Должность, компания, зарплата и резюме
+ * появляются после согласия — раньше они были здесь же, и сервис их
+ * теперь отклоняет.
  */
 export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
   const [state, formAction] = useActionState<CandidateState, FormData>(
@@ -114,22 +117,8 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="currentPosition">Текущая должность</Label>
-          <Input id="currentPosition" name="currentPosition" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="currentCompany">Текущая компания</Label>
-          <Input id="currentCompany" name="currentCompany" />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="salaryExpectation">Ожидание, ₽</Label>
-          <Input
-            id="salaryExpectation"
-            name="salaryExpectation"
-            type="number"
-          />
+          <Label htmlFor="telegram">Telegram</Label>
+          <Input id="telegram" name="telegram" placeholder="@username" />
         </div>
 
         <div className="space-y-2">
@@ -149,19 +138,24 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="resume">Резюме</Label>
+          <Label htmlFor="sourceDetails">Ссылка на профиль</Label>
           <Input
-            id="resume"
-            name="resume"
-            type="file"
-            accept=".pdf,.doc,.docx,.rtf,.odt"
+            id="sourceDetails"
+            name="sourceDetails"
+            placeholder="hh.ru, LinkedIn, Telegram-канал — где нашли"
           />
-          <p className="text-xs text-muted-foreground">
-            Без резюме кандидата не представить клиенту — но добавить
-            в базу можно и потом приложить.
-          </p>
         </div>
       </div>
+
+      <Alert>
+        <AlertDescription className="text-sm">
+          Пока кандидат не дал согласие, храним только имя, контакты и ссылку
+          на профиль — так требует 152-ФЗ, если данные получены не от самого
+          человека. Должность, опыт, зарплата и резюме — после согласия.
+          Без согласия данные удалятся через {SOURCING_LEAD_TTL_DAYS} дней:
+          уведомить человека и получить ссылку на согласие можно в его карточке.
+        </AlertDescription>
+      </Alert>
 
       {/* BR-7: показываем не «дубликат», а где человек сейчас в работе */}
       {duplicates.length > 0 && (

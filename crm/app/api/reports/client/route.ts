@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { canDo } from "@/lib/access";
-import { getActor } from "@/lib/auth/session";
+import { getGatedActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { REJECTION_REASON_LABELS } from "@/lib/labels";
 import {
@@ -24,7 +24,7 @@ const RANGES: Record<string, number> = { month: 30, quarter: 90, year: 365 };
  * ни к другому.
  */
 export async function GET(request: NextRequest) {
-  const actor = await getActor();
+  const actor = await getGatedActor();
   if (!actor) return new NextResponse("Требуется вход", { status: 401 });
 
   if (!canDo(actor, "analytics.client", { clientId: actor.clientId })) {

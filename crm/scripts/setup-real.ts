@@ -31,6 +31,8 @@ async function wipe() {
   await db.attachment.deleteMany();
   await db.stageTransition.deleteMany();
   await db.application.deleteMany();
+  // Внешние ключи на кандидата, вакансию, клиента и пользователя
+  await db.disclosureConsent.deleteMany();
   await db.candidate.deleteMany();
   await db.pipelineStage.deleteMany();
   await db.invoice.deleteMany();

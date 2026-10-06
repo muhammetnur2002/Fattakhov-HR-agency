@@ -49,8 +49,10 @@ export function StatCard({
     пояснение.
   */
   const className = cn(
-    "relative grid grid-rows-[auto_auto_auto] content-start gap-0 px-5 py-4",
-    "sm:row-span-3 sm:grid-rows-subgrid",
+    // Отступы плотнее на телефоне: плитка там вдвое уже (две колонки),
+    // и 20px по бокам съедали почти половину её ширины
+    "relative grid grid-rows-[auto_auto_auto] content-start gap-0 px-4 py-3 sm:px-5 sm:py-4",
+    "row-span-3 grid-rows-subgrid",
     // Засечка повторяет вертикальные рёбра знака
     hot && "before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:rounded-full before:bg-primary",
     href && "transition-colors hover:bg-muted/50",
@@ -139,7 +141,15 @@ export function StatRow({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border sm:auto-rows-auto sm:grid-cols-2 sm:grid-rows-[auto_auto_auto]",
+        /*
+          Две колонки уже на телефоне. Одна плитка в строку занимала
+          ~120 точек, и на экран помещалось три из восьми: чтобы увидеть
+          все показатели, приходилось прокручивать два экрана. В две
+          колонки — четыре ряда, и почти всё видно сразу. Общие ряды
+          (subgrid) держат числа на одной линии, даже если подпись
+          одной плитки в две строки, а другой в одну.
+        */
+        "grid grid-cols-2 auto-rows-auto grid-rows-[auto_auto_auto] gap-px overflow-hidden rounded-xl border bg-border",
         lgCols,
       )}
     >

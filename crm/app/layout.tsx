@@ -52,6 +52,13 @@ export const metadata: Metadata = {
       { url: "/icons/favicon-dark.png", media: "(prefers-color-scheme: dark)", type: "image/png" },
     ],
   },
+  formatDetection: {
+    // Иначе Safari на iPhone превращает в ссылки «позвонить» любые цифры,
+    // похожие на телефон: ИНН и ОГРНИП в подвале, суммы, номера вакансий.
+    // Настоящие телефоны — явные ссылки tel: (lib/contacts.ts), их это
+    // не касается
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {

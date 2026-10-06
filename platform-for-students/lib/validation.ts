@@ -288,9 +288,6 @@ export const resetPasswordSchema = z.object({
 
 export const notificationSettingsSchema = z.object({ email: z.boolean() });
 
-/** «Показывать, что я в сети» */
-export const presenceSettingsSchema = z.object({ show: z.boolean() });
-
 export const employerCodeSchema = z.object({
   code: z
     .string()

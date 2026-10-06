@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAgency, isClient } from "@/lib/access";
-import { getActor } from "@/lib/auth/session";
+import { getGatedActor } from "@/lib/auth/session";
 import { readCompanyLogo } from "@/lib/services/company-profile";
 
 /**
@@ -9,7 +9,7 @@ import { readCompanyLogo } from "@/lib/services/company-profile";
  * же компании — это не персональные данные, но и не публичная картинка.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ clientId: string }> }) {
-  const actor = await getActor();
+  const actor = await getGatedActor();
   const { clientId } = await params;
   if (!actor || !(isAgency(actor) || (isClient(actor) && actor.clientId === clientId))) {
     return new NextResponse(null, { status: 404 });

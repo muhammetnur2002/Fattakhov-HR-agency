@@ -11,6 +11,8 @@ import type {
   ClientDecision,
   ClientStatus,
   EmploymentType,
+  ErasureReason,
+  GuaranteeBreakReason,
   InterviewFormat,
   InterviewStatus,
   InterviewType,
@@ -53,6 +55,10 @@ export const STAFF_GRANT_LABELS: Record<StaffGrant, { label: string; hint: strin
   "students.pilot": {
     label: "Студенческая платформа: метрики пилота",
     hint: "Воронка, время до первой возможности и журнал событий.",
+  },
+  "students.search": {
+    label: "Студенческая платформа: поиск студентов",
+    hint: "Список студентов с поиском и фильтрами для подбора. Профиль открывается по клику, контакты — отдельной кнопкой, и каждый показ пишется в журнал доступа к персональным данным.",
   },
 };
 
@@ -230,4 +236,21 @@ export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
   PROJECT: "Проектная работа",
   GPH: "Договор ГПХ",
   SELF_EMPLOYED: "Самозанятый",
+};
+
+/** Почему нанятый ушёл в гарантийный срок (BR-10). */
+export const GUARANTEE_BREAK_REASON_LABELS: Record<GuaranteeBreakReason, string> = {
+  CANDIDATE_LEFT: "Ушёл сам",
+  DISMISSED: "Уволил работодатель",
+  PROBATION_FAILED: "Не прошёл испытательный срок",
+  OTHER: "Другое",
+};
+
+/** Основание уничтожения ПДн (ст. 21 152-ФЗ) — подпись в очереди на экране ПДн. */
+export const ERASURE_REASON_LABELS: Record<ErasureReason, string> = {
+  CONSENT_REVOKED: "согласие отозвано",
+  CONSENT_EXPIRED: "срок согласия истёк",
+  SOURCING_EXPIRED: "нет согласия за 14 дней (сорсинг)",
+  SUBJECT_REQUEST: "требование кандидата",
+  PURPOSE_ACHIEVED: "цель обработки достигнута",
 };

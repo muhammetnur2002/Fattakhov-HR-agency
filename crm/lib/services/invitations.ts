@@ -5,8 +5,9 @@ import { isUniqueViolation } from "@/lib/db/errors";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { ROLE_LABELS } from "@/lib/labels";
-import { getEmailTransport } from "@/lib/notifications/channels";
+import { channelStatus, getEmailTransport } from "@/lib/notifications/channels";
 import { appUrl } from "@/lib/urls";
+import { passwordProblem } from "@/lib/validation/password";
 import { brandedEmail } from "@/lib/notifications/email-brand";
 
 /** Срок жизни ссылки-приглашения. */
@@ -69,25 +70,32 @@ export async function createInvitation(params: {
   const token = await prismaRaw.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${params.organizationId} FOR UPDATE`;
 
+    /*
+      Подробности отказа — только своим: сотрудник агентства видит всё,
+      клиент — лишь про свою компанию. Иначе форма приглашения
+      превращается в проверку «кто и где зарегистрирован или приглашён»
+      по всей системе. Правило одно на обе проверки ниже: раньше оно
+      стояло только у занятого адреса, а «уже есть действующее
+      приглашение» отвечал любому — и администратор одной компании
+      узнавал, что адрес позвали в другую (BR-28).
+    */
+    const inviter = await tx.user.findFirst({
+      where: { id: params.createdById },
+      select: { clientId: true },
+    });
+    const mayDisclose = (clientId: string | null) =>
+      !inviter?.clientId || clientId === inviter.clientId;
+    const unavailable = () =>
+      new InviteError(`Не удалось пригласить ${email}: адрес недоступен. Укажите другой.`);
+
     const taken = await tx.user.findFirst({
       where: { email },
       select: { fullName: true, clientId: true },
     });
     if (taken) {
+      if (!mayDisclose(taken.clientId)) throw unavailable();
       // Где именно занят адрес — важно: чаще всего это сам приглашающий
       // или сотрудник, которого уже завели в другой роли
-      // Подробности — только своим: сотрудник агентства видит всё, клиент — лишь про свою компанию.
-      // Иначе форма приглашения превращается в проверку «кто и где зарегистрирован» по всей системе
-      const inviter = await tx.user.findFirst({
-        where: { id: params.createdById },
-        select: { clientId: true },
-      });
-      const mayDisclose = !inviter?.clientId || taken.clientId === inviter.clientId;
-      if (!mayDisclose) {
-        throw new InviteError(
-          `Не удалось пригласить ${email}: адрес недоступен. Укажите другой.`,
-        );
-      }
       const where = taken.clientId ? "в кабинете клиента" : "в агентстве";
       throw new InviteError(
         `${email} уже занят: ${taken.fullName}, ${where}. ` +
@@ -97,12 +105,13 @@ export async function createInvitation(params: {
 
     const pending = await tx.invitation.findFirst({
       where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
-      select: { id: true },
+      select: { clientId: true },
     });
     if (pending) {
+      if (!mayDisclose(pending.clientId)) throw unavailable();
       throw new InviteError(
-        `На ${email} уже есть действующее приглашение. ` +
-          `Отправьте человеку прежнюю ссылку или дождитесь, пока она истечёт.`,
+        `На ${email} уже есть действующее приглашение — оно в списке «Ждут принятия». ` +
+          `Нужно пригласить заново — отзовите там прежнее.`,
       );
     }
 
@@ -135,6 +144,20 @@ export async function createInvitation(params: {
 }
 
 /**
+ * Что сказать пригласившему — одинаково на всех экранах, откуда зовут.
+ *
+ * «Отправлено» без оговорок было бы неправдой: транспорт молча глотает
+ * отказ доставки, а без SMTP письмо уходит только в журнал сервера.
+ * Наверняка известно одно — подключена ли почта вообще, и от этого
+ * зависит, нужно ли человеку самому передавать ссылку.
+ */
+export function inviteResultMessage(email: string): string {
+  return channelStatus().email
+    ? `Приглашение отправлено на ${email}. Не дойдёт письмо — ссылку можно скопировать в списке «Ждут принятия».`
+    : `Приглашение для ${email} готово, но почта на сервере не подключена и письмо не ушло — скопируйте ссылку в списке «Ждут принятия» и передайте сами.`;
+}
+
+/**
  * Письмо со ссылкой приглашения. Раньше приглашение только создавалось
  * в базе, а ссылку передавали руками — «Письма пока не отправляются»
  * было написано прямо в кабинете клиента.
@@ -146,15 +169,34 @@ async function sendInvitationMail(token: string): Promise<void> {
   const invite = await getInvitation(token);
   if (!invite) return;
 
+  await getEmailTransport().send({ to: invite.email, ...invitationMail(invite) });
+}
+
+/**
+ * Тема и текст письма-приглашения. Отдельно от отправки — чтобы текст
+ * можно было проверить без почты и без базы.
+ *
+ * Компания-клиент по имени не называется, и это не забывчивость. Адрес
+ * до принятия приглашения никем не подтверждён: опечатка в домене —
+ * и посторонний узнаёт, что такая-то компания работает с агентством.
+ * Связка «кто с кем работает» — ровно то, что бережёт BR-28. Настоящему
+ * получателю имя его собственной компании ничего не добавляет, а на
+ * странице по ссылке оно есть. Название агентства не скрыть: оно и есть
+ * отправитель письма. Так было в CRM агентства — здесь вернули.
+ */
+export function invitationMail(invite: InviteDetails): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const place = invite.clientName
-    ? `в кабинет компании «${invite.clientName}»`
+    ? "в кабинет вашей компании"
     : `в агентство «${invite.organizationName}»`;
   const from = invite.invitedByName ? `${invite.invitedByName} приглашает вас` : "Вас приглашают";
-  const link = appUrl(`/invite/${token}`);
+  const link = appUrl(`/invite/${invite.token}`);
 
   const subject = `Приглашение ${place}`;
-  await getEmailTransport().send({
-    to: invite.email,
+  return {
     subject,
     text: [
       `${from} ${place} — роль «${ROLE_LABELS[invite.role]}».`,
@@ -176,7 +218,7 @@ async function sendInvitationMail(token: string): Promise<void> {
         "Если вы не ожидали этого приглашения, просто не переходите по ней" +
         " и сообщите тому, кто его прислал.",
     }),
-  });
+  };
 }
 
 /**
@@ -254,6 +296,10 @@ export async function acceptInvitation(params: {
         `Попросите отправить приглашение на другой адрес.`,
     );
   }
+
+  // Правило слабых паролей одно на все формы; почта — та, на которую пришло приглашение
+  const problem = passwordProblem(params.password, { email: invite.email });
+  if (problem) throw new InviteError(problem);
 
   const passwordHash = await hashPassword(params.password);
 

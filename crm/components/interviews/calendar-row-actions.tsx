@@ -82,10 +82,18 @@ export function CalendarRowActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isPast && feedbackRating == null && (
-        <form action={feedback} className="flex items-center gap-1.5">
+        /*
+          flex-wrap и подпись на всю строку на телефоне: пять кнопок по 44
+          и подпись в одну строку не помещались в карточку встречи, и
+          последняя оценка, «5», срезалась краем. Теперь подпись сверху,
+          кнопки ниже одним рядом; с sm — всё в строку, как раньше.
+        */
+        <form action={feedback} className="flex flex-wrap items-center gap-1.5">
           <input type="hidden" name="interviewId" value={interviewId} />
           <input type="hidden" name="applicationId" value={applicationId} />
-          <span className="text-xs text-muted-foreground">Как прошло?</span>
+          <span className="basis-full text-xs text-muted-foreground sm:basis-auto">
+            Как прошло?
+          </span>
           {[1, 2, 3, 4, 5].map((n) => (
             <RatingButton key={n} value={n} />
           ))}
@@ -123,7 +131,11 @@ function RatingButton({ value }: { value: number }) {
       size="sm"
       variant="outline"
       disabled={pending}
-      className="size-7 p-0 tabular-nums"
+      // Пальцем — квадрат 40 (touch:size-10): пять оценок подряд, и промах
+      // по соседней записал бы не ту оценку. Мышью — компактный размер.
+      // Свой квадрат, а не общее правило 2.4em (globals.css): по пропорции
+      // мелкого текста кнопка вышла бы около 31px — мало для пяти подряд
+      className="size-7 p-0 tabular-nums touch:size-10"
     >
       {value}
     </Button>

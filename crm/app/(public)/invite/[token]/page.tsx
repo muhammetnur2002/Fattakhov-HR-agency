@@ -29,13 +29,17 @@ export default async function InvitePage({
 
   const invite = await getInvitation(token);
 
+  // Один ответ на все случаи — истекло, отозвано, использовано или не было
+  // вовсе: по ссылке нельзя выяснить, существовало ли приглашение и чем
+  // кончилось (отозванное удаляется — getInvitation его просто не находит)
   if (!invite) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
           <CardDescription>
-            Приглашение истекло или уже использовано. Попросите отправить новое.
+            Приглашение истекло, отозвано или уже использовано. Попросите
+            отправить новое.
           </CardDescription>
         </CardHeader>
         <CardContent>

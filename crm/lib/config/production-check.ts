@@ -22,7 +22,7 @@ import {
  * ронять выкатку, а не первого пользователя.
  *
  * Проверяется только то, без чего платформа именно что неисправна.
- * Telegram сюда не входит: это канал по желанию, и его отсутствие
+ * ВК сюда не входит: это канал по желанию, и его отсутствие
  * означает «такой возможности нет», а не потерянное письмо.
  */
 
@@ -109,6 +109,28 @@ function draftRegistrationConsentProblem(): string | null {
   );
 }
 
+/**
+ * Ключ шифрования секретов 2FA. Отдельно от списка переменных: «задан»
+ * мало, ключ короче 32 символов тихо не применяется (totp-secret.ts), и
+ * вместо шифрования сохранялся бы открытый текст. Двухфакторная теперь
+ * обязательна всему агентству — без годного ключа секрет не сохранится
+ * вовсе, и сотрудники не смогут войти. Лучше узнать об этом при выкатке,
+ * чем от первого, кого не пустили в кабинет.
+ */
+function totpKeyProblem(): string | null {
+  // Условие «годный ключ» то же, что в lib/auth/totp-secret.ts (не короче 32 символов),
+  // но повторено здесь, а не импортировано: этот файл подключает instrumentation.ts,
+  // который собирается и под Edge, где node:crypto из totp-secret.ts недоступен
+  if ((process.env.TOTP_ENCRYPTION_KEY?.trim().length ?? 0) >= 32) return null;
+  return (
+    "Двухфакторная аутентификация обязательна для сотрудников агентства, а секреты " +
+    "для неё без ключа шифрования не сохраняются: сотрудники не смогут настроить " +
+    "вход и попасть в кабинет.\n  Не заданы: TOTP_ENCRYPTION_KEY (не короче 32 символов; " +
+    "openssl rand -base64 32; после включения не менять — иначе у всех с 2FA " +
+    "вход останется только по кодам восстановления)"
+  );
+}
+
 function isSet(name: string): boolean {
   return name.split("|").some((key) => Boolean(process.env[key]?.trim()));
 }
@@ -127,10 +149,11 @@ export function productionConfigProblems(): string[] {
     return `${req.breaks}.\n  Не заданы: ${missing.join(", ")}`;
   });
 
+  const totp = totpKeyProblem();
   const drafts = [draftConsentProblem(), draftRegistrationConsentProblem()].filter(
     (p): p is string => p !== null,
   );
-  return [...missingVars, ...drafts];
+  return [...missingVars, ...(totp ? [totp] : []), ...drafts];
 }
 
 /**

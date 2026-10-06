@@ -12,9 +12,8 @@ import { prismaRaw as db } from "@/lib/db/prisma";
 import {
   clearLoginFailures,
   isLoginBlocked,
-  isSecondFactorBlocked,
   recordLoginFailure,
-  recordSecondFactorFailure,
+  reserveSecondFactorAttempt,
 } from "@/lib/security/login-throttle";
 import { createComment, markCommentsRead } from "@/lib/services/comments";
 
@@ -48,11 +47,15 @@ describe("перебор при входе", () => {
     expect(await isLoginBlocked(EMAIL)).toBe(false);
   });
 
-  it("код второго фактора закрывается после пяти неверных", async () => {
-    for (let i = 0; i < 4; i++) await recordSecondFactorFailure(USER_ID);
-    expect(await isSecondFactorBlocked(USER_ID)).toBe(false);
-    await recordSecondFactorFailure(USER_ID);
-    expect(await isSecondFactorBlocked(USER_ID)).toBe(true);
+  it("код второго фактора закрывается после пяти попыток, успех их сбрасывает", async () => {
+    for (let i = 0; i < 5; i++) expect(await reserveSecondFactorAttempt(USER_ID)).toBe(true);
+    // Шестая попытка не проходит: код при этом не проверяется вовсе
+    expect(await reserveSecondFactorAttempt(USER_ID)).toBe(false);
+    // Другой пользователь не задет
+    expect(await reserveSecondFactorAttempt(`${USER_ID}-other`)).toBe(true);
+
+    await clearLoginFailures(EMAIL, USER_ID);
+    expect(await reserveSecondFactorAttempt(USER_ID)).toBe(true);
   });
 });
 

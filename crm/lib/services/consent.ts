@@ -2,6 +2,10 @@ import { randomBytes } from "node:crypto";
 
 import type { Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
+import {
+  blockForErasure,
+  liftExpiredConsentBlock,
+} from "@/lib/services/erasure";
 import type { ConsentStatus } from "@/lib/generated/prisma/enums";
 import { CANDIDATE_CONSENT_VERSION } from "@/lib/legal/candidate-consent";
 
@@ -16,7 +20,7 @@ export class ConsentError extends Error {}
 const CONSENT_TTL_MONTHS = 12;
 
 /** Сколько живёт ссылка на форму согласия. */
-const LINK_TTL_DAYS = 14;
+export const LINK_TTL_DAYS = 14;
 
 /**
  * Действует ли согласие прямо сейчас.
@@ -163,10 +167,22 @@ export async function giveConsent(params: {
     }),
   ]);
 
+  // Продлил после истечения — блокировка по сроку снимается. Отзыв
+  // и прямое требование так не отменяются (см. liftExpiredConsentBlock)
+  await liftExpiredConsentBlock(candidate.id);
+
   return { candidateId: candidate.id };
 }
 
-/** Отзыв согласия. Данные после этого подлежат удалению. */
+/**
+ * Отзыв согласия. Данные после этого подлежат уничтожению.
+ *
+ * Отзыв — это не только смена статуса. По ч. 5 ст. 21 152-ФЗ оператор
+ * обязан прекратить обработку и уничтожить данные в тридцатидневный
+ * срок. Раньше отзыв оставлял строку в списке «требуют решения», и данные
+ * лежали, пока кто-нибудь не нажмёт кнопку. Теперь блокировка наступает
+ * сразу, а срок назначается сам (lib/services/erasure.ts).
+ */
 export async function revokeConsent(
   actor: Actor,
   candidateId: string,
@@ -191,4 +207,11 @@ export async function revokeConsent(
       },
     }),
   ]);
+
+  await blockForErasure({
+    candidateId,
+    organizationId: actor.organizationId,
+    reason: "CONSENT_REVOKED",
+    actorId: actor.id,
+  });
 }

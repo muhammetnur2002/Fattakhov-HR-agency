@@ -41,6 +41,8 @@ async function cleanup() {
 }
 
 beforeEach(async () => {
+  // Письма сброса ограничены по адресу (три в час, счётчик в базе): тесты просят много раз
+  await db.authFailure.deleteMany({ where: { key: { startsWith: "mail:" } } });
   await cleanup();
   const user = await db.user.create({
     data: {
@@ -165,6 +167,12 @@ describe("смена пароля вошедшим", () => {
     expect(user.passwordChangedAt).toBeNull();
   });
 
+  it("не принимает пароль с почтой внутри", async () => {
+    await expect(
+      changePassword({ userId, currentPassword: OLD, newPassword: "password-test-moy-parol" }),
+    ).rejects.toThrow(/почт/);
+  });
+
   it("не даёт поставить тот же пароль", async () => {
     await expect(
       changePassword({ userId, currentPassword: OLD, newPassword: OLD }),
@@ -226,6 +234,42 @@ describe("восстановление по ссылке", () => {
     ).rejects.toThrow(PasswordError);
   });
 
+  it("два одновременных запроса с одной ссылкой: пароль меняет только один", async () => {
+    const token = await requestAndCaptureToken();
+    const passwords = Array.from({ length: 8 }, (_, i) => `kofe-nomer-${i}-s-molokom`);
+
+    const results = await Promise.allSettled(
+      passwords.map((newPassword) => resetPassword({ token: token!, newPassword })),
+    );
+
+    const winners = results.flatMap((r, i) => (r.status === "fulfilled" ? [passwords[i]] : []));
+    expect(winners).toHaveLength(1);
+    for (const r of results) {
+      if (r.status === "rejected") expect(r.reason).toBeInstanceOf(PasswordError);
+    }
+
+    // В базе пароль победителя, а не последнего записавшего
+    const user = await db.user.findFirstOrThrow({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+    expect(await verifyPassword(user.passwordHash!, winners[0])).toBe(true);
+    for (const loser of passwords.filter((p) => p !== winners[0])) {
+      expect(await verifyPassword(user.passwordHash!, loser)).toBe(false);
+    }
+  });
+
+  it("новый пароль с почтой внутри не принимается и ссылку не тратит", async () => {
+    const token = await requestAndCaptureToken();
+
+    await expect(
+      resetPassword({ token: token!, newPassword: "password-test-moy-parol" }),
+    ).rejects.toThrow(/почт/);
+
+    // Отказ по слабому паролю — не повод сжигать ссылку: человек поправит и повторит
+    expect(await getResetTarget(token!)).not.toBeNull();
+  });
+
   it("новый запрос гасит прежнюю ссылку", async () => {
     const first = await requestAndCaptureToken();
     const second = await requestAndCaptureToken();
@@ -254,7 +298,16 @@ describe("восстановление по ссылке", () => {
     expect(await getResetTarget(token!)).toBeNull();
   });
 
-  it("несуществующий адрес не отличить от существующего", async () => {
+  /** Что ушло в «почту» (в тестах она пишется в лог). */
+  async function mailsFor(email: string, times = 1): Promise<string> {
+    const spy = vi.spyOn(console, "info").mockImplementation(() => {});
+    for (let i = 0; i < times; i++) await requestPasswordReset({ email });
+    const output = spy.mock.calls.flat().join("\n");
+    spy.mockRestore();
+    return output;
+  }
+
+  it("несуществующий адрес не отличить от существующего — на экране", async () => {
     // Ни исключения, ни разницы в поведении: иначе форма превращается
     // в способ проверить, работает ли человек в компании
     await expect(
@@ -263,6 +316,30 @@ describe("восстановление по ссылке", () => {
 
     const created = await db.passwordReset.count();
     expect(created).toBe(0);
+  });
+
+  it("на адрес без учётки уходит письмо «восстановить нечего», без ссылки", async () => {
+    // Раньше не уходило ничего, и человек ждал письма, которого не будет
+    const output = await mailsFor("нет-такого@example.com");
+    expect(output).toContain("→ нет-такого@example.com");
+    expect(output).toContain("Учётной записи с этим адресом на платформе нет");
+    expect(output).not.toMatch(/\/reset\//);
+  });
+
+  it("отключённому — письмо, что доступ отключён, и ни одной ссылки", async () => {
+    await db.user.update({ where: { id: userId }, data: { isActive: false } });
+    const output = await mailsFor(EMAIL);
+    expect(output).toContain("Учётная запись с этим адресом отключена");
+    expect(output).not.toMatch(/\/reset\//);
+    expect(await db.passwordReset.count({ where: { userId } })).toBe(0);
+  });
+
+  it("не больше трёх писем в час на адрес — чужой ящик формой не засыпать", async () => {
+    const output = await mailsFor("нет-такого@example.com", 5);
+    expect(output.match(/→ нет-такого@example\.com/g)).toHaveLength(3);
+
+    // Потолок свой у каждого адреса: настоящему пользователю ссылка уходит
+    expect(await requestAndCaptureToken()).toBeTruthy();
   });
 
   it("токен в базе хранится хешем, а не как есть", async () => {

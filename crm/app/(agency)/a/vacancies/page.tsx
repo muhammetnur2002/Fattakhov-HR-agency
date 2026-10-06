@@ -95,7 +95,10 @@ export default async function AgencyVacanciesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      {/* flex-wrap: на телефоне в 320 точек заголовок и кнопка вместе
+          не помещаются, и несжимаемая кнопка уводила всю страницу вбок
+          на 31 точку. Теперь кнопка переносится под заголовок */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div>
           <h1 className="text-2xl font-semibold">Вакансии</h1>
           <p className="text-sm text-muted-foreground">

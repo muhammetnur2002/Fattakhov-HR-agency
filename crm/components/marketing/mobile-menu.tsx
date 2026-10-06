@@ -61,7 +61,7 @@ export function MarketingMobileMenu({
         <Button
           variant="ghost"
           size="icon-sm"
-          className="size-11 lg:hidden"
+          className="size-11 xl:hidden"
           aria-label="Открыть меню"
         >
           <Menu className="size-5" />

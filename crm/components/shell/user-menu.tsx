@@ -14,6 +14,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { forgetThisDevice } from "@/lib/notifications/push-client";
+
+/**
+ * Выход: сначала это устройство отписывается от пушей, потом сессия
+ * закрывается. Подписка живёт в браузере, а не в сессии, — без этого
+ * следующий, кто войдёт с этого устройства, получал бы уведомления
+ * прежнего хозяина (см. forgetThisDevice).
+ */
+async function logoutHere(): Promise<void> {
+  await forgetThisDevice();
+  await logout();
+}
 
 export function UserMenu({
   fullName,
@@ -61,7 +73,7 @@ export function UserMenu({
             </Link>
           </DropdownMenuItem>
         )}
-        <form action={logout}>
+        <form action={logoutHere}>
           <DropdownMenuItem asChild>
             <button type="submit" className="w-full cursor-pointer">
               <LogOut className="size-4" />

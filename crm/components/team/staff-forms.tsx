@@ -109,10 +109,92 @@ function RoleAndPosition({
 }
 
 /**
- * Создание сотрудника по требованию: на странице только кнопка и список команды,
- * бланк раскрывается по нажатию, а после успешного создания сворачивается обратно.
+ * Новый сотрудник по требованию: на странице только кнопки и список команды,
+ * бланк раскрывается по нажатию, а после успеха сворачивается обратно.
+ *
+ * Путей два, и каждый для своего случая. Аккаунт с паролем — когда человек
+ * рядом и войти надо сейчас: пароль вы сообщаете лично. Приглашение по
+ * почте — когда пароль передать некому: человек получает письмо и задаёт
+ * пароль сам, а ссылка остаётся в списке «Ждут принятия» на случай, если
+ * письмо не дойдёт. Права у обоих путей одинаковые.
  */
-export function StaffCreatePanel({
+export function StaffAddPanel({
+  createAction,
+  inviteAction,
+  roles,
+  grants,
+}: {
+  createAction: TeamAction;
+  inviteAction: TeamAction;
+  roles: TeamOption[];
+  grants: TeamOption[];
+}) {
+  const [mode, setMode] = useState<"create" | "invite" | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  // Успех закрывает бланк; сообщение остаётся над списком, чтобы было видно, что получилось
+  const wrap =
+    (action: TeamAction): TeamAction =>
+    async (prev, formData) => {
+      const result = await action(prev, formData);
+      if (result.ok) {
+        setDone(result.ok);
+        setMode(null);
+      }
+      return result;
+    };
+
+  function open(next: "create" | "invite") {
+    setDone(null);
+    setMode(next);
+  }
+
+  if (!mode) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={() => open("create")}>
+          Создать аккаунт сотрудника
+        </Button>
+        <Button type="button" variant="outline" onClick={() => open("invite")}>
+          Пригласить по почте
+        </Button>
+        {done && <p className="text-sm text-muted-foreground">{done}</p>}
+      </div>
+    );
+  }
+
+  const invite = mode === "invite";
+  return (
+    <div className="rounded-xl border p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">
+            {invite ? "Приглашение в команду" : "Новый сотрудник"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {invite
+              ? "Человеку уйдёт письмо со ссылкой — пароль он задаст сам. Ссылка действует 7 дней."
+              : "Задайте пароль и сообщите его человеку лично — почта и пароль работают сразу, ссылка-приглашение не нужна."}
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setMode(null)}>
+          Отмена
+        </Button>
+      </div>
+      {invite ? (
+        <StaffInviteForm action={wrap(inviteAction)} roles={roles} grants={grants} />
+      ) : (
+        <StaffCreateForm action={wrap(createAction)} roles={roles} grants={grants} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Приглашение по почте: почта, роль, должность и доступы — всё, кроме
+ * пароля и имени, их человек укажет сам по ссылке.
+ */
+export function StaffInviteForm({
   action,
   roles,
   grants,
@@ -121,51 +203,38 @@ export function StaffCreatePanel({
   roles: TeamOption[];
   grants: TeamOption[];
 }) {
-  const [open, setOpen] = useState(false);
-  const [created, setCreated] = useState<string | null>(null);
+  const [state, formAction] = useActionState<TeamFormState, FormData>(action, {});
+  const defaultRole = roles.find((r) => r.value === "RECRUITER")?.value ?? roles[0]?.value ?? "";
 
-  // Успех закрывает бланк; сообщение остаётся над списком, чтобы было видно, что получилось
-  const wrapped: TeamAction = async (prev, formData) => {
-    const result = await action(prev, formData);
-    if (result.ok) {
-      setCreated(result.ok);
-      setOpen(false);
-    }
-    return result;
-  };
-
-  if (!open) {
-    return (
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          onClick={() => {
-            setCreated(null);
-            setOpen(true);
-          }}
-        >
-          Создать аккаунт сотрудника
-        </Button>
-        {created && <p className="text-sm text-muted-foreground">{created}</p>}
-      </div>
-    );
+  // Отправляем вручную, как и создание: после action формы React 19 очищает
+  // поля, и при ошибке («адрес уже занят») пришлось бы отмечать всё заново
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
   }
 
   return (
-    <div className="rounded-xl border p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Новый сотрудник</h2>
-          <p className="text-sm text-muted-foreground">
-            Задайте пароль и сообщите его человеку лично — почта и пароль работают сразу, ссылка-приглашение не нужна.
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Отмена
-        </Button>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="staff-invite-email">Почта</Label>
+        <Input
+          id="staff-invite-email"
+          name="email"
+          type="email"
+          required
+          placeholder="name@fattakhovhr.ru"
+        />
       </div>
-      <StaffCreateForm action={wrapped} roles={roles} grants={grants} />
-    </div>
+      <RoleAndPosition idPrefix="staff-invite" roles={roles} role={defaultRole} position="" />
+      <GrantsFieldset idPrefix="staff-invite" grants={grants} checked={[]} />
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Ссылка — пропуск в CRM с этой ролью и доступами: кто её открыл, тот и войдёт.
+        Ошиблись в адресе — отзовите приглашение в списке «Ждут принятия» и отправьте заново.
+      </p>
+      <SubmitButton label="Пригласить" pending="Приглашаем…" />
+      <FormMessages state={state} />
+    </form>
   );
 }
 

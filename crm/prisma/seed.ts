@@ -14,6 +14,7 @@
 import { hashPassword } from "../lib/auth/password";
 import { prismaRaw as db } from "../lib/db/prisma";
 import { DEFAULT_PIPELINE_STAGES } from "../lib/services/pipeline-stages";
+import { DEV_TOTP_SECRET } from "./dev-totp";
 
 const ORG_ID = "org_fattakhov";
 const now = new Date();
@@ -44,6 +45,9 @@ async function clean() {
   await db.attachment.deleteMany();
   await db.stageTransition.deleteMany();
   await db.application.deleteMany();
+  // Подтверждения передачи работодателю держат внешние ключи на кандидата,
+  // вакансию, клиента и пользователя — без этой строки seed не перезапустится
+  await db.disclosureConsent.deleteMany();
   await db.candidate.deleteMany();
   await db.pipelineStage.deleteMany();
   await db.invoice.deleteMany();
@@ -221,7 +225,12 @@ async function main() {
         ...u,
         passwordHash,
         organizationId: ORG_ID,
-        notifyPrefs: { email: true, telegram: true, digest: "instant" },
+        notifyPrefs: { email: true, vk: true, digest: "instant" },
+        // Сотрудникам агентства 2FA обязательна, обхода нет: у тестовых
+        // учёток она включена с известным тестовым секретом (prisma/dev-totp.ts),
+        // а не отключена исключением
+        totpSecret: DEV_TOTP_SECRET,
+        totpEnabledAt: now,
       },
     });
   }
@@ -312,7 +321,7 @@ async function main() {
         passwordHash,
         organizationId: ORG_ID,
         clientId: "cl_starfish",
-        notifyPrefs: { email: true, telegram: false, digest: "instant" },
+        notifyPrefs: { email: true, vk: false, digest: "instant" },
       },
     });
   }
@@ -903,7 +912,8 @@ async function main() {
   }
 
   console.log(`\nВход (пароль у всех — ${DEV_PASSWORD}):`);
-  console.log("  Агентство");
+  console.log("  Агентство (2FA включена, обязательна: ключ для приложения —");
+  console.log(`  ${DEV_TOTP_SECRET}, см. prisma/dev-totp.ts)`);
   console.log("    owner@fattakhov.hr    Владелец");
   console.log("    head@fattakhov.hr     Руководитель подбора");
   console.log("    rec1@fattakhov.hr     Рекрутер");

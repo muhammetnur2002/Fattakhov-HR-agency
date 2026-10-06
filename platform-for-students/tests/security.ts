@@ -30,6 +30,9 @@ import { devOutbox } from '../lib/mail/transport';
 import { confirmPendingRegistration, resendPendingRegistration } from '../lib/pending-registration';
 import { hashPassword, verifyPassword } from '../lib/security/password';
 import type { DataStore } from '../lib/db/types';
+import { GET as staffStudentsList } from '../app/api/service/staff/students/route';
+import { GET as staffStudentProfile } from '../app/api/service/staff/students/[id]/route';
+import { searchStaffStudents, parseStaffSearch, MAX_PAGE_SIZE } from '../lib/staff-students';
 
 let passed = 0;
 const failures: string[] = [];
@@ -521,6 +524,16 @@ async function main() {
   await test('лимит пульса — тысяча в час, и он всё равно режет запись, если её требуют каждую секунду', () => {
     assert.equal(RATE_LIMITS.presence.limit, 1000);
   });
+  await test('сохранённое «не показывать» (прежнее значение) пульс не останавливает: пишется как всем', async () => {
+    const { account } = await newStudent(store, `pulse-hidden-${unique()}@demo.ru`);
+    await store.accounts.setShowPresence(account.id, false);
+    const hidden = await store.accounts.findById(account.id);
+    assert.equal(hidden?.showPresence, false);
+
+    const at = new Date();
+    assert.deepEqual(await recordPulse(store, hidden, at), { written: true });
+    assert.equal((await store.accounts.findById(account.id))?.lastSeenAt?.getTime(), at.getTime());
+  });
   await test('нет учётной записи — пульс молча не пишется', async () => {
     assert.deepEqual(await recordPulse(store, null), { written: false });
   });
@@ -599,6 +612,349 @@ async function main() {
     for (let i = 0; i < RECHECK_EVERY_TICKS * 2; i++) await guard();
     assert.equal(revoked, 0);
   });
+
+
+  // ---------- Поиск студентов для сотрудников (служебный API для CRM) ----------
+  console.log('\nПоиск студентов для сотрудников');
+  {
+    const secret = 'staff-search-secret-0123456789abcdef0123456789';
+    const savedSecret = process.env.CRM_SERVICE_SECRET;
+    process.env.CRM_SERVICE_SECRET = secret;
+    const M = `Вуз${unique()}`;
+    // Идентификаторы сотрудников — как cuid из CRM: латиница и цифры (в заголовок кириллица не пройдёт)
+    const A = unique();
+    const year = new Date().getFullYear();
+    const call = (route: typeof staffStudentsList | typeof staffStudentProfile, url: string, init: { actor?: string | null; auth?: string | null } = {}) => {
+      const headers: Record<string, string> = {};
+      const auth = init.auth === undefined ? `Bearer ${secret}` : init.auth;
+      if (auth) headers.authorization = auth;
+      if (init.actor !== null) headers['x-crm-actor'] = init.actor ?? `act-${A}`;
+      const id = url.split('?')[0].split('/').pop()!;
+      return (route as (request: Request, props: { params: Promise<{ id: string }> }) => ReturnType<typeof staffStudentsList>)(
+        new Request(`https://students.example.ru${url}`, { headers }),
+        { params: Promise.resolve({ id }) },
+      );
+    };
+    const list = async (query: string, actor?: string) => {
+      const response = await call(staffStudentsList, `/api/service/staff/students?university=${encodeURIComponent(M)}&${query}`, { actor });
+      assert.equal(response.status, 200, `список: ${response.status}`);
+      return (await response.json()) as Awaited<ReturnType<typeof searchStaffStudents>>;
+    };
+    const names = (r: { items: { fullName: string }[] }) => r.items.map((i) => i.fullName);
+
+    async function mk(opts: {
+      name: string;
+      age: number;
+      gender: 'MALE' | 'FEMALE';
+      spec: string;
+      studyYear: number;
+      city: string | null;
+      skills: string[];
+      about?: string | null;
+      phone?: string | null;
+    }) {
+      const email = `staff-${unique()}@demo.ru`;
+      const created = await store.students.createWithAccount({
+        email,
+        password: 'Tuman-Zakat-4821',
+        fullName: opts.name,
+        phone: opts.phone ?? null,
+        gender: opts.gender,
+        birthYear: year - opts.age,
+        birthDate: `${year - opts.age}-01-01`,
+        photoUrl: null,
+        resumeUrl: null,
+        resumeName: null,
+        university: M,
+        speciality: opts.spec,
+        studyYear: opts.studyYear,
+        city: opts.city,
+        workDays: ['MON'],
+        hoursPerWeek: 10,
+        skills: opts.skills,
+        about: opts.about ?? null,
+        lookingFor: [],
+        institutionId: null,
+        consentVersion: 'test',
+        consentIp: null,
+        termsVersion: 'test',
+        marketingConsent: false,
+      });
+      return { ...created, email };
+    }
+
+    // Регистрируются по очереди: новые первыми — это порядок обратный
+    const sharipova = await mk({ name: 'Шарипова Алия', age: 19, gender: 'FEMALE', spec: 'Информатика', studyYear: 2, city: 'Казань', skills: ['Python', 'SQL'], phone: '+7 900 111-22-33', about: 'Люблю данные. '.repeat(40) });
+    await sleep(15);
+    const elkin = await mk({ name: 'Ёлкин Пётр', age: 22, gender: 'MALE', spec: 'Дизайн', studyYear: 4, city: 'Казань', skills: ['Figma'] });
+    await sleep(15);
+    const ivanov = await mk({ name: 'Иванов Иван', age: 25, gender: 'MALE', spec: 'Юриспруденция', studyYear: 3, city: 'Москва', skills: ['Excel', 'Английский B2'] });
+    await sleep(15);
+    const petrova = await mk({ name: 'Петрова Мария', age: 20, gender: 'FEMALE', spec: 'Информатика', studyYear: 2, city: 'Казань', skills: ['SMM'] });
+    await sleep(15);
+    const sidorova = await mk({ name: 'Сидорова Анна', age: 21, gender: 'FEMALE', spec: 'Маркетинг', studyYear: 3, city: 'Казань', skills: ['SMM', 'Excel'] });
+    await sleep(15);
+    const testov = await mk({ name: 'Тестов Тест', age: 18, gender: 'MALE', spec: 'Физика', studyYear: 1, city: null, skills: [] });
+
+    await store.students.setStudyVerified(sharipova.student.id, true);
+    await store.students.setStudyVerified(ivanov.student.id, true);
+    await store.students.setStudyVerified(petrova.student.id, true);
+    await store.students.setStudyDocument(elkin.student.id, { url: '/api/files/study/00000000-0000-0000-0000-000000000000.pdf', name: 'spravka.pdf' });
+    await store.students.setStatus(elkin.student.id, 'PAUSED');
+    await store.students.setStatus(ivanov.student.id, 'PLACED');
+    const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
+    await store.accounts.setLastSeen(sidorova.account.id, minutesAgo(1));
+    await store.accounts.setLastSeen(petrova.account.id, minutesAgo(1));
+    await store.accounts.setShowPresence(petrova.account.id, false);
+    await store.accounts.setLastSeen(testov.account.id, minutesAgo(3 * 24 * 60));
+
+    await test('без секрета и с чужим секретом — 401, и список, и профиль', async () => {
+      for (const route of [staffStudentsList, staffStudentProfile] as const) {
+        const url = route === staffStudentsList ? '/api/service/staff/students' : `/api/service/staff/students/${sharipova.student.id}`;
+        assert.equal((await call(route, url, { auth: null })).status, 401);
+        assert.equal((await call(route, url, { auth: 'Bearer wrong-secret-wrong-secret-wrong-secret-12' })).status, 401);
+        assert.equal((await call(route, url, { auth: `Basic ${secret}` })).status, 401);
+      }
+    });
+    await test('секрет службы не настроен — 503, а не открытый доступ', async () => {
+      delete process.env.CRM_SERVICE_SECRET;
+      try {
+        assert.equal((await call(staffStudentsList, '/api/service/staff/students', { auth: `Bearer ${secret}` })).status, 503);
+      } finally {
+        process.env.CRM_SERVICE_SECRET = secret;
+      }
+    });
+    await test('список отдаёт анкету без почты, телефона, даты рождения, фото и резюме', async () => {
+      const body = JSON.stringify(await list(''));
+      for (const key of ['email', 'phone', 'birthDate', 'photoUrl', 'resumeUrl', 'resumeName', 'studyDocUrl', 'contacts']) {
+        assert.ok(!body.includes(`"${key}"`), `в списке есть поле ${key}`);
+      }
+      assert.ok(!body.includes(sharipova.email), 'почта в списке');
+      assert.ok(!body.includes('111-22-33'), 'телефон в списке');
+      assert.ok(!body.includes(`${year - 19}-01-01`), 'дата рождения в списке');
+      const result = JSON.parse(body) as Awaited<ReturnType<typeof searchStaffStudents>>;
+      assert.equal(result.total, 6);
+      const item = result.items.find((i) => i.id === sharipova.student.id)!;
+      assert.equal(item.fullName, 'Шарипова Алия');
+      assert.equal(item.age, 19);
+      assert.equal(item.studyVerified, true);
+      assert.ok(item.about!.length <= 201 && item.about!.endsWith('…'), '«о себе» обрезано до ~200 знаков');
+    });
+    await test('фильтры по вузу, специальности, курсу, городу и полу', async () => {
+      assert.deepEqual(names(await list('speciality=информатика&sort=name')), ['Петрова Мария', 'Шарипова Алия']);
+      assert.deepEqual(names(await list('studyYear=3&sort=name')), ['Иванов Иван', 'Сидорова Анна']);
+      assert.equal((await list('city=казан')).total, 4);
+      assert.deepEqual(names(await list('gender=MALE&sort=name')), ['Ёлкин Пётр', 'Иванов Иван', 'Тестов Тест']);
+      assert.equal((await list('university=нет-такого-вуза')).total, 0);
+    });
+    await test('фильтр по возрасту точный: от 20 до 22', async () => {
+      assert.deepEqual(names(await list('ageFrom=20&ageTo=22&sort=name')), ['Ёлкин Пётр', 'Петрова Мария', 'Сидорова Анна']);
+      assert.deepEqual(names(await list('ageFrom=25')), ['Иванов Иван']);
+      assert.deepEqual(names(await list('ageTo=18')), ['Тестов Тест']);
+    });
+    await test('возраст «от» больше «до» — ошибка проверки, а не пустой список', async () => {
+      const response = await call(staffStudentsList, '/api/service/staff/students?ageFrom=30&ageTo=20');
+      assert.equal(response.status, 400);
+    });
+    await test('навыки — подстрока без учёта регистра, все указанные сразу', async () => {
+      assert.deepEqual(names(await list('skills=pyth')), ['Шарипова Алия']);
+      assert.deepEqual(names(await list('skills=smm&sort=name')), ['Петрова Мария', 'Сидорова Анна']);
+      assert.deepEqual(names(await list('skills=smm,excel')), ['Сидорова Анна']);
+      assert.deepEqual(names(await list('skills=excel&sort=name')), ['Иванов Иван', 'Сидорова Анна']);
+    });
+    await test('статусы: учёба подтверждена / на проверке / нет, на паузе, трудоустроен', async () => {
+      assert.deepEqual(names(await list('study=verified&sort=name')), ['Иванов Иван', 'Петрова Мария', 'Шарипова Алия']);
+      assert.deepEqual(names(await list('study=pending')), ['Ёлкин Пётр']);
+      assert.deepEqual(names(await list('study=none&sort=name')), ['Сидорова Анна', 'Тестов Тест']);
+      assert.deepEqual(names(await list('status=paused')), ['Ёлкин Пётр']);
+      assert.deepEqual(names(await list('status=placed')), ['Иванов Иван']);
+      assert.equal((await list('status=active')).total, 4);
+      const all = await list('');
+      const elkinItem = all.items.find((i) => i.id === elkin.student.id)!;
+      assert.equal(elkinItem.paused, true);
+      assert.equal(elkinItem.studyPending, true);
+      assert.equal(all.items.find((i) => i.id === ivanov.student.id)!.placed, true);
+    });
+    await test('поиск по имени: фамилия, часть имени, ё = е, несколько слов, вуз и навык', async () => {
+      assert.deepEqual(names(await list('q=шарипова')), ['Шарипова Алия']);
+      assert.deepEqual(names(await list('q=ЛИЯ')), ['Шарипова Алия']);
+      assert.deepEqual(names(await list('q=елкин')), ['Ёлкин Пётр']);
+      assert.deepEqual(names(await list('q=петр')).sort(), ['Петрова Мария', 'Ёлкин Пётр'].sort());
+      assert.deepEqual(names(await list('q=иван иванов')), ['Иванов Иван']);
+      assert.deepEqual(names(await list('q=figma')), ['Ёлкин Пётр']);
+      assert.deepEqual(names(await list('q=юриспр')), ['Иванов Иван']);
+      assert.equal((await list('q=несуществующий')).total, 0);
+    });
+    await test('поиск по имени сочетается с фильтрами', async () => {
+      assert.deepEqual(names(await list('q=а&city=москва')), ['Иванов Иван']);
+      assert.deepEqual(names(await list('q=ия&gender=FEMALE&study=verified&sort=name')), ['Петрова Мария', 'Шарипова Алия']);
+      assert.deepEqual(names(await list('q=ия&gender=FEMALE&study=verified&city=казань&speciality=информ&sort=name')), ['Петрова Мария', 'Шарипова Алия']);
+      assert.deepEqual(names(await list('q=лия&gender=MALE')), []);
+    });
+    await test('присутствие: скрывший показ — null, как и не заходивший; видимый — время', async () => {
+      const r = await list('');
+      const by = (id: string) => r.items.find((i) => i.id === id)!;
+      assert.equal(by(petrova.student.id).lastSeenAt, null);
+      assert.equal(by(elkin.student.id).lastSeenAt, null);
+      assert.ok(by(sidorova.student.id).lastSeenAt);
+      assert.ok(by(testov.student.id).lastSeenAt);
+    });
+    await test('«в сети за N минут» не находит скрывшего показ', async () => {
+      assert.deepEqual(names(await list('onlineWithin=10')), ['Сидорова Анна']);
+      assert.deepEqual(names(await list('onlineWithin=10000&sort=seen')), ['Сидорова Анна', 'Тестов Тест']);
+    });
+    await test('сортировка по входу: скрывшие и не заходившие в конце, порядок по скрытому времени не выдаёт', async () => {
+      const r = await list('sort=seen');
+      assert.deepEqual(names(r).slice(0, 2), ['Сидорова Анна', 'Тестов Тест']);
+      // Петрова заходила минуту назад, но скрыла показ — места среди видимых у неё нет
+      assert.ok(names(r).indexOf('Петрова Мария') >= 2);
+    });
+    await test('сортировка по имени, по вузу и новые регистрации первыми', async () => {
+      assert.deepEqual(names(await list('sort=name')), ['Ёлкин Пётр', 'Иванов Иван', 'Петрова Мария', 'Сидорова Анна', 'Тестов Тест', 'Шарипова Алия']);
+      // «Ё» в русской сортировке стоит рядом с «Е», а не после «Я»
+      assert.deepEqual(names(await list('sort=new')), ['Тестов Тест', 'Сидорова Анна', 'Петрова Мария', 'Иванов Иван', 'Ёлкин Пётр', 'Шарипова Алия']);
+      const byUni = await list('sort=university');
+      assert.equal(byUni.total, 6);
+      // Один вуз у всех: внутри него по специальности (Дизайн, Информатика, Информатика, Маркетинг, Физика, Юриспруденция)
+      assert.deepEqual(byUni.items.map((i) => i.speciality), ['Дизайн', 'Информатика', 'Информатика', 'Маркетинг', 'Физика', 'Юриспруденция']);
+    });
+    await test('пагинация: страницы не пересекаются, потолок — 50 на страницу', async () => {
+      const p1 = await list('pageSize=4&page=1');
+      const p2 = await list('pageSize=4&page=2');
+      assert.equal(p1.items.length, 4);
+      assert.equal(p2.items.length, 2);
+      assert.equal(p1.total, 6);
+      assert.ok(p1.items.every((a) => !p2.items.some((b) => b.id === a.id)));
+      const huge = await list('pageSize=500');
+      assert.equal(huge.pageSize, MAX_PAGE_SIZE);
+      assert.equal(MAX_PAGE_SIZE, 50);
+      assert.ok(huge.items.length <= 50);
+      assert.equal((await list('')).pageSize, 20);
+      // Пагинация и в режиме с поиском в памяти
+      const q1 = await list('q=а&sort=name&pageSize=2&page=2');
+      assert.equal(q1.items.length, 2);
+      assert.equal(q1.page, 2);
+    });
+    await test('слишком большая выборка для поиска по имени — подсказка «уточните фильтры», а не расшифровка всех', async () => {
+      const query = parseStaffSearch(new URLSearchParams({ university: M, q: 'а' }));
+      const result = await searchStaffStudents(query, new Date(), 3);
+      assert.equal(result.items.length, 0);
+      assert.equal(result.total, 6);
+      assert.match(result.hint ?? '', /уточните фильтры/i);
+      // Без поиска по имени и навыкам тот же размер выборки ничему не мешает
+      const plain = await searchStaffStudents(parseStaffSearch(new URLSearchParams({ university: M })), new Date(), 3);
+      assert.equal(plain.items.length, 6);
+      assert.equal(plain.hint, null);
+      // Сортировка по имени на большой выборке — новые первыми и пояснение
+      const sorted = await searchStaffStudents(parseStaffSearch(new URLSearchParams({ university: M, sort: 'name' })), new Date(), 3);
+      assert.equal(sorted.items.length, 6);
+      assert.ok(sorted.hint);
+    });
+    await test('мусор в параметрах — 400, а не 500', async () => {
+      for (const bad of ['studyYear=99', 'gender=robot', 'sort=hack', 'onlineWithin=-5', 'page=0', 'study=maybe']) {
+        const response = await call(staffStudentsList, `/api/service/staff/students?${bad}`);
+        assert.equal(response.status, 400, bad);
+      }
+      // Подозрительные строки в тексте безвредны: параметризованный запрос, в памяти — подстрока
+      const response = await call(staffStudentsList, `/api/service/staff/students?city=${encodeURIComponent('\'; drop table "Student"; --')}`);
+      assert.equal(response.status, 200);
+      assert.equal(((await response.json()) as { total: number }).total, 0);
+    });
+    await test('список журнал не пишет', async () => {
+      const count = async () => (await store.audit.list(2000)).filter((e) => e.action.startsWith('student.profile.read')).length;
+      const before = await count();
+      await list('q=шарипова');
+      assert.equal(await count(), before);
+    });
+
+    const profileUrl = (id: string, query = '') => `/api/service/staff/students/${id}${query}`;
+    const readAudit = async (action: string, studentId: string, actor: string) =>
+      (await store.audit.list(2000)).filter((e) => e.action === action && e.entityId === studentId && e.actorLabel === `CRM:${actor}`);
+
+    await test('профиль без contacts=1: все открытые поля, но без почты, телефона и даты рождения', async () => {
+      const response = await call(staffStudentProfile, profileUrl(sharipova.student.id), { actor: `prof-${A}` });
+      assert.equal(response.status, 200);
+      const body = await response.text();
+      assert.ok(!body.includes(sharipova.email) && !body.includes('111-22-33'), 'контакты без contacts=1');
+      assert.ok(!body.includes(`${year - 19}-01-01`));
+      const profile = JSON.parse(body);
+      assert.equal(profile.fullName, 'Шарипова Алия');
+      assert.equal(profile.contacts, null);
+      assert.equal(profile.about.length > 200, true, 'в профиле «о себе» целиком');
+      assert.deepEqual(profile.skills, ['Python', 'SQL']);
+      assert.equal(profile.age, 19);
+    });
+    await test('contacts=1 отдаёт почту и телефон; любое другое значение — нет', async () => {
+      const opened = await (await call(staffStudentProfile, profileUrl(sharipova.student.id, '?contacts=1'), { actor: `prof-${A}` })).json();
+      assert.deepEqual(opened.contacts, { email: sharipova.email, phone: '+7 900 111-22-33' });
+      for (const value of ['0', 'true', 'yes', '']) {
+        const other = await (await call(staffStudentProfile, profileUrl(sharipova.student.id, `?contacts=${value}`), { actor: `prof-${A}` })).json();
+        assert.equal(other.contacts, null, `contacts=${value}`);
+      }
+    });
+    await test('профиль: журнал платформы с актором CRM:<id>, без ФИО, не чаще раза в 10 минут', async () => {
+      const actor = `aud-${A}`;
+      const id = petrova.student.id;
+      await call(staffStudentProfile, profileUrl(id), { actor });
+      await call(staffStudentProfile, profileUrl(id), { actor });
+      const plain = await readAudit('student.profile.read', id, actor);
+      assert.equal(plain.length, 1);
+      assert.equal(plain[0].entity, 'Student');
+      assert.ok(!JSON.stringify(plain[0]).includes('Петрова'), 'в журнале нет ФИО');
+      assert.equal((await readAudit('student.profile.read.contacts', id, actor)).length, 0);
+
+      await call(staffStudentProfile, profileUrl(id, '?contacts=1'), { actor });
+      await call(staffStudentProfile, profileUrl(id, '?contacts=1'), { actor });
+      assert.equal((await readAudit('student.profile.read.contacts', id, actor)).length, 1);
+      // Другой сотрудник — своя запись; другой студент — тоже
+      await call(staffStudentProfile, profileUrl(id, '?contacts=1'), { actor: `${actor}-b` });
+      assert.equal((await readAudit('student.profile.read.contacts', id, `${actor}-b`)).length, 1);
+      await call(staffStudentProfile, profileUrl(sidorova.student.id, '?contacts=1'), { actor });
+      assert.equal((await readAudit('student.profile.read.contacts', sidorova.student.id, actor)).length, 1);
+    });
+    await test('журнал: окно дедупликации истекает', async () => {
+      const entry = { accountId: null, actorLabel: `CRM:win-${M}`, action: 'student.profile.read', entity: 'Student', entityId: 'x', ip: null, userAgent: null, meta: null };
+      await store.audit.log(entry);
+      assert.equal(await store.audit.recentExists({ actorLabel: entry.actorLabel, action: entry.action, entityId: 'x', withinMs: 60_000 }), true);
+      await sleep(30);
+      assert.equal(await store.audit.recentExists({ actorLabel: entry.actorLabel, action: entry.action, entityId: 'x', withinMs: 10 }), false);
+      assert.equal(await store.audit.recentExists({ actorLabel: entry.actorLabel, action: 'student.profile.read.contacts', entityId: 'x', withinMs: 60_000 }), false);
+    });
+    await test('профиль: без сотрудника в заголовке — 400, неизвестный студент — 404, и в журнал это не пишется', async () => {
+      assert.equal((await call(staffStudentProfile, profileUrl(sharipova.student.id), { actor: null })).status, 400);
+      assert.equal((await call(staffStudentProfile, profileUrl(sharipova.student.id), { actor: 'bad actor!' })).status, 400);
+      const actor = `nf-${A}`;
+      assert.equal((await call(staffStudentProfile, profileUrl('no-such-student', '?contacts=1'), { actor })).status, 404);
+      assert.equal((await readAudit('student.profile.read.contacts', 'no-such-student', actor)).length, 0);
+    });
+    await test('профиль скрывшего показ: lastSeenAt = null', async () => {
+      const profile = await (await call(staffStudentProfile, profileUrl(petrova.student.id), { actor: `pr-${A}` })).json();
+      assert.equal(profile.lastSeenAt, null);
+      const seen = await (await call(staffStudentProfile, profileUrl(sidorova.student.id), { actor: `pr-${A}` })).json();
+      assert.ok(seen.lastSeenAt);
+    });
+    await test('лимит: поиск на сотрудника — 120 в минуту, раскрытие контактов — 60 за 10 минут', async () => {
+      const rl = `rl-${A}`;
+      let last = 200;
+      for (let i = 0; i < RATE_LIMITS.staffStudents.limit + 1; i++) {
+        last = (await call(staffStudentsList, '/api/service/staff/students?pageSize=1', { actor: rl })).status;
+      }
+      assert.equal(last, 429);
+      // Лимит у одного сотрудника не задевает другого
+      assert.equal((await call(staffStudentsList, '/api/service/staff/students?pageSize=1', { actor: `${rl}-other` })).status, 200);
+
+      const ct = `ct-${A}`;
+      const statuses: number[] = [];
+      for (let i = 0; i < RATE_LIMITS.staffContacts.limit + 1; i++) {
+        statuses.push((await call(staffStudentProfile, profileUrl(testov.student.id, '?contacts=1'), { actor: ct })).status);
+      }
+      assert.equal(statuses[RATE_LIMITS.staffContacts.limit - 1], 200);
+      assert.equal(statuses[RATE_LIMITS.staffContacts.limit], 429);
+    });
+
+    if (savedSecret === undefined) delete process.env.CRM_SERVICE_SECRET;
+    else process.env.CRM_SERVICE_SECRET = savedSecret;
+  }
 
   // ---------- Образ: словарь паролей ----------
   console.log('\nСборка');

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { describeUser } from "@/components/messages/direct-conversation-list";
 import { MessageThread } from "@/components/messages/message-thread";
+import { PresenceLabel } from "@/components/presence/presence-label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { requireClientActor } from "@/lib/auth/session";
@@ -60,6 +61,12 @@ export default async function ClientMessageThreadPage({
             {describeUser(user.role as UserRole, user.clientName)}
             {user.position ? ` · ${user.position}` : ""}
           </div>
+          {user.presence && (
+            <PresenceLabel
+              lastSeenAt={user.presence.lastSeenAt}
+              className="text-xs text-muted-foreground"
+            />
+          )}
         </div>
       </div>
 

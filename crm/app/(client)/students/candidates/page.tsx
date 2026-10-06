@@ -94,7 +94,7 @@ export default async function StudentsCandidatesPage({
 
       {selected && (
         <>
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="pill-scroller flex gap-2">
             {vacancies.map((v) => (
               <Link
                 key={v.id}

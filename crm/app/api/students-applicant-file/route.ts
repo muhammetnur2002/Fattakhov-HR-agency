@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { recordStudentFileRead } from "@/lib/services/student-file-audit";
 import { fetchApplicantFile } from "@/lib/students-service";
 
 /**
  * Фото и резюме студента, откликнувшегося на вакансию клиента. Файл берётся с
  * платформы по отклику своей компании (чужой отклик платформа не отдаёт), поэтому
  * клиент видит только тех, кто откликнулся именно ему. Секрет остаётся на сервере.
+ * Чтение записывается в журнал доступа к ПДн (в фоне, выдачу не задерживает).
  */
 export async function GET(request: NextRequest) {
   const actor = await requireClientActor();
@@ -21,6 +23,12 @@ export async function GET(request: NextRequest) {
   const user = await prisma.user.findFirst({ where: { id: actor.id }, select: { fullName: true } });
   const upstream = await fetchApplicantFile(actor.clientId, applicationId, kind, user?.fullName ?? "CRM");
   if (!upstream.ok || !upstream.body) return new NextResponse(null, { status: 404 });
+
+  recordStudentFileRead(
+    actor,
+    { kind: kind === "photo" ? "applicant_photo" : "applicant_resume", objectId: applicationId },
+    request.headers,
+  ).catch(() => {});
 
   return new NextResponse(upstream.body, {
     headers: {

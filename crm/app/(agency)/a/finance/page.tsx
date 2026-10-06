@@ -44,7 +44,15 @@ export default async function FinancePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/*
+        Не sm:grid-cols-3, а колонки с минимальной шириной: три плитки
+        встают в ряд, только если каждой хватает места, иначе ряд
+        переносится. Сумма вроде «105 000 ₽» не переносится вовсе (Intl
+        ставит неразрывные пробелы), и жёсткие три колонки на 1024 при
+        корне 125% выталкивали плитку за край страницы на 20px. Минимум
+        15rem считается от базового размера и подстраивается вместе с ним.
+      */}
+      <div className="grid gap-4 sm:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
         <StatCard
           label="Готовы к выставлению"
           value={pending.length}

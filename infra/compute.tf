@@ -61,13 +61,19 @@ locals {
 
   # JSON — корректный YAML, поэтому словарь переменных встаёт
   # в `environment:` как есть, без ручной сборки отступов
-  docker_compose = replace(replace(replace(replace(replace(
+  #
+  # CADDYFILE_PLACEHOLDER вставляется последним: текст Caddyfile не должен
+  # попасть под поиск остальных меток.
+  docker_compose = replace(replace(replace(replace(replace(replace(replace(replace(
     file("${path.module}/docker-compose.yaml"),
     "APP_IMAGE_PLACEHOLDER", var.app_image),
     "TOOLS_IMAGE_PLACEHOLDER", var.tools_image),
     "UA_IMAGE_PLACEHOLDER", var.unified_agent_image),
     "UA_CONFIG_PLACEHOLDER", jsonencode(local.unified_agent_config)),
-  "RUNTIME_ENV_PLACEHOLDER", jsonencode(local.crm_env))
+    "RUNTIME_ENV_PLACEHOLDER", jsonencode(local.crm_env)),
+    "MAINTENANCE_MODE_PLACEHOLDER", local.maintenance_mode_compose),
+    "MAINTENANCE_BYPASS_PLACEHOLDER", local.maintenance_bypass_compose),
+  "CADDYFILE_PLACEHOLDER", local.caddyfile_app_compose)
 }
 
 resource "yandex_compute_instance" "app" {
@@ -104,7 +110,7 @@ resource "yandex_compute_instance" "app" {
   boot_disk {
     initialize_params {
       image_id = data.yandex_compute_image.container_optimized.id
-      size     = 20
+      size     = 40
       type     = "network-ssd"
     }
   }
@@ -152,7 +158,9 @@ resource "yandex_compute_instance" "app" {
       # Отступ в шесть пробелов: содержимое вставляется внутрь
       # блока content: | и обязано быть с ним выровнено, иначе
       # cloud-init молча пропустит файл
-      CADDYFILE_INDENTED = indent(6, file("${path.module}/Caddyfile"))
+      # Копия Caddyfile на диске — для справки: контейнер caddy читает
+      # конфигурацию из compose (CADDYFILE), см. maintenance.tf
+      CADDYFILE_INDENTED = indent(6, local.caddyfile_app)
       ENVFILE_INDENTED   = indent(6, file(pathexpand(var.env_file)))
     }))
   }
@@ -177,10 +185,12 @@ resource "yandex_compute_instance" "app" {
     прочитав план, а не по «apply прошёл».
 
     Машина остаётся на образе, с которого создана; обновляется он там,
-    где пересоздание и так нужно: правка prod.env или Caddyfile идёт
-    через -replace, и новая машина возьмёт свежий образ (ignore_changes
-    касается только существующей машины, не создания новой). Так обновление
-    ОС — осознанное решение, а не побочный эффект выкатки тега.
+    где пересоздание и так нужно: правка prod.env идёт через -replace
+    (Caddyfile с 06.10.2026 едет в compose, см. maintenance.tf, и
+    пересоздания не требует), и новая машина возьмёт свежий образ
+    (ignore_changes касается только существующей машины, не создания
+    новой). Так обновление ОС — осознанное решение, а не побочный
+    эффект выкатки тега.
   */
   lifecycle {
     ignore_changes = [boot_disk[0].initialize_params[0].image_id]

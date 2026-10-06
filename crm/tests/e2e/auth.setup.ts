@@ -1,4 +1,6 @@
-import { test as setup, expect } from "@playwright/test";
+import { test as setup } from "@playwright/test";
+
+import { loginAs } from "./dev-totp";
 
 /**
  * Вход один раз на весь прогон — не в каждом тесте.
@@ -21,14 +23,12 @@ async function login(
   page: import("@playwright/test").Page,
   email: string,
 ): Promise<void> {
-  await page.goto("/login");
-  await page.locator("#email").fill(email);
-  await page.locator("#password").fill(DEV_PASSWORD);
-  await page.getByRole("button", { name: "Войти" }).click();
   // Обе стороны после входа уводят с формы: агентство на /a, клиента
   // на /dashboard. Ждём именно ухода с /login, а не конкретный адрес —
   // так сетап не знает лишнего о том, куда каждая роль попадает.
-  await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
+  // Сотрудникам агентства 2FA обязательна: код считается из известного
+  // тестового секрета seed (prisma/dev-totp.ts), см. dev-totp.ts
+  await loginAs(page, email, DEV_PASSWORD);
 }
 
 setup("вход рекрутёром", async ({ page }) => {

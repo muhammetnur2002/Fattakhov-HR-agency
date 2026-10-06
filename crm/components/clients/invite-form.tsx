@@ -89,8 +89,15 @@ export function InviteForm({
         относительно обоих. Subgrid убирает саму возможность: ряд подписи
         и ряд поля общие для всех трёх колонок.
 
-        Высоты рядов — не auto, а числом: 20px под подпись, 32px —
-        ровно высота Input/SelectTrigger/Button (h-8).
+        Высоты рядов — не auto, а числом: 20px под подпись, 2rem —
+        ровно высота Input/SelectTrigger/Button (h-8): 32px, а на корне
+        125% (app/globals.css) — 40px. Пикселями 32 поле вылезало из ряда
+        на 8px и съедало отступ до подсказки ниже.
+
+        В ряд — только с lg. На 768 при корне 125% поля, выбор роли (w-60)
+        и кнопка в ширину карточки не помещались, и «Пригласить» молча
+        срезался её краем на 95px; ниже lg поля идут столбиком, как на
+        телефоне.
 
         И второе, менее очевидное: промежуток между подписью и полем
         задавался дважды — один раз на родителе (общий gap), второй раз
@@ -101,8 +108,11 @@ export function InviteForm({
         учёл, отчего поле вставало на 4px выше положенного. Число
         одно, место одно — на родителе.
       */}
-      <div className="grid gap-x-4 gap-y-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:grid-rows-[20px_32px] sm:items-start">
-        <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
+      {/* На сенсорном экране поля и кнопка выше h-8 (min-height 2.4em,
+          globals.css), и ряд поля растёт вместе с ними: иначе поля
+          вылезали бы из ряда */}
+      <div className="grid gap-x-4 gap-y-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:grid-rows-[20px_2rem] lg:items-start lg:touch:grid-rows-[20px_2.75rem]">
+        <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
           <Label htmlFor="invite-email">Email</Label>
           <Input
             id="invite-email"
@@ -113,12 +123,12 @@ export function InviteForm({
           />
         </div>
 
-        <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
+        <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
           <Label htmlFor="invite-position">Должность</Label>
           <Input id="invite-position" name="position" placeholder="Руководитель отдела" />
         </div>
 
-        <div className="space-y-2 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:space-y-0">
+        <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
           <Label htmlFor="invite-role">Роль</Label>
           <Select
             name="role"
@@ -126,7 +136,7 @@ export function InviteForm({
           >
             {/* 52 не хватало: «Нанимающий менеджер» упирался в стрелку
                 и обрезался на последней букве */}
-            <SelectTrigger id="invite-role" className="w-full sm:w-60">
+            <SelectTrigger id="invite-role" className="w-full lg:w-60">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -142,7 +152,7 @@ export function InviteForm({
         {/* Колонка указана явно вместе с рядом. С одним только рядом
             раскладка ставила кнопку в первую свободную ячейку строки —
             то есть перед Email, хотя в разметке она последняя */}
-        <div className="sm:col-start-4 sm:row-start-2">
+        <div className="lg:col-start-4 lg:row-start-2">
           <SubmitButton />
         </div>
       </div>

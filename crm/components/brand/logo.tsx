@@ -3,6 +3,14 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
+ * Знак и надпись состоят из тонких линий и мелких букв, и сжатие
+ * по умолчанию (75) их заметно мылит — особенно в шапке, где логотип
+ * небольшой. Значение обязано быть в images.qualities (next.config.ts),
+ * иначе Next молча округлит его до ближайшего разрешённого.
+ */
+const LOGO_QUALITY = 92;
+
+/**
  * Логотип Fattakhov HR Agency.
  *
  * Два начертания под тему сразу в разметке, переключаются классом `dark:`.
@@ -62,6 +70,7 @@ export function Logo({
           width={width}
           height={height}
           priority={priority}
+          quality={LOGO_QUALITY}
           className="h-full w-auto"
         />
         {!decorative && <span className="sr-only">Fattakhov HR Agency</span>}
@@ -82,6 +91,7 @@ export function Logo({
         width={width}
         height={height}
         priority={priority}
+        quality={LOGO_QUALITY}
         className="h-full w-auto dark:hidden"
       />
       <Image
@@ -90,6 +100,7 @@ export function Logo({
         width={width}
         height={height}
         priority={priority}
+        quality={LOGO_QUALITY}
         className="hidden h-full w-auto dark:block"
       />
       {!decorative && <span className="sr-only">Fattakhov HR Agency</span>}

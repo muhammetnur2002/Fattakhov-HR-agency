@@ -8,13 +8,39 @@
 #
 # Caddy на этой машине включается (students_vm_caddy) только после того, как запись
 # students на Рег.ру переключена на её адрес: до этого проверка домена не пройдёт.
+#
+# Файл на машину попадает так же, как Caddyfile сайта: склеивается Terraform
+# с maintenance.caddy и уходит переменной CADDYFILE контейнера caddy в составе
+# docker-compose (обычный apply, без пересоздания машины). Копия
+# /etc/caddy/Caddyfile из cloud-init осталась для справки и ничем не читается.
 
 {
   email profattakhov@gmail.com
+
+  # Защита от медленных и раздутых запросов. Таймаут записи (write) не ставим
+  # намеренно: он оборвал бы поток чата SSE (/api/messages/stream). Лимита
+  # запросов на клиента в самом Caddy нет (нужен сборочный плагин): входы и
+  # отклики ограничивает приложение, здесь — размеры, время чтения и число
+  # соединений к приложению.
+  servers {
+    max_header_size 32KB
+    timeouts {
+      read_header 15s
+      read_body 10m
+      idle 5m
+    }
+  }
 }
 
 students.fattakhovhr.ru {
   encode zstd gzip
+
+  # Потолок тела запроса: самая большая загрузка через сервер — 50 МБ (видео,
+  # UPLOAD_LIMITS в lib/validation.ts) плюс поля формы. Крупнее файлы идут
+  # напрямую в хранилище по presign и через Caddy не проходят.
+  request_body {
+    max_size 55MB
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -24,11 +50,24 @@ students.fattakhovhr.ru {
     -Server
   }
 
+  # Страница «технические работы» — см. Caddyfile и maintenance.caddy. Бренд
+  # и подпись у платформы свои.
+  import maintenance_gate "Fattakhov Students" "Студенческая платформа"
+  import maintenance_errors "Fattakhov Students" "Студенческая платформа"
+
   # flush_interval -1: чат платформы получает новые сообщения потоком
   # (SSE, /api/messages/stream) — ответ отдаётся сразу, без буфера Caddy
   reverse_proxy students:3000 {
     flush_interval -1
     header_up X-Forwarded-For {remote_host}
     header_up X-Real-IP {remote_host}
+
+    # До 512 соединений к приложению: потоки чата живут долго, по одному на
+    # открытую вкладку, поэтому запас больше, чем у кабинета.
+    transport http {
+      dial_timeout 5s
+      response_header_timeout 120s
+      max_conns_per_host 512
+    }
   }
 }

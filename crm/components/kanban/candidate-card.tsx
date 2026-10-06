@@ -31,6 +31,7 @@ export function CandidateCard({
   onToggleSelect,
   onMoveToStage,
   now,
+  movable,
 }: {
   card: KanbanCard;
   stage: KanbanStage;
@@ -44,6 +45,12 @@ export function CandidateCard({
   selected?: boolean;
   onToggleSelect?: () => void;
   onMoveToStage: (cardId: string, stageId: string) => void;
+  /**
+   * Показывать меню «перевести на этап». По умолчанию — там же, где
+   * перетаскивание. Отдельно нужно в списке по этапам на телефоне:
+   * там перетаскивать некуда, а переводить надо.
+   */
+  movable?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id, disabled: !draggable });
@@ -83,20 +90,27 @@ export function CandidateCard({
       className={cn(
         "rounded-md border bg-background p-3 text-sm",
         /*
-          Два обязательных свойства для перетаскивания указателем,
-          без которых оно просто не начинается:
+          Перетаскивание: мышью — с порога в 6 пикселей, пальцем — долгим
+          нажатием (датчики в kanban-board.tsx).
 
-          touch-none - иначе браузер забирает жест себе. Доска
-          прокручивается по горизонтали, и на трекпаде или на телефоне
-          движение по карточке считается прокруткой, а не перетаскиванием.
+          touch-manipulation, а не touch-none. Раньше был один датчик
+          указателя, и без touch-none жест забирал браузер. С отдельным
+          датчиком касаний наоборот: карточка обязана отдавать браузеру
+          обычный свайп, иначе доску на телефоне не пролистать — только
+          за промежутки между карточками. Пока держишь, dnd-kit сам
+          гасит прокрутку.
 
-          select-none - иначе движение по имени кандидата выделяет текст,
-          и выделение перехватывает жест.
+          select-none — иначе движение по имени кандидата выделяет текст,
+          и выделение перехватывает жест. [-webkit-touch-callout:none] —
+          иначе долгое нажатие на имя (это ссылка) открывает в iOS меню
+          предпросмотра ссылки вместо того, чтобы поднять карточку.
 
-          Оба только для перетаскиваемого варианта: в кабинете клиента
-          карточки неподвижны, и отбирать там обычное поведение незачем.
+          Всё это только для перетаскиваемого варианта: в кабинете
+          клиента карточки неподвижны, и отбирать там обычное поведение
+          незачем.
         */
-        draggable && "cursor-grab touch-none select-none active:cursor-grabbing",
+        draggable &&
+          "cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] active:cursor-grabbing",
         isDragging && "opacity-40",
         overdue && "border-destructive/50",
         rejected && "opacity-60",
@@ -126,7 +140,7 @@ export function CandidateCard({
             тащить карточку и листать доску вбок одним и тем же пальцем
             нельзя — жесты конфликтуют. Тап по пункту меню работает
             всегда, независимо от того, помещается ли доска на экране. */}
-        {draggable && (
+        {(movable ?? draggable) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

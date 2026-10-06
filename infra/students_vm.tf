@@ -76,6 +76,11 @@ locals {
     enable_caddy         = var.students_vm_caddy
     enable_cron          = var.students_vm_cron
 
+    # Конфигурация Caddy и режим плановых работ — см. maintenance.tf
+    caddyfile_json          = local.caddyfile_students_compose
+    maintenance_mode_json   = local.maintenance_mode_compose
+    maintenance_bypass_json = local.maintenance_bypass_compose
+
     unified_agent_image       = var.unified_agent_image
     unified_agent_config_json = jsonencode(local.unified_agent_config)
   })
@@ -122,7 +127,7 @@ resource "yandex_compute_instance" "students" {
     # В user-data здесь нет секретов (только Caddyfile и таймер уборки образов),
     # но sensitive оставлен единообразно с fhr-app
     user-data = sensitive(templatefile("${path.module}/cloud-init-students.yaml.tftpl", {
-      CADDYFILE_INDENTED = indent(6, file("${path.module}/Caddyfile.students"))
+      CADDYFILE_INDENTED = indent(6, local.caddyfile_students)
     }))
   }
 

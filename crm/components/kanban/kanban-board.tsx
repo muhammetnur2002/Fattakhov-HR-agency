@@ -3,7 +3,8 @@
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -170,9 +171,26 @@ export function KanbanBoard({
     );
   }
 
-  // Небольшой порог, иначе клик по имени кандидата превращается в перетаскивание
+  /*
+    Мышь и палец — разные датчики, и у каждого своё условие старта.
+
+    Мышь и трекпад: 6 пикселей движения — иначе клик по имени кандидата
+    превращался бы в перетаскивание.
+
+    Палец: долгое нажатие, 250 мс, как в iOS. Раньше был один датчик
+    указателя на всё, и карточке нужно было touch-action: none — иначе
+    браузер забирал жест себе. Цена: на телефоне свайп по карточке
+    не листал доску, а доска там шириной в 4–5 экранов, и пролистать
+    её можно было только за промежутки между карточками. Теперь
+    быстрый свайп — прокрутка, нажал и держишь — карточка поднялась.
+    tolerance 8 — палец чуть дрожит, пока держишь, и это не должно
+    срывать нажатие.
+  */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
   );
 
   /*
@@ -357,6 +375,30 @@ export function KanbanBoard({
 
   return (
     <div className={cn((compareEnabled || bulkEnabled) && "pb-16")}>
+      {/*
+        Телефон: не доска, а список по этапам. Доска там шириной в 4–5
+        экранов (замер 21.09.2026), и чтобы увидеть, кто на «Оффере»,
+        приходилось листать вбок мимо всех колонок. Здесь сверху
+        переключатель этапов со счётчиками, ниже — карточки одного
+        этапа во всю ширину, перевод — меню на карточке.
+
+        Вне DndContext намеренно: у карточки те же id, что на доске,
+        а два перетаскиваемых узла с одним id в одном контексте dnd-kit
+        путает. Снаружи контекста перетаскивание у списка просто не
+        подключено — оно ему и не нужно.
+      */}
+      <MobileStageList
+        stages={stages}
+        cards={cards}
+        hrefBase={hrefBase}
+        movable={draggable}
+        selectable={compareEnabled || bulkEnabled}
+        selected={selected}
+        onToggleSelect={toggleSelect}
+        onMoveToStage={moveCard}
+        now={now}
+      />
+
       <DndContext
         // Без явного id dnd-kit генерирует его сам, и на сервере он
         // получается не тот, что на клиенте — гидратация ругается
@@ -390,8 +432,15 @@ export function KanbanBoard({
             тёмным на тёмном, тогда как должность и зарплата рядом
             читались нормально.
           */}
-          <div className="dark relative rounded-xl bg-background p-3 text-foreground">
-            <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-4">
+          <div className="dark relative hidden rounded-xl bg-background p-3 text-foreground md:block">
+            {/*
+              relative — чтобы прокрутка обрезала и то, что спозиционировано
+              абсолютно: скрытые <input> чекбоксов Radix (до гидратации они
+              есть в разметке у каждой карточки) иначе отсчитывались от
+              обёртки доски выше, выходили из-под обрезки, и вся страница
+              до загрузки скриптов уезжала вбок на ширину невидимых колонок
+            */}
+            <div ref={scrollRef} className="relative flex gap-3 overflow-x-auto pb-4">
               {stages.map((stage) => (
                 <Column
                   key={stage.id}
@@ -432,7 +481,9 @@ export function KanbanBoard({
         и «перевести десятерых», и отдельного порога тут не нужно.
       */}
       {bulkEnabled && selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-4 z-10 flex justify-center px-4">
+        // На телефоне — над нижней панелью разделов: та выше по z-index
+        // и закрыла бы панель целиком (кнопка «Перевести» под ней)
+        <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+var(--tabbar-offset)+8px)] z-10 flex justify-center px-4 md:bottom-4">
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-background px-4 py-2 text-sm shadow-lg">
             <span className="tabular-nums">Выбрано: {selected.size}</span>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
@@ -479,7 +530,8 @@ export function KanbanBoard({
       {/* Появляется только когда есть с кем сравнивать: одна карточка —
           это просто карточка, сравнение начинается с двух */}
       {compareEnabled && selected.size >= 2 && (
-        <div className="fixed inset-x-0 bottom-4 z-10 flex justify-center px-4">
+        // Над нижней панелью разделов на телефоне — как и панель выше
+        <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+var(--tabbar-offset)+8px)] z-10 flex justify-center px-4 md:bottom-4">
           <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2 text-sm shadow-lg">
             <span>Выбрано: {selected.size}</span>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
@@ -689,5 +741,111 @@ function MovingCard({
         now={now}
       />
     </motion.div>
+  );
+}
+
+/**
+ * Воронка на телефоне: переключатель этапов и карточки одного этапа.
+ *
+ * Выбранный этап по умолчанию — первый, где кто-то есть: открыв вакансию
+ * с пустым лонг-листом, человек иначе видел бы «Пусто» и не понимал,
+ * где кандидаты.
+ */
+function MobileStageList({
+  stages,
+  cards,
+  hrefBase,
+  movable,
+  selectable,
+  selected,
+  onToggleSelect,
+  onMoveToStage,
+  now,
+}: {
+  stages: KanbanStage[];
+  cards: KanbanCard[];
+  hrefBase: string;
+  movable: boolean;
+  selectable?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onMoveToStage: (cardId: string, stageId: string) => void;
+  now: number;
+}) {
+  const firstFilled =
+    stages.find((s) => cards.some((c) => c.stageId === s.id)) ?? stages[0];
+  const [stageId, setStageId] = useState(firstFilled?.id);
+  const stage = stages.find((s) => s.id === stageId) ?? stages[0];
+  if (!stage) return null;
+
+  const list = cards.filter((c) => c.stageId === stage.id);
+
+  return (
+    <div className="dark rounded-xl bg-background p-3 text-foreground md:hidden">
+      <div
+        role="tablist"
+        aria-label="Этапы воронки"
+        className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 pb-3"
+      >
+        {stages.map((s) => {
+          const count = cards.filter((c) => c.stageId === s.id).length;
+          const active = s.id === stage.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setStageId(s.id)}
+              className={cn(
+                // min-h-10 — тот же ориентир, что у остальных элементов
+                // управления на сенсорном экране (globals.css, 40px)
+                "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm transition-colors",
+                active
+                  ? "border-foreground bg-foreground text-background"
+                  : "text-muted-foreground",
+                // Скрытые от клиента этапы отличаются и здесь — граница
+                // кабинета клиента видна рекрутеру и на телефоне
+                !s.visibleToClient && !active && "border-dashed",
+              )}
+            >
+              {s.name}
+              <span className="tabular-nums opacity-70">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {!stage.visibleToClient && (
+        <div className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="size-3" />
+          этот этап клиенту не виден
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {list.map((card) => (
+          <CandidateCard
+            key={card.id}
+            card={card}
+            stage={stage}
+            allStages={stages}
+            hrefBase={hrefBase}
+            draggable={false}
+            movable={movable}
+            selectable={selectable}
+            selected={selected?.has(card.id)}
+            onToggleSelect={() => onToggleSelect?.(card.id)}
+            onMoveToStage={onMoveToStage}
+            now={now}
+          />
+        ))}
+        {list.length === 0 && (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            На этом этапе никого
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

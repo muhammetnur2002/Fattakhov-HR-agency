@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { canDo } from "@/lib/access";
-import { getActor } from "@/lib/auth/session";
+import { getGatedActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { buildCsv, reportFileName, type Sheet } from "@/lib/services/analytics/export";
 import { listInvoices } from "@/lib/services/invoices";
@@ -23,7 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
  * клиента о его собственном счёте.
  */
 export async function GET() {
-  const actor = await getActor();
+  const actor = await getGatedActor();
   if (!actor) return new NextResponse("Требуется вход", { status: 401 });
   // Та же проверка, что и у страницы «Документы»: счета видит администратор компании
   if (!actor.clientId || !canDo(actor, "invoice.view", { clientId: actor.clientId })) {

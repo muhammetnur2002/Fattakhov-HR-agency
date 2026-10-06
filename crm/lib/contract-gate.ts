@@ -1,11 +1,12 @@
 /**
  * Разделы кабинета клиента, которые работают только по договору: это работа
- * агентства (заявки на подбор, кандидаты от рекрутера, встречи, отчёты, переписка
- * с командой). Студенческая платформа, дашборд, настройки и «Документы» открыты
+ * агентства (заявки на подбор, кандидаты от рекрутера, встречи, отчёты).
+ * Студенческая платформа, дашборд, настройки, «Документы» и «Сообщения» открыты
  * всем: в документах клиент без договора как раз берёт шаблон договора, подписывает
- * и присылает нам на проверку.
+ * и присылает нам на проверку, а в сообщениях может написать команде агентства,
+ * если хочет воспользоваться нашими услугами.
  */
-export const CONTRACT_ONLY_PREFIXES = ["/vacancies", "/candidates", "/calendar", "/analytics", "/messages"] as const;
+export const CONTRACT_ONLY_PREFIXES = ["/vacancies", "/candidates", "/calendar", "/analytics"] as const;
 
 export function isContractOnlyPath(pathname: string): boolean {
   return CONTRACT_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -13,3 +14,30 @@ export function isContractOnlyPath(pathname: string): boolean {
 
 /** none — условия не выбраны, pending — выбраны, договор ждёт подтверждения, active — договор действует. */
 export type ContractState = "none" | "pending" | "active";
+
+/**
+ * Что из пути к договору открыто этому человеку. Считается в макете
+ * кабинета через canDo (права — только в lib/access), здесь только
+ * читается. Условия выбирает и договор присылает администратор компании;
+ * у нанимающего менеджера и наблюдателя «Документов» нет вовсе — кнопка
+ * «Договор в «Документах»» вела их на 404, а плашка обещала им документы,
+ * наблюдателю — ещё и студенческую платформу.
+ */
+export type ContractGateAccess = {
+  /** Выбрать условия сотрудничества — agreement.accept. */
+  chooseTerms: boolean;
+  /** «Документы»: шаблон договора и подписанный скан — invoice.view. */
+  documents: boolean;
+  /** Студенческая платформа — students.enterAsClient. */
+  students: boolean;
+};
+
+/** «…доступны уже сейчас» — только про то, что этому человеку правда открыто. */
+export function availableNowText(access: ContractGateAccess): string | null {
+  if (access.students && access.documents) {
+    return "Студенческая платформа, документы и сообщения доступны уже сейчас.";
+  }
+  if (access.students) return "Студенческая платформа и сообщения доступны уже сейчас.";
+  if (access.documents) return "Документы и сообщения доступны уже сейчас.";
+  return "Сообщения доступны уже сейчас: напишите команде агентства.";
+}

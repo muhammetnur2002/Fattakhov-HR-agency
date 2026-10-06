@@ -1,12 +1,13 @@
 import { createTransport, type Transporter } from "nodemailer";
 
+import { isDeliverableEmail } from "./deliverable";
 import {
-  BotApiTelegramTransport,
   LoggingEmailTransport,
-  LoggingTelegramTransport,
+  LoggingVkTransport,
+  VkApiTransport,
   type EmailMessage,
   type EmailTransport,
-  type TelegramTransport,
+  type VkTransport,
 } from "./transport";
 
 /**
@@ -24,6 +25,9 @@ class SmtpEmailTransport implements EmailTransport {
   }
 
   async send(message: EmailMessage): Promise<void> {
+    // Последний рубеж для заглушек быстрой регистрации (…@users.invalid):
+    // рассылка их уже отсеивает, но приглашения и сброс пароля идут мимо неё
+    if (!isDeliverableEmail(message.to)) return;
     try {
       await this.transporter.sendMail({
         from: this.from,
@@ -34,12 +38,37 @@ class SmtpEmailTransport implements EmailTransport {
       });
     } catch (error) {
       console.error(`[письмо] не доставлено ${message.to}`, error);
+      await reportMailFailure(message.to, error);
     }
   }
 }
 
+/**
+ * Почтовый сервер не принял письмо — сигнал владельцу (пуш, ВК,
+ * письмо на ящик сбоев).
+ *
+ * Раньше отказ оставался только в журнале контейнера: письмо — ссылка
+ * сброса пароля, приглашение — пропадало молча, и узнавали об этом от
+ * человека, который его не дождался. Действие по-прежнему не падает:
+ * reportFailure не бросает, повтор того же сбоя глушится на 15 минут.
+ *
+ * Письмо на сам ящик сбоев отсюда не сообщается: его отказ — это и есть
+ * сообщение о сбое, и сообщать о нём было бы некуда, кроме журнала.
+ * Импорт динамический: модуль сигналов сам шлёт почту через этот файл,
+ * и статический импорт замкнул бы их друг на друга.
+ */
+async function reportMailFailure(to: string, error: unknown): Promise<void> {
+  if (to === process.env.ALERT_EMAIL?.trim()) return;
+  try {
+    const { reportFailure } = await import("@/lib/monitoring/alerts");
+    await reportFailure({ where: "почта", error });
+  } catch (reportError) {
+    console.error("[письмо] не удалось сообщить об отказе почты", reportError);
+  }
+}
+
 let email: EmailTransport | undefined;
-let telegram: TelegramTransport | undefined;
+let vk: VkTransport | undefined;
 
 /**
  * Канал почты. Без SMTP_URL письма пишутся в лог — это рабочий режим
@@ -77,27 +106,53 @@ export function getEmailTransport(): EmailTransport {
 }
 
 /**
- * Канал Telegram. Без TELEGRAM_BOT_TOKEN сообщения идут в лог.
+ * Канал ВКонтакте. Без VK_BOT_TOKEN сообщения идут в лог.
  *
- * Отказа на старте здесь нет, и это не недосмотр: Telegram — канал
- * по желанию, человек сам вписывает свой чат в настройках, и пустой
- * токен означает «этой возможности у нас нет», а не потерянное письмо.
- * Настроенность обоих каналов видно в настройках (channelStatus).
+ * Отказа на старте здесь нет, и это не недосмотр: ВК — канал по желанию,
+ * человек сам привязывает страницу в настройках, и пустой токен означает
+ * «этой возможности у нас нет», а не потерянное письмо. Настроенность
+ * обоих каналов видно в настройках (channelStatus).
  */
-export function getTelegramTransport(): TelegramTransport {
-  if (!telegram) {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    telegram = token
-      ? new BotApiTelegramTransport(token)
-      : new LoggingTelegramTransport();
+export function getVkTransport(): VkTransport {
+  if (!vk) {
+    const token = process.env.VK_BOT_TOKEN?.trim();
+    vk = token ? new VkApiTransport(token) : new LoggingVkTransport();
   }
-  return telegram;
+  return vk;
 }
 
 /** Настроены ли реальные каналы — показываем в настройках, чтобы не гадать. */
 export function channelStatus() {
   return {
     email: Boolean(process.env.SMTP_URL && process.env.SMTP_FROM),
-    telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    vk: Boolean(process.env.VK_BOT_TOKEN?.trim()),
   };
+}
+
+/**
+ * Номер сообщества агентства во ВКонтакте — без «-» и «club».
+ * Один источник для обеих ссылок ниже.
+ */
+function vkGroupId(): string | null {
+  const id = process.env.VK_GROUP_ID?.trim().replace(/^-/, "");
+  return id || null;
+}
+
+/** Страница сообщества агентства во ВКонтакте. */
+export function vkGroupUrl(): string | null {
+  const id = vkGroupId();
+  return id ? `https://vk.com/club${id}` : null;
+}
+
+/**
+ * Личные сообщения с сообществом — сразу переписка, а не страница сообщества.
+ *
+ * Человек, которому надо отправить код боту, не должен сам искать на странице
+ * кнопку «Написать сообщение» и гадать, что нажимать: ссылка vk.me открывает
+ * чат с сообществом (в приложении ВК на телефоне — тоже). Пишет в него
+ * человек первым, и именно это разрешает сообществу отвечать (код 901).
+ */
+export function vkMessageUrl(): string | null {
+  const id = vkGroupId();
+  return id ? `https://vk.me/club${id}` : null;
 }

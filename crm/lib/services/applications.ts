@@ -5,7 +5,14 @@ import {
   type Actor,
 } from "@/lib/access";
 import { isUniqueViolation } from "@/lib/db/errors";
+import { getActiveAgreement } from "@/lib/services/agreements";
 import { consentIsValid } from "@/lib/services/consent";
+import { findValidDisclosure } from "@/lib/services/disclosure-consent";
+import {
+  erasureBlockMessage,
+  erasureBlocksProcessing,
+  liftExpiredConsentBlock,
+} from "@/lib/services/erasure";
 import { prisma } from "@/lib/db/prisma";
 import { link } from "@/lib/notifications/links";
 import { plain } from "@/lib/db/serialize";
@@ -17,7 +24,11 @@ import {
   clientSideRecipients,
 } from "@/lib/notifications/recipients";
 import { REJECTION_REASON_LABELS } from "@/lib/labels";
-import type { RejectInput } from "@/lib/validation/candidate";
+import type {
+  GuaranteeCaseInput,
+  OfferInput,
+  RejectInput,
+} from "@/lib/validation/candidate";
 
 export class ApplicationError extends Error {}
 
@@ -134,10 +145,27 @@ export async function moveStage(
       stageEnteredAt: true,
       outcome: true,
       vacancyId: true,
+      offerSalary: true,
+      offerStartDate: true,
       stage: { select: { order: true } },
+      candidate: { select: { erasureState: true } },
+      vacancy: { select: { clientId: true } },
     },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+
+  /*
+    Заблокированные данные не двигаются по воронке. Блокировка по ст. 21
+    152-ФЗ означает прекращение обработки, а перевод на этап — обработка
+    и есть: меняется запись, уходит уведомление, кандидат появляется
+    у клиента. Проверка здесь, а не только в интерфейсе: карточку тянут
+    мышью на доске и переводят пачкой, и запрет обязан жить в сервисе.
+  */
+  if (erasureBlocksProcessing(application.candidate.erasureState)) {
+    throw new ApplicationError(
+      erasureBlockMessage(application.candidate.erasureState),
+    );
+  }
 
   if (application.stageId === toStageId) return { moved: false };
 
@@ -167,6 +195,87 @@ export async function moveStage(
   const hoursInPreviousStage =
     (now.getTime() - application.stageEnteredAt.getTime()) / 3_600_000;
 
+  /*
+    Найм — не просто перенос карточки на этап HIRED («Вышел на работу»).
+
+    Раньше он им и был: этап менялся, а исход, дата найма, срок гарантии
+    оставались пустыми. На них при этом держится всё, что после найма:
+    список к выставлению счёта (outcome HIRED и hiredAt), аналитика
+    наймов за период, гарантия замены (BR-10) и удаление исходного резюме
+    через 30 дней после закрытия кандидата. В тестовых данных этого не
+    было видно — seed записывает эти поля напрямую, — а на живых данных
+    ни один найм не попал бы в счёт.
+
+    Без суммы оффера не нанимаем: вознаграждение считается от неё
+    (BR-31), и найм без неё — счёт, который потом не из чего посчитать.
+    Гарантия отсчитывается от даты выхода, если она известна: замену
+    обещают на срок работы человека, а не на срок с момента нажатия.
+  */
+  const hiring = toStage.code === "HIRED";
+  const leavingHire = application.outcome === "HIRED" && !hiring;
+
+  let hireData: {
+    outcome: "HIRED";
+    hiredAt: Date;
+    guaranteeUntil: Date | null;
+    guaranteeBrokenAt: null;
+    guaranteeBreakReason: null;
+    guaranteeBreakComment: null;
+    replacementForId: string | null;
+  } | null = null;
+
+  if (hiring) {
+    if (application.offerSalary === null) {
+      throw new ApplicationError(
+        "Перед наймом внесите сумму оффера: от неё считается вознаграждение, " +
+          "и без неё счёт за этого кандидата не выставится.",
+      );
+    }
+
+    // Тот же договор, по которому запускают вакансию (BR-1) и считают
+    // счёт: срок гарантии — его условие, а не общее правило агентства
+    const agreement = await getActiveAgreement(application.vacancy.clientId);
+    const guaranteeStart = application.offerStartDate ?? now;
+
+    /*
+      Замена по гарантии. Если по этой вакансии есть гарантийный случай,
+      для которого замены ещё нет, этот найм — она и есть. Отмечаем, чтобы
+      его не выставили в счёт: за подбор уже заплачено исходным наймом,
+      а гарантия и означает, что замену агентство ищет бесплатно.
+    */
+    const brokenHires = await prisma.application.findMany({
+      where: {
+        vacancyId: application.vacancyId,
+        guaranteeBrokenAt: { not: null },
+        id: { not: application.id },
+      },
+      orderBy: { guaranteeBrokenAt: "asc" },
+      select: { id: true },
+    });
+    const covered = brokenHires.length
+      ? await prisma.application.findMany({
+          where: { replacementForId: { in: brokenHires.map((b) => b.id) } },
+          select: { replacementForId: true },
+        })
+      : [];
+    const coveredIds = new Set(covered.map((c) => c.replacementForId));
+    const replaces = brokenHires.find((b) => !coveredIds.has(b.id));
+
+    hireData = {
+      outcome: "HIRED",
+      hiredAt: now,
+      guaranteeUntil: agreement
+        ? new Date(guaranteeStart.getTime() + agreement.guaranteeDays * 86_400_000)
+        : null,
+      // Новый найм начинает гарантию с чистого листа: случай от прежнего
+      // найма этой же заявки (его вернули с этапа найма) к нему не относится
+      guaranteeBrokenAt: null,
+      guaranteeBreakReason: null,
+      guaranteeBreakComment: null,
+      replacementForId: replaces?.id ?? null,
+    };
+  }
+
   await prisma.$transaction([
     prisma.application.update({
       where: { id: applicationId },
@@ -181,6 +290,15 @@ export async function moveStage(
           rejectionComment: null,
           rejectedBy: null,
         }),
+        // Отмена найма: человек не вышел или найм внесли по ошибке.
+        // Без сброса он остался бы в списке к оплате и в наймах периода.
+        // Сорвалась и замена: гарантийный случай снова ждёт своего найма
+        ...(leavingHire && {
+          hiredAt: null,
+          guaranteeUntil: null,
+          replacementForId: null,
+        }),
+        ...hireData,
       },
     }),
     prisma.stageTransition.create({
@@ -189,7 +307,7 @@ export async function moveStage(
         fromStageId: application.stageId,
         toStageId,
         fromOutcome: application.outcome,
-        toOutcome: "IN_PROGRESS",
+        toOutcome: hiring ? "HIRED" : "IN_PROGRESS",
         comment: comment?.trim() || null,
         hoursInPreviousStage,
         actorId: actor.id,
@@ -222,10 +340,24 @@ export async function presentToClient(
       outcome: true,
       candidateId: true,
       vacancyId: true,
-      candidate: { select: { consentStatus: true, consentExpiresAt: true } },
+      candidate: {
+        select: {
+          consentStatus: true,
+          consentExpiresAt: true,
+          erasureState: true,
+        },
+      },
     },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+
+  // Тот же запрет, что и в moveStage: передавать клиенту данные,
+  // обработка которых прекращена, нельзя тем более
+  if (erasureBlocksProcessing(application.candidate.erasureState)) {
+    throw new ApplicationError(
+      erasureBlockMessage(application.candidate.erasureState),
+    );
+  }
 
   // BR-33: без согласия на обработку ПДн передавать данные клиенту нельзя
   // Не только статус, но и срок: EXPIRED проставляет фоновая задача,
@@ -238,6 +370,24 @@ export async function presentToClient(
   ) {
     throw new ApplicationError(
       "Нет согласия кандидата на обработку персональных данных",
+    );
+  }
+
+  /*
+    §4.2 согласия кандидата и раздел 6 Политики: данные передаются
+    конкретному работодателю только после отдельного подтверждения.
+    Общего согласия (BR-33) для этого мало — оно разрешает обработку
+    у нас, а не передачу наружу. Подтверждение привязано к паре
+    «кандидат + вакансия»: на другого работодателя или другую вакансию
+    оно не распространяется (§8.1 документа).
+  */
+  const disclosure = await findValidDisclosure(
+    application.candidateId,
+    application.vacancyId,
+  );
+  if (!disclosure) {
+    throw new ApplicationError(
+      "Нет подтверждения кандидата на передачу данных этому работодателю",
     );
   }
 
@@ -623,6 +773,143 @@ export async function undoClientRejection(actor: Actor, applicationId: string) {
   });
 }
 
+/**
+ * Записать условия оффера.
+ *
+ * Отдельная операция, потому что сумму оффера знает только агентство:
+ * клиент решает «делаем предложение» (setClientDecision OFFER), а о чём
+ * договорились с кандидатом, вносит рекрутер. Без суммы найм не пройдёт —
+ * см. moveStage.
+ *
+ * Дату первой отправки не переписываем при повторном сохранении: торг
+ * по офферу обычное дело, а «когда впервые предложили» нужно для сроков.
+ */
+export async function recordOffer(
+  actor: Actor,
+  applicationId: string,
+  // Форма присылает все поля (OfferInput), сервис — и тесты, и будущие
+  // вызовы — вправе передать только сумму
+  input: Pick<OfferInput, "salary"> & Partial<Omit<OfferInput, "salary">>,
+) {
+  const application = await prisma.application.findFirst({
+    where: { id: applicationId, organizationId: actor.organizationId },
+    select: {
+      id: true,
+      offerSentAt: true,
+      candidate: { select: { erasureState: true } },
+    },
+  });
+  if (!application) throw new ApplicationError("Кандидат не найден");
+
+  // Оффер — тоже обработка данных кандидата: после блокировки (ст. 21
+  // 152-ФЗ) его не вносят, как и не двигают карточку
+  if (erasureBlocksProcessing(application.candidate.erasureState)) {
+    throw new ApplicationError(
+      erasureBlockMessage(application.candidate.erasureState),
+    );
+  }
+
+  await prisma.application.update({
+    where: { id: application.id },
+    data: {
+      offerSalary: input.salary,
+      offerPosition: input.position ?? null,
+      offerStartDate: input.startDate ?? null,
+      offerSentAt: application.offerSentAt ?? new Date(),
+    },
+  });
+}
+
+/**
+ * Записать гарантийный случай (BR-10): нанятый ушёл в гарантийный срок.
+ *
+ * Клиенту обещано: если человек уходит в оговорённый срок, агентство ищет
+ * замену. До этой функции записать такой уход было негде, и замену
+ * выставили бы в счёт как новый найм.
+ *
+ * Исход остаётся HIRED: найм состоялся и оплачен, случай — отдельный факт
+ * поверх него. Замену отмечает уже moveStage при следующем найме
+ * по этой же вакансии (replacementForId) — её в счёт не включают.
+ *
+ * Возвращает вакансию, чтобы действие могло сразу вернуть её в работу.
+ */
+export async function recordGuaranteeCase(
+  actor: Actor,
+  applicationId: string,
+  input: Pick<GuaranteeCaseInput, "leftAt" | "reason"> &
+    Partial<Pick<GuaranteeCaseInput, "comment">>,
+): Promise<{ vacancyId: string }> {
+  const application = await prisma.application.findFirst({
+    where: { id: applicationId, organizationId: actor.organizationId },
+    select: {
+      id: true,
+      vacancyId: true,
+      outcome: true,
+      hiredAt: true,
+      guaranteeUntil: true,
+      guaranteeBrokenAt: true,
+    },
+  });
+  if (!application) throw new ApplicationError("Кандидат не найден");
+
+  if (application.outcome !== "HIRED" || !application.hiredAt) {
+    throw new ApplicationError(
+      "Гарантийный случай бывает только у нанятого кандидата",
+    );
+  }
+  if (application.guaranteeBrokenAt) {
+    throw new ApplicationError("Гарантийный случай по этому найму уже записан");
+  }
+  if (!application.guaranteeUntil) {
+    throw new ApplicationError(
+      "У этого найма нет гарантии: при найме у клиента не было действующего договора",
+    );
+  }
+
+  // Сравниваем по дням: «ушёл в последний день гарантии» — гарантийный
+  // случай, а время суток в дате ухода никто не указывает
+  const dayEnd = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(23, 59, 59, 999);
+    return x;
+  };
+  if (input.leftAt.getTime() > dayEnd(application.guaranteeUntil).getTime()) {
+    throw new ApplicationError(
+      `Гарантия закончилась ${application.guaranteeUntil.toLocaleDateString("ru-RU")} — ` +
+        "уход после неё не гарантийный случай, замена по договору не положена.",
+    );
+  }
+  if (input.leftAt.getTime() < new Date(application.hiredAt).setHours(0, 0, 0, 0)) {
+    throw new ApplicationError("Дата ухода раньше даты найма — проверьте дату");
+  }
+
+  await prisma.$transaction([
+    prisma.application.update({
+      where: { id: application.id },
+      data: {
+        guaranteeBrokenAt: input.leftAt,
+        guaranteeBreakReason: input.reason,
+        guaranteeBreakComment: input.comment ?? null,
+      },
+    }),
+    prisma.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        entityType: "Application",
+        entityId: application.id,
+        action: "guarantee_case",
+        diff: {
+          ушёл: input.leftAt.toISOString(),
+          причина: input.reason,
+        },
+      },
+    }),
+  ]);
+
+  return { vacancyId: application.vacancyId };
+}
+
 /** Отметка о полученном согласии на обработку ПДн (BR-33). */
 export async function markConsentGiven(actor: Actor, candidateId: string) {
   const candidate = await prisma.candidate.findFirst({
@@ -645,6 +932,12 @@ export async function markConsentGiven(actor: Actor, candidateId: string) {
       consentExpiresAt: expires,
     },
   });
+
+  // Продление вручную снимает блокировку по истёкшему сроку так же, как
+  // продление по ссылке: иначе кандидат с действующим согласием остался
+  // бы заблокированным, а через тридцать дней очередь уничтожила бы его
+  // данные. Отзыв этим не отменяется — см. liftExpiredConsentBlock
+  await liftExpiredConsentBlock(candidateId);
 }
 
 /**

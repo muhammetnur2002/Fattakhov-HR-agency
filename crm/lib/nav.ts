@@ -13,6 +13,14 @@ export const AGENCY_HOME = "/a";
 export const CLIENT_HOME = "/dashboard";
 
 /**
+ * Экран обязательной настройки двухфакторной для сотрудников агентства.
+ * Живёт вне /a намеренно: макет /a никого без 2FA не пускает, и экран
+ * внутри него отправил бы человека по кругу. Единственное место вне
+ * кабинета, куда proxy.ts пускает сотрудника агентства.
+ */
+export const TWO_FACTOR_SETUP_PATH = "/security/two-factor";
+
+/**
  * Куда ведёт роль.
  *
  * Раньше это было посчитано дважды: своим списком ролей внутри proxy.ts
@@ -45,13 +53,31 @@ export type NavItem = {
   badge?: number;
   /** Раздел закрыт до договора: рядом с названием показывается замок. */
   locked?: boolean;
+  /**
+   * Вкладка нижней панели на телефоне — туда, куда заходят каждый день.
+   * Их не больше четырёх: пятая кнопка — «Ещё», за ней весь остальной
+   * список. Больше пяти вкладок в панели — уже не нажать большим пальцем,
+   * не глядя.
+   *
+   * Выбор одинаковый в обоих кабинетах: дашборд, вакансии, кандидаты,
+   * сообщения — ежедневная работа и рекрутёра, и нанимающего менеджера.
+   * Команда, проверки студенческой платформы, финансы, настройки — раз
+   * в неделю и реже, и почти все — только владельцу; им место в «Ещё».
+   * У вкладок нет `requires`, поэтому все четыре есть у каждой роли
+   * и панель не меняет состав от роли к роли.
+   */
+  mobileTab?: boolean;
 };
 
 export const CLIENT_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Дашборд", icon: "LayoutDashboard", exact: true },
-  { href: "/vacancies", label: "Вакансии", icon: "Briefcase" },
-  { href: "/candidates", label: "Кандидаты", icon: "Users" },
-  { href: "/messages", label: "Сообщения", icon: "MessagesSquare" },
+  { href: "/dashboard", label: "Дашборд", icon: "LayoutDashboard", exact: true, mobileTab: true },
+  // У клиента без договора три вкладки из четырёх — с замком (AppShell,
+  // lib/contract-gate.ts), как и в боковом меню: по нажатию открывается
+  // тот же ContractGate с причиной. Это и есть подсказка, что откроется
+  // после договора, поэтому вкладки не прячутся и не подменяются
+  { href: "/vacancies", label: "Вакансии", icon: "Briefcase", mobileTab: true },
+  { href: "/candidates", label: "Кандидаты", icon: "Users", mobileTab: true },
+  { href: "/messages", label: "Сообщения", icon: "MessagesSquare", mobileTab: true },
   { href: "/calendar", label: "Календарь", icon: "CalendarDays" },
   {
     href: "/analytics",
@@ -72,13 +98,15 @@ export const CLIENT_NAV: NavItem[] = [
     requires: "students.enterAsClient",
   },
   { href: "/settings", label: "Настройки", icon: "Settings" },
+  // Без requires: помощь нужна всем ролям, и до договора — больше всего
+  { href: "/help", label: "Помощь", icon: "CircleHelp" },
 ];
 
 export const AGENCY_NAV: NavItem[] = [
-  { href: "/a", label: "Дашборд", icon: "LayoutDashboard", exact: true },
-  { href: "/a/vacancies", label: "Вакансии", icon: "Briefcase" },
-  { href: "/a/candidates", label: "Кандидаты", icon: "Users" },
-  { href: "/a/messages", label: "Сообщения", icon: "MessagesSquare" },
+  { href: "/a", label: "Дашборд", icon: "LayoutDashboard", exact: true, mobileTab: true },
+  { href: "/a/vacancies", label: "Вакансии", icon: "Briefcase", mobileTab: true },
+  { href: "/a/candidates", label: "Кандидаты", icon: "Users", mobileTab: true },
+  { href: "/a/messages", label: "Сообщения", icon: "MessagesSquare", mobileTab: true },
   { href: "/a/calendar", label: "Календарь", icon: "CalendarDays" },
   {
     href: "/a/clients",
@@ -122,10 +150,13 @@ export const AGENCY_NAV: NavItem[] = [
     icon: "ShieldCheck",
     requires: "students.enter",
   },
-  {
-    href: "/a/settings",
-    label: "Настройки",
-    icon: "Settings",
-    requires: "org.settings",
-  },
+  // Без requires: там у каждого свои профиль, пароль, вход по двум
+  // факторам и уведомления — включая пуш на телефон, который включается
+  // только на этой странице. Разделы владельца (сбои, ПДн, договор,
+  // сотрудники) страница прячет сама через canDo. С `org.settings` пункт
+  // видел только владелец, а рекрутер добирался сюда лишь по адресу
+  { href: "/a/settings", label: "Настройки", icon: "Settings" },
+  // Без requires: помощь нужна всем, и рекрутеру нужнее всех —
+  // именно он упирается в запреты представления
+  { href: "/a/help", label: "Помощь", icon: "CircleHelp" },
 ];

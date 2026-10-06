@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { CandidateProfile } from "@/components/applications/candidate-profile";
 import { DecisionPanel } from "@/components/applications/decision-panel";
+import { GuaranteeCaseForm } from "@/components/applications/guarantee-case-form";
+import { OfferForm } from "@/components/applications/offer-form";
 import {
   PresentForm,
   RejectForm,
@@ -20,13 +22,16 @@ import {
 import { canDo } from "@/lib/access";
 import { requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { formatDate } from "@/lib/format-date";
 import {
   APPLICATION_OUTCOME_LABELS,
+  GUARANTEE_BREAK_REASON_LABELS,
   REJECTION_REASON_LABELS,
   REJECTION_SIDE_LABELS,
 } from "@/lib/labels";
 import { getApplication } from "@/lib/services/applications";
 import { consentIsValid } from "@/lib/services/consent";
+import { findValidDisclosure } from "@/lib/services/disclosure-consent";
 import { InterviewSection } from "@/components/interviews/interview-section";
 import { listApplicationComments } from "@/lib/services/comments";
 import { listApplicationInterviews } from "@/lib/services/interviews";
@@ -89,6 +94,11 @@ export default async function AgencyApplicationPage({
     application.candidate.consentStatus,
     application.candidate.consentExpiresAt,
   );
+  // §4.2: подтверждение передачи данных именно этому работодателю.
+  // Отдельно от общего согласия и привязано к паре «кандидат + вакансия»
+  const hasDisclosure =
+    (await findValidDisclosure(application.candidateId, application.vacancyId)) !==
+    null;
   const canPresent = canDo(actor, "application.present");
   const alreadyPresented = application.presentedAt !== null;
   const closed =
@@ -120,6 +130,101 @@ export default async function AgencyApplicationPage({
           {alreadyPresented && " · представлен клиенту"}
         </p>
       </div>
+
+      {/*
+        Оффер и найм. Карточка появляется с этапа «Оффер»: раньше вносить
+        нечего, а на «Вышел на работу» без суммы не пустит сервис (moveStage).
+        Показывается и после найма — сумма и гарантия нужны при выставлении
+        счёта и при замене.
+      */}
+      {(application.stage.code === "OFFER" ||
+        application.stage.code === "HIRED" ||
+        application.offerSalary !== null) &&
+        canDo(actor, "application.moveStage") && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {application.outcome === "HIRED" ? "Найм" : "Оффер"}
+              </CardTitle>
+              <CardDescription>
+                {application.outcome === "HIRED" && application.hiredAt
+                  ? `Нанят ${formatDate(application.hiredAt)}` +
+                    (application.guaranteeUntil
+                      ? `, гарантия до ${formatDate(application.guaranteeUntil)}`
+                      : ", гарантия не рассчитана: у клиента нет действующего договора")
+                  : "Сумма и дата выхода нужны до перевода в «Вышел на работу»: от них считаются вознаграждение и гарантия."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {application.replacementForId && (
+                <p className="text-sm text-muted-foreground">
+                  Это замена по гарантии — в счёт не попадает: за подбор
+                  заплачено исходным наймом.
+                </p>
+              )}
+              <OfferForm
+                applicationId={application.id}
+                salary={
+                  application.offerSalary === null
+                    ? null
+                    : Number(application.offerSalary)
+                }
+                position={application.offerPosition}
+                startDate={
+                  application.offerStartDate
+                    ? new Date(application.offerStartDate)
+                        .toISOString()
+                        .slice(0, 10)
+                    : null
+                }
+              />
+
+              {/*
+                Гарантийный случай (BR-10). Три состояния, и каждое
+                говорит своё: записан — что и когда; срок идёт — форма;
+                срок вышел — прямо сказать, что замены по договору нет.
+              */}
+              {application.outcome === "HIRED" &&
+                application.guaranteeUntil &&
+                (application.guaranteeBrokenAt ? (
+                  <div className="space-y-1 border-t pt-4 text-sm">
+                    <div className="font-medium">Гарантийный случай</div>
+                    <div className="text-muted-foreground">
+                      Ушёл {formatDate(application.guaranteeBrokenAt)}
+                      {application.guaranteeBreakReason
+                        ? ` — ${GUARANTEE_BREAK_REASON_LABELS[application.guaranteeBreakReason].toLowerCase()}`
+                        : ""}
+                      . Следующий найм по вакансии будет заменой и в счёт
+                      не попадёт.
+                    </div>
+                    {application.guaranteeBreakComment && (
+                      <div className="whitespace-pre-line">
+                        {application.guaranteeBreakComment}
+                      </div>
+                    )}
+                  </div>
+                ) : new Date(application.guaranteeUntil).getTime() >=
+                  new Date().setHours(0, 0, 0, 0) ? (
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="text-sm font-medium">
+                      Если человек ушёл в гарантийный срок
+                    </div>
+                    <GuaranteeCaseForm
+                      applicationId={application.id}
+                      guaranteeUntil={new Date(application.guaranteeUntil)
+                        .toISOString()
+                        .slice(0, 10)}
+                    />
+                  </div>
+                ) : (
+                  <p className="border-t pt-4 text-sm text-muted-foreground">
+                    Гарантия закончилась {formatDate(application.guaranteeUntil)}:
+                    замена по договору больше не положена.
+                  </p>
+                ))}
+            </CardContent>
+          </Card>
+        )}
 
       {closed && application.rejectionReason && (
         <Card>
@@ -191,6 +296,7 @@ export default async function AgencyApplicationPage({
               candidateId={application.candidateId}
               hasResume={hasResume}
               hasConsent={hasConsent}
+              hasDisclosure={hasDisclosure}
               defaultSalary={
                 application.candidate.salaryExpectation != null
                   ? Number(application.candidate.salaryExpectation)

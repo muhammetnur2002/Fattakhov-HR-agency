@@ -95,6 +95,12 @@ export const RATE_LIMITS = {
   // Считается только на настоящие записи (не чаще одной в минуту, то есть 60 в час),
   // а тысяча — страховка от сломанного клиента, не рабочий предел
   presence: { limit: 1000, windowSeconds: 3600 },
+  // Поиск студентов из CRM: на сотрудника, а не на адрес — у CRM он один. Живой человек
+  // листает страницы и меняет фильтры, а не шлёт сотни запросов в минуту
+  staffStudents: { limit: 120, windowSeconds: 60 },
+  // Раскрытие контактов студентов: счёт общий для всех экземпляров, чтобы нельзя было
+  // выгрузить базу, открывая анкету за анкетой
+  staffContacts: { limit: 60, windowSeconds: 600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /**
@@ -122,6 +128,7 @@ const SHARED_COUNT: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
   'registerResendPause',
   'passwordResetMiss',
   'invite',
+  'staffContacts',
 ]);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

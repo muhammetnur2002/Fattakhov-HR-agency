@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 /**
  * Мозаика ролей.
  *
- * Одна сетка на 12 колонок, две строки, доли колонок в каждой строке
- * складываются ровно в 12 — раскладка не «подогнана на глаз», а честно
- * выравнена. Раньше у каждой плитки была своя скорость прокруточного
+ * Одна сетка на 12 колонок (с xl, ниже — две, см. mdSpan), две строки,
+ * доли колонок в каждой строке складываются ровно в 12 — раскладка
+ * не «подогнана на глаз», а честно выравнена. Раньше у каждой плитки была своя скорость прокруточного
  * параллакса (components/motion/primitives.tsx, ParallaxLayer): плитки
  * визуально разъезжались по высоте при скролле и сетка читалась как
  * сломанная. Движение здесь — только общее появление (Reveal), без
@@ -77,10 +77,24 @@ const ROWS: Tile[][] = [
 
 /** Tailwind не собирает классы из шаблонных строк — только буквальный список. */
 const COL_SPAN: Record<number, string> = {
-  3: "md:col-span-3",
-  4: "md:col-span-4",
-  6: "md:col-span-6",
+  3: "xl:col-span-3",
+  4: "xl:col-span-4",
+  6: "xl:col-span-6",
 };
+
+/**
+ * Между md и xl — две колонки, а не двенадцать: на 768 узкой плитке
+ * (три колонки из двенадцати, ≈150px) крупный заголовок не помещался
+ * и молча срезался краем — «Руковод», «Систе», «Инжене» — даже при
+ * обычном размере; на корне 125% (app/globals.css) то же было и на 1024.
+ * Во всю ширину встают якорная роль и последняя плитка строки, если
+ * она осталась без пары, — иначе ряд кончался бы дырой.
+ */
+function mdSpan(row: Tile[], j: number): string | false {
+  if (row[j].featured) return "md:col-span-2";
+  const плитки = row.filter((t) => !t.featured);
+  return плитки.length % 2 === 1 && row[j] === плитки.at(-1) && "md:col-span-2";
+}
 
 function TileCard({ tile }: { tile: Tile }) {
   const dark = tile.tone !== "light";
@@ -122,9 +136,11 @@ function TileCard({ tile }: { tile: Tile }) {
       <h3
         className={cn(
           "relative mt-8 leading-[1.03] font-semibold tracking-tight text-balance",
+          // Остальные — text-4xl только с 2xl: на 1280 при корне 125%
+          // «Системный» в плитку из трёх колонок не помещался на 7px
           tile.featured
             ? "text-4xl md:text-6xl"
-            : "text-3xl md:text-4xl",
+            : "text-3xl 2xl:text-4xl",
         )}
       >
         {tile.title}
@@ -137,12 +153,12 @@ export function RoleMosaic() {
   return (
     <div className="mt-12 space-y-3">
       {ROWS.map((row, i) => (
-        <div key={i} className="grid gap-3 md:grid-cols-12">
+        <div key={i} className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
           {row.map((tile, j) => (
             <Reveal
               key={tile.title}
               delay={j * 0.05}
-              className={cn("min-w-0", COL_SPAN[tile.span])}
+              className={cn("min-w-0", mdSpan(row, j), COL_SPAN[tile.span])}
             >
               <TileCard tile={tile} />
             </Reveal>

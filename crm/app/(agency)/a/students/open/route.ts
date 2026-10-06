@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { canDo, effectiveGrants } from "@/lib/access";
-import { getActor } from "@/lib/auth/session";
+import { getGatedActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import {
   issueStudentsTicket,
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const actor = await getActor();
+  const actor = await getGatedActor();
   if (!actor || !canDo(actor, "students.enter")) {
     return new NextResponse(null, { status: 404 });
   }

@@ -47,7 +47,10 @@ beforeEach(async () => {
       organizationId: ORG,
       email: EMAIL,
       fullName: "Тестовый Фактор",
-      role: "OWNER",
+      // Клиент, а не сотрудник агентства: агентству 2FA не отключается
+      // (tests/two-factor-required.test.ts), а здесь проверяется и отключение
+      role: "CLIENT_ADMIN",
+      clientId: "cl_starfish",
       passwordHash: await hashPassword(PASSWORD),
     },
     select: { id: true },
@@ -62,7 +65,7 @@ afterAll(async () => {
 
 /** Проходит подключение целиком и отдаёт секрет с кодами восстановления. */
 async function enable(): Promise<{ secret: string; codes: string[] }> {
-  const setup = await startTwoFactorSetup({ userId, issuer: "Fattakhov HR" });
+  const setup = await startTwoFactorSetup({ userId, issuer: "Fattakhov HR", password: PASSWORD });
   const codes = await confirmTwoFactor({
     userId,
     code: totp(setup.secret),
@@ -72,7 +75,7 @@ async function enable(): Promise<{ secret: string; codes: string[] }> {
 
 describe("подключение", () => {
   it("до подтверждения второй фактор не требуется", async () => {
-    await startTwoFactorSetup({ userId, issuer: "Fattakhov HR" });
+    await startTwoFactorSetup({ userId, issuer: "Fattakhov HR", password: PASSWORD });
 
     // Человек, закрывший вкладку на середине, не должен оказаться заперт
     expect(await requiresSecondFactor(userId)).toBe(false);
@@ -94,7 +97,7 @@ describe("подключение", () => {
   });
 
   it("неверный код не включает и не выдаёт коды", async () => {
-    await startTwoFactorSetup({ userId, issuer: "Fattakhov HR" });
+    await startTwoFactorSetup({ userId, issuer: "Fattakhov HR", password: PASSWORD });
 
     await expect(
       confirmTwoFactor({ userId, code: "000000" }),
@@ -113,7 +116,7 @@ describe("подключение", () => {
   it("включить дважды нельзя", async () => {
     await enable();
     await expect(
-      startTwoFactorSetup({ userId, issuer: "Fattakhov HR" }),
+      startTwoFactorSetup({ userId, issuer: "Fattakhov HR", password: PASSWORD }),
     ).rejects.toThrow(/уже включена/);
   });
 

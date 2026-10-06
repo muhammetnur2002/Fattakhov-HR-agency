@@ -115,50 +115,99 @@ export default async function AgencyAnalyticsPage({
           {data.load.length === 0 ? (
             <p className="text-sm text-muted-foreground">Рекрутеров нет.</p>
           ) : (
-            <div className="space-y-2 overflow-x-auto">
-              {/* minmax вместо 1fr: на узком экране остальные четыре
-                  колонки — все auto, то есть по своему полному размеру —
-                  забирали всё место контейнера и не оставляли имени
-                  ничего, оно схлопывалось до нулевой ширины и пропадало
-                  из виду. Пол в 8rem держит имя читаемым, а если после
-                  этого строка всё равно не помещается — прокручиваем
-                  вбок всей таблицей, не давя по отдельности */}
-              <div className="grid grid-cols-[minmax(8rem,1fr)_auto_auto_auto_auto] gap-x-4 border-b pb-2 text-xs text-muted-foreground">
-                <div>Рекрутер</div>
-                <div className="w-20 text-right">Вакансий</div>
-                <div className="w-20 text-right">В работе</div>
-                <div className="w-24 text-right">Представил</div>
-                <div className="w-20 text-right">Качество</div>
-              </div>
-              {data.load.map((item) => (
-                <Link
-                  key={item.recruiterId}
-                  href={`/a/vacancies?recruiterId=${item.recruiterId}`}
-                  className="grid grid-cols-[minmax(8rem,1fr)_auto_auto_auto_auto] items-center gap-x-4 rounded-sm py-0.5 text-sm hover:bg-muted"
-                >
-                  <div className="truncate">{item.fullName}</div>
-                  <div className="w-20 text-right tabular-nums">
-                    {item.activeVacancies}
-                  </div>
-                  <div className="w-20 text-right tabular-nums">
-                    {item.activeCandidates}
-                  </div>
-                  <div className="w-24 text-right tabular-nums">
-                    {item.presented}
-                  </div>
-                  <div
-                    className={cn(
-                      "w-20 text-right tabular-nums",
-                      item.quality !== null &&
-                        item.quality < 40 &&
-                        "font-medium text-destructive",
-                    )}
+            <>
+              {/*
+                Телефон (< 640): карточка на рекрутера с четырьмя подписанными
+                показателями. Таблица на пять колонок в 326 точек не помещалась —
+                «Представил» и «Качество» уезжали за край и открывались только
+                свайпом вбок (замер 22.09.2026 в CRM агентства: скрыто 202 из
+                528 точек), то есть ровно то, ради чего страницу открывают,
+                было не видно.
+              */}
+              <div className="space-y-2 sm:hidden">
+                {data.load.map((item) => (
+                  <Link
+                    key={item.recruiterId}
+                    href={`/a/vacancies?recruiterId=${item.recruiterId}`}
+                    className="block rounded-lg border p-3 active:bg-muted"
                   >
-                    {item.quality === null ? "—" : `${item.quality}%`}
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    <div className="truncate font-medium">{item.fullName}</div>
+                    <dl className="mt-2 grid grid-cols-4 gap-2">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Вакансий</dt>
+                        <dd className="tabular-nums">{item.activeVacancies}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">В работе</dt>
+                        <dd className="tabular-nums">{item.activeCandidates}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Представил</dt>
+                        <dd className="tabular-nums">{item.presented}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Качество</dt>
+                        <dd
+                          className={cn(
+                            "tabular-nums",
+                            item.quality !== null &&
+                              item.quality < 40 &&
+                              "font-medium text-destructive",
+                          )}
+                        >
+                          {item.quality === null ? "—" : `${item.quality}%`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="hidden space-y-2 overflow-x-auto sm:block">
+                {/* minmax вместо 1fr: на узком экране остальные четыре
+                    колонки — все auto, то есть по своему полному размеру —
+                    забирали всё место контейнера и не оставляли имени
+                    ничего, оно схлопывалось до нулевой ширины и пропадало
+                    из виду. Пол в 8rem держит имя читаемым, а если после
+                    этого строка всё равно не помещается — прокручиваем
+                    вбок всей таблицей, не давя по отдельности */}
+                <div className="grid grid-cols-[minmax(8rem,1fr)_auto_auto_auto_auto] gap-x-4 border-b pb-2 text-xs text-muted-foreground">
+                  <div>Рекрутер</div>
+                  <div className="w-20 text-right">Вакансий</div>
+                  <div className="w-20 text-right">В работе</div>
+                  <div className="w-24 text-right">Представил</div>
+                  <div className="w-20 text-right">Качество</div>
+                </div>
+                {data.load.map((item) => (
+                  <Link
+                    key={item.recruiterId}
+                    href={`/a/vacancies?recruiterId=${item.recruiterId}`}
+                    className="grid grid-cols-[minmax(8rem,1fr)_auto_auto_auto_auto] items-center gap-x-4 rounded-sm py-0.5 text-sm hover:bg-muted"
+                  >
+                    <div className="truncate">{item.fullName}</div>
+                    <div className="w-20 text-right tabular-nums">
+                      {item.activeVacancies}
+                    </div>
+                    <div className="w-20 text-right tabular-nums">
+                      {item.activeCandidates}
+                    </div>
+                    <div className="w-24 text-right tabular-nums">
+                      {item.presented}
+                    </div>
+                    <div
+                      className={cn(
+                        "w-20 text-right tabular-nums",
+                        item.quality !== null &&
+                          item.quality < 40 &&
+                          "font-medium text-destructive",
+                      )}
+                    >
+                      {item.quality === null ? "—" : `${item.quality}%`}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -191,7 +240,12 @@ export default async function AgencyAnalyticsPage({
                       {/* Кто ведёт — иначе «вакансия стоит» остаётся
                           наблюдением, а не поводом с кем-то поговорить */}
                       {[vacancy.clientName, vacancy.leadRecruiterName ?? "ведущий не назначен"].join(" · ")}
-                      <Badge variant="outline">{vacancy.reason}</Badge>
+                      {/* max-w-full и truncate — как у этапа в списке
+                          кандидатов: «Ни одного кандидата за 54 дня» не
+                          помещалось в строку и срезалось краем карточки */}
+                      <Badge variant="outline" className="max-w-full" title={vacancy.reason}>
+                        <span className="truncate">{vacancy.reason}</span>
+                      </Badge>
                     </div>
                   </li>
                 ))}

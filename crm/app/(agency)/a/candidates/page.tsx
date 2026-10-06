@@ -11,6 +11,7 @@ import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { formatNumber } from "@/lib/pricing";
 import { listApplications } from "@/lib/services/applications";
 import { searchCandidates } from "@/lib/services/candidates";
+import { isSourcingLead, sourcingDaysLeft } from "@/lib/sourcing";
 
 export const metadata = { title: "Кандидаты" };
 
@@ -166,7 +167,7 @@ export default async function CandidatesPage({
                   </div>
 
                   {c.consentStatus !== "GIVEN" && (
-                    <Badge variant="outline">без согласия</Badge>
+                    <ConsentBadge sourcedAt={c.sourcedAt} consentStatus={c.consentStatus} />
                   )}
                 </CardContent>
               </Card>
@@ -177,5 +178,28 @@ export default async function CandidatesPage({
 
       {hasMore && <LoadMore href={withQuery({ page: String(page + 1) })} />}
     </div>
+  );
+}
+
+/**
+ * Без согласия — а у сорсинг-лида ещё и сколько осталось до удаления
+ * (lib/services/sourcing.ts): за три дня метка красная, чтобы список
+ * сам показывал, кого пора довести до согласия.
+ */
+function ConsentBadge({
+  sourcedAt,
+  consentStatus,
+}: {
+  sourcedAt: Date | null;
+  consentStatus: string;
+}) {
+  if (!sourcedAt || !isSourcingLead({ sourcedAt, consentStatus })) {
+    return <Badge variant="outline">без согласия</Badge>;
+  }
+  const daysLeft = sourcingDaysLeft(new Date(sourcedAt));
+  return (
+    <Badge variant={daysLeft <= 3 ? "destructive" : "outline"}>
+      {daysLeft > 0 ? `без согласия · ${daysLeft} дн.` : "без согласия · срок вышел"}
+    </Badge>
   );
 }

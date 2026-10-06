@@ -5,19 +5,32 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { isContractOnlyPath, type ContractState } from "@/lib/contract-gate";
+import {
+  availableNowText,
+  isContractOnlyPath,
+  type ContractGateAccess,
+  type ContractState,
+} from "@/lib/contract-gate";
+
+const WORK =
+  "заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика";
 
 /**
  * Разделы работы агентства без договора: содержимое видно размытым, чтобы
  * было понятно, что здесь появится, а поверх — замок и причина. Пока договора
  * нет, раздел не кликается и не читается с экрана (inert).
+ *
+ * Договор оформляет администратор компании. Остальным замок говорит, кто это
+ * делает, и не показывает кнопок, которые им не откроются (access).
  */
 export function ContractGate({
   state,
+  access,
   telegramHref,
   children,
 }: {
   state: ContractState;
+  access: ContractGateAccess;
   telegramHref: string;
   children: React.ReactNode;
 }) {
@@ -25,6 +38,16 @@ export function ContractGate({
   if (state === "active" || !isContractOnlyPath(pathname)) return <>{children}</>;
 
   const pending = state === "pending";
+  const text = pending
+    ? access.chooseTerms
+      ? `Вы выбрали условия — агентство свяжется с вами и подтвердит договор. Сразу после этого здесь появятся ${WORK}.` +
+        (access.documents ? " Подписанный договор можно прислать в разделе «Документы»." : "")
+      : `Администратор вашей компании выбрал условия — агентство подтвердит договор. Сразу после этого здесь появятся ${WORK}.`
+    : access.documents
+      ? "Заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика — это работа агентства, она начинается с договора. Скачайте шаблон в разделе «Документы», подпишите и пришлите нам — после проверки раздел откроется."
+      : "Заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика — это работа агентства, она начинается с договора. Договор оформляет администратор вашей компании — после проверки агентством раздел откроется.";
+  const availableNow = availableNowText(access);
+
   return (
     <div className="relative min-h-[26rem]">
       <div aria-hidden inert className="pointer-events-none select-none opacity-60 blur-[7px]">
@@ -42,16 +65,14 @@ export function ContractGate({
           <h2 className="text-lg font-semibold">
             {pending ? "Ждём подтверждения договора" : "Раздел откроется после договора"}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {pending
-              ? "Вы выбрали условия — агентство свяжется с вами и подтвердит договор. Сразу после этого здесь появятся заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика и переписка с командой. Подписанный договор можно прислать в разделе «Документы»."
-              : "Заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика и переписка с командой — это работа агентства, она начинается с договора. Скачайте шаблон в разделе «Документы», подпишите и пришлите нам — после проверки раздел откроется."}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{text}</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Button asChild size="sm">
-              <Link href="/documents">Договор в «Документах»</Link>
-            </Button>
-            {!pending && (
+            {access.documents && (
+              <Button asChild size="sm">
+                <Link href="/documents">Договор в «Документах»</Link>
+              </Button>
+            )}
+            {!pending && access.chooseTerms && (
               <Button asChild size="sm" variant="outline">
                 <Link href="/onboarding">Выбрать тариф</Link>
               </Button>
@@ -62,9 +83,9 @@ export function ContractGate({
               </a>
             </Button>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Студенческая платформа и документы работают уже сейчас.
-          </p>
+          {availableNow && (
+            <p className="mt-4 text-xs text-muted-foreground">{availableNow}</p>
+          )}
         </div>
       </div>
     </div>

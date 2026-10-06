@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { loginAs } from "./dev-totp";
+
 /**
  * Вход в платформу.
  *
@@ -9,11 +11,10 @@ import { test, expect } from "@playwright/test";
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test("верный пароль ведёт в кабинет", async ({ page }) => {
-  await page.goto("/login");
-  await page.locator("#email").fill("rec1@fattakhov.hr");
-  await page.locator("#password").fill("demo1234");
-  await page.getByRole("button", { name: "Войти" }).click();
+test("верный пароль и код ведут в кабинет", async ({ page }) => {
+  // У сотрудников агентства 2FA обязательна — тестовый секрет из seed.
+  // Код следующего шага: код текущего уже потратил сетап (auth.setup.ts)
+  await loginAs(page, "rec1@fattakhov.hr", "demo1234", { stepOffset: 1 });
 
   await expect(page).toHaveURL(/\/a/);
 });

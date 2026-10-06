@@ -48,7 +48,9 @@ test.describe("приём кандидата в воронку", () => {
 
     // Диалог закрывается сам только при успехе (handleAdd: setOpen(false))
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText(fullName)).toBeVisible();
+    // Карточка есть в разметке дважды: на доске и в списке по этапам для
+    // телефона (он скрыт на широком экране) — проверяем видимую
+    await expect(page.getByText(fullName).filter({ visible: true })).toBeVisible();
   });
 
   test("повторное добавление — понятная ошибка, а не сбой (BR-6)", async ({ page }) => {

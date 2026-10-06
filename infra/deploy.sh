@@ -238,10 +238,23 @@ if [[ $YES -ne 1 ]]; then
   read -r -p "Применить? Введите yes: " answer
   [[ "$answer" == "yes" ]] || { echo "не применено"; exit 1; }
 fi
+# curl к сайтам. При плановых работах (maintenance_mode = "on", infra/maintenance.tf)
+# прокси отвечает 503 со страницей работ, и проверки ниже не дождались бы выкатки.
+# Если задан MAINTENANCE_BYPASS (значение maintenance_bypass из prod.tfvars),
+# запросы уходят с заголовком обхода. Через stdin (-K -), а не аргументом:
+# аргументы видны в списке процессов.
+site_curl() {
+  if [[ -n "${MAINTENANCE_BYPASS:-}" ]]; then
+    curl -K - "$@" <<<"header = \"X-Maintenance-Bypass: ${MAINTENANCE_BYPASS}\""
+  else
+    curl "$@" </dev/null
+  fi
+}
+
 # Номер сборки Next на странице — \"b\":\"<номер>\" в разметке. Пусто, если
 # страница не ответила
 build_id() {
-  curl -s --max-time 15 "$1" </dev/null 2>/dev/null |
+  site_curl -s --max-time 15 "$1" 2>/dev/null |
     grep -oE '\\"b\\":\\"[^\\"]+\\"' | head -1 |
     sed -E 's/.*:\\"([^\\]+)\\"$/\1/' || true
 }
@@ -317,7 +330,7 @@ deadline=$((SECONDS + ${DEPLOY_HEALTH_WAIT:-360}))
 while :; do
   down=""
   while IFS='|' read -r name url; do
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)
+    code=$(site_curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)
     [[ "$code" == "200" ]] || down="${down}  ${name}: HTTP ${code} — ${url}"$'\n'
   done <<<"$TARGETS"
   if [[ -z "$down" ]]; then

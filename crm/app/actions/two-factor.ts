@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import QRCode from "qrcode";
 
+import { maskPhone } from "@/lib/auth/phone";
 import { requireActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { SmsSendError } from "@/lib/notifications/sms";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
+import { clientIp } from "@/lib/security/rate-limit";
+import { PhoneCodeError, requestPhoneCode } from "@/lib/services/phone-auth";
 import {
   confirmTwoFactor,
   disableTwoFactor,
@@ -23,9 +28,21 @@ export type TwoFactorState = {
   codes?: string[];
 };
 
-/** Начало подключения: секрет и QR для приложения. */
-export async function startTwoFactorAction(): Promise<TwoFactorState> {
-  const actor = await requireActor();
+/**
+ * Начало подключения: секрет и QR для приложения.
+ *
+ * Только после подтверждения личности — текущим паролем или кодом из SMS
+ * (у тех, у кого пароля нет). Просит актора allowWithoutTwoFactor: это
+ * действие и есть выход из «2FA ещё не включена».
+ */
+export async function startTwoFactorAction(input: {
+  password?: string;
+  smsCode?: string;
+}): Promise<TwoFactorState> {
+  const actor = await requireActor({ allowWithoutTwoFactor: true });
+
+  const rate = await guardRate("login");
+  if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
 
   try {
     const organization = await prisma.organization.findFirst({
@@ -36,6 +53,8 @@ export async function startTwoFactorAction(): Promise<TwoFactorState> {
     const setup = await startTwoFactorSetup({
       userId: actor.id,
       issuer: organization?.name ?? "Fattakhov HR",
+      password: typeof input?.password === "string" ? input.password : undefined,
+      smsCode: typeof input?.smsCode === "string" ? input.smsCode : undefined,
     });
 
     // QR рисуем на сервере в data: URI. Клиентская библиотека потянула бы
@@ -53,11 +72,42 @@ export async function startTwoFactorAction(): Promise<TwoFactorState> {
   }
 }
 
+/**
+ * Код из SMS для тех, у кого нет пароля: им 2FA подтверждается им.
+ * У тех, у кого пароль есть, SMS не нужен и не отправляется — иначе
+ * это был бы второй способ включить 2FA без пароля.
+ */
+export async function requestTwoFactorSmsAction(): Promise<{ error?: string; sentTo?: string }> {
+  const actor = await requireActor({ allowWithoutTwoFactor: true });
+
+  const rate = await guardRate("smsRequest");
+  if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
+
+  const user = await prisma.user.findFirst({
+    where: { id: actor.id, isActive: true },
+    select: { passwordHash: true, phoneVerified: true },
+  });
+  if (!user || user.passwordHash || !user.phoneVerified) {
+    return { error: "Подтвердить кодом из SMS нельзя — используйте пароль" };
+  }
+
+  try {
+    await requestPhoneCode(user.phoneVerified, { ip: clientIp(await headers()) });
+    return { sentTo: maskPhone(user.phoneVerified) };
+  } catch (error) {
+    if (error instanceof PhoneCodeError) return { error: error.message };
+    if (error instanceof SmsSendError) {
+      return { error: "SMS не отправилось. Попробуйте через минуту" };
+    }
+    throw error;
+  }
+}
+
 export async function confirmTwoFactorAction(
   _prev: TwoFactorState,
   formData: FormData,
 ): Promise<TwoFactorState> {
-  const actor = await requireActor();
+  const actor = await requireActor({ allowWithoutTwoFactor: true });
 
   const rate = await guardRate("login");
   if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };

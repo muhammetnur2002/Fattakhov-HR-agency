@@ -53,7 +53,7 @@ beforeEach(async () => {
   });
   await db.user.createMany({
     data: [
-      { id: U_FREE, organizationId: ORG, email: "free1@test-del.example", fullName: "Свободный Один", role: "CLIENT_ADMIN", clientId: FREE, phone: "+7 900 000-00-01" },
+      { id: U_FREE, organizationId: ORG, email: "free1@test-del.example", fullName: "Свободный Один", role: "CLIENT_ADMIN", clientId: FREE, phone: "+7 900 000-00-01", vkUserId: "400500600" },
       { id: U_FREE2, organizationId: ORG, email: "free2@test-del.example", fullName: "Свободный Два", role: "CLIENT_HIRING", clientId: FREE },
       { id: U_PAID, organizationId: ORG, email: "paid@test-del.example", fullName: "Платный Клиент", role: "CLIENT_ADMIN", clientId: PAID },
     ],
@@ -77,6 +77,31 @@ describe("клиент без договора", () => {
     expect(row?.fullName).toBe("Удалённый пользователь");
     expect(row?.phone).toBeNull();
     expect(row?.passwordHash).toBeNull();
+    // Мессенджер — тоже ПДн: страница ВКонтакте
+    expect(row?.vkUserId).toBeNull();
+  });
+
+  it("пуш-подписки его устройств удаляются, коллег — нет", async () => {
+    // Строка пользователя обезличивается, а не удаляется: каскад по ключу
+    // не сработает, подписки обязан убрать сам anonymizeUser
+    const subscription = (n: string, userId: string) => ({
+      userId,
+      endpoint: `https://fcm.googleapis.com/fcm/send/test-del-${n}`,
+      p256dh: "B".repeat(87),
+      auth: "A".repeat(22),
+    });
+    await db.pushSubscription.createMany({
+      data: [
+        subscription("phone", U_FREE),
+        subscription("laptop", U_FREE),
+        subscription("colleague", U_FREE2),
+      ],
+    });
+
+    await deleteOwnAccount(clientActor(U_FREE, FREE));
+
+    expect(await db.pushSubscription.count({ where: { userId: U_FREE } })).toBe(0);
+    expect(await db.pushSubscription.count({ where: { userId: U_FREE2 } })).toBe(1);
   });
 
   it("если он последний в компании, это отмечено; иначе нет", async () => {

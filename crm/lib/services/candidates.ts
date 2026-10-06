@@ -4,6 +4,11 @@ import { plain } from "@/lib/db/serialize";
 import { buildStorageKey, validateUpload } from "@/lib/storage";
 import { getStorage } from "@/lib/storage/client";
 import {
+  assertFieldsAllowed,
+  assertFilesAllowed,
+  assertNewCandidateFields,
+} from "@/lib/services/sourcing";
+import {
   normalizePhone,
   type CandidateProfileInput,
   type QuickCandidateInput,
@@ -67,23 +72,31 @@ export async function findSimilarCandidates(
   );
 }
 
-/** Быстрое добавление: имя, контакт, остальное дозаполняется потом. */
+/**
+ * Быстрое добавление: имя, контакты, ссылка на профиль.
+ *
+ * Новый кандидат — сорсинг-лид (lib/services/sourcing.ts): согласия
+ * у него ещё нет, поэтому профиль и файлы — только после согласия,
+ * а с этой минуты идут 14 дней на то, чтобы его получить. Поля профиля,
+ * присланные формой (например, открытой до выкатки), не отбрасываются
+ * молча, а отклоняются с объяснением.
+ */
 export async function quickCreateCandidate(
   actor: Actor,
   input: QuickCandidateInput,
 ) {
+  assertNewCandidateFields(input);
+
   return prisma.candidate.create({
     data: {
       organizationId: actor.organizationId,
       fullName: input.fullName,
       phone: normalizePhone(input.phone) ?? input.phone,
       email: input.email?.toLowerCase(),
-      city: input.city,
-      currentPosition: input.currentPosition,
-      currentCompany: input.currentCompany,
-      salaryExpectation: input.salaryExpectation,
+      telegram: input.telegram,
       source: input.source,
       sourceDetails: input.sourceDetails,
+      sourcedAt: new Date(),
       createdById: actor.id,
     },
     select: { id: true, fullName: true },
@@ -97,9 +110,11 @@ export async function updateCandidateProfile(
 ) {
   const existing = await prisma.candidate.findFirst({
     where: { id: candidateId, organizationId: actor.organizationId },
-    select: { id: true },
+    select: { id: true, sourcedAt: true, consentStatus: true },
   });
   if (!existing) return null;
+  // До согласия — только имя, контакты и ссылка на профиль (сорсинг-лид)
+  assertFieldsAllowed(existing, input);
 
   return prisma.candidate.update({
     where: { id: candidateId },
@@ -173,6 +188,8 @@ export async function searchCandidates(
       email: true,
       salaryExpectation: true,
       consentStatus: true,
+      // Сорсинг-лид: в списке видно, сколько дней осталось до удаления
+      sourcedAt: true,
       createdAt: true,
       _count: { select: { applications: true } },
     },
@@ -246,6 +263,10 @@ export async function attachFile(
     visibility?: "INTERNAL" | "SHARED";
   },
 ) {
+  // Сорсинг-лиду файлы не сохраняются (lib/services/sourcing.ts). Проверка
+  // до загрузки в хранилище — иначе отказ оставил бы там файл без записи
+  await assertFilesAllowed(actor.organizationId, params);
+
   const body = Buffer.from(await params.file.arrayBuffer());
   validateUpload({ size: params.file.size, type: params.file.type, body });
 

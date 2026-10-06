@@ -3,8 +3,11 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { getEmailTransport } from "@/lib/notifications/channels";
+import { reserveMail } from "@/lib/security/mail-limit";
+import { recordAuthEvent } from "@/lib/services/auth-events";
 import { appUrl } from "@/lib/urls";
 import { brandedEmail } from "@/lib/notifications/email-brand";
+import { passwordProblem } from "@/lib/validation/password";
 
 export class PasswordError extends Error {}
 
@@ -36,7 +39,7 @@ export async function changePassword(params: {
 }): Promise<void> {
   const user = await prisma.user.findFirst({
     where: { id: params.userId, isActive: true },
-    select: { id: true, passwordHash: true },
+    select: { id: true, passwordHash: true, email: true },
   });
   if (!user?.passwordHash) {
     throw new PasswordError("Пароль сменить нельзя, обратитесь к владельцу");
@@ -48,6 +51,10 @@ export async function changePassword(params: {
   if (params.currentPassword === params.newPassword) {
     throw new PasswordError("Новый пароль совпадает с текущим");
   }
+
+  // Правило слабых паролей одно на все формы; почта — из базы
+  const problem = passwordProblem(params.newPassword, { email: user.email });
+  if (problem) throw new PasswordError(problem);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -73,11 +80,19 @@ export async function requestPasswordReset(params: {
 }): Promise<void> {
   const email = params.email.toLowerCase().trim();
 
+  // Не больше трёх писем в час на адрес — со ссылкой или без: экран
+  // отвечает одинаково, и сверх потолка письмо просто не уходит. Счётчик
+  // в базе, а не в памяти: память обнуляется перезапуском
+  if (!(await reserveMail("reset", email)).allowed) return;
+
   const user = await prisma.user.findFirst({
-    where: { email, isActive: true },
-    select: { id: true, email: true, fullName: true },
+    where: { email },
+    select: { id: true, email: true, fullName: true, isActive: true },
   });
-  if (!user) return;
+  if (!user || !user.isActive) {
+    await sendNoResetMail(email, user ? "inactive" : "unknown");
+    return;
+  }
 
   // Прежние неиспользованные ссылки гасим: иначе у человека на руках
   // оказывается несколько рабочих, и отозвать их нечем
@@ -124,6 +139,49 @@ export async function requestPasswordReset(params: {
   });
 }
 
+/**
+ * Письмо «восстановить нечего» — на сам адрес, а не на экран.
+ *
+ * Раньше по адресу без учётки форма молча ничего не слала, и человек ждал
+ * письма, которого не будет: «запрос отправляется, но письмо не приходит».
+ * Экран по-прежнему отвечает одинаково на любой адрес — кто работает
+ * в компании, через форму не узнать, — а владелец ящика узнаёт, в чём
+ * дело: учётки с этим адресом нет или доступ отключён. Так же устроена
+ * регистрация: в письме либо ссылка, либо «у вас уже есть доступ».
+ */
+async function sendNoResetMail(email: string, reason: "unknown" | "inactive"): Promise<void> {
+  const login = appUrl("/login");
+  const explanation =
+    reason === "inactive"
+      ? "Учётная запись с этим адресом отключена: вернуть доступ может только тот, кто вас приглашал, — администратор вашей компании или агентство."
+      : "Учётной записи с этим адресом на платформе нет. Если вас приглашали, проверьте, на какой адрес пришло приглашение, или попросите прислать его заново. Если вы входили по номеру телефона, войдите тем же способом.";
+
+  await getEmailTransport().send({
+    to: email,
+    subject: "Восстановление доступа к платформе",
+    text: [
+      `Кто-то — возможно, вы — запросил смену пароля для адреса ${email}.`,
+      "",
+      explanation,
+      "",
+      `Вход: ${login}`,
+      "",
+      "Если вы ничего не запрашивали, просто удалите письмо.",
+    ].join("\n"),
+    html: brandedEmail({
+      title: "Восстановление доступа к платформе",
+      preview: reason === "inactive" ? "Учётная запись отключена" : "Учётной записи с этим адресом нет",
+      heading: "Восстановить нечего",
+      paragraphs: [
+        `Кто-то — возможно, вы — запросил смену пароля для адреса ${email}.`,
+        explanation,
+      ],
+      action: { href: login, label: "Перейти ко входу" },
+      note: "Если вы ничего не запрашивали, просто удалите письмо.",
+    }),
+  });
+}
+
 export type ResetTarget = { userId: string; email: string; fullName: string };
 
 /**
@@ -159,6 +217,12 @@ export async function getResetTarget(
  *
  * Гашение ссылки и смена пароля идут одной транзакцией: иначе сбой между
  * ними оставит рабочую ссылку при уже смененном пароле.
+ *
+ * «Использована» записывается условием `usedAt: null` в самом UPDATE
+ * и первым действием транзакции: прежнее «прочитать — потом записать»
+ * пропускало два одновременных запроса с одной ссылкой, и пароль
+ * становился тем, кто записал последним. Теперь успех у одного,
+ * проигравший откатывается целиком.
  */
 export async function resetPassword(params: {
   token: string;
@@ -168,22 +232,36 @@ export async function resetPassword(params: {
 
   const record = await prisma.passwordReset.findFirst({
     where: { tokenHash: hash, usedAt: null, expiresAt: { gt: new Date() } },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, user: { select: { email: true, isActive: true } } },
   });
-  if (!record) throw new PasswordError("Ссылка недействительна или истекла");
+  if (!record?.user?.isActive) throw new PasswordError("Ссылка недействительна или истекла");
+
+  // Правило слабых паролей одно на все формы; почта — из базы. До гашения
+  // ссылки: человек поправит пароль и повторит по той же ссылке
+  const problem = passwordProblem(params.newPassword, { email: record.user.email });
+  if (problem) throw new PasswordError(problem);
 
   const passwordHash = await hashPassword(params.newPassword);
 
-  await prisma.$transaction([
-    prisma.user.update({
+  await prisma.$transaction(async (tx) => {
+    const spent = await tx.passwordReset.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (spent.count !== 1) throw new PasswordError("Ссылка недействительна или истекла");
+
+    await tx.user.update({
       where: { id: record.userId },
       data: { passwordHash, passwordChangedAt: new Date() },
-    }),
-    prisma.passwordReset.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    }),
-  ]);
+    });
+  });
+
+  await recordAuthEvent({
+    kind: "PASSWORD_RESET",
+    userId: record.userId,
+    email: record.user.email,
+    details: { method: "link" },
+  });
 }
 
 /**

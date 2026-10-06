@@ -7,6 +7,8 @@
  * включается переменными окружения, вызовы при этом не меняются.
  */
 
+import { vkSendMessage } from "@/lib/notifications/vk-api";
+
 export type EmailMessage = {
   to: string;
   subject: string;
@@ -15,10 +17,11 @@ export type EmailMessage = {
   html?: string;
 };
 
-export type TelegramMessage = {
-  chatId: string;
+export type VkMessage = {
+  /** Числовой id страницы ВКонтакте. */
+  userId: string;
   text: string;
-  /** Ссылка на объект — Telegram показывает её кнопкой. */
+  /** Ссылка на объект — в ВК уходит последней строкой. */
   url?: string;
   urlLabel?: string;
 };
@@ -27,8 +30,8 @@ export interface EmailTransport {
   send(message: EmailMessage): Promise<void>;
 }
 
-export interface TelegramTransport {
-  send(message: TelegramMessage): Promise<void>;
+export interface VkTransport {
+  send(message: VkMessage): Promise<void>;
 }
 
 /**
@@ -46,53 +49,33 @@ export class LoggingEmailTransport implements EmailTransport {
   }
 }
 
-export class LoggingTelegramTransport implements TelegramTransport {
-  async send(message: TelegramMessage): Promise<void> {
-    console.info(
-      `[telegram] → ${message.chatId}\n  ${message.text.replace(/\n/g, "\n  ")}` +
-        (message.url ? `\n  ссылка: ${message.url}` : ""),
-    );
-  }
-}
-
 /**
- * Отправка через Telegram Bot API.
+ * Сообщения ВКонтакте от имени сообщества.
  *
- * Без внешних зависимостей: нужен один POST. Ошибки не бросаем —
- * упавшее уведомление не должно ронять действие, которое его вызвало.
- * Клиент не должен получать ошибку в ответ на «отказать кандидату»
- * только потому, что у рекрутера отвалился Telegram.
+ * Отказы не бросаются — как у почты: недоставленное сообщение
+ * не должно ронять действие, ради которого его отправляли. Но и не
+ * глотаются молча: ВК отвечает отказом с кодом 200, и без разбора тела
+ * сбой выглядел бы успехом (см. lib/notifications/vk-api.ts).
  */
-export class BotApiTelegramTransport implements TelegramTransport {
+export class VkApiTransport implements VkTransport {
   constructor(private readonly token: string) {}
 
-  async send(message: TelegramMessage): Promise<void> {
+  async send(message: VkMessage): Promise<void> {
     const text = message.url
       ? `${message.text}\n\n${message.urlLabel ?? "Открыть"}: ${message.url}`
       : message.text;
 
-    try {
-      const response = await fetch(
-        `https://api.telegram.org/bot${this.token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: message.chatId,
-            text,
-            parse_mode: "HTML",
-            disable_web_page_preview: true,
-          }),
-        },
+    const result = await vkSendMessage(this.token, message.userId, text);
+    if (!result.ok) {
+      console.error(
+        `[вк] не доставлено ${message.userId}: ${result.code ?? "—"} ${result.message}`,
       );
-
-      if (!response.ok) {
-        console.error(
-          `[telegram] не доставлено ${message.chatId}: ${response.status}`,
-        );
-      }
-    } catch (error) {
-      console.error("[telegram] сбой отправки", error);
     }
+  }
+}
+
+export class LoggingVkTransport implements VkTransport {
+  async send(message: VkMessage): Promise<void> {
+    console.info(`[вк] → ${message.userId}\n  ${message.text}`);
   }
 }

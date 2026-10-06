@@ -1,7 +1,6 @@
 'use client';
 
 import { NotificationToggle } from '@/components/account/NotificationToggle';
-import { PresenceToggle } from '@/components/account/PresenceToggle';
 import { PushToggle } from '@/components/account/PushToggle';
 
 import { useState } from 'react';
@@ -352,7 +351,6 @@ export function CompanyEditor({
 
         <Section title="Уведомления">
           <NotificationToggle audience="company" bordered={false} />
-          <PresenceToggle audience="company" />
           <PushToggle audience="company" />
         </Section>
       </div>

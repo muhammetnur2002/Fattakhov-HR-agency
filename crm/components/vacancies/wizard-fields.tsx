@@ -26,6 +26,8 @@ export function Field({
   label,
   htmlFor,
   hint,
+  counter,
+  error,
   required,
   className,
   children,
@@ -33,6 +35,15 @@ export function Field({
   label: string;
   htmlFor: string;
   hint?: string;
+  /**
+   * Счётчик длины — своей строкой под подсказкой.
+   *
+   * В хвосте подсказки он терялся: подсказка занимает две строки,
+   * и «пока 7 символов из 30» читается как её продолжение.
+   */
+  counter?: string;
+  /** Чего не хватает именно здесь. Показывается вместе с подсказкой, а не вместо. */
+  error?: string;
   required?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -44,9 +55,46 @@ export function Field({
         {required && <span> *</span>}
       </Label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && (
+        <p id={`${htmlFor}-hint`} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
+      {counter && (
+        <p
+          id={`${htmlFor}-counter`}
+          className="text-xs tabular-nums text-muted-foreground"
+        >
+          {counter}
+        </p>
+      )}
+      {error && (
+        <p id={`${htmlFor}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
+}
+
+/**
+ * Что читает вслух скринридер, встав на поле.
+ *
+ * Ошибка идёт первой: она про то, что прямо сейчас мешает, подсказка —
+ * про то, как заполнять.
+ */
+function describedBy(
+  id: string,
+  hint?: string,
+  error?: string,
+  counter?: string,
+) {
+  const ids = [
+    error && `${id}-error`,
+    counter && `${id}-counter`,
+    hint && `${id}-hint`,
+  ].filter(Boolean);
+  return ids.length > 0 ? ids.join(" ") : undefined;
 }
 
 export function TextField({
@@ -55,6 +103,7 @@ export function TextField({
   value,
   onChange,
   hint,
+  error,
   required,
   placeholder,
   type = "text",
@@ -65,18 +114,28 @@ export function TextField({
   value: string;
   onChange: (v: string) => void;
   hint?: string;
+  error?: string;
   required?: boolean;
   placeholder?: string;
   type?: string;
   className?: string;
 }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint} required={required} className={className}>
+    <Field
+      label={label}
+      htmlFor={id}
+      hint={hint}
+      error={error}
+      required={required}
+      className={className}
+    >
       <Input
         id={id}
         type={type}
         value={value}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(id, hint, error)}
         onChange={(e) => onChange(e.target.value)}
       />
     </Field>
@@ -89,6 +148,8 @@ export function AreaField({
   value,
   onChange,
   hint,
+  counter,
+  error,
   required,
   placeholder,
   rows = 5,
@@ -98,17 +159,28 @@ export function AreaField({
   value: string;
   onChange: (v: string) => void;
   hint?: string;
+  counter?: string;
+  error?: string;
   required?: boolean;
   placeholder?: string;
   rows?: number;
 }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint} required={required}>
+    <Field
+      label={label}
+      htmlFor={id}
+      hint={hint}
+      counter={counter}
+      error={error}
+      required={required}
+    >
       <Textarea
         id={id}
         rows={rows}
         value={value}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(id, hint, error, counter)}
         onChange={(e) => onChange(e.target.value)}
       />
     </Field>

@@ -29,7 +29,7 @@
  * а не только оборачивается.
  *
  * Текст вокруг email при этом не меняется ни на символ — важно для
- * LEAD_CONSENT_TEXT/MARKETING_CONSENT_TEXT (lib/legal/consent-texts.ts),
+ * текстов согласий (lib/legal/*: сайт, регистрация, реклама),
  * где сама формулировка зафиксирована версией из юридического пакета.
  */
 function escapeHtml(value: string): string {

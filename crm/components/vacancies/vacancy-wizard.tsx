@@ -17,6 +17,7 @@ import {
   WORK_FORMAT_LABELS,
 } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { BRIEF_MIN_CHARS } from "@/lib/validation/brief-limits";
 
 export type WizardValues = Record<string, string>;
 
@@ -34,6 +35,74 @@ const STEPS = [
 
 /** Интервал автосохранения (BR-20). */
 const AUTOSAVE_MS = 10_000;
+
+/**
+ * Что должно быть заполнено, чтобы заявку приняли в работу.
+ *
+ * Порог тот же, что у `vacancySubmitSchema`: судья по-прежнему сервер,
+ * но требование обязано быть видно на том шаге, где стоит поле. Раньше
+ * человек проходил второй шаг с двумя словами и узнавал об этом на пятом,
+ * сообщением, которое читается как «ты не заполнила» — при заполненном
+ * поле. Поэтому здесь ещё и номер шага: без него неясно, куда идти.
+ */
+const SUBMIT_REQUIREMENTS = [
+  { field: "title", step: 1, label: "Название позиции", min: 3 },
+  {
+    field: "responsibilities",
+    step: 2,
+    label: "Обязанности",
+    min: BRIEF_MIN_CHARS,
+  },
+  {
+    field: "requirements",
+    step: 2,
+    label: "Требования",
+    min: BRIEF_MIN_CHARS,
+  },
+] as const;
+
+type Gap = {
+  field: string;
+  step: number;
+  label: string;
+  /** Короткая формулировка — для подписи под самим полем. */
+  short: string;
+  /** С названием поля — для списка на шаге проверки. */
+  message: string;
+};
+
+/** «1 символ», «23 символа», «30 символов» — иначе счётчик читается коряво. */
+function chars(n: number): string {
+  const teens = n % 100;
+  const last = n % 10;
+  if (teens >= 11 && teens <= 14) return `${n} символов`;
+  if (last === 1) return `${n} символ`;
+  if (last >= 2 && last <= 4) return `${n} символа`;
+  return `${n} символов`;
+}
+
+/** Чего не хватает для отправки. Пусто — можно отправлять. */
+function submitGaps(values: WizardValues): Gap[] {
+  const gaps: Gap[] = [];
+  for (const rule of SUBMIT_REQUIREMENTS) {
+    const filled = (values[rule.field] ?? "").trim().length;
+    if (filled >= rule.min) continue;
+
+    const short =
+      filled === 0
+        ? `Поле пустое — нужно не меньше ${chars(rule.min)}`
+        : `Пока ${chars(filled)} из ${rule.min} — добавьте ещё ${chars(rule.min - filled)}`;
+
+    gaps.push({
+      field: rule.field,
+      step: rule.step,
+      label: rule.label,
+      short,
+      message: `${rule.label}: ${short.charAt(0).toLowerCase()}${short.slice(1)}`,
+    });
+  }
+  return gaps;
+}
 
 const EMPTY: WizardValues = {
   title: "",
@@ -120,6 +189,13 @@ export function VacancyWizard({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Красным подписываем поля только после попытки отправить: подсвечивать
+  // «мало символов» человеку, который ещё печатает первое слово, — травля.
+  const [showGaps, setShowGaps] = useState(false);
+  const gaps = submitGaps(values);
+  const gapFor = (field: string) =>
+    showGaps ? gaps.find((g) => g.field === field)?.short : undefined;
+
   // Черновик сохраняется, только если с прошлого раза что-то изменилось —
   // иначе таймер будет молотить в базу на открытой вкладке
   const dirty = useRef(false);
@@ -169,10 +245,29 @@ export function VacancyWizard({
       setError("Черновик ещё не сохранён — подождите пару секунд");
       return;
     }
+
+    // Недостающее показываем у самого поля и уводим туда же. Отправить
+    // и получить отказ — тот же результат, только человек остаётся
+    // на шаге проверки и гадает, о каком поле речь.
+    const missing = submitGaps(values);
+    if (missing.length > 0) {
+      setShowGaps(true);
+      setError(missing[0].message);
+      setStep(missing[0].step);
+      return;
+    }
+
     startTransition(async () => {
       const result = await submitVacancyAction(vacancyId, values, clientId);
       if (result.error) {
         setError(result.error);
+        // Сервер — судья: если он назвал поле, уводим к нему, даже когда
+        // проверка выше пропустила
+        const target = SUBMIT_REQUIREMENTS.find((r) => r.field === result.field);
+        if (target) {
+          setShowGaps(true);
+          setStep(target.step);
+        }
         return;
       }
       router.push(`${hrefBase}/${vacancyId}`);
@@ -224,12 +319,35 @@ export function VacancyWizard({
           {step === 1 && (
             <Step1 values={values} set={set} hiringManagers={hiringManagers} />
           )}
-          {step === 2 && <Step2 values={values} set={set} />}
+          {step === 2 && <Step2 values={values} set={set} gapFor={gapFor} />}
           {step === 3 && <Step3 values={values} set={set} />}
           {step === 4 && <Step4 values={values} set={set} />}
           {step === 5 && <Preview values={values} managers={hiringManagers} />}
         </CardContent>
       </Card>
+
+      {step === 5 && gaps.length > 0 && (
+        <Alert>
+          <AlertDescription className="space-y-2">
+            <div className="font-medium text-foreground">
+              Чтобы отправить заявку, не хватает:
+            </div>
+            <ul className="list-disc space-y-1 pl-5">
+              {gaps.map((g) => (
+                <li key={g.field}>{g.message}</li>
+              ))}
+            </ul>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => goTo(gaps[0].step)}
+            >
+              Вернуться и дописать
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="destructive">
@@ -394,7 +512,28 @@ function Step1({
   );
 }
 
-function Step2({ values, set }: StepProps) {
+/**
+ * Счётчик длины — серый, спокойный и виден во время ввода.
+ *
+ * Порог в тридцать символов не был написан нигде, и человек с коротким,
+ * но заполненным полем получал «опишите обязанности», как будто не
+ * написал ничего. Теперь требование видно до отправки, а не после.
+ * Когда набрано достаточно, счётчик уходит: дальше он только мешает.
+ */
+function counterFor(value: string): string | undefined {
+  const filled = value.trim().length;
+  if (filled === 0) return `Нужно не меньше ${chars(BRIEF_MIN_CHARS)}`;
+  if (filled < BRIEF_MIN_CHARS) {
+    return `Пока ${chars(filled)} из ${BRIEF_MIN_CHARS}`;
+  }
+  return undefined;
+}
+
+function Step2({
+  values,
+  set,
+  gapFor,
+}: StepProps & { gapFor: (field: string) => string | undefined }) {
   return (
     <div className="space-y-5">
       <AreaField
@@ -405,6 +544,8 @@ function Step2({ values, set }: StepProps) {
         onChange={(v) => set("responsibilities", v)}
         placeholder="Что человек будет делать каждый день"
         hint="Конкретика важнее полноты: пять реальных задач лучше двадцати общих формулировок"
+        counter={counterFor(values.responsibilities)}
+        error={gapFor("responsibilities")}
       />
       <AreaField
         id="requirements"
@@ -414,6 +555,8 @@ function Step2({ values, set }: StepProps) {
         onChange={(v) => set("requirements", v)}
         placeholder="Без чего кандидата точно не возьмёте"
         hint="Только то, без чего откажете. Всё остальное — в поле ниже"
+        counter={counterFor(values.requirements)}
+        error={gapFor("requirements")}
       />
       <AreaField
         id="niceToHave"

@@ -1,6 +1,7 @@
 import { isAgency, type Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
 import { link } from "@/lib/notifications/links";
+import { effectiveShowPresence, type Presence } from "@/lib/presence";
 import { truncateBody } from "@/lib/notifications/events";
 import { notify } from "@/lib/notifications/notify";
 
@@ -17,7 +18,101 @@ export type Correspondent = {
   avatarUrl: string | null;
   /** Логотип компании — показывается вместо фото у сотрудников клиента. */
   clientLogoUrl: string | null;
+  /**
+   * «В сети» / «был(а)…». null — показывать нечего: владелец агентства скрыл
+   * статус (showPresence; у остальных ролей он виден всегда) или смотрящему он не положен. Собеседник попадает сюда
+   * только через правило «кому можно писать», так что чужую компанию
+   * клиент не увидит и со статусом.
+   */
+  presence: Presence | null;
 };
+
+/** Что нужно знать о человеке, чтобы решить, видна ли его активность смотрящему. */
+export type PresenceSource = {
+  id: string;
+  organizationId: string;
+  /** null — сотрудник агентства. */
+  clientId: string | null;
+  /** Роль нужна, чтобы учесть, что скрыть статус может только владелец. */
+  role: string;
+  showPresence: boolean;
+  lastSeenAt: Date | null;
+};
+
+/**
+ * Вправе ли актор общаться с человеком — правило из чистых полей, без базы.
+ *
+ * Единственное место, где записано «агентство — со всеми, клиент — с командой
+ * агентства и своими коллегами»: по нему же решается, кому показывать статус
+ * «в сети». listCorrespondents выражает то же самое условием запроса
+ * (проверяется тестом на совпадение).
+ */
+export function canCommunicateWith(
+  actor: Actor,
+  target: { organizationId: string; clientId: string | null },
+): boolean {
+  if (target.organizationId !== actor.organizationId) return false;
+  // Агентство работает со всеми внутри организации
+  if (isAgency(actor)) return true;
+  // Клиент — только агентству и своим коллегам
+  return target.clientId === null || target.clientId === actor.clientId;
+}
+
+/**
+ * Статус человека для экрана — или null, если показывать его нельзя.
+ *
+ * Здесь же, а не в компоненте: в ответ сервера `lastSeenAt` попадает только
+ * когда смотрящему можно его видеть. Скрытое владельцем (showPresence=false
+ * у OWNER, см. effectiveShowPresence) не отдаётся вовсе, даже как «давно»;
+ * себя не показываем — «в сети» у собственной строки ничего не говорит.
+ */
+export function presenceFor(actor: Actor, target: PresenceSource): Presence | null {
+  if (target.id === actor.id) return null;
+  if (!effectiveShowPresence(target)) return null;
+  if (!canCommunicateWith(actor, target)) return null;
+  return { lastSeenAt: target.lastSeenAt };
+}
+
+/** Поля человека, нужные и для списка собеседников, и для шапки переписки. */
+const CORRESPONDENT_SELECT = {
+  id: true,
+  organizationId: true,
+  clientId: true,
+  fullName: true,
+  role: true,
+  position: true,
+  avatarUrl: true,
+  showPresence: true,
+  lastSeenAt: true,
+  client: { select: { name: true, logoUrl: true } },
+} as const;
+
+function toCorrespondent(
+  actor: Actor,
+  u: {
+    id: string;
+    organizationId: string;
+    clientId: string | null;
+    fullName: string;
+    role: string;
+    position: string | null;
+    avatarUrl: string | null;
+    showPresence: boolean;
+    lastSeenAt: Date | null;
+    client: { name: string; logoUrl: string | null } | null;
+  },
+): Correspondent {
+  return {
+    id: u.id,
+    fullName: u.fullName,
+    role: u.role,
+    position: u.position,
+    clientName: u.client?.name ?? null,
+    avatarUrl: u.avatarUrl,
+    clientLogoUrl: u.client?.logoUrl ?? null,
+    presence: presenceFor(actor, u),
+  };
+}
 
 export type DirectConversation = {
   user: Correspondent;
@@ -48,26 +143,11 @@ export async function listCorrespondents(
       // Клиенту видны только агентство (clientId: null) и свои коллеги
       ...(isAgency(actor) ? {} : { OR: [{ clientId: null }, { clientId: actor.clientId }] }),
     },
-    select: {
-      id: true,
-      fullName: true,
-      role: true,
-      position: true,
-      avatarUrl: true,
-      client: { select: { name: true, logoUrl: true } },
-    },
+    select: CORRESPONDENT_SELECT,
     orderBy: { fullName: "asc" },
   });
 
-  return users.map((u) => ({
-    id: u.id,
-    fullName: u.fullName,
-    role: u.role,
-    position: u.position,
-    clientName: u.client?.name ?? null,
-    avatarUrl: u.avatarUrl,
-    clientLogoUrl: u.client?.logoUrl ?? null,
-  }));
+  return users.map((u) => toCorrespondent(actor, u));
 }
 
 /** Может ли актор писать этому человеку — та же проверка, но точечная. */
@@ -84,15 +164,11 @@ export async function canWriteTo(
       isActive: true,
       deletedAt: null,
     },
-    select: { clientId: true },
+    select: { organizationId: true, clientId: true },
   });
   if (!recipient) return false;
 
-  // Агентство пишет кому угодно внутри организации
-  if (isAgency(actor)) return true;
-
-  // Клиент — только агентству и своим коллегам
-  return recipient.clientId === null || recipient.clientId === actor.clientId;
+  return canCommunicateWith(actor, recipient);
 }
 
 /**
@@ -140,14 +216,7 @@ export async function listDirectConversations(
 
   const users = await prisma.user.findMany({
     where: { id: { in: [...byUser.keys()] } },
-    select: {
-      id: true,
-      fullName: true,
-      role: true,
-      position: true,
-      avatarUrl: true,
-      client: { select: { name: true, logoUrl: true } },
-    },
+    select: CORRESPONDENT_SELECT,
   });
   const userById = new Map(users.map((u) => [u.id, u]));
 
@@ -156,15 +225,7 @@ export async function listDirectConversations(
       const u = userById.get(userId);
       if (!u) return null;
       return {
-        user: {
-          id: u.id,
-          fullName: u.fullName,
-          role: u.role,
-          position: u.position,
-          clientName: u.client?.name ?? null,
-          avatarUrl: u.avatarUrl,
-          clientLogoUrl: u.client?.logoUrl ?? null,
-        },
+        user: toCorrespondent(actor, u),
         lastMessage: {
           body: acc.last.body,
           createdAt: acc.last.createdAt,
@@ -208,26 +269,11 @@ export async function getCorrespondent(
 
   const u = await prisma.user.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
-    select: {
-      id: true,
-      fullName: true,
-      role: true,
-      position: true,
-      avatarUrl: true,
-      client: { select: { name: true, logoUrl: true } },
-    },
+    select: CORRESPONDENT_SELECT,
   });
   if (!u) return null;
 
-  return {
-    id: u.id,
-    fullName: u.fullName,
-    role: u.role,
-    position: u.position,
-    clientName: u.client?.name ?? null,
-    avatarUrl: u.avatarUrl,
-    clientLogoUrl: u.client?.logoUrl ?? null,
-  };
+  return toCorrespondent(actor, u);
 }
 
 export async function sendDirectMessage(

@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import { ConversationList } from "./conversation-list";
 import { DirectConversationList } from "./direct-conversation-list";
 import { NewMessageDialog } from "./new-message-dialog";
+import { PresenceRefresh } from "@/components/presence/presence-refresh";
 import { Button } from "@/components/ui/button";
 import { useKeyboardViewport } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
@@ -74,10 +75,29 @@ export function MessagesShell({
   return (
     <div
       ref={rootRef}
-      // На телефоне — экран приложения: без рамки и скруглений, на всю ширину и высоту под шапкой
-      // (отступы main p-4 гасятся отрицательными). Карточка с рамкой — только с md
-      className="-m-4 flex h-[calc(100svh-3.5rem)] overflow-hidden md:m-0 md:h-[calc(100svh-3.5rem-3rem)] md:rounded-3xl md:border"
+      // Открытая переписка на телефоне убирает нижнюю панель разделов
+      // (globals.css): внутри диалога вкладок нет, как в мессенджерах,
+      // назад — стрелкой в шапке диалога. С md панели нет вовсе
+      data-hides-bottom-tabs={threadOpen || undefined}
+      className={cn(
+        // На телефоне — экран приложения: без рамки и скруглений, на всю
+        // ширину под шапкой (отступы main гасятся отрицательными), и страница
+        // вокруг не прокручивается. Карточка с рамкой — только с md
+        "-mx-4 -mt-4 flex overflow-hidden md:m-0 md:h-[calc(100svh-3.5rem-3rem)] md:rounded-3xl md:border md:pb-0",
+        threadOpen
+          ? // Диалог — до низа экрана: панели нет, отступ main под неё
+            // (--tabbar-space) гасится целиком, а снизу — полоса «Домой»
+            // (viewport-fit=cover), чтобы поле ввода не легло под неё
+            "mb-[calc(var(--tabbar-space)*-1)] h-[calc(100svh-3.5rem)] pb-(--safe-bottom)"
+          : // Список — до панели: кончается над ней, а не под ней, и
+            // последний диалог не прячется за стеклом. Высота — ровно
+            // столько, чтобы с отступом main под панель страница была
+            // в один экран
+            "-mb-4 h-[calc(100svh-3.5rem-var(--tabbar-space)+1rem)]",
+      )}
     >
+      {/* «В сети» у собеседников не должно застывать на моменте загрузки */}
+      <PresenceRefresh />
       <aside
         className={cn(
           "flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r",
@@ -108,10 +128,10 @@ export function MessagesShell({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Поиск"
                 aria-label="Поиск по диалогам"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none touch:text-base placeholder:text-muted-foreground"
               />
             </div>
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="pill-scroller flex gap-2">
               <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
                 Все
               </FilterChip>

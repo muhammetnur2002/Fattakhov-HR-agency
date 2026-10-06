@@ -1,10 +1,55 @@
-import { CLIENT_ROLES, visibleVacanciesFilter, type Actor } from "@/lib/access";
+import {
+  assertCanDo,
+  CLIENT_ROLES,
+  isClient,
+  visibleVacanciesFilter,
+  type Actor,
+} from "@/lib/access";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import { decimalToNumber } from "@/lib/services/agreements";
+import { InviteError } from "@/lib/services/invitations";
+import { presenceFor } from "@/lib/services/messages";
 import type { ClientInput } from "@/lib/validation/client";
+import { recordAuthEvent } from "@/lib/services/auth-events";
+import { passwordProblem } from "@/lib/validation/password";
 
 export class ClientUserError extends Error {}
+
+/** Сотрудник клиента для списков: поля строки плюс то, что нужно для «в сети». */
+const TEAM_USER_SELECT = {
+  id: true,
+  organizationId: true,
+  clientId: true,
+  fullName: true,
+  email: true,
+  role: true,
+  position: true,
+  lastLoginAt: true,
+  showPresence: true,
+  lastSeenAt: true,
+} as const;
+
+/** Строка человека без сырых полей присутствия — вместо них готовое решение сервера. */
+function withPresence<
+  U extends {
+    id: string;
+    organizationId: string;
+    clientId: string | null;
+    role: string;
+    showPresence: boolean;
+    lastSeenAt: Date | null;
+  },
+>(viewer: Actor | undefined, user: U) {
+  const { organizationId, clientId, showPresence, lastSeenAt, ...rest } = user;
+  const { role } = user;
+  return {
+    ...rest,
+    presence: viewer
+      ? presenceFor(viewer, { id: user.id, organizationId, clientId, role, showPresence, lastSeenAt })
+      : null,
+  };
+}
 
 /**
  * Своя команда — для кабинета клиента (org.manageClientUsers).
@@ -14,19 +59,12 @@ export class ClientUserError extends Error {}
  * нужно, а тянуть лишнее ради переиспользования одной функции того
  * не стоит.
  */
-export async function listClientTeam(clientId: string) {
+export async function listClientTeam(clientId: string, viewer?: Actor) {
   const [users, invitations] = await Promise.all([
     prisma.user.findMany({
       where: { clientId, isActive: true },
       orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        position: true,
-        lastLoginAt: true,
-      },
+      select: TEAM_USER_SELECT,
     }),
 
     prisma.invitation.findMany({
@@ -36,7 +74,67 @@ export async function listClientTeam(clientId: string) {
     }),
   ]);
 
-  return { users, invitations };
+  return {
+    // Без смотрящего статус не отдаётся вовсе: presence: null
+    users: users.map((user) => withPresence(viewer, user)),
+    invitations,
+  };
+}
+
+/**
+ * Отозвать неотвеченное приглашение пользователя клиента.
+ *
+ * Зачем — то же, что у сотрудников агентства (revokeStaffInvitation):
+ * опечатка в адресе. Пока приглашение живо, повторно позвать того же
+ * человека нельзя — createInvitation отвечает «на этот адрес уже есть
+ * действующее приглашение», — а ссылка из неверного письма всю неделю
+ * пускает в кабинет клиента любого, кто её откроет, с указанной ролью.
+ * И место в команде из пяти человек оно занимает так же, как принятое.
+ *
+ * Зовут отсюда обе стороны, и право у них разное: агентство ведёт
+ * пользователей любого своего клиента (client.manage), администратор
+ * клиента — только своих коллег (org.manageClientUsers, ownClient).
+ * Поэтому сторона задаёт и проверку права, и границу поиска. Границу —
+ * обязательно: чужая компания должна не находиться вовсе, а не
+ * отказывать по правам. Отказ подтвердил бы, что такое приглашение
+ * существует (BR-28), а id приглашения виден в разметке своей же
+ * страницы и подставляется в форму руками.
+ *
+ * Удаление физическое, и это не нарушение BR-26: мягкое удаление бережёт
+ * историю, а у непринятого приглашения её нет — по нему никто не вошёл
+ * и ссылаться на него нечему.
+ */
+export async function revokeClientInvitation(
+  actor: Actor,
+  invitationId: string,
+): Promise<void> {
+  const own = isClient(actor);
+
+  /*
+    Клиентский пользователь без компании — в продукте такого нет, но
+    ценой одной строки исключаем случай, когда `clientId: null` ниже
+    превратит поиск в «любое приглашение сотрудника агентства».
+  */
+  if (own && !actor.clientId) throw new InviteError("Приглашение не найдено");
+
+  const invitation = await prisma.invitation.findFirst({
+    where: {
+      id: invitationId,
+      organizationId: actor.organizationId,
+      acceptedAt: null,
+      // Сотрудники агентства сюда не относятся: у них своё право
+      // и свой экран (lib/services/staff.ts)
+      clientId: own ? actor.clientId : { not: null },
+    },
+    select: { id: true, clientId: true },
+  });
+  if (!invitation) throw new InviteError("Приглашение не найдено");
+
+  assertCanDo(actor, own ? "org.manageClientUsers" : "client.manage", {
+    clientId: invitation.clientId,
+  });
+
+  await prisma.invitation.delete({ where: { id: invitation.id } });
 }
 
 /** Список клиентов для кабинета агентства. */
@@ -110,14 +208,7 @@ export async function getClient(actor: Actor, clientId: string) {
     prisma.user.findMany({
       where: { clientId, isActive: true },
       orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        position: true,
-        lastLoginAt: true,
-      },
+      select: TEAM_USER_SELECT,
     }),
 
     prisma.agreement.findMany({
@@ -142,11 +233,14 @@ export async function getClient(actor: Actor, clientId: string) {
       },
     }),
 
-    // Неиспользованные приглашения — чтобы менеджер видел, кого уже позвали
+    // Неиспользованные приглашения — кого клиент уже позвал сам. Без токена:
+    // ссылка — пропуск в чужой кабинет, агентству она не нужна (своих людей
+    // клиенту оно заводит аккаунтом с паролем), а карточка уходит в браузер
+    // целиком — ClientForm получает её как есть
     prisma.invitation.findMany({
       where: { clientId, acceptedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, email: true, role: true, token: true, expiresAt: true },
+      select: { id: true, email: true, role: true, expiresAt: true },
     }),
 
     prisma.vacancy.count({
@@ -156,7 +250,9 @@ export async function getClient(actor: Actor, clientId: string) {
 
   return {
     ...client,
-    users,
+    // «В сети» — только то, что агентству можно видеть (presenceFor); сырые
+    // lastSeenAt и showPresence в карточку, уходящую в браузер, не попадают
+    users: users.map((user) => withPresence(actor, user)),
     // Ставки — Decimal, а карточку клиента рисует клиентский компонент
     agreements: agreements.map((a) => ({
       ...a,
@@ -276,9 +372,13 @@ export async function resetClientUserPassword(params: {
       organizationId: params.organizationId,
       clientId: params.clientId,
     },
-    select: { id: true },
+    select: { id: true, email: true },
   });
   if (!target) throw new ClientUserError("Пользователь не найден");
+
+  // Правило слабых паролей одно на все формы; почта пользователя в контексте — из базы
+  const problem = passwordProblem(params.password, { email: target.email });
+  if (problem) throw new ClientUserError(problem);
 
   await prisma.user.update({
     where: { id: target.id },
@@ -286,6 +386,13 @@ export async function resetClientUserPassword(params: {
       passwordHash: await hashPassword(params.password),
       passwordChangedAt: new Date(),
     },
+  });
+
+  await recordAuthEvent({
+    kind: "PASSWORD_RESET",
+    userId: target.id,
+    email: target.email,
+    details: { method: "by_admin" },
   });
 }
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { BRIEF_MIN_CHARS } from "./brief-limits";
+
 /** Пустая строка из формы → undefined, чтобы в БД не легли "". */
 const optionalText = (max: number) =>
   z
@@ -158,14 +160,23 @@ export type VacancyBriefInput = z.infer<typeof vacancyBriefSchema>;
  */
 export const vacancySubmitSchema = z.object({
   title: z.string().trim().min(3, "Укажите название позиции"),
+  // Сообщение называет порог. Без числа оно читается как «поле пустое»,
+  // и человек с заполненным, но коротким полем не понимает, чего от него
+  // хотят: ровно этим мастер и озадачивал.
   responsibilities: z
     .string()
     .trim()
-    .min(30, "Опишите обязанности — хотя бы пару предложений"),
+    .min(
+      BRIEF_MIN_CHARS,
+      `Опишите обязанности подробнее — нужно не меньше ${BRIEF_MIN_CHARS} символов`,
+    ),
   requirements: z
     .string()
     .trim()
-    .min(30, "Опишите требования к кандидату"),
+    .min(
+      BRIEF_MIN_CHARS,
+      `Опишите требования подробнее — нужно не меньше ${BRIEF_MIN_CHARS} символов`,
+    ),
 });
 
 /** Оценка сроков агентством (BR-2). */

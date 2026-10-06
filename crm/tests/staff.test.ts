@@ -113,14 +113,23 @@ describe("создание аккаунта сотрудника", () => {
 
 describe("перевыдача пароля", () => {
   it("владелец задаёт сотруднику новый пароль", async () => {
-    await resetStaffPassword(owner, "usr_rec1", "NewPass12345!");
+    await resetStaffPassword(owner, "usr_rec1", "zelenyy-chaynik-na-okne");
     const user = await db.user.findFirst({ where: { id: "usr_rec1" } });
-    expect(await verifyPassword(user!.passwordHash!, "NewPass12345!")).toBe(true);
+    expect(await verifyPassword(user!.passwordHash!, "zelenyy-chaynik-na-okne")).toBe(true);
     expect(user?.passwordChangedAt).not.toBeNull();
   });
 
+  it("слабый пароль и пароль с почтой сотрудника не принимаются и ничего не меняют", async () => {
+    // Правило слабых паролей одно на все формы — и когда пароль задаёт не сам человек
+    const before = await db.user.findFirst({ where: { id: "usr_rec1" } });
+    await expect(resetStaffPassword(owner, "usr_rec1", "NewPass12345!")).rejects.toThrow(/распространённ/);
+    await expect(resetStaffPassword(owner, "usr_rec1", "moy-rec1-parol-2026")).rejects.toThrow(/почт/);
+    const after = await db.user.findFirst({ where: { id: "usr_rec1" } });
+    expect(after?.passwordHash).toBe(before?.passwordHash);
+  });
+
   it("себя и владельца не перевыдать через это действие", async () => {
-    await expect(resetStaffPassword(owner, "usr_owner", "NewPass12345!")).rejects.toThrow(
+    await expect(resetStaffPassword(owner, "usr_owner", "zelenyy-chaynik-na-okne")).rejects.toThrow(
       AccessDeniedError,
     );
   });

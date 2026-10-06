@@ -1,5 +1,7 @@
 import "dotenv/config";
 
+import { recordWorkerTick } from "@/lib/monitoring/worker-heartbeat";
+
 import { runScheduledTasks } from "./tasks";
 
 /**
@@ -31,8 +33,16 @@ async function tick() {
         `[планировщик] ${done.map(([k, n]) => `${k}: ${n}`).join(", ")}`,
       );
     }
+    // «Жив и работает» — для /api/health/worker и внешней проверки
+    await recordWorkerTick(true);
   } catch (error) {
     console.error("[планировщик] сбой прохода", error);
+    await recordWorkerTick(false);
+    // Фоновые задачи никто не видит: упавший проход означает, что
+    // не ушли напоминания и уведомления, и узнать об этом неоткуда,
+    // кроме журнала. reportFailure() не бросает — петли не будет
+    const { reportFailure } = await import("@/lib/monitoring/alerts");
+    await reportFailure({ where: "планировщик", error });
   } finally {
     running = false;
   }
