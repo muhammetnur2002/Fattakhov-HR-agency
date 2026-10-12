@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 
 import { decideAccountDeletionAction } from "@/app/(agency)/a/clients/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Клиент с договором просит удалить свой аккаунт. Владелец агентства подтверждает
@@ -22,6 +24,7 @@ export function DeletionRequest({
   canDecide: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
 
@@ -33,7 +36,7 @@ export function DeletionRequest({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-destructive/40 p-3">
+    <Panel tone="danger">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="destructive">Просит удалить аккаунт</Badge>
         {!canDecide && <span className="text-xs text-muted-foreground">Решает владелец агентства</span>}
@@ -43,17 +46,17 @@ export function DeletionRequest({
           <div className="space-y-2">
             <p className="text-sm">Удалить аккаунт? Имя, почта и пароль будут стёрты, вход закроется. Это нельзя отменить.</p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => decide("confirm")}>
+              <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => decide("confirm")}>
                 {pending ? "Подождите…" : "Да, удалить"}
               </Button>
-              <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+              <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
                 Назад
               </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="destructive" onClick={() => setConfirming(true)}>
+            <Button ref={triggerRef} type="button" size="sm" variant="destructive" onClick={() => setConfirming(true)}>
               Подтвердить удаление
             </Button>
             <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => decide("reject")}>
@@ -61,16 +64,7 @@ export function DeletionRequest({
             </Button>
           </div>
         ))}
-      {message.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{message.error}</AlertDescription>
-        </Alert>
-      )}
-      {message.ok && (
-        <Alert>
-          <AlertDescription>{message.ok}</AlertDescription>
-        </Alert>
-      )}
-    </div>
+      <FormMessage error={message.error} ok={message.ok} />
+    </Panel>
   );
 }

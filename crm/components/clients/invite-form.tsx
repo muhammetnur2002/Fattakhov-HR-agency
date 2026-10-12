@@ -1,10 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { controlProps, FieldError } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,18 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { FormState } from "@/lib/form-state";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import { ROLE_LABELS } from "@/lib/labels";
 
 const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"] as const;
 
-export type InviteFormState = { error?: string; ok?: string };
+export type InviteFormState = FormState;
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Создаём…" : "Пригласить"}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel="Создаём…">
+      Пригласить
+    </SubmitButtonBase>
   );
 }
 
@@ -59,13 +59,12 @@ export function InviteForm({
    */
   noUsersYet?: boolean;
 }) {
-  const [state, formAction] = useActionState<InviteFormState, FormData>(
-    action,
-    {},
-  );
+  // Приглашение отправляется через useFormAction: «адрес уже занят» не стирает остальное
+  // набранное, а текст ошибки встаёт под рядом — у поля с красной рамкой
+  const { state, fields, pending, formProps } = useFormAction(action, {}, { resetOnSuccess: true });
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="clientId" value={clientId} />
 
       {noUsersYet && (
@@ -111,21 +110,25 @@ export function InviteForm({
       {/* На сенсорном экране поля и кнопка выше h-8 (min-height 2.4em,
           globals.css), и ряд поля растёт вместе с ними: иначе поля
           вылезали бы из ряда */}
-      <div className="grid gap-x-4 gap-y-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:grid-rows-[20px_2rem] lg:items-start lg:touch:grid-rows-[20px_2.75rem]">
+      <div className="grid gap-x-4 gap-y-4 lg:gap-y-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:grid-rows-[20px_2rem] lg:items-start lg:touch:grid-rows-[20px_2.75rem]">
         <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
           <Label htmlFor="invite-email">Email</Label>
           <Input
-            id="invite-email"
             name="email"
             type="email"
             placeholder="name@company.ru"
             required
+            {...controlProps("invite-email", { error: fields.email })}
           />
         </div>
 
         <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
           <Label htmlFor="invite-position">Должность</Label>
-          <Input id="invite-position" name="position" placeholder="Руководитель отдела" />
+          <Input
+            name="position"
+            placeholder="Руководитель отдела"
+            {...controlProps("invite-position", { error: fields.position })}
+          />
         </div>
 
         <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
@@ -136,7 +139,7 @@ export function InviteForm({
           >
             {/* 52 не хватало: «Нанимающий менеджер» упирался в стрелку
                 и обрезался на последней букве */}
-            <SelectTrigger id="invite-role" className="w-full lg:w-60">
+            <SelectTrigger {...controlProps("invite-role", { error: fields.role })} className="w-full lg:w-60">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -153,9 +156,19 @@ export function InviteForm({
             раскладка ставила кнопку в первую свободную ячейку строки —
             то есть перед Email, хотя в разметке она последняя */}
         <div className="lg:col-start-4 lg:row-start-2">
-          <SubmitButton />
+          <SubmitButton loading={pending} />
         </div>
       </div>
+
+      {/* Тексты ошибок — под всем рядом: поля стоят в общей сетке с фиксированными рядами, и
+          строка под полем сдвинула бы кнопку. Поле с ошибкой выделено рамкой и связано с текстом. */}
+      {(fields.email || fields.position || fields.role) && (
+        <div className="space-y-2">
+          {fields.email && <FieldError id="invite-email-error">{fields.email}</FieldError>}
+          {fields.position && <FieldError id="invite-position-error">{fields.position}</FieldError>}
+          {fields.role && <FieldError id="invite-role-error">{fields.role}</FieldError>}
+        </div>
+      )}
 
       {/* Приглашённый получает реальный доступ к кандидатам и вакансиям
           компании сразу после перехода по ссылке — предупреждение рядом
@@ -166,16 +179,7 @@ export function InviteForm({
         зовите только тех, кому доверяете.
       </p>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

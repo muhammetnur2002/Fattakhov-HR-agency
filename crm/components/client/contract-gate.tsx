@@ -11,6 +11,7 @@ import {
   type ContractGateAccess,
   type ContractState,
 } from "@/lib/contract-gate";
+import { PageTitle } from "@/components/ui/page-title";
 
 const WORK =
   "заявки на подбор, кандидаты от рекрутера, календарь встреч, аналитика";
@@ -62,9 +63,11 @@ export function ContractGate({
           <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-full bg-muted">
             <Lock className="size-5" />
           </div>
-          <h2 className="text-lg font-semibold">
+          {/* Страница под плашкой закрыта от читалки (aria-hidden + inert), поэтому
+              плашка — единственное, что у неё есть, и её заголовок — h1 страницы */}
+          <PageTitle compact>
             {pending ? "Ждём подтверждения договора" : "Раздел откроется после договора"}
-          </h2>
+          </PageTitle>
           <p className="mt-2 text-sm text-muted-foreground">{text}</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {access.documents && (

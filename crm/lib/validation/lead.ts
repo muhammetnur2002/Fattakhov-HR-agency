@@ -1,13 +1,12 @@
 import { z } from "zod";
 
-/** Варианты из формы. Свободный ввод здесь не нужен и только мешает разбору. */
-export const VACANCY_COUNT_OPTIONS = [
-  "1 вакансия",
-  "2-3 вакансии",
-  "4-5 вакансий",
-  "Более 5 вакансий",
-  "Пока формируем план",
-] as const;
+import { VACANCY_COUNT_OPTIONS } from "./lead-options";
+
+/**
+ * Варианты из формы. Свободный ввод здесь не нужен и только мешает разбору.
+ * Сам список лежит в lead-options.ts — без zod, чтобы клиентская форма его не тянула.
+ */
+export { VACANCY_COUNT_OPTIONS };
 
 const optional = (max: number) =>
   z

@@ -23,13 +23,13 @@ import { formatNumber } from "@/lib/pricing";
  */
 export function HeroOffer() {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white/[0.06] p-6 ring-1 ring-white/12 backdrop-blur-sm md:p-7">
+    <div className="relative overflow-hidden rounded-2xl bg-white/[0.06] p-6 ring-1 ring-white/12 backdrop-blur-sm md:p-6">
       <div className="text-sm font-medium tracking-[0.14em] text-white/65 uppercase">
         Команда по подписке
       </div>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="text-base text-white/70">от</span>
-        <span className="text-6xl font-semibold tracking-tight tabular-nums lg:text-7xl">
+        <span className="text-7xl font-semibold tracking-tight tabular-nums">
           {formatNumber(ENTRY_PRICE)}
         </span>
         <span className="text-3xl font-semibold">₽</span>

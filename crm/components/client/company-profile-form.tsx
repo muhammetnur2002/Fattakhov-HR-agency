@@ -1,21 +1,23 @@
 "use client";
 
 import { ImagePlus, Trash2 } from "lucide-react";
-import { startTransition, useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { saveCompanyProfileAction, type CompanyProfileState } from "@/app/(client)/company/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { saveCompanyProfileAction } from "@/app/(client)/company/actions";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import type { CompanyProfile } from "@/lib/services/company-profile";
 
 function Submit({ pending }: { pending: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить"}
-    </Button>
+    <SubmitButton loading={pending} pendingLabel="Сохраняем…">
+      Сохранить
+    </SubmitButton>
   );
 }
 
@@ -72,7 +74,7 @@ function LogoField({ initialUrl, editable, name }: { initialUrl: string | null; 
       {editable && (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+            <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => input.current?.click()}>
               {busy ? "Загружаем…" : url ? "Заменить" : "Добавить логотип"}
             </Button>
             {url && (
@@ -83,7 +85,7 @@ function LogoField({ initialUrl, editable, name }: { initialUrl: string | null; 
             )}
           </div>
           <p className="text-xs text-muted-foreground">JPG или PNG до 4 МБ. Виден студентам на карточке вакансии.</p>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          <FormMessage compact error={error} className="text-sm" />
           <input
             ref={input}
             type="file"
@@ -101,30 +103,20 @@ function LogoField({ initialUrl, editable, name }: { initialUrl: string | null; 
 
 /** Профиль компании клиента. Правит администратор, остальные сотрудники читают. */
 export function CompanyProfileForm({ company, editable }: { company: CompanyProfile; editable: boolean }) {
-  const [state, action, pending] = useActionState<CompanyProfileState, FormData>(saveCompanyProfileAction, {});
-
-  // Отправляем вручную: после action формы React 19 очищает поля, и при ошибке («ИНН уже
+  // Отправка через useFormAction: после action формы React 19 очищает поля, и при ошибке («ИНН уже
   // занят») человек терял бы набранное
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    startTransition(() => action(data));
-  }
-  const errors = state.fields ?? {};
+  const { state, fields: errors, pending, formProps } = useFormAction(saveCompanyProfileAction, {});
   const ro = !editable;
 
   return (
     <div className="space-y-6">
       <LogoField initialUrl={company.logoUrl} editable={editable} name={company.name} />
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Название компании</Label>
+      <form {...formProps} className="space-y-4">
+        <Field label="Название компании" error={errors.name}>
           <Input id="name" name="name" defaultValue={company.name} required readOnly={ro} />
-          {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="legalName">Юридическое лицо</Label>
+        </Field>
+        <Field label="Юридическое лицо" error={errors.legalName}>
           <Input
             id="legalName"
             name="legalName"
@@ -132,10 +124,12 @@ export function CompanyProfileForm({ company, editable }: { company: CompanyProf
             placeholder="ООО «Ромашка» / ИП Иванов И. И."
             readOnly={ro}
           />
-          {errors.legalName && <p className="text-sm text-destructive">{errors.legalName}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="inn">ИНН</Label>
+        </Field>
+        <Field
+          label="ИНН"
+          error={errors.inn}
+          hint="По ИНН агентство проверяет компанию перед публикацией вакансии на студенческой платформе."
+        >
           <Input
             id="inn"
             name="inn"
@@ -144,28 +138,19 @@ export function CompanyProfileForm({ company, editable }: { company: CompanyProf
             placeholder="10 цифр у компании, 12 у ИП"
             readOnly={ro}
           />
-          <p className="text-xs text-muted-foreground">
-            По ИНН агентство проверяет компанию перед публикацией вакансии на студенческой платформе.
-          </p>
-          {errors.inn && <p className="text-sm text-destructive">{errors.inn}</p>}
-        </div>
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="industry">Отрасль</Label>
+          <Field label="Отрасль" error={errors.industry}>
             <Input id="industry" name="industry" defaultValue={company.industry ?? ""} readOnly={ro} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">Город</Label>
+          </Field>
+          <Field label="Город" error={errors.city}>
             <Input id="city" name="city" defaultValue={company.city ?? ""} readOnly={ro} />
-          </div>
+          </Field>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="website">Сайт</Label>
+        <Field label="Сайт" error={errors.website}>
           <Input id="website" name="website" defaultValue={company.website ?? ""} placeholder="https://" readOnly={ro} />
-          {errors.website && <p className="text-sm text-destructive">{errors.website}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="description">О компании</Label>
+        </Field>
+        <Field label="О компании" error={errors.description}>
           <Textarea
             id="description"
             name="description"
@@ -174,19 +159,9 @@ export function CompanyProfileForm({ company, editable }: { company: CompanyProf
             placeholder="Чем занимается компания, сколько человек в команде, что важно знать кандидату"
             readOnly={ro}
           />
-          {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
-        </div>
+        </Field>
 
-        {state.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
-        {state.ok && (
-          <Alert>
-            <AlertDescription>{state.ok}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={state.error} ok={state.ok} />
         {editable ? (
           <Submit pending={pending} />
         ) : (

@@ -10,7 +10,13 @@ import { DaySeparator, MessageBubble } from './MessageBubble';
 import { PresenceLine } from './PresenceLine';
 import { durations, easeOutExpo } from '@/lib/motion';
 import { cn, dayLabel, formatDate, isSameBurst } from '@/lib/utils';
-import { APPLICATION_STATUS_LABEL, type ApplicationStatus, type MessageDTO, type ThreadDTO } from '@/lib/types';
+import {
+  APPLICATION_STATUS_LABEL,
+  type ApplicationStatus,
+  type MessageDTO,
+  type PendingMessageDTO,
+  type ThreadDTO,
+} from '@/lib/types';
 
 /**
  * Цвет статуса в превью строки списка — тот же смысл, что у
@@ -38,12 +44,21 @@ export function Conversation({
   thread,
   pending,
   onSend,
+  onRetry,
+  onDiscard,
   onBack,
+  hideStatus,
 }: {
   thread: ThreadDTO | null;
-  pending: MessageDTO[];
+  pending: PendingMessageDTO[];
   onSend: (body: string) => void;
+  /** Повторить отправку реплики, которая не ушла */
+  onRetry?: (id: string) => void;
+  /** Убрать реплику, которая не ушла */
+  onDiscard?: (id: string) => void;
   onBack?: () => void;
+  /** Без пилюли статуса отклика: у переписки с агентством отклика нет */
+  hideStatus?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -99,7 +114,7 @@ export function Conversation({
     );
   }
 
-  const all = [...thread.messages, ...pending];
+  const all: (MessageDTO | PendingMessageDTO)[] = [...thread.messages, ...pending];
 
   return (
     <div className="flex h-full flex-col">
@@ -125,7 +140,7 @@ export function Conversation({
               первым. Строки нет вовсе, когда статус показывать нечего */}
           <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="text-[11.5px] text-paper-faint" />
         </div>
-        <ApplicationStatusPill status={thread.status} className="shrink-0" />
+        {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0" />}
       </header>
 
       <div
@@ -160,6 +175,9 @@ export function Conversation({
                     grouped={grouped && !showDay}
                     lastInBurst={!next || !isSameBurst(message, next)}
                     pending={message.id.startsWith('pending-')}
+                    failed={'failed' in message && message.failed === true}
+                    onRetry={onRetry ? () => onRetry(message.id) : undefined}
+                    onDiscard={onDiscard ? () => onDiscard(message.id) : undefined}
                   />
                 </div>
               );

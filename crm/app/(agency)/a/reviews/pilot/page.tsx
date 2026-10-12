@@ -1,13 +1,16 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ServiceUnavailable } from "../service-unavailable";
 import { StatCard, StatRow } from "@/components/shell/stat-card";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { fetchPilotMetrics, StudentsServiceError } from "@/lib/students-service";
+import {
+  fetchPilotMetrics,
+  StudentsServiceError,
+} from "@/lib/students-service";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Метрики пилота" };
 
@@ -105,14 +108,14 @@ export default async function PilotReviewPage() {
 function Header() {
   return (
     <>
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/a/reviews">← Студенческая платформа</Link>
-        </Button>
+      <div className="flex">
+        <BackLink href="/a/reviews" className="mb-0">
+          Студенческая платформа
+        </BackLink>
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold">Метрики пилота</h1>
+        <PageTitle>Метрики пилота</PageTitle>
         <p className="text-sm text-muted-foreground">
           Числа со студенческой платформы: регистрации, отклики, публикации, конверсии.
         </p>

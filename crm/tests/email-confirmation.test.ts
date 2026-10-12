@@ -10,6 +10,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { clearStrangerMailCaps } from "./helpers/mail-caps";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { requestPasswordReset } from "@/lib/services/passwords";
 import {
@@ -25,6 +26,7 @@ const PHONE = "+79990007711";
 const MARK = "test-email-confirm";
 
 async function cleanup() {
+  await clearStrangerMailCaps();
   const users = await db.user.findMany({
     where: { phoneVerified: PHONE },
     select: { id: true, clientId: true },

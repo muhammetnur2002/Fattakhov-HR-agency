@@ -27,6 +27,9 @@ vi.mock("@/app/actions/vacancies", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  // useStaleGuard: «устаревшей вкладки» в этих сценариях нет
+  unstable_isUnrecognizedActionError: () => false,
 }));
 
 import { VacancyWizard } from "@/components/vacancies/vacancy-wizard";

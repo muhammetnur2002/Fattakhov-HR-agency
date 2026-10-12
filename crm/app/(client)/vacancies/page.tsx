@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ListRegion } from "@/components/shell/list-pending";
+import { ListToolbar } from "@/components/shell/list-toolbar";
 import { LoadMore } from "@/components/shell/load-more";
 import { SearchField } from "@/components/shell/search-field";
 import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
@@ -10,6 +12,7 @@ import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { listVacancies } from "@/lib/services/vacancies";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Вакансии" };
 
@@ -49,7 +52,7 @@ export default async function ClientVacanciesPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Вакансии</h1>
+          <PageTitle>Вакансии</PageTitle>
           <p className="text-sm text-muted-foreground">
             {vacancies.length === 0
               ? "Заявок пока нет"
@@ -65,10 +68,10 @@ export default async function ClientVacanciesPage({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <SearchField placeholder="Название, подразделение, город…" />
-        <VacancyStatusFilter />
-      </div>
+      <ListToolbar
+        search={<SearchField placeholder="Название, подразделение, город…" />}
+        filters={<VacancyStatusFilter />}
+      />
 
       {closedIds.length > 0 && (
         <DeleteVacancies
@@ -78,20 +81,22 @@ export default async function ClientVacanciesPage({
         />
       )}
 
-      <VacancyList
-        vacancies={vacancies}
-        hrefBase="/vacancies"
-        emptyText={
-          q || status
-            ? "Ничего не нашлось по этому запросу."
-            : canCreate
-              ? "Отправьте первую заявку на подбор — мы возьмём её в работу и назначим рекрутера."
-              // Наблюдатель заявку отправить не может — приглашение
-              // сделать то, чего у него нет прав сделать, это не
-              // пустое состояние, а мелкая, но настоящая ошибка
-              : "Заявок на подбор пока нет."
-        }
-      />
+      <ListRegion>
+        <VacancyList
+          vacancies={vacancies}
+          hrefBase="/vacancies"
+          emptyText={
+            q || status
+              ? "Ничего не нашлось по этому запросу."
+              : canCreate
+                ? "Отправьте первую заявку на подбор — мы возьмём её в работу и назначим рекрутера."
+                // Наблюдатель заявку отправить не может — приглашение
+                // сделать то, чего у него нет прав сделать, это не
+                // пустое состояние, а мелкая, но настоящая ошибка
+                : "Заявок на подбор пока нет."
+          }
+        />
+      </ListRegion>
 
       {hasMore && <LoadMore href={withQuery({ page: String(page + 1) })} />}
     </div>

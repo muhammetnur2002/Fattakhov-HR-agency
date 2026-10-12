@@ -8,6 +8,7 @@ import { Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
 import { ENTRY_PRICE, TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
 import { formatNumber } from "@/lib/pricing";
+import { PageHero, PageIntro } from "@/components/marketing/page-intro";
 
 export const metadata: Metadata = {
   title: {
@@ -45,28 +46,16 @@ export default function TariffsPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden bg-brand-slate text-white">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
-        />
-        <div className="relative mx-auto max-w-4xl px-5 py-16 md:py-24">
-          <div className="text-xs font-medium tracking-[0.14em] text-white/65 uppercase">
-            Тарифы
-          </div>
-          <h1 className="mt-5 text-[2rem] leading-[1.08] font-semibold tracking-tight text-balance sm:text-4xl md:text-5xl">
-            Сколько стоит внешняя команда найма
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/75 md:text-lg">
-            От {formatNumber(ENTRY_PRICE)} ₽ в месяц за одну вакансию
-            в активной работе. Цена растёт медленнее объёма: на пяти
-            вакансиях слот обходится на {дешевле}% дешевле, чем на одной.
-            Ниже открытый прайс и расчёт, с чем его сравнивать.
-          </p>
-        </div>
-      </section>
+      <PageHero>
+        <PageIntro eyebrow="Тарифы" title="Сколько стоит внешняя команда найма">
+          От {formatNumber(ENTRY_PRICE)} ₽ в месяц за одну вакансию
+          в активной работе. Цена растёт медленнее объёма: на пяти
+          вакансиях слот обходится на {дешевле}% дешевле, чем на одной.
+          Ниже открытый прайс и расчёт, с чем его сравнивать.
+        </PageIntro>
+      </PageHero>
 
-      <Section id="pricing" pad="tall">
+      <Section id="pricing">
         <SectionHead
           title="Пять конфигураций"
           lead="Слот — это одна вакансия в активной работе. Закрыли позицию, переводим слот на следующую."
@@ -77,25 +66,23 @@ export default function TariffsPage() {
       {/* Разбор идёт после цен, а не до: человек из поиска сначала
           хочет увидеть цифру, и только потом готов слушать, почему
           она такая */}
-      <Section tone="muted" pad="tall">
+      <Section tone="muted">
         <SectionHead
           eyebrow="С чем сравнивать"
           title="Отдел найма в штате и команда по подписке."
           lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Оклады у всех разные, поэтому цифры здесь ваши: подставьте свои и сравните с подпиской."
         />
-        <div className="mt-12">
-          <CostCalculator />
-          <BeyondSalary />
-        </div>
+        <CostCalculator />
+        <BeyondSalary />
       </Section>
 
-      <Section width="narrow" pad="tight">
+      <Section width="narrow">
         <SectionHead
           title="Что входит в цену и чего в ней нет"
           align="center"
         />
 
-        <div className="mt-10 space-y-6">
+        <div className="space-y-6">
           <Item title="Входит: работа команды, а не количество резюме">
             Recruitment lead отвечает за стратегию и качество, рекрутер ведёт
             кандидатов, research-функция расширяет воронку. Вы платите
@@ -118,7 +105,7 @@ export default function TariffsPage() {
           </Item>
         </div>
 
-        <p className="mt-10 text-sm text-muted-foreground">
+        <p className="mt-6 text-sm text-muted-foreground">
           Минимальный срок сотрудничества 3 месяца.
         </p>
       </Section>
@@ -129,7 +116,7 @@ export default function TariffsPage() {
           title="Посчитаем под ваш план найма"
           lead="За 20 минут разберём вакансии, сравним модели и покажем, какая конфигурация нужна именно вам. Если подписка невыгодна, скажем об этом прямо."
         />
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button asChild size="lg" variant="secondary">
             <Link href="/#diagnostic">Получить расчёт</Link>
           </Button>

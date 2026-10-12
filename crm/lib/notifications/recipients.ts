@@ -157,3 +157,52 @@ export async function studentsClientRecipients(clientId: string): Promise<string
   });
   return users.map((u) => u.id);
 }
+
+/**
+ * Кому сообщить, что студент ответил агентству: кто завёл кандидата, кто ведёт его
+ * воронки и кто писал ему из CRM. Только активные сотрудники агентства. Если никого
+ * из них не нашлось (всех отключили), сообщение получают владелец и руководитель.
+ */
+export async function studentReplyRecipients(
+  organizationId: string,
+  studentId: string,
+): Promise<{ candidateId: string; fullName: string; userIds: string[] } | null> {
+  const candidate = await prisma.candidate.findFirst({
+    where: { organizationId, studentPlatformId: studentId },
+    select: {
+      id: true,
+      fullName: true,
+      createdById: true,
+      applications: { where: { outcome: "IN_PROGRESS" }, select: { ownerId: true } },
+    },
+  });
+  if (!candidate) return null;
+
+  const senders = await prisma.activityLog.findMany({
+    where: {
+      organizationId,
+      entityType: "Candidate",
+      entityId: candidate.id,
+      action: "student_message_sent",
+      actorId: { not: null },
+    },
+    select: { actorId: true },
+    distinct: ["actorId"],
+  });
+
+  const wanted = new Set<string>([
+    candidate.createdById,
+    ...candidate.applications.map((a) => a.ownerId),
+    ...senders.map((s) => s.actorId as string),
+  ]);
+
+  const staff = await prisma.user.findMany({
+    where: { organizationId, isActive: true, role: { in: ["OWNER", "HEAD", "RECRUITER", "ACCOUNT"] } },
+    select: { id: true, role: true },
+  });
+  let userIds = staff.filter((u) => wanted.has(u.id)).map((u) => u.id);
+  if (userIds.length === 0) {
+    userIds = staff.filter((u) => u.role === "OWNER" || u.role === "HEAD").map((u) => u.id);
+  }
+  return { candidateId: candidate.id, fullName: candidate.fullName, userIds };
+}

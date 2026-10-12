@@ -53,7 +53,7 @@ export function StudentsNudge({
   const ready = kind === "ready";
   return (
     <Card className="border-primary/30">
-      <CardContent className="relative flex flex-wrap items-center justify-between gap-4 p-4 pr-12">
+      <CardContent className="relative flex flex-wrap items-center justify-between gap-4 pr-12">
         <button
           type="button"
           onClick={close}

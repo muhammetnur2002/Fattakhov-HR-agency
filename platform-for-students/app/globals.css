@@ -65,6 +65,15 @@
   --color-accent-200: 47 63 79;
   --color-accent-100: 26 35 44;
 
+  /* Статусы. В светлой теме — тёмные тона: прежние (#C9A227, #4FA37F, #71D9AC) давали на светлом
+     полотне 1,5–2,6:1, а на плашках с лёгкой заливкой ещё ниже. Здесь не меньше 4,5:1 на полотне,
+     карточке и плашке (проверка — tests/unit.ts) */
+  --color-yes: 30 108 78;
+  --color-yes-glow: 24 98 70;
+  --color-yes-deep: 28 58 47;
+  --color-warn: 120 90 0;
+  --color-danger: 140 46 42;
+
   --page-gutter: clamp(1.25rem, 4vw, 3.5rem);
   --header-h: 4.5rem;
   /* Атмосфера (components/layout/Aurora.tsx): на чёрном полотне цветное
@@ -103,6 +112,13 @@
 }
 
 .dark {
+  /* Статусы на чёрном: yes и warn прежние (8–12:1); danger осветлён — прежний 180 83 79 давал 4,3:1 на чёрном и 3,6:1 на плашке */
+  --color-yes: 79 163 127;
+  --color-yes-glow: 113 217 172;
+  --color-yes-deep: 28 58 47;
+  --color-warn: 201 162 39;
+  --color-danger: 216 121 116;
+
   --color-ink: 0 0 0;
   --color-ink-raise: 8 9 10;
   --color-ink-deep: 5 5 6;
@@ -342,6 +358,31 @@
     padding-right: var(--page-gutter);
   }
 
+  /*
+    Нижние панели (cookie, «Сохранить») оставляют справа место под плавающую кнопку
+    темы: она стоит в том же углу, где у панелей главные кнопки, и закрывала их.
+    Ширина кнопки 2.75rem + отступ от края 1rem + зазор; безопасная зона — как у кнопки.
+  */
+  .clear-theme-toggle {
+    padding-right: max(0px, calc(4.25rem + env(safe-area-inset-right) - var(--page-gutter)));
+  }
+
+  /*
+    Появление первого экрана — на CSS, а не на JS-анимации. Блок, который стартует
+    невидимым из JavaScript, остаётся пустым, пока скрипты не загрузятся и страница
+    не оживёт: на медленной сети это секунды пустого экрана, а без JS — навсегда.
+    CSS-анимация идёт с первого кадра. Задержку и сдвиг задаёт rise() из lib/motion.
+  */
+  .rise-in {
+    animation: rise-in var(--rise-dur, 450ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+  .word-rise {
+    display: inline-block;
+    animation: word-rise 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+
   /* Маска для построчного/пословного раскрытия текста */
   .mask-reveal {
     display: inline-block;
@@ -378,5 +419,34 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise-y, 12px)) scale(var(--rise-scale, 1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes word-rise {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Без движения — сразу готовый вид; прежнее правило выше сокращало длительность,
+   но задержка оставалась, и текст до неё был бы невидим */
+@media (prefers-reduced-motion: reduce) {
+  .rise-in,
+  .word-rise {
+    animation: none;
   }
 }

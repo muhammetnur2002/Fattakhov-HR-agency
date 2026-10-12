@@ -4,7 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { fetchCrmLinkRequests, fetchModerationQueue, fetchPendingStudyReview } from "@/lib/students-service";
+import {
+  fetchCrmLinkRequests,
+  fetchModerationQueue,
+  fetchPendingStudyReview,
+} from "@/lib/students-service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Студенческая платформа" };
 
@@ -58,7 +64,7 @@ export default async function ReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Студенческая платформа</h1>
+        <PageTitle>Студенческая платформа</PageTitle>
         <p className="text-sm text-muted-foreground">
           Студенческая платформа — данные читаются и решения принимаются прямо здесь.
         </p>
@@ -66,7 +72,7 @@ export default async function ReviewsPage() {
 
       {linkRequests.length > 0 && (
         <Card className="border-primary/40">
-          <CardContent className="flex items-center justify-between gap-4 p-5">
+          <CardContent className="flex items-center justify-between gap-4">
             <div>
               <p className="font-medium">Заявки на привязку к CRM</p>
               <p className="text-sm text-muted-foreground">
@@ -81,11 +87,10 @@ export default async function ReviewsPage() {
       )}
 
       {cards.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Владелец пока не выдал вам ни одного раздела проверок — доступы выдаются в «Сотрудниках».
-          </CardContent>
-        </Card>
+        <EmptyState>
+          Владелец пока не выдал вам ни одного раздела проверок — доступы
+          выдаются в «Сотрудниках».
+        </EmptyState>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           {cards.map((card) => (

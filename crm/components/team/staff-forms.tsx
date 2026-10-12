@@ -1,16 +1,18 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { useActionState, useState } from "react";
 
 import {
-  FormMessages,
   ResetPasswordForm,
   SubmitButton,
   type AccountAction,
   type AccountFormState,
 } from "@/components/shared/account-forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldSet } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Panel } from "@/components/ui/panel";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 export type TeamFormState = AccountFormState;
 type TeamAction = AccountAction;
@@ -34,15 +38,16 @@ function GrantsFieldset({
   idPrefix,
   grants,
   checked,
+  error,
 }: {
   idPrefix: string;
   grants: TeamOption[];
   checked: string[];
+  error?: string;
 }) {
   if (grants.length === 0) return null;
   return (
-    <fieldset className="space-y-3">
-      <legend className="mb-1 text-sm font-medium">Доступы</legend>
+    <FieldSet id={`${idPrefix}-grants`} legend="Доступы" error={error}>
       {grants.map((grant) => (
         <div key={grant.value} className="flex items-start gap-3">
           <Checkbox
@@ -62,7 +67,7 @@ function GrantsFieldset({
           </div>
         </div>
       ))}
-    </fieldset>
+    </FieldSet>
   );
 }
 
@@ -71,16 +76,17 @@ function RoleAndPosition({
   roles,
   role,
   position,
+  errors = {},
 }: {
   idPrefix: string;
   roles: TeamOption[];
   role: string;
   position: string;
+  errors?: Record<string, string>;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-position`}>Должность</Label>
+      <Field label="Должность" error={errors.position}>
         <Input
           id={`${idPrefix}-position`}
           name="position"
@@ -88,22 +94,23 @@ function RoleAndPosition({
           defaultValue={position}
           placeholder="Например, Администратор"
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-role`}>Роль в CRM</Label>
-        <Select name="role" defaultValue={role}>
-          <SelectTrigger id={`${idPrefix}-role`} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      </Field>
+      <Field label="Роль в CRM" error={errors.role} id={`${idPrefix}-role`}>
+        {(control) => (
+          <Select name="role" defaultValue={role}>
+            <SelectTrigger {...control} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
     </div>
   );
 }
@@ -158,14 +165,14 @@ export function StaffAddPanel({
         <Button type="button" variant="outline" onClick={() => open("invite")}>
           Пригласить по почте
         </Button>
-        {done && <p className="text-sm text-muted-foreground">{done}</p>}
+        <FormMessage compact ok={done} className="text-sm" />
       </div>
     );
   }
 
   const invite = mode === "invite";
   return (
-    <div className="rounded-xl border p-5">
+    <Panel>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">
@@ -186,7 +193,7 @@ export function StaffAddPanel({
       ) : (
         <StaffCreateForm action={wrap(createAction)} roles={roles} grants={grants} />
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -203,21 +210,14 @@ export function StaffInviteForm({
   roles: TeamOption[];
   grants: TeamOption[];
 }) {
-  const [state, formAction] = useActionState<TeamFormState, FormData>(action, {});
+  // Форма уходит через useFormAction: после action формы React 19 очищает поля, и при ошибке
+  // («адрес уже занят») пришлось бы отмечать всё заново
+  const { state, fields, pending, formProps } = useFormAction(action, {}, { resetOnSuccess: true });
   const defaultRole = roles.find((r) => r.value === "RECRUITER")?.value ?? roles[0]?.value ?? "";
 
-  // Отправляем вручную, как и создание: после action формы React 19 очищает
-  // поля, и при ошибке («адрес уже занят») пришлось бы отмечать всё заново
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    startTransition(() => formAction(data));
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="staff-invite-email">Почта</Label>
+    <form {...formProps} className="space-y-4">
+      <Field label="Почта" error={fields.email}>
         <Input
           id="staff-invite-email"
           name="email"
@@ -225,15 +225,21 @@ export function StaffInviteForm({
           required
           placeholder="name@fattakhovhr.ru"
         />
-      </div>
-      <RoleAndPosition idPrefix="staff-invite" roles={roles} role={defaultRole} position="" />
-      <GrantsFieldset idPrefix="staff-invite" grants={grants} checked={[]} />
+      </Field>
+      <RoleAndPosition
+        idPrefix="staff-invite"
+        roles={roles}
+        role={defaultRole}
+        position=""
+        errors={fields}
+      />
+      <GrantsFieldset idPrefix="staff-invite" grants={grants} checked={[]} error={fields.grants} />
       <p className="text-xs leading-relaxed text-muted-foreground">
         Ссылка — пропуск в CRM с этой ролью и доступами: кто её открыл, тот и войдёт.
         Ошиблись в адресе — отзовите приглашение в списке «Ждут принятия» и отправьте заново.
       </p>
-      <SubmitButton label="Пригласить" pending="Приглашаем…" />
-      <FormMessages state={state} />
+      <SubmitButton label="Пригласить" pending="Приглашаем…" loading={pending} />
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }
@@ -247,22 +253,14 @@ export function StaffCreateForm({
   roles: TeamOption[];
   grants: TeamOption[];
 }) {
-  const [state, formAction] = useActionState<TeamFormState, FormData>(action, {});
+  // Набранное остаётся после отказа («пароли не совпадают»); успех очищает форму, в том числе пароли
+  const { state, fields, pending, formProps } = useFormAction(action, {}, { resetOnSuccess: true });
   const defaultRole = roles.find((r) => r.value === "RECRUITER")?.value ?? roles[0]?.value ?? "";
 
-  // Отправляем вручную: после action формы React 19 очищает поля, и при ошибке
-  // («пароли не совпадают») пришлось бы вводить всё заново
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    startTransition(() => formAction(data));
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form {...formProps} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="staff-create-email">Почта</Label>
+        <Field label="Почта" error={fields.email}>
           <Input
             id="staff-create-email"
             name="email"
@@ -270,33 +268,36 @@ export function StaffCreateForm({
             required
             placeholder="name@fattakhovhr.ru"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="staff-create-fullName">Имя и фамилия</Label>
+        </Field>
+        <Field label="Имя и фамилия" error={fields.fullName}>
           <Input id="staff-create-fullName" name="fullName" required maxLength={120} />
-        </div>
+        </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="staff-create-password">Пароль</Label>
+        <Field label="Пароль" error={fields.password}>
           <Input id="staff-create-password" name="password" type="password" required minLength={10} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="staff-create-passwordConfirm">Пароль ещё раз</Label>
+        </Field>
+        <Field label="Пароль ещё раз" error={fields.passwordConfirm}>
           <Input id="staff-create-passwordConfirm" name="passwordConfirm" type="password" required minLength={10} />
-        </div>
+        </Field>
       </div>
       <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
         Пароль сообщите сотруднику лично — письма платформа не отправляет.
       </p>
-      <RoleAndPosition idPrefix="staff-create" roles={roles} role={defaultRole} position="" />
+      <RoleAndPosition
+        idPrefix="staff-create"
+        roles={roles}
+        role={defaultRole}
+        position=""
+        errors={fields}
+      />
       <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
         Роль определяет работу с вакансиями, кандидатами и счетами. Должность —
         любое название, её видят клиенты.
       </p>
-      <GrantsFieldset idPrefix="staff-create" grants={grants} checked={[]} />
-      <SubmitButton label="Создать аккаунт" pending="Создаём…" />
-      <FormMessages state={state} />
+      <GrantsFieldset idPrefix="staff-create" grants={grants} checked={[]} error={fields.grants} />
+      <SubmitButton label="Создать аккаунт" pending="Создаём…" loading={pending} />
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }
@@ -316,7 +317,7 @@ export function StaffMemberEditor({
   activeAction: TeamAction;
   resetPasswordAction: TeamAction;
 }) {
-  const [state, formAction] = useActionState<TeamFormState, FormData>(updateAction, {});
+  const { state, fields, pending, formProps } = useFormAction(updateAction, {});
   const [activeState, activeFormAction] = useActionState<TeamFormState, FormData>(activeAction, {});
   const prefix = `staff-${member.id}`;
 
@@ -326,17 +327,18 @@ export function StaffMemberEditor({
         Изменить должность и доступы
       </summary>
 
-      <form action={formAction} className="mt-4 space-y-5">
+      <form {...formProps} className="mt-4 space-y-4">
         <input type="hidden" name="userId" value={member.id} />
         <RoleAndPosition
           idPrefix={prefix}
           roles={roles}
           role={member.role}
           position={member.position ?? ""}
+          errors={fields}
         />
-        <GrantsFieldset idPrefix={prefix} grants={grants} checked={member.grants} />
-        <SubmitButton label="Сохранить" pending="Сохраняем…" />
-        <FormMessages state={state} />
+        <GrantsFieldset idPrefix={prefix} grants={grants} checked={member.grants} error={fields.grants} />
+        <SubmitButton label="Сохранить" pending="Сохраняем…" loading={pending} />
+        <FormMessage error={state.error} ok={state.ok} />
       </form>
 
       <div className="mt-4 border-t pt-4">
@@ -347,17 +349,17 @@ export function StaffMemberEditor({
         />
       </div>
 
-      <form action={activeFormAction} className="mt-4 space-y-3 border-t pt-4">
+      <form action={activeFormAction} className="mt-4 space-y-4 border-t pt-4">
         <input type="hidden" name="userId" value={member.id} />
         <input type="hidden" name="active" value={member.isActive ? "false" : "true"} />
-        <Button type="submit" variant="outline" size="sm">
+        <SubmitButtonBase variant="outline" size="sm">
           {member.isActive ? "Отключить доступ" : "Вернуть доступ"}
-        </Button>
+        </SubmitButtonBase>
         <p className="text-xs leading-relaxed text-muted-foreground">
           Отключённый сотрудник сразу теряет вход в CRM. Уже открытая панель
           студенческой платформы закроется не позже чем через восемь часов.
         </p>
-        <FormMessages state={activeState} />
+        <FormMessage error={activeState.error} ok={activeState.ok} />
       </form>
     </details>
   );

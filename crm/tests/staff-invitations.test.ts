@@ -14,6 +14,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AccessDeniedError, type Actor } from "@/lib/access";
+import { inviteTokenHash } from "@/lib/auth/invite-token";
 import { prismaRaw as db } from "@/lib/db/prisma";
 import {
   acceptInvitation,
@@ -56,7 +57,7 @@ async function cleanup() {
 
 /** id приглашения по токену — его видит тот, кто зовёт, в списке. */
 async function idOf(token: string): Promise<string> {
-  const { id } = await db.invitation.findFirstOrThrow({ where: { token }, select: { id: true } });
+  const { id } = await db.invitation.findFirstOrThrow({ where: { tokenHash: inviteTokenHash(token) }, select: { id: true } });
   return id;
 }
 
@@ -77,7 +78,7 @@ describe("приглашение", () => {
       grants: ["students.study"],
     });
 
-    const pending = await db.invitation.findFirstOrThrow({ where: { token } });
+    const pending = await db.invitation.findFirstOrThrow({ where: { tokenHash: inviteTokenHash(token) } });
     // Пустая компания — и это главное: без clientId человек сотрудник агентства
     expect(pending.clientId).toBeNull();
 
@@ -196,7 +197,7 @@ describe("отзыв", () => {
     // getInvitation — то, что читает страница /invite: null на любой
     // негодный токен, одна и та же «Ссылка недействительна»
     expect(await getInvitation(token)).toBeNull();
-    expect(await db.invitation.findFirst({ where: { token } })).toBeNull();
+    expect(await db.invitation.findFirst({ where: { tokenHash: inviteTokenHash(token) } })).toBeNull();
   });
 
   it("освобождает адрес: опечатку можно исправить сразу, а не через неделю", async () => {

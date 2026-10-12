@@ -27,6 +27,10 @@ import type {
   ModerationCompany,
   ModerationVacancy,
 } from "@/lib/students-service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Panel, panelClass } from "@/components/ui/panel";
+import { useConfirmFocus, useReturnFocus } from "@/lib/hooks/use-return-focus";
+import { FormMessage } from "@/components/ui/form-message";
 
 type Decide = (decision: "APPROVE" | "REJECT", note?: string) => Promise<boolean>;
 
@@ -68,6 +72,8 @@ export function ModerationBoard({
   const [vacancies, setVacancies] = useState(initialVacancies);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [preview, setPreview] = useState<ModerationVacancy | null>(null);
+  // Карточка открывается кнопкой в списке, а не DialogTrigger: фокус возвращаем сами
+  const returnFocus = useReturnFocus();
   const [query, setQuery] = useState("");
 
   const q = query.trim().toLowerCase();
@@ -120,11 +126,9 @@ export function ModerationBoard({
 
   if (companies.length === 0 && vacancies.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          Очередь пуста — новые компании и вакансии из кабинетов появятся здесь.
-        </CardContent>
-      </Card>
+      <EmptyState>
+        Очередь пуста — новые компании и вакансии из кабинетов появятся здесь.
+      </EmptyState>
     );
   }
 
@@ -177,7 +181,10 @@ export function ModerationBoard({
                 key={item.vacancy.id}
                 item={item}
                 busy={busy.has(item.vacancy.id)}
-                onPreview={() => setPreview(item)}
+                onPreview={(opener) => {
+                  returnFocus.remember(opener);
+                  setPreview(item);
+                }}
                 onDecide={(decision, note) =>
                   decide("vacancy", item.vacancy.id, decision, note, item.version)
                 }
@@ -195,7 +202,10 @@ export function ModerationBoard({
         карточка, которую увидит студент.
       */}
       <Dialog open={preview !== null} onOpenChange={(open) => !open && setPreview(null)}>
-        <DialogContent className="max-h-[85dvh] gap-0 overflow-y-auto rounded-3xl p-0 sm:max-w-lg">
+        <DialogContent
+          className="max-h-[85dvh] gap-0 overflow-y-auto rounded-3xl p-0 sm:max-w-lg"
+          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
+        >
           {preview && (
             <>
               <div className="relative overflow-hidden rounded-t-3xl bg-gradient-to-br from-primary/25 via-primary/10 to-transparent px-6 pb-5 pt-6">
@@ -221,7 +231,7 @@ export function ModerationBoard({
                   </div>
                 </div>
 
-                <h2 className="mt-4 text-xl font-semibold">{preview.vacancy.title}</h2>
+                <h2 className="mt-4 text-lg font-semibold">{preview.vacancy.title}</h2>
                 <p className="mt-1.5 text-base font-medium text-primary">
                   {money(preview.vacancy.salaryFrom, preview.vacancy.salaryTo)}
                   {preview.vacancy.salaryPeriod === "SHIFT" && " за смену"}
@@ -248,7 +258,7 @@ export function ModerationBoard({
 
               <div className="space-y-5 px-6 py-5">
                 {preview.vacancy.address && (
-                  <p className="rounded-xl border bg-muted/40 p-3 text-sm">
+                  <p className={panelClass("muted", "text-sm")}>
                     <MapPin className="mr-1.5 inline size-3.5 text-muted-foreground" />
                     {preview.vacancy.city}, {preview.vacancy.address}
                     {preview.vacancy.addressDetails && (
@@ -298,7 +308,7 @@ function CompanyCard({
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-5">
+      <CardContent className="space-y-4">
         <div className="flex items-start gap-3">
           <Avatar>
             {company.logoUrl && <AvatarImage src={studentsFileProxyUrl(company.logoUrl)} alt="" />}
@@ -398,7 +408,7 @@ function VacancyCard({
 }: {
   item: ModerationVacancy;
   busy: boolean;
-  onPreview: () => void;
+  onPreview: (opener: HTMLElement) => void;
   onDecide: Decide;
 }) {
   const { vacancy } = item;
@@ -406,7 +416,7 @@ function VacancyCard({
 
   return (
     <Card>
-      <CardContent className="space-y-3 p-5">
+      <CardContent className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate font-medium">{vacancy.title}</p>
@@ -428,7 +438,7 @@ function VacancyCard({
         </p>
         <p className="line-clamp-3 text-sm text-muted-foreground">{vacancy.summary}</p>
 
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={onPreview}>
+        <Button variant="ghost" size="sm" className="-ml-2" onClick={(e) => onPreview(e.currentTarget)}>
           Открыть карточку, как у студента
         </Button>
 
@@ -451,7 +461,7 @@ function VacancyCard({
 function CompanyBrief({ company }: { company: NonNullable<ModerationVacancy["company"]> }) {
   const website = company.website && /^https?:\/\//i.test(company.website) ? company.website : null;
   return (
-    <div className="space-y-2 rounded-xl border bg-muted/30 p-3 text-sm">
+    <Panel tone="muted" className="text-sm">
       <div className="flex items-center gap-3">
         <Avatar className="size-9">
           {company.logoUrl && <AvatarImage src={studentsFileProxyUrl(company.logoUrl)} alt="" />}
@@ -500,7 +510,7 @@ function CompanyBrief({ company }: { company: NonNullable<ModerationVacancy["com
       ) : (
         <p className="text-destructive">Описание компании не заполнено</p>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -514,6 +524,8 @@ function DecisionBar({
   onDecide: Decide;
 }) {
   const [rejecting, setRejecting] = useState(false);
+  // «Отклонить» заменяет кнопки полем причины: фокус — в поле, а после «Отмены» — на «Отклонить»
+  const { triggerRef, focusRef } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
@@ -533,6 +545,7 @@ function DecisionBar({
     return (
       <div className="space-y-2 border-t pt-3">
         <Textarea
+          ref={focusRef}
           value={note}
           rows={2}
           placeholder="Причина отказа — компания увидит её в кабинете"
@@ -541,7 +554,7 @@ function DecisionBar({
             setError(undefined);
           }}
         />
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        <FormMessage compact error={error} />
         <div className="flex gap-2">
           <Button variant="destructive" size="sm" disabled={busy} onClick={() => void reject()}>
             <X /> Отклонить
@@ -560,7 +573,7 @@ function DecisionBar({
         <Button size="sm" disabled={busy || !!approveBlockedReason} onClick={() => void onDecide("APPROVE")}>
           <Check /> Одобрить
         </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
+        <Button ref={triggerRef} variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
           <X /> Отклонить
         </Button>
       </div>

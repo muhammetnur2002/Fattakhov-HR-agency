@@ -72,7 +72,8 @@ export type EventCategory =
   | "interviews"
   | "finance"
   | "digest"
-  | "students";
+  | "students"
+  | "tasks";
 
 export const CATEGORY_LABELS: Record<EventCategory, string> = {
   leads: "Заявки с сайта",
@@ -83,6 +84,7 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   finance: "Счета",
   digest: "Сводки",
   students: "Студенческая платформа",
+  tasks: "Задания",
 };
 
 export type EventDefinition = {
@@ -126,6 +128,12 @@ export const EVENTS = {
     channels: ["email"],
     priority: "normal",
     description: "Вакансия закрыта",
+    category: "vacancies",
+  },
+  VACANCY_BRIEF_CHANGED: {
+    channels: ["email"],
+    priority: "normal",
+    description: "Агентство изменило бриф вакансии",
     category: "vacancies",
   },
   RECRUITER_ASSIGNED: {
@@ -190,6 +198,44 @@ export const EVENTS = {
     priority: "high",
     description: "Личное сообщение",
     category: "discussion",
+  },
+
+  // --- Задания в календаре ---
+  TASK_ASSIGNED: {
+    channels: ["email", "vk"],
+    priority: "high",
+    description: "Вам поставили задание",
+    category: "tasks",
+  },
+  TASK_CHANGED: {
+    channels: ["email"],
+    priority: "normal",
+    description: "Задание изменили: срок или содержание",
+    category: "tasks",
+  },
+  TASK_CANCELLED: {
+    channels: ["email"],
+    priority: "normal",
+    description: "Задание отменили или передали другому",
+    category: "tasks",
+  },
+  TASK_COMPLETED: {
+    channels: ["email"],
+    priority: "normal",
+    description: "Поставленное вами задание выполнено",
+    category: "tasks",
+  },
+  TASK_REMINDER: {
+    channels: ["email", "vk"],
+    priority: "high",
+    description: "Напоминание за 15 минут до срока задания",
+    category: "tasks",
+  },
+  TASK_OVERDUE: {
+    channels: ["email", "vk"],
+    priority: "high",
+    description: "Задание просрочено",
+    category: "tasks",
   },
 
   // --- Интервью ---
@@ -310,6 +356,12 @@ export const EVENTS = {
     channels: ["email"],
     priority: "high",
     description: "Решение по вашей вакансии на студенческой платформе",
+    category: "students",
+  },
+  STUDENTS_AGENCY_REPLY: {
+    channels: ["email", "vk"],
+    priority: "normal",
+    description: "Студент ответил в переписке с агентством",
     category: "students",
   },
 

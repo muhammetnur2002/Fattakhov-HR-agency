@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   saveNotifySettingsAction,
@@ -9,7 +8,8 @@ import {
 } from "@/app/actions/notifications";
 import { PushDevice, type PushDeviceRef } from "@/components/settings/push-device";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Label } from "@/components/ui/label";
 import { VkLinkBlock } from "./vk-link-block";
 import {
@@ -21,11 +21,8 @@ import {
 } from "@/lib/notifications/events";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить"}
-    </Button>
+    <SubmitButtonBase pendingLabel="Сохраняем…">Сохранить</SubmitButtonBase>
   );
 }
 
@@ -208,16 +205,7 @@ export function NotificationSettings({
         </Alert>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
       <Submit />
     </form>

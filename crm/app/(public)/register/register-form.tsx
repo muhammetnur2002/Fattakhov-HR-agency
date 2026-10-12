@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { EmailRegistration } from "./email-registration";
 import { PhoneLogin } from "@/components/auth/phone-login";
+import { FieldError } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,16 @@ const METHOD_LABELS: Record<RegisterMethod, string> = {
   форм у галочки короткая подпись, а не абзац закона. Сокращаем не текст,
   а его ПОКАЗ: по умолчанию — короткая подпись, полный текст — по клику,
   слово в слово тот же, что сохраняется версией вместе с согласием.
+
+  Подпись (label) — только у галочки: короткая фраза. Раскрывашка «Текст
+  согласия» и ссылка на политику лежат РЯДОМ, не внутри неё (11.10.2026).
+  Раньше обе были внутри label, и это ломало три вещи: у галочки в имени
+  оказывались «Текст согласия · Политика обработки данных» и весь развёрнутый
+  текст; нажатие на раскрывашку или ссылку внутри подписи читалки и часть
+  браузеров считали нажатием на саму галочку; вложенные интерактивные
+  элементы в label — нарушение разметки. Теперь имя галочки — «Согласен(на) на
+  обработку персональных данных», а текст и политика связаны с ней как
+  описание (aria-describedby): читалка проговорит их после имени.
 */
 function ConsentCheckbox({
   consentText,
@@ -60,30 +71,45 @@ function ConsentCheckbox({
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const id = useId();
+  const boxId = `${id}-box`;
+  const detailsId = `${id}-details`;
+  const textId = `${id}-text`;
+  const alertId = `${id}-alert`;
+  const showNudge = nudge && !checked;
 
   return (
-    <label
+    <div
       className={cn(
         // -mx-2, а не -m-2: отрицательный отступ по вертикали перебивал
         // зазор формы (space-y в Tailwind 4 — margin с нулевой
         // специфичностью), и подпись вставала вплотную к кнопке
-        "-mx-2 flex items-start gap-2 rounded-md p-2 text-xs text-muted-foreground transition-colors",
-        nudge && !checked && "bg-destructive/10 text-foreground",
+        "-mx-2 rounded-md p-2 text-xs text-muted-foreground transition-colors",
+        showNudge && "bg-destructive/10 text-foreground",
       )}
     >
-      <input
-        ref={inputRef}
-        type="checkbox"
-        name="consent"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 size-4 shrink-0 cursor-pointer accent-brand-graphite"
-      />
-      <span>
-        Согласен(на) на обработку персональных данных.{" "}
+      {/* py-1.5 с -my-1.5: область нажатия выше строки (≈33px вместо 18 на телефоне), вёрстка не сдвигается */}
+      <label htmlFor={boxId} className="-my-1.5 flex cursor-pointer items-start gap-2 py-1.5">
+        <input
+          id={boxId}
+          ref={inputRef}
+          type="checkbox"
+          name="consent"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-describedby={showNudge ? `${detailsId} ${alertId}` : detailsId}
+          className="mt-0.5 size-4 shrink-0 cursor-pointer"
+        />
+        <span>Согласен(на) на обработку персональных данных.</span>
+      </label>
+
+      {/* Вне label: нажатие на «Текст согласия» и на ссылку не ставит галочку */}
+      <div id={detailsId} className="mt-1.5 ml-6">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={textId}
           className="underline underline-offset-2 hover:text-foreground"
         >
           {expanded ? "Скрыть текст" : "Текст согласия"}
@@ -92,14 +118,19 @@ function ConsentCheckbox({
         <a href={privacyHref} target="_blank" rel="noreferrer" className="underline underline-offset-2">
           Политика обработки данных
         </a>
-        {expanded && <span className="mt-1.5 block">{consentText}</span>}
-        {nudge && !checked && (
-          <span role="alert" className="mt-1.5 block font-medium text-destructive">
-            Сначала отметьте согласие — без него зарегистрировать нельзя
-          </span>
+        {expanded && (
+          <p id={textId} className="mt-1.5">
+            {consentText}
+          </p>
         )}
-      </span>
-    </label>
+      </div>
+
+      {showNudge && (
+        <FieldError id={alertId} role="alert" className="mt-1.5 ml-6 font-medium">
+          Сначала отметьте согласие — без него зарегистрировать нельзя
+        </FieldError>
+      )}
+    </div>
   );
 }
 

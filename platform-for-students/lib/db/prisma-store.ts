@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { InnExistsError } from './memory';
 import { blindIndex, encrypt } from '@/lib/security/crypto';
 import { hashPassword } from '@/lib/security/password';
+import { DELETED_ACTOR_LABEL } from '@/lib/audit-retention';
 import { readCompanyProfile } from '@/lib/company';
 import { readPortfolio } from '@/lib/portfolio';
 import { readApprovedContent, readVacancyMedia } from '@/lib/vacancy';
@@ -53,7 +54,8 @@ function studentSearchWhere(filter: StudentSearchFilter): Prisma.StudentWhereInp
   if (filter.status === 'PAUSED') and.push({ status: 'PAUSED' });
   if (filter.status === 'PLACED') and.push({ status: 'PLACED' });
   if (filter.onlineSince) {
-    and.push({ account: { showPresence: true, lastSeenAt: { gte: filter.onlineSince } } });
+    // Статус виден всегда (lib/presence.ts): сохранённое прежде «скрыто» ничего не значит
+    and.push({ account: { lastSeenAt: { gte: filter.onlineSince } } });
   }
   return and.length ? { AND: and } : {};
 }
@@ -106,6 +108,9 @@ export function createPrismaStore(): DataStore {
       },
       async markEmailVerified(id) {
         await prisma.account.updateMany({ where: { id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+      },
+      async revokeSessions(id) {
+        await prisma.account.update({ where: { id }, data: { passwordChangedAt: new Date() } });
       },
       async setPassword(id, passwordHash) {
         await prisma.account.update({ where: { id }, data: { passwordHash, passwordChangedAt: new Date() } });
@@ -270,6 +275,21 @@ export function createPrismaStore(): DataStore {
       async markApplicationsViewed(id) {
         await prisma.student.updateMany({ where: { id }, data: { applicationsViewedAt: new Date() } });
       },
+      async acceptConsent(id, input) {
+        const exists = await prisma.student.findUnique({ where: { id }, select: { id: true } });
+        if (!exists) return null;
+        const row = await prisma.student.update({
+          where: { id },
+          data: { consentVersion: input.version, consentAt: new Date(), consentIp: input.ip },
+        });
+        return toStudentRecord(row);
+      },
+      async findByFileUrl(url) {
+        const row = await prisma.student.findFirst({
+          where: { OR: [{ photoUrl: url }, { resumeUrl: url }, { studyDocUrl: url }, { videoUrl: url }] },
+        });
+        return row ? toStudentRecord(row) : null;
+      },
       async rejectStudy(id, note) {
         const exists = await prisma.student.findUnique({ where: { id }, select: { id: true } });
         if (!exists) return null;
@@ -329,9 +349,17 @@ export function createPrismaStore(): DataStore {
       },
 
       async deleteByAccountId(accountId) {
-        // Каскады в схеме уносят анкету, свайпы, отклики и переписку.
-        // Журнал аудита остаётся: у него ссылка обнуляется, а не удаляется.
-        await prisma.account.delete({ where: { id: accountId } });
+        // Каскады в схеме уносят анкету, свайпы, отклики и переписку (вместе с consentIp анкеты).
+        // Журнал аудита остаётся: у записей ссылка обнуляется, а подпись, IP и user-agent
+        // стираются. Одной транзакцией: ссылку обнуляет схема в момент удаления аккаунта,
+        // и записи нельзя найти по accountId уже после него.
+        await prisma.$transaction([
+          prisma.auditLog.updateMany({
+            where: { accountId },
+            data: { actorLabel: DELETED_ACTOR_LABEL, ip: null, userAgent: null },
+          }),
+          prisma.account.delete({ where: { id: accountId } }),
+        ]);
       },
     },
 
@@ -713,6 +741,24 @@ export function createPrismaStore(): DataStore {
       },
     },
 
+    agencyMessages: {
+      listByStudent: (studentId) =>
+        prisma.agencyMessage.findMany({ where: { studentId }, orderBy: { createdAt: 'asc' } }),
+      create: ({ studentId, author, staffName, body }) =>
+        prisma.agencyMessage.create({
+          data: { studentId, author, staffName: author === 'AGENCY' ? (staffName ?? null) : null, bodyEnc: encrypt(body) },
+        }),
+      async markRead(studentId, reader) {
+        const { count } = await prisma.agencyMessage.updateMany({
+          where: { studentId, author: { not: reader }, readAt: null },
+          data: { readAt: new Date() },
+        });
+        return count;
+      },
+      unreadFor: (studentId, reader) =>
+        prisma.agencyMessage.count({ where: { studentId, author: { not: reader }, readAt: null } }),
+    },
+
     accessCodes: {
       findByHash: (codeHash) => prisma.accessCode.findUnique({ where: { codeHash } }),
       async markUsed(id) {
@@ -856,6 +902,7 @@ export function createPrismaStore(): DataStore {
       async log(entry) {
         await prisma.auditLog.create({
           data: {
+            ...(entry.createdAt ? { createdAt: entry.createdAt } : {}),
             accountId: entry.accountId,
             actorLabel: entry.actorLabel,
             action: entry.action,
@@ -867,16 +914,22 @@ export function createPrismaStore(): DataStore {
           },
         });
       },
-      async list(limit) {
-        const rows = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
-        return rows.map((r) => ({ ...r, meta: (r.meta ?? null) as Record<string, unknown> | null }));
-      },
-      async recentExists({ actorLabel, action, entityId, withinMs }) {
+      async recentExists(query) {
+        const { action, actorLabel, entityId } = query;
+        const since = 'since' in query ? query.since : new Date(Date.now() - query.withinMs);
         const row = await prisma.auditLog.findFirst({
-          where: { actorLabel, action, entityId, createdAt: { gte: new Date(Date.now() - withinMs) } },
+          where: { action, actorLabel, entityId, createdAt: { gte: since } },
           select: { id: true },
         });
         return row !== null;
+      },
+      async purgeOlderThan(cutoff) {
+        const { count } = await prisma.auditLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+        return count;
+      },
+      async list(limit) {
+        const rows = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
+        return rows.map((r) => ({ ...r, meta: (r.meta ?? null) as Record<string, unknown> | null }));
       },
     },
 

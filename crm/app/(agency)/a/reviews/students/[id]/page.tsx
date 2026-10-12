@@ -1,16 +1,17 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RevealContacts } from "./reveal-contacts";
+import { StudentPickToggle, StudentSelectionBar } from "@/components/students/student-selection";
+import { candidateIdsByStudent } from "@/lib/services/student-candidates";
 import { ServiceUnavailable } from "../../service-unavailable";
 import { ageLabel, GENDER_LABEL, StudentStatusBadges } from "../student-bits";
 import { PresenceLabel } from "@/components/presence/presence-label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { effectiveGrants } from "@/lib/access";
+import { canDo, effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { clientIp } from "@/lib/security/rate-limit";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
@@ -24,6 +25,8 @@ import {
 import { parseStudentSearchParams, studentSearchQuery } from "@/lib/students-search-params";
 import { studentsPermissions } from "@/lib/students-sso";
 import { studyLine } from "@/lib/study-level";
+import { BackLink as UiBackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Анкета студента" };
 
@@ -124,6 +127,9 @@ export default async function StudentProfilePage({
   });
 
   const canOpenPlatform = studentsPermissions(grants).length > 0;
+  // Выбрать студента (и добавить в кандидаты) может тот, кто ведёт воронку
+  const canPick = canDo(actor, "application.create");
+  const knownCandidateId = canPick ? ((await candidateIdsByStudent(actor, [id]))[id] ?? null) : null;
   const days = [...student.workDays].sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b));
   const education = [
     student.university || "Вуз не указан",
@@ -137,7 +143,7 @@ export default async function StudentProfilePage({
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 basis-64">
-          <h1 className="text-2xl font-semibold break-words">{student.fullName}</h1>
+          <PageTitle className="break-words">{student.fullName}</PageTitle>
           <p className="text-sm text-muted-foreground">
             {[ageLabel(student.age), GENDER_LABEL[student.gender], student.city].filter(Boolean).join(" · ")}
           </p>
@@ -147,9 +153,9 @@ export default async function StudentProfilePage({
         </div>
         {canOpenPlatform && (
           <form action="/a/students/open" method="post">
-            <Button type="submit" variant="outline" size="sm">
+            <SubmitButton variant="outline" size="sm">
               Открыть на студенческой платформе
-            </Button>
+            </SubmitButton>
           </form>
         )}
       </div>
@@ -157,6 +163,10 @@ export default async function StudentProfilePage({
       <p className="text-xs text-muted-foreground">
         Персональные данные студентов: открываются для подбора, просмотры записываются в журнал.
       </p>
+
+      {canPick && (
+        <StudentPickToggle studentId={student.id} name={student.fullName} candidateId={knownCandidateId} />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -301,16 +311,18 @@ export default async function StudentProfilePage({
           </Card>
         </div>
       </div>
+
+      {canPick && <StudentSelectionBar />}
     </div>
   );
 }
 
 function BackLink({ href }: { href: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <Button asChild variant="ghost" size="sm">
-        <Link href={href}>← К списку студентов</Link>
-      </Button>
+    <div className="flex">
+      <UiBackLink href={href} className="mb-0">
+        К списку студентов
+      </UiBackLink>
     </div>
   );
 }

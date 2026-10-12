@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { useListNavigation } from "@/components/shell/list-pending";
 import {
   Select,
   SelectContent,
@@ -19,7 +20,7 @@ export function NotificationCategoryFilter({
 }: {
   categories: EventCategory[];
 }) {
-  const router = useRouter();
+  const { navigate, pending } = useListNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const value = searchParams.get("category") ?? ALL;
@@ -29,12 +30,12 @@ export function NotificationCategoryFilter({
     if (next && next !== ALL) params.set("category", next);
     else params.delete("category");
     params.delete("page");
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    navigate(`${pathname}?${params.toString()}`);
   }
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-full max-w-56" aria-label="Фильтр по категории">
+      <SelectTrigger pending={pending} className="w-full max-w-56" aria-label="Фильтр по категории">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

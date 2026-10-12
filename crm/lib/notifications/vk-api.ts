@@ -152,7 +152,13 @@ export function vkHumanError(code: number | null): string | null {
   return code === null ? null : (VK_ERROR_HINTS[code] ?? null);
 }
 
-export type VkMessage = { from_id?: number; text?: string; payload?: string };
+export type VkMessage = {
+  from_id?: number;
+  text?: string;
+  payload?: string;
+  /** Номер сообщения внутри диалога — по нему отличаем уже разобранные. */
+  conversation_message_id?: number;
+};
 
 /**
  * Сообщение из поля object события message_new. С версии API 5.103 оно
@@ -166,4 +172,83 @@ export function vkMessageOf(
   if (!object) return undefined;
   if (object.message && typeof object.message === "object") return object.message;
   return typeof object.from_id === "number" ? object : undefined;
+}
+
+/** Сообщение, каким его отдаёт API (messages.getHistory, getConversations). */
+export type VkApiMessage = {
+  id: number;
+  conversation_message_id?: number;
+  date: number;
+  from_id: number;
+  peer_id: number;
+  /** 1 — написало сообщество, 0 — написал человек. */
+  out: 0 | 1;
+  text: string;
+  payload?: string;
+};
+
+export type VkRecentConversation = {
+  peerId: number;
+  /** Последнее сообщение диалога — по нему видно, ждёт ли человек ответа. */
+  last: { cmid: number | null; date: number; fromId: number; out: 0 | 1 } | null;
+};
+
+/**
+ * Последние диалоги сообщества — независимо от того, прочитаны ли они.
+ *
+ * По «непрочитанным» нельзя: администратор, открывший входящие сообщества
+ * в ВК, прочитывает сообщения раньше нашего опроса, и бот их не увидит.
+ * От повторов защищает таблица уже разобранных сообщений.
+ *
+ * Это единственное, что нужно от ВК, чтобы бот отвечал без настройки
+ * Callback API: токен сообщества с правом «сообщения» читает диалоги, а
+ * управлять сообществом (Callback, Long Poll) он не может — код 15.
+ * Диалоги-беседы (peer_id от 2e9) пропускаем: привязывают в личных.
+ */
+export async function vkRecentConversations(
+  token: string,
+  timeoutMs = 10_000,
+): Promise<VkResult<VkRecentConversation[]>> {
+  const result = await vkCall<{
+    items?: Array<{
+      conversation?: { peer?: { id?: number; type?: string } };
+      last_message?: { conversation_message_id?: number; date?: number; from_id?: number; out?: 0 | 1 };
+    }>;
+  }>("messages.getConversations", { filter: "all", count: "20", extended: "0" }, token, timeoutMs);
+  if (!result.ok) return result;
+
+  const list: VkRecentConversation[] = [];
+  for (const item of result.value.items ?? []) {
+    const peerId = item.conversation?.peer?.id;
+    if (typeof peerId !== "number" || peerId <= 0 || item.conversation?.peer?.type !== "user") continue;
+    const m = item.last_message;
+    list.push({
+      peerId,
+      last: m && typeof m.date === "number" && typeof m.from_id === "number"
+        ? { cmid: m.conversation_message_id ?? null, date: m.date, fromId: m.from_id, out: m.out ?? 0 }
+        : null,
+    });
+  }
+  return { ok: true, value: list };
+}
+
+/** Последние сообщения диалога, новые первыми. */
+export async function vkHistory(
+  token: string,
+  peerId: number,
+  count: number,
+  timeoutMs = 10_000,
+): Promise<VkResult<VkApiMessage[]>> {
+  const result = await vkCall<{ items?: VkApiMessage[] }>(
+    "messages.getHistory",
+    { peer_id: String(peerId), count: String(Math.min(Math.max(count, 1), 20)), rev: "0" },
+    token,
+    timeoutMs,
+  );
+  return result.ok ? { ok: true, value: result.value.items ?? [] } : result;
+}
+
+/** Пометить диалог прочитанным — чтобы следующий опрос не брал те же сообщения. */
+export async function vkMarkAsRead(token: string, peerId: number, timeoutMs = 10_000): Promise<VkResult<number>> {
+  return vkCall<number>("messages.markAsRead", { peer_id: String(peerId) }, token, timeoutMs);
 }

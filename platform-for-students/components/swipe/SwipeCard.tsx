@@ -243,7 +243,7 @@ export function SwipeCard({
         <motion.div
           aria-hidden
           style={{ opacity: yesGlow }}
-          className="pointer-events-none absolute inset-0 rounded-4xl ring-2 ring-inset ring-yes-glow/70 shadow-glow-yes"
+          className="pointer-events-none absolute inset-0 rounded-4xl ring-2 ring-inset ring-yes-bright/70 shadow-glow-yes"
         />
         <motion.div
           aria-hidden
@@ -358,7 +358,7 @@ export function SwipeCard({
         <motion.div
           aria-hidden
           style={{ opacity: yesOpacity }}
-          className="pointer-events-none absolute left-6 top-8 -rotate-[14deg] rounded-xl border-[3px] border-yes-glow px-3.5 py-1.5 text-[15px] font-bold uppercase tracking-[0.1em] text-yes-glow"
+          className="pointer-events-none absolute left-6 top-8 -rotate-[14deg] rounded-xl border-[3px] border-yes-bright px-3.5 py-1.5 text-[15px] font-bold uppercase tracking-[0.1em] text-yes-bright"
         >
           Отклик
         </motion.div>

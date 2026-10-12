@@ -87,3 +87,25 @@ export function createComment(params: {
 export function cleanupCandidate(params: { candidateId: string }): Promise<object> {
   return call({ op: "cleanupCandidate", ...params });
 }
+
+export function cleanupDraftVacancies(params: { titlePrefix: string }): Promise<{ removed: number }> {
+  return call({ op: "cleanupDraftVacancies", ...params }) as Promise<{ removed: number }>;
+}
+
+export function createLeads(params: {
+  leads: {
+    name: string;
+    contact: string;
+    company?: string;
+    website?: string;
+    vacancies?: string;
+    note?: string;
+    status: "NEW" | "IN_PROGRESS" | "SPAM" | "CONVERTED" | "REJECTED";
+  }[];
+}): Promise<{ ids: string[] }> {
+  return call({ op: "createLeads", ...params });
+}
+
+export function cleanupLeads(params: { namePrefix: string }): Promise<{ removed: number }> {
+  return call({ op: "cleanupLeads", ...params }) as Promise<{ removed: number }>;
+}

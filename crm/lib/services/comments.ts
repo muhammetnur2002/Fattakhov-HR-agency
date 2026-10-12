@@ -12,6 +12,7 @@ import type { CommentVisibility } from "@/lib/generated/prisma/enums";
 import { truncateBody } from "@/lib/notifications/events";
 import { notify } from "@/lib/notifications/notify";
 import { threadRecipients } from "@/lib/notifications/recipients";
+import { createUnlessDuplicate } from "@/lib/services/duplicate-guard";
 
 export class CommentError extends Error {}
 
@@ -336,11 +337,26 @@ export async function createComment(
   // иначе положила бы реплику в чужой тред и разослала уведомления его участникам
   if (params.applicationId) {
     const application = await prisma.application.findFirst({
-      where: { id: params.applicationId, organizationId: actor.organizationId },
+      // Видимость, а не только организация: клиент пишет лишь к своим кандидатам (BR-28)
+      where: {
+        id: params.applicationId,
+        organizationId: actor.organizationId,
+        ...visibleApplicationsFilter(actor),
+      },
       select: { vacancyId: true },
     });
     if (!application) throw new CommentError("Не найдено");
     params = { ...params, vacancyId: application.vacancyId };
+  } else if (params.vacancyId) {
+    const vacancy = await prisma.vacancy.findFirst({
+      where: {
+        id: params.vacancyId,
+        organizationId: actor.organizationId,
+        ...visibleVacanciesFilter(actor),
+      },
+      select: { id: true },
+    });
+    if (!vacancy) throw new CommentError("Не найдено");
   }
 
   // Внутренний комментарий может написать только агентство. Проверка
@@ -385,19 +401,53 @@ export async function createComment(
     }
   }
 
-  const comment = await prisma.comment.create({
-    data: {
-      organizationId: actor.organizationId,
-      applicationId: params.applicationId,
-      vacancyId: params.vacancyId,
+  // Повтор того же комментария в том же месте за несколько секунд — двойное
+  // нажатие, а не новая реплика (lib/services/duplicate-guard.ts). Видимость и
+  // ответ входят в «то же самое»: внутренняя заметка и такой же по тексту
+  // комментарий клиенту — разные поступки, один не должен проглатывать другой
+  const { record: comment, duplicate } = await createUnlessDuplicate({
+    lockKey: [
+      "comment",
+      actor.id,
+      params.applicationId ?? "-",
+      params.vacancyId ?? "-",
+      params.parentId ?? "-",
+      params.visibility,
       body,
-      visibility: params.visibility,
-      parentId: params.parentId,
-      mentionedUserIds: params.mentionedUserIds ?? [],
-      authorId: actor.id,
-    },
-    select: { id: true },
+    ].join(":"),
+    findRecent: (tx, since) =>
+      tx.comment.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          authorId: actor.id,
+          applicationId: params.applicationId ?? null,
+          vacancyId: params.vacancyId ?? null,
+          parentId: params.parentId ?? null,
+          visibility: params.visibility,
+          body,
+          createdAt: { gte: since },
+          // Удалённая секунду назад реплика — не повод проглотить новую
+          deletedAt: null,
+        },
+        select: { id: true },
+      }),
+    create: (tx) =>
+      tx.comment.create({
+        data: {
+          organizationId: actor.organizationId,
+          applicationId: params.applicationId,
+          vacancyId: params.vacancyId,
+          body,
+          visibility: params.visibility,
+          parentId: params.parentId,
+          mentionedUserIds: params.mentionedUserIds ?? [],
+          authorId: actor.id,
+        },
+        select: { id: true },
+      }),
   });
+  // Адресаты уже уведомлены о первом
+  if (duplicate) return comment;
 
   await notifyAboutComment(actor, { ...params, body }, comment.id);
 

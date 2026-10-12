@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { ConversationSummary } from "@/lib/services/comments";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Список обсуждений по кандидатам и вакансиям — компактные строки для
@@ -35,8 +36,8 @@ export function ConversationList({
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <div className="truncate text-[13.5px] font-medium">{c.title}</div>
-              <div className="shrink-0 text-[11px] text-muted-foreground">
+              <div className="truncate text-sm font-medium">{c.title}</div>
+              <div className="shrink-0 text-xs text-muted-foreground">
                 {formatWhen(c.lastMessage.createdAt)}
               </div>
             </div>
@@ -45,11 +46,7 @@ export function ConversationList({
               <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 <span className="text-foreground">{c.lastMessage.authorName}:</span> {c.lastMessage.body}
               </div>
-              {c.unreadCount > 0 && (
-                <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                  {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                </span>
-              )}
+              {c.unreadCount > 0 && <CountBadge count={c.unreadCount} label="непрочитанных" />}
             </div>
           </div>
         </Link>

@@ -269,6 +269,9 @@ export const profileUpdateSchema = registrationSteps.identity
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
+/** Принятие новой редакции согласия: версия, которую человеку показали. */
+export const consentRenewalSchema = z.object({ version: z.string().min(1).max(32) });
+
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Введите пароль'),

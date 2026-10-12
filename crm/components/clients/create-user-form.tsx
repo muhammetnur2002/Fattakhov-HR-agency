@@ -1,15 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
-
 import {
-  FormMessages,
   SubmitButton,
   type AccountAction,
-  type AccountFormState,
 } from "@/components/shared/account-forms";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import { ROLE_LABELS } from "@/lib/labels";
 
 const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"] as const;
@@ -26,6 +24,10 @@ const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_HIRING", "CLIENT_VIEWER"] as const
  * задаёт он сам и сообщает клиенту лично — ссылка-приглашение здесь не
  * нужна (в отличие от app/(client)/settings, где клиент зовёт коллегу
  * сам и передать пароль лично некому).
+ *
+ * Ошибки — у своих полей (почта занята, пароли не совпадают), набранное
+ * после отказа остаётся: раньше `action={formAction}` стирал всё, включая
+ * имя и почту, из-за одного неверного пароля.
  */
 export function CreateClientUserForm({
   clientId,
@@ -37,10 +39,10 @@ export function CreateClientUserForm({
   /** Первому пользователю — роль администратора по умолчанию: он выбирает тариф на онбординге. */
   noUsersYet?: boolean;
 }) {
-  const [state, formAction] = useActionState<AccountFormState, FormData>(action, {});
+  const { state, fields, pending, formProps } = useFormAction(action, {}, { resetOnSuccess: true });
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="clientId" value={clientId} />
 
       {noUsersYet && (
@@ -51,48 +53,45 @@ export function CreateClientUserForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="client-create-email">Почта</Label>
+        <Field label="Почта" error={fields.email}>
           <Input id="client-create-email" name="email" type="email" required placeholder="name@company.ru" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="client-create-fullName">Имя и фамилия</Label>
+        </Field>
+        <Field label="Имя и фамилия" error={fields.fullName}>
           <Input id="client-create-fullName" name="fullName" required maxLength={120} />
-        </div>
+        </Field>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="client-create-password">Пароль</Label>
+        <Field label="Пароль" error={fields.password}>
           <Input id="client-create-password" name="password" type="password" required minLength={10} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="client-create-passwordConfirm">Пароль ещё раз</Label>
+        </Field>
+        <Field label="Пароль ещё раз" error={fields.passwordConfirm}>
           <Input id="client-create-passwordConfirm" name="passwordConfirm" type="password" required minLength={10} />
-        </div>
+        </Field>
       </div>
       <p className="-mt-2 text-xs leading-relaxed text-muted-foreground">
         Пароль сообщите клиенту лично — письма платформа не отправляет.
       </p>
 
-      <div className="space-y-2">
-        <Label htmlFor="client-create-role">Роль</Label>
-        <Select name="role" defaultValue={noUsersYet ? "CLIENT_ADMIN" : "CLIENT_HIRING"}>
-          <SelectTrigger id="client-create-role" className="w-full sm:w-60">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CLIENT_ROLES.map((role) => (
-              <SelectItem key={role} value={role}>
-                {ROLE_LABELS[role]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Field label="Роль" error={fields.role} id="client-create-role">
+        {(control) => (
+          <Select name="role" defaultValue={noUsersYet ? "CLIENT_ADMIN" : "CLIENT_HIRING"}>
+            <SelectTrigger {...control} className="w-full sm:w-60">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CLIENT_ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
 
-      <SubmitButton label="Создать аккаунт" pending="Создаём…" />
-      <FormMessages state={state} />
+      <SubmitButton label="Создать аккаунт" pending="Создаём…" loading={pending} />
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

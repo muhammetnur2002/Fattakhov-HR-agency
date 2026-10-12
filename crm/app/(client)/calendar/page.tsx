@@ -1,12 +1,11 @@
-import Link from "next/link";
-
 import { CalendarSubscription } from "@/components/interviews/calendar-subscription";
 import { CalendarView } from "@/components/interviews/calendar-view";
-import { Button } from "@/components/ui/button";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
 import { calendarFeedUrl } from "@/lib/calendar/feed";
 import { listInterviews } from "@/lib/services/interviews";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Календарь" };
 
@@ -39,7 +38,7 @@ export default async function ClientCalendarPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Календарь</h1>
+          <PageTitle>Календарь</PageTitle>
           <p className="text-sm text-muted-foreground">
             Ваши интервью с кандидатами
           </p>
@@ -47,20 +46,13 @@ export default async function ClientCalendarPage({
         <CalendarSubscription url={feedUrl} />
       </div>
 
-      <div className="flex gap-2">
+      <FilterChipGroup label="Период">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
-          <Button
-            key={r}
-            asChild
-            size="sm"
-            variant={key === r ? "default" : "outline"}
-          >
-            <Link href={`/calendar?range=${r}`}>
-              {r === "week" ? "Неделя" : r === "month" ? "Месяц" : "Квартал"}
-            </Link>
-          </Button>
+          <FilterChip key={r} href={`/calendar?range=${r}`} selected={key === r}>
+            {r === "week" ? "Неделя" : r === "month" ? "Месяц" : "Квартал"}
+          </FilterChip>
         ))}
-      </div>
+      </FilterChipGroup>
 
       <CalendarView
         interviews={interviews}

@@ -1,20 +1,25 @@
 import { StatCard, StatRow } from "@/components/shell/stat-card";
 import { canDo } from "@/lib/access";
 import { requireAgencyActor } from "@/lib/auth/session";
-import { getAgencyDashboardStats } from "@/lib/services/dashboard";
+import {
+  getAgencyDashboardStats,
+  getNewCandidatesCounts,
+} from "@/lib/services/dashboard";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Дашборд агентства" };
 
 export default async function AgencyDashboard() {
   const actor = await requireAgencyActor();
   const stats = await getAgencyDashboardStats(actor);
+  const newCandidates = await getNewCandidatesCounts(actor);
   const manages = canDo(actor, "vacancy.assignRecruiter");
   const managesBusiness = canDo(actor, "invoice.manage");
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Дашборд</h1>
+        <PageTitle>Дашборд</PageTitle>
         <p className="text-sm text-muted-foreground">
           Состояние подбора по агентству
         </p>
@@ -95,6 +100,16 @@ export default async function AgencyDashboard() {
           />
         )}
 
+        {/* Рекрутёру и менеджеру общая аналитика закрыта, своя — открыта */}
+        {!manages && canDo(actor, "analytics.employee") && (
+          <StatCard
+            label="Моя аналитика"
+            value="→"
+            hint="Мои показатели и финалисты"
+            href={`/a/analytics/employees/${actor.id}`}
+          />
+        )}
+
         <StatCard
           label="Вакансий в работе"
           value={stats.activeVacancies}
@@ -111,6 +126,36 @@ export default async function AgencyDashboard() {
           href="/a/calendar"
         />
       </StatRow>
+
+      {/* Новые кандидаты в общей базе: только число, за три срока.
+          Отдельный ряд, чтобы не менять состав и порядок плиток выше */}
+      {newCandidates && (
+        <section className="space-y-3" aria-labelledby="new-candidates-title">
+          <h2
+            id="new-candidates-title"
+            className="text-sm font-medium text-muted-foreground"
+          >
+            Новые кандидаты в базе
+          </h2>
+          <StatRow>
+            <StatCard
+              label="За 3 дня"
+              value={newCandidates.last3Days}
+              href="/a/candidates"
+            />
+            <StatCard
+              label="За 7 дней"
+              value={newCandidates.last7Days}
+              href="/a/candidates"
+            />
+            <StatCard
+              label="За 10 дней"
+              value={newCandidates.last10Days}
+              href="/a/candidates"
+            />
+          </StatRow>
+        </section>
+      )}
     </div>
   );
 }

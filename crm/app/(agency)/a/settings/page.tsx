@@ -5,6 +5,8 @@ import { AlertCheck } from "@/components/settings/alert-check";
 import { VkEventsCard } from "@/components/settings/vk-events-card";
 import { NotificationSettings } from "@/components/settings/notification-settings";
 import { PasswordForm } from "@/components/settings/password-form";
+import { SessionLimitsCard } from "@/components/settings/session-limits-card";
+import { SessionsCard } from "@/components/settings/sessions-card";
 import { PresenceCard } from "@/components/settings/presence-card";
 import { TwoFactorSettings } from "@/components/settings/two-factor";
 import { Button } from "@/components/ui/button";
@@ -25,7 +27,9 @@ import { listPushDevices } from "@/lib/notifications/push";
 import { pushPublicKey } from "@/lib/notifications/push-config";
 import { formatDate } from "@/lib/format-date";
 import { getContractTemplate } from "@/lib/services/contract-documents";
+import { getSessionLimits } from "@/lib/services/session-settings";
 import { getTwoFactorStatus } from "@/lib/services/two-factor";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Настройки" };
 
@@ -34,6 +38,7 @@ export default async function AgencySettingsPage() {
   const twoFactor = await getTwoFactorStatus(actor.id);
   const canManageContract = canDo(actor, "agreement.manage", { clientId: null });
   const template = canManageContract ? await getContractTemplate(actor.organizationId) : null;
+  const sessionLimits = canDo(actor, "org.settings") ? await getSessionLimits(actor.organizationId) : null;
 
   const user = await prisma.user.findFirst({
     where: { id: actor.id },
@@ -60,9 +65,9 @@ export default async function AgencySettingsPage() {
     canDo(actor, "org.settings") && channelStatus().vk ? await listVkEvents(10) : null;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Настройки</h1>
+        <PageTitle>Настройки</PageTitle>
         <p className="text-sm text-muted-foreground">
           {user?.fullName} · {ROLE_LABELS[actor.role]}
         </p>
@@ -96,6 +101,33 @@ export default async function AgencySettingsPage() {
           <PasswordForm />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Сессии</CardTitle>
+          <CardDescription>
+            Выйти на всех устройствах сразу, если есть подозрение на чужой доступ.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SessionsCard />
+        </CardContent>
+      </Card>
+
+      {sessionLimits && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Срок сессии</CardTitle>
+            <CardDescription>
+              Как долго можно оставаться в кабинете после входа. Чем короче срок, тем меньше шансов у
+              украденной cookie, но тем чаще вход.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SessionLimitsCard limits={sessionLimits} />
+          </CardContent>
+        </Card>
+      )}
 
       <PresenceCard role={actor.role} showPresence={user?.showPresence ?? true} />
 
@@ -155,10 +187,10 @@ export default async function AgencySettingsPage() {
           <CardHeader>
             <CardTitle className="text-base">ВКонтакте: что приходит от сообщества</CardTitle>
             <CardDescription>
-              Последние события от сообщества агентства и чем они закончились.
-              По этому списку видно, на каком шаге рвётся привязка: ВКонтакте
-              ничего не присылает, секретный ключ не совпал или ответить
-              человеку не вышло. Хранится 30 дней, текст сообщений не сохраняется.
+              Что бот сделал с сообщениями сообщества агентства и чем это
+              кончилось: запустился ли, привязал ли страницу, смог ли ответить.
+              По списку видно, на каком шаге рвётся привязка. Хранится 30
+              дней, текст сообщений не сохраняется.
             </CardDescription>
           </CardHeader>
           <CardContent>

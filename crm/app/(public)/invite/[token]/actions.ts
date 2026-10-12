@@ -3,11 +3,13 @@
 import { AuthError } from "next-auth";
 
 import { signIn } from "@/auth";
+import type { FormState } from "@/lib/form-state";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
 import { acceptInvitation, InviteError } from "@/lib/services/invitations";
 import { acceptInviteSchema } from "@/lib/validation/auth";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type AcceptState = { error?: string };
+export type AcceptState = FormState;
 
 export async function acceptInvite(
   _prev: AcceptState,
@@ -25,9 +27,7 @@ export async function acceptInvite(
     passwordConfirm: formData.get("passwordConfirm"),
   });
 
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   let email: string;
   try {

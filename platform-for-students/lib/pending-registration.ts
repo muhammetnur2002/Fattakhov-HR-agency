@@ -30,6 +30,20 @@ export interface IssuedPending {
   retryAfter: number;
 }
 
+/**
+ * Письмо с кодом уходит на любой названный адрес, поэтому у него есть общий
+ * суточный потолок. Сверх него письмо не отправляется, а человек видит то же,
+ * что и при сбое почты: «не удалось отправить, попробуйте позже».
+ */
+async function sendCodeMail(to: string, code: string): Promise<boolean> {
+  const daily = await rateLimit('mailCodeDaily', 'all');
+  if (!daily.ok) {
+    console.error('[почта] суточный потолок писем с кодом исчерпан — письмо не отправлено');
+    return false;
+  }
+  return sendMail({ to, ...emailCodeMail({ code, minutes: EMAIL_CODE_TTL_MINUTES }) });
+}
+
 export async function issuePendingRegistration(kind: PendingKind, email: string, data: unknown): Promise<IssuedPending> {
   const code = generateEmailCode();
   const token = await signPendingRegistration({
@@ -40,7 +54,7 @@ export async function issuePendingRegistration(kind: PendingKind, email: string,
     sentAt: Date.now(),
     payloadEnc: encrypt(JSON.stringify(data)),
   });
-  const delivered = await sendMail({ to: email, ...emailCodeMail({ code, minutes: EMAIL_CODE_TTL_MINUTES }) });
+  const delivered = await sendCodeMail(email, code);
   return { token, delivered, retryAfter: 60 };
 }
 
@@ -114,7 +128,7 @@ export async function resendPendingRegistration(kind: PendingKind, token: string
     attempts: 0,
     sentAt: Date.now(),
   });
-  const delivered = await sendMail({ to: claims.email, ...emailCodeMail({ code, minutes: EMAIL_CODE_TTL_MINUTES }) });
+  const delivered = await sendCodeMail(claims.email, code);
   return { status: 'SENT', token: refreshed, delivered, retryAfter: 60 };
 }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { StudentCandidate } from "@/lib/students-service";
 import { studyLine } from "@/lib/study-level";
-import { cn } from "@/lib/utils";
+import { SearchField } from "@/components/ui/search-field";
 import { inviteCandidateAction } from "../actions";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 
 const WEEKDAYS = [
   { code: "MON", label: "Пн" },
@@ -57,52 +58,41 @@ export function CandidatesList({ vacancyId, candidates }: { vacancyId: string; c
 
   if (candidates.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          Подходящих студентов пока нет — все уже откликались или ещё не подтвердили учёбу.
-        </CardContent>
-      </Card>
+      <EmptyState>
+        Подходящих студентов пока нет — все уже откликались или ещё не
+        подтвердили учёбу.
+      </EmptyState>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex h-9 items-center gap-2 rounded-xl border bg-muted/40 px-3">
-        <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Имя, вуз, специальность или навык"
-          aria-label="Поиск студентов"
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none touch:text-base placeholder:text-muted-foreground"
-        />
-      </div>
+      <SearchField value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, вуз, специальность или навык" aria-label="Поиск студентов" />
 
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <FilterChipGroup label="Курс">
           <span className="text-xs text-muted-foreground">Курс:</span>
-          <Chip active={year === null} onClick={() => setYear(null)}>
+          <FilterChip selected={year === null} onClick={() => setYear(null)}>
             Любой
-          </Chip>
+          </FilterChip>
           {years.map((y) => (
-            <Chip key={y} active={year === y} onClick={() => setYear(y)}>
+            <FilterChip key={y} selected={year === y} onClick={() => setYear(y)}>
               {y}
-            </Chip>
+            </FilterChip>
           ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        </FilterChipGroup>
+        <FilterChipGroup label="Может в дни">
           <span className="text-xs text-muted-foreground">Может в дни:</span>
           {WEEKDAYS.map((d) => (
-            <Chip
+            <FilterChip
               key={d.code}
-              active={days.includes(d.code)}
+              selected={days.includes(d.code)}
               onClick={() => setDays((prev) => (prev.includes(d.code) ? prev.filter((x) => x !== d.code) : [...prev, d.code]))}
             >
               {d.label}
-            </Chip>
+            </FilterChip>
           ))}
-        </div>
+        </FilterChipGroup>
       </div>
 
       {error && (
@@ -119,7 +109,7 @@ export function CandidatesList({ vacancyId, candidates }: { vacancyId: string; c
         <div className="grid gap-3">
           {visible.map((c) => (
             <Card key={c.id}>
-              <CardContent className="space-y-2 py-4">
+              <CardContent className="space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-medium">{c.fullName}</div>
@@ -154,21 +144,5 @@ export function CandidatesList({ vacancyId, candidates }: { vacancyId: string; c
         </div>
       )}
     </div>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "shrink-0 rounded-full border px-3 py-1 text-[13px] font-medium transition-colors",
-        active ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }

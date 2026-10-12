@@ -3,16 +3,16 @@
 import { startTransition, useActionState } from "react";
 
 import { uploadSignedContractAction, type ContractUploadState } from "@/app/(client)/documents/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 function Submit({ pending }: { pending: boolean }) {
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Отправляем…" : "Отправить на проверку"}
-    </Button>
+    <SubmitButton size="sm" loading={pending} pendingLabel="Отправляем…">
+      Отправить на проверку
+    </SubmitButton>
   );
 }
 
@@ -28,7 +28,7 @@ export function ContractUpload() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="signedContract">Подписанный договор</Label>
         <Input
@@ -47,16 +47,7 @@ export function ContractUpload() {
         <p className="text-xs text-muted-foreground">Скан в PDF или фото (JPG, PNG) до 4 МБ.</p>
       </div>
       <Submit pending={pending} />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

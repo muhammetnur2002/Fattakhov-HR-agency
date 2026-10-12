@@ -1,6 +1,7 @@
 import 'server-only';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { maskEmail } from '@/lib/account-codes';
+import { secureSmtpUrl } from './smtp-url';
 import type { MailContent } from './templates';
 
 export interface OutgoingMail extends MailContent {
@@ -48,7 +49,7 @@ export async function sendMail(mail: OutgoingMail): Promise<boolean> {
       return true;
     }
 
-    globalForMail.fhrMailer ??= nodemailer.createTransport(process.env.SMTP_URL!.trim());
+    globalForMail.fhrMailer ??= nodemailer.createTransport(secureSmtpUrl(process.env.SMTP_URL!.trim()));
     await globalForMail.fhrMailer.sendMail({
       from: process.env.SMTP_FROM!.trim(),
       to: mail.to,

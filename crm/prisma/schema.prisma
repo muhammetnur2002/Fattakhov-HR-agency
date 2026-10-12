@@ -147,7 +147,14 @@ model Invitation {
   /// Должность и доступы сотрудника агентства — переходят в учётку при приёме
   position       String?
   grants         String[]  @default([])
-  token          String    @unique
+  /// Прежнее открытое поле. Новые приглашения его не заполняют: в базе только
+  /// хеш и шифр (lib/auth/invite-token.ts). У старых открытых приглашений
+  /// значение дожидается своего срока и стирается при показе или приёме
+  token          String?   @unique
+  /// sha256 токена — по нему ищется ссылка
+  tokenHash      String?   @unique
+  /// Токен под ключом приложения — чтобы позже показать ссылку команде
+  tokenEnc       String?
   expiresAt      DateTime
   acceptedAt     DateTime?
   // Пусто у приглашения, созданного системой при первичной настройке:
@@ -406,6 +413,8 @@ enum CandidateSource {
   OWN_BASE
   DIRECT_SEARCH
   INBOUND
+  /// Студент, добавленный сотрудником из раздела «Студенты» студенческой платформы
+  STUDENT_PLATFORM
   OTHER
 }
 
@@ -414,6 +423,18 @@ enum ConsentStatus {
   GIVEN
   REVOKED
   EXPIRED
+}
+
+/// Рабочий статус кандидата в общей базе агентства: ставится вручную,
+/// на воронки по вакансиям не влияет. Пусто у тех, кому его не ставили.
+enum CandidateStatus {
+  NEW // новый
+  IN_PROGRESS // в работе
+  WAITING_CLIENT // ждёт решения клиента
+  RESERVE // в резерве
+  HIRED // нанят
+  NOT_RELEVANT // не актуален
+  ON_HOLD // на паузе
 }
 
 model Candidate {
@@ -441,6 +462,12 @@ model Candidate {
 
   source        CandidateSource @default(OTHER)
   sourceDetails String? // ссылка на профиль hh / откуда пришёл
+  /// Идентификатор студента на студенческой платформе: по нему не добавляем дважды
+  /// и находим переписку. Заполнен только у кандидатов из студплатформы.
+  studentPlatformId String?
+
+  /// Рабочий статус в общей базе (задаётся вручную, см. CandidateStatus).
+  status CandidateStatus?
 
   // ПДн-контур (BR-33, BR-34)
   consentStatus    ConsentStatus @default(PENDING)
@@ -483,11 +510,15 @@ model Candidate {
 
   applications Application[]
   attachments  Attachment[]
+  /// Заметки команды по кандидату в целом, вне вакансий (только агентство).
+  comments     Comment[]
 
   disclosureConsents DisclosureConsent[]
 
   @@index([organizationId, fullName])
   @@index([organizationId, phone])
+  @@unique([organizationId, studentPlatformId])
+  @@index([organizationId, status])
 }
 
 /// Почему нанятый ушёл в гарантийный срок.
@@ -638,6 +669,10 @@ model Comment {
   application    Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyId      String?
   vacancy        Vacancy?     @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  /// Заметка команды по кандидату в целом, без вакансии. Только внутренняя:
+  /// клиент видит комментарии лишь в рамках своей вакансии (applicationId).
+  candidateId    String?
+  candidate      Candidate?   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   body             String            @db.Text // markdown
   visibility       CommentVisibility @default(SHARED)
@@ -658,6 +693,7 @@ model Comment {
 
   @@index([applicationId, createdAt])
   @@index([vacancyId, createdAt])
+  @@index([candidateId, createdAt])
 }
 
 model CommentRead {
@@ -702,6 +738,42 @@ model DirectMessage {
 }
 
 // ============ ИНТЕРВЬЮ И КАЛЕНДАРЬ ============
+
+/// Задание сотрудника в календаре агентства: что сделать и к какому сроку.
+///
+/// Ставит себе или (по правилам ролей, lib/services/calendar-tasks.ts) коллеге.
+/// Связи с пользователем, вакансией и кандидатом хранятся идентификаторами без
+/// внешних ключей, как у уведомлений: задание живёт само по себе, а исчезновение
+/// вакансии или кандидата не должно уносить его с собой.
+model CalendarTask {
+  id             String @id @default(cuid())
+  organizationId String
+
+  title  String
+  dueAt  DateTime
+  /// Кто выполняет.
+  assigneeId  String
+  /// Кто поставил.
+  createdById String
+
+  vacancyId   String?
+  candidateId String?
+
+  completedAt   DateTime?
+  completedById String?
+
+  /// Напоминание за 15 минут уже ушло: повторно не шлём.
+  reminderSentAt    DateTime?
+  /// О просрочке уже сообщили: повторно не шлём.
+  overdueNotifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assigneeId, dueAt])
+  @@index([organizationId, dueAt])
+  @@index([createdById, dueAt])
+}
 
 enum InterviewStatus {
   SLOTS_REQUESTED // нужно предложить слоты
@@ -1304,6 +1376,7 @@ enum AuthEventKind {
   PASSWORD_RESET
   TWO_FACTOR_ENABLED
   TWO_FACTOR_RESET
+  SESSIONS_REVOKED
 }
 
 /// Журнал входов (lib/services/auth-events.ts): кто и откуда входил,
@@ -1382,5 +1455,20 @@ model VkEvent {
   /// Код отказа ВК, если не удалось ответить человеку (901 — писать первым нельзя).
   vkErrorCode Int?
 
+  @@index([at])
+}
+
+/// Входящие сообщения сообщества ВКонтакте, которые уже разобраны. Нужна, чтобы
+/// вебхук и опрос (lib/notifications/vk-poll.ts) не обработали одно сообщение
+/// дважды: второй раз код привязки уже погашен, и человеку пришло бы «код не
+/// найден» сразу после «Готово». Ключ — диалог и номер сообщения в нём.
+/// Хранится 30 дней, текста сообщений здесь нет.
+model VkMessageSeen {
+  id        String   @id @default(cuid())
+  peerId    String
+  messageId Int
+  at        DateTime @default(now())
+
+  @@unique([peerId, messageId])
   @@index([at])
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { useListNavigation } from "@/components/shell/list-pending";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,7 @@ const ALL = "__all__";
  * был только элемент управления.
  */
 export function VacancyStatusFilter() {
-  const router = useRouter();
+  const { navigate, pending } = useListNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const value = searchParams.get("status") ?? ALL;
@@ -32,12 +33,12 @@ export function VacancyStatusFilter() {
     if (next && next !== ALL) params.set("status", next);
     else params.delete("status");
     params.delete("page");
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    navigate(`${pathname}?${params.toString()}`);
   }
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-full max-w-48" aria-label="Фильтр по статусу">
+      <SelectTrigger pending={pending} className="w-full max-w-48" aria-label="Фильтр по статусу">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

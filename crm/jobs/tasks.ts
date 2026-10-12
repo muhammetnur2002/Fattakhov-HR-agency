@@ -1,3 +1,4 @@
+import { toDateParam } from "@/lib/calendar/day-range";
 import { prisma } from "@/lib/db/prisma";
 import { notify, flushCollapsed } from "@/lib/notifications/notify";
 import { agencySideRecipients } from "@/lib/notifications/recipients";
@@ -319,12 +320,82 @@ export async function markOverdueInvoices(): Promise<number> {
   return overdue.length;
 }
 
+/**
+ * Напоминание за 15 минут до срока задания календаря.
+ *
+ * Выбираются невыполненные задания, срок которых наступит в ближайшие
+ * 15 минут. Флаг `reminderSentAt` делает проход идемпотентным; задания,
+ * созданные уже внутри этого окна, помечены при создании и не напоминают.
+ */
+export async function sendTaskReminders(): Promise<number> {
+  const now = new Date();
+  const tasks = await prisma.calendarTask.findMany({
+    where: {
+      completedAt: null,
+      reminderSentAt: null,
+      dueAt: { gt: now, lte: new Date(now.getTime() + 15 * 60_000) },
+    },
+    select: { id: true, organizationId: true, assigneeId: true, title: true, dueAt: true },
+  });
+
+  for (const task of tasks) {
+    const minutes = Math.max(1, Math.round((task.dueAt.getTime() - now.getTime()) / 60_000));
+    await notify({
+      organizationId: task.organizationId,
+      userIds: [task.assigneeId],
+      event: "TASK_REMINDER",
+      title: `Через ${minutes} мин. срок задания: ${task.title}`,
+      linkUrl: `/a/calendar?range=day&date=${toDateParam(task.dueAt)}`,
+      groupKey: task.id,
+    });
+    await prisma.calendarTask.update({ where: { id: task.id }, data: { reminderSentAt: new Date() } });
+  }
+
+  return tasks.length;
+}
+
+/**
+ * Просроченные задания календаря.
+ *
+ * Сообщаем исполнителю и тому, кто поставил (если это разные люди), один
+ * раз на задание: повторно та же просрочка не рассылается.
+ */
+export async function notifyOverdueTasks(): Promise<number> {
+  const tasks = await prisma.calendarTask.findMany({
+    where: { completedAt: null, overdueNotifiedAt: null, dueAt: { lt: new Date() } },
+    select: {
+      id: true,
+      organizationId: true,
+      assigneeId: true,
+      createdById: true,
+      title: true,
+      dueAt: true,
+    },
+  });
+
+  for (const task of tasks) {
+    await notify({
+      organizationId: task.organizationId,
+      userIds: [...new Set([task.assigneeId, task.createdById])],
+      event: "TASK_OVERDUE",
+      title: `Задание просрочено: ${task.title}`,
+      linkUrl: `/a/calendar?range=day&date=${toDateParam(task.dueAt)}`,
+      groupKey: task.id,
+    });
+    await prisma.calendarTask.update({ where: { id: task.id }, data: { overdueNotifiedAt: new Date() } });
+  }
+
+  return tasks.length;
+}
+
 /** Полный проход планировщика. */
 export async function runScheduledTasks(): Promise<Record<string, number>> {
   return {
     напоминанийЗаСутки: await sendReminders24h(),
     напоминанийЗаЧас: await sendReminders1h(),
     завершеноВстреч: await completePastInterviews(),
+    напоминанийОЗаданиях: await sendTaskReminders(),
+    просроченныхЗаданий: await notifyOverdueTasks(),
     просрочекРешений: await checkOverdueDecisions(),
     просроченныхСчетов: await markOverdueInvoices(),
     истёкшихСогласий: await expireConsents(),

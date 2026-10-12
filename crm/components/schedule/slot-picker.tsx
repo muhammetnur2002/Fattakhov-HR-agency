@@ -2,15 +2,15 @@
 
 import { Check, Clock } from "lucide-react";
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   confirmSlotAction,
   requestOtherSlotsAction,
   type ScheduleState,
 } from "@/app/(public)/schedule/[token]/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -46,11 +46,10 @@ const TIMEZONES = [
 ];
 
 function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending}>
-      {pending ? "Сохраняем…" : label}
-    </Button>
+    <SubmitButtonBase size="lg" className="w-full" pendingLabel="Сохраняем…">
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -183,7 +182,7 @@ export function SlotPicker({
 
       {!askingOther && !nothingLeft && (
         <>
-          <form action={handleConfirm} className="space-y-5">
+          <form action={handleConfirm} className="space-y-4">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="slotId" value={selected ?? ""} />
 
@@ -249,11 +248,7 @@ export function SlotPicker({
               </p>
             </div>
 
-            {state.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            )}
+            <FormMessage error={state.error} />
 
             <SubmitButton label="Подтвердить время" />
           </form>
@@ -282,11 +277,7 @@ export function SlotPicker({
             />
           </div>
 
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <FormMessage error={state.error} />
 
           <SubmitButton label="Отправить рекрутеру" />
           <button

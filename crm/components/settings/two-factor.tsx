@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   confirmTwoFactorAction,
@@ -15,10 +14,13 @@ import {
   type TwoFactorState,
 } from "@/app/actions/two-factor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TwoFactorStatus } from "@/lib/services/two-factor";
+import { Panel, panelClass } from "@/components/ui/panel";
 
 export type TwoFactorSetupData = NonNullable<TwoFactorState["setup"]>;
 
@@ -31,11 +33,14 @@ function SubmitButton({
   variant?: "default" | "outline" | "destructive";
   className?: string;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} disabled={pending} className={className}>
-      {pending ? "Секунду…" : label}
-    </Button>
+    <SubmitButtonBase
+      variant={variant}
+      className={className}
+      pendingLabel="Секунду…"
+    >
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -50,7 +55,7 @@ export function RecoveryCodes({ codes }: { codes: string[] }) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="space-y-3 rounded-lg border border-primary/30 bg-secondary/40 p-4">
+    <Panel tone="accent">
       <div>
         <div className="font-medium">Коды восстановления</div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -81,7 +86,7 @@ export function RecoveryCodes({ codes }: { codes: string[] }) {
       >
         {copied ? "Скопировано" : "Скопировать все"}
       </Button>
-    </div>
+    </Panel>
   );
 }
 
@@ -125,7 +130,7 @@ export function StartSetup({
 
   return (
     <form
-      className="space-y-3"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -150,7 +155,7 @@ export function StartSetup({
           <Button
             type="button"
             variant="outline"
-            disabled={pending}
+            loading={pending}
             onClick={() =>
               startTransition(async () => {
                 setError(null);
@@ -181,16 +186,12 @@ export function StartSetup({
         </div>
       )}
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={error} />
 
       {(!usesSms || smsSentTo) && (
-        <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-          {pending ? "Готовим…" : buttonLabel}
-        </Button>
+        <SubmitButtonBase loading={pending} pendingLabel="Готовим…" className="w-full sm:w-auto">
+          {buttonLabel}
+        </SubmitButtonBase>
       )}
     </form>
   );
@@ -235,7 +236,7 @@ export function ConfirmSetup({
         </li>
       </ol>
 
-      <form action={formAction} className="space-y-3 border-t pt-5">
+      <form action={formAction} className="space-y-4 border-t pt-5">
         <div className="space-y-2">
           <Label htmlFor="totp-code">Код из приложения</Label>
           <Input
@@ -248,11 +249,7 @@ export function ConfirmSetup({
             autoFocus
           />
         </div>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={error} />
         <SubmitButton label={submitLabel} className="w-full sm:w-auto" />
       </form>
     </div>
@@ -282,11 +279,7 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
   if (freshCodes) {
     return (
       <div className="space-y-4">
-        {(confirmState.ok ?? codesState.ok) && (
-          <Alert>
-            <AlertDescription>{confirmState.ok ?? codesState.ok}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage ok={confirmState.ok ?? codesState.ok} />
         <RecoveryCodes codes={freshCodes} />
       </div>
     );
@@ -294,8 +287,8 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
 
   if (status.enabled) {
     return (
-      <div className="space-y-5">
-        <div className="flex items-start gap-3 rounded-lg border bg-secondary/30 p-3.5">
+      <div className="space-y-6">
+        <div className={panelClass("muted", "flex items-start gap-3 space-y-0")}>
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
           <div className="text-sm">
             <div className="font-medium">Включена</div>
@@ -307,7 +300,7 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
           </div>
         </div>
 
-        <form action={codesAction} className="space-y-3">
+        <form action={codesAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="regen-password">
               Перевыпустить коды восстановления
@@ -324,11 +317,7 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
               Прежние коды перестанут работать.
             </p>
           </div>
-          {codesState.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{codesState.error}</AlertDescription>
-            </Alert>
-          )}
+          <FormMessage error={codesState.error} />
           <SubmitButton label="Перевыпустить" variant="outline" />
         </form>
 
@@ -339,7 +328,7 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
             и не отключается.
           </p>
         ) : (
-          <form action={disableAction} className="space-y-3 border-t pt-5">
+          <form action={disableAction} className="space-y-4 border-t pt-5">
             <div className="space-y-2">
               <Label htmlFor="disable-password">Выключить двухфакторную</Label>
               <Input
@@ -351,16 +340,7 @@ export function TwoFactorSettings({ status }: { status: TwoFactorStatus }) {
                 required
               />
             </div>
-            {disableState.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{disableState.error}</AlertDescription>
-              </Alert>
-            )}
-            {disableState.ok && (
-              <Alert>
-                <AlertDescription>{disableState.ok}</AlertDescription>
-              </Alert>
-            )}
+            <FormMessage error={disableState.error} ok={disableState.ok} />
             <SubmitButton label="Выключить" variant="destructive" />
           </form>
         )}

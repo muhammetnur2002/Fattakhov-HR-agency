@@ -289,8 +289,10 @@ export async function markThreadRead(
 /** Счётчик для значка в навигации. */
 export async function countUnread(viewer: Viewer): Promise<number> {
   const store = await getStore();
+  // Студенту к непрочитанному по откликам добавляется переписка с агентством
+  const agency = viewer.role === 'STUDENT' ? await store.agencyMessages.unreadFor(viewer.profileId, 'STUDENT') : 0;
   const ids = (await applicationsFor(viewer)).map((a) => a.id);
-  if (ids.length === 0) return 0;
+  if (ids.length === 0) return agency;
   const unread = await store.messages.unreadFor(ids, viewer.role);
-  return Object.values(unread).reduce((sum, n) => sum + n, 0);
+  return agency + Object.values(unread).reduce((sum, n) => sum + n, 0);
 }

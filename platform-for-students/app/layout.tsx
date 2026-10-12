@@ -50,15 +50,16 @@ export const viewport: Viewport = {
  * вписан прямо в серверную разметку, а не рождён клиентским компонентом,
  * чтобы React 19 не помечал исполняемый <script> предупреждением при
  * реконсиляции. Ключ "theme" обязан совпадать со STORAGE_KEY в
- * components/theme/ThemeProvider.tsx. По умолчанию — тёмная: это
- * единственная тема, которая существовала до переключателя, и первый
- * визит без сохранённого выбора не должен ничего менять для тех, кто
- * уже привык к тёмному полотну.
+ * components/theme/ThemeProvider.tsx. По умолчанию — «как в системе», ровно как
+ * у ThemeProvider (readStoredTheme): раньше скрипт ставил тёмную, а после
+ * загрузки провайдер пересчитывал в системную — на светлом телефоне страница
+ * секунды стояла чёрной и вспыхивала светлой. Значения по умолчанию в двух местах
+ * обязаны совпадать.
  */
 const NO_FLASH_SCRIPT = `
 (function () {
   try {
-    var theme = localStorage.getItem("theme") || "dark";
+    var theme = localStorage.getItem("theme") || "system";
     var dark = theme === "dark" ||
       (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
     var root = document.documentElement;
@@ -67,6 +68,14 @@ const NO_FLASH_SCRIPT = `
   } catch (e) {}
 })();
 `;
+
+/**
+ * Без JavaScript блоки, которые появляются анимацией (Stagger, Reveal, FadeIn),
+ * остались бы невидимыми: их начальное состояние — прозрачность 0 прямо в разметке.
+ * Показываем их как есть; приложение целиком без скриптов не работает, об этом
+ * честно сказано в плашке ниже.
+ */
+const NO_SCRIPT_STYLE = `[data-reveal]{opacity:1!important;transform:none!important;filter:none!important}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -80,8 +89,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preload" href="/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
+        <noscript>
+          <style dangerouslySetInnerHTML={{ __html: NO_SCRIPT_STYLE }} />
+        </noscript>
       </head>
       <body className="grain min-h-dvh bg-ink text-paper" suppressHydrationWarning>
+        <noscript>
+          <p className="relative z-[80] bg-graphite-900 px-4 py-3 text-center text-sm text-paper">
+            Платформе нужен JavaScript: включите его в настройках браузера, чтобы войти и откликаться на вакансии.
+          </p>
+        </noscript>
         <ThemeProvider>
           <Aurora />
           <ToastProvider>

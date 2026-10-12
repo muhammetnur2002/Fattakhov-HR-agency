@@ -1,11 +1,11 @@
-import Link from "next/link";
-
 import { ApplicationList } from "@/components/candidates/application-list";
 import { CandidateFilters } from "@/components/candidates/candidate-filters";
 import { LoadMore } from "@/components/shell/load-more";
-import { Button } from "@/components/ui/button";
+import { ListRegion } from "@/components/shell/list-pending";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { requireClientActor } from "@/lib/auth/session";
 import { listApplications } from "@/lib/services/applications";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Кандидаты" };
 
@@ -69,7 +69,7 @@ export default async function ClientCandidatesPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Кандидаты</h1>
+        <PageTitle>Кандидаты</PageTitle>
         <p className="text-sm text-muted-foreground">
           {applications.length === 0
             ? "Кандидатов пока нет"
@@ -80,36 +80,30 @@ export default async function ClientCandidatesPage({
         </p>
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          asChild
-          variant={awaitingOnly ? "outline" : "secondary"}
-          size="sm"
-        >
-          <Link href={withQuery({})}>Все</Link>
-        </Button>
-        <Button
-          asChild
-          variant={awaitingOnly ? "secondary" : "outline"}
-          size="sm"
-        >
-          <Link href={withQuery({ filter: "awaiting" })}>Ждут решения</Link>
-        </Button>
-      </div>
+      <FilterChipGroup label="Какие кандидаты">
+        <FilterChip href={withQuery({})} selected={!awaitingOnly}>
+          Все
+        </FilterChip>
+        <FilterChip href={withQuery({ filter: "awaiting" })} selected={awaitingOnly}>
+          Ждут решения
+        </FilterChip>
+      </FilterChipGroup>
 
       <CandidateFilters />
 
-      <ApplicationList
-        applications={applications}
-        hrefBase="/applications"
-        emptyText={
-          q || sf || st
-            ? "Ничего не нашлось по этим условиям."
-            : awaitingOnly
-              ? "Никто не ждёт вашего ответа — всё разобрано."
-              : "Как только агентство представит первого кандидата, он появится здесь."
-        }
-      />
+      <ListRegion>
+        <ApplicationList
+          applications={applications}
+          hrefBase="/applications"
+          emptyText={
+            q || sf || st
+              ? "Ничего не нашлось по этим условиям."
+              : awaitingOnly
+                ? "Никто не ждёт вашего ответа — всё разобрано."
+                : "Как только агентство представит первого кандидата, он появится здесь."
+          }
+        />
+      </ListRegion>
 
       {hasMore && (
         <LoadMore

@@ -2,20 +2,18 @@
 
 import { Check } from "lucide-react";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { forgotPasswordAction, type PasswordState } from "@/app/actions/passwords";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Отправляем…" : "Прислать ссылку"}
-    </Button>
+    <SubmitButtonBase className="w-full" pendingLabel="Отправляем…">
+      Прислать ссылку
+    </SubmitButtonBase>
   );
 }
 
@@ -57,11 +55,7 @@ export function ForgotForm() {
         />
       </div>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <SubmitButton />
     </form>

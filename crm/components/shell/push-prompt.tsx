@@ -16,6 +16,7 @@ import {
   subscribedWithKey,
   type PushSupport,
 } from "@/lib/notifications/push-client";
+import { FormMessage } from "@/components/ui/form-message";
 
 type View =
   | { kind: "hidden" }
@@ -183,10 +184,10 @@ export function PushPrompt({
             ? "Кандидаты и решения, комментарии, сообщения, встречи и счета — сразу уведомлением на экран, без захода в почту."
             : view.text}
         </p>
-        {error && <p className="mt-1 text-destructive">{error}</p>}
+        <FormMessage compact error={error} className="mt-1 text-sm" />
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
           {view.kind === "ask" && (
-            <Button type="button" size="sm" onClick={() => void enable()} disabled={pending}>
+            <Button type="button" size="sm" onClick={() => void enable()} loading={pending}>
               {pending ? "Включаем…" : "Разрешить уведомления"}
             </Button>
           )}

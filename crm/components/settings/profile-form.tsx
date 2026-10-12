@@ -1,20 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import { updateProfileAction, type ProfileState } from "@/app/actions/profile";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function Submit() {
-  const { pending } = useFormStatus();
+function Submit({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить"}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel="Сохраняем…">
+      Сохранить
+    </SubmitButtonBase>
   );
 }
 
@@ -23,6 +20,8 @@ function Submit() {
  *
  * Имя и должность задаются один раз при принятии приглашения; опечатку
  * или смену должности исправить было негде.
+ *
+ * Ошибка — у своего поля («Укажите имя и фамилию»), набранное после отказа остаётся.
  */
 export function ProfileForm({
   fullName,
@@ -33,28 +32,22 @@ export function ProfileForm({
   phone: string | null;
   position: string | null;
 }) {
-  const [state, formAction] = useActionState<ProfileState, FormData>(
-    updateProfileAction,
-    {},
-  );
+  const { state, fields, pending, formProps } = useFormAction<ProfileState>(updateProfileAction, {});
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Имя</Label>
+    <form {...formProps} className="space-y-4">
+      <Field label="Имя" error={fields.fullName}>
         <Input id="fullName" name="fullName" defaultValue={fullName} required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="position">Должность</Label>
+      </Field>
+      <Field label="Должность" error={fields.position}>
         <Input
           id="position"
           name="position"
           defaultValue={position ?? ""}
           placeholder="Показывается собеседникам в кабинете"
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="phone">Телефон</Label>
+      </Field>
+      <Field label="Телефон" error={fields.phone}>
         <Input
           id="phone"
           name="phone"
@@ -62,20 +55,11 @@ export function ProfileForm({
           defaultValue={phone ?? ""}
           placeholder="+7 999 123-45-67"
         />
-      </div>
+      </Field>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
-      <Submit />
+      <Submit loading={pending} />
     </form>
   );
 }

@@ -17,6 +17,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getActiveAgreement } from "@/lib/services/agreements";
 import { fetchStudentsSummary, hasStudentsContact } from "@/lib/students-service";
 import { StudentsTabs } from "./students-tabs";
+import { PageTitle } from "@/components/ui/page-title";
 
 export default async function StudentsLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireClientActor();
@@ -26,21 +27,24 @@ export default async function StudentsLayout({ children }: { children: React.Rea
   // не отдаём (см. studentsContact), поэтому сначала — настоящая почта
   if (actor.clientId && !(await hasStudentsContact(actor.clientId))) {
     return (
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">Сначала — рабочая почта</CardTitle>
-          <CardDescription>
-            На неё студенческая платформа присылает отклики и решения по
-            вакансиям. Укажите почту в настройках и подтвердите её по ссылке
-            из письма — после этого раздел откроется.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/settings">Указать почту</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <PageTitle>Студенческая платформа</PageTitle>
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-base">Сначала — рабочая почта</CardTitle>
+            <CardDescription>
+              На неё студенческая платформа присылает отклики и решения по
+              вакансиям. Укажите почту в настройках и подтвердите её по ссылке
+              из письма — после этого раздел откроется.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/settings">Указать почту</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -57,7 +61,7 @@ export default async function StudentsLayout({ children }: { children: React.Rea
   const nudge = nudgeFor(contracted, summary);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <StudentsIntro contracted={contracted} />
       {nudge !== "none" && (
         <StudentsNudge kind={nudge} applications={summary?.applications ?? 0} telegramHref={TELEGRAM_HREF} />

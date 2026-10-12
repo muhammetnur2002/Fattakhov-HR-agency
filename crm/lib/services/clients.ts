@@ -1,5 +1,6 @@
 import {
   assertCanDo,
+  isAgency,
   CLIENT_ROLES,
   isClient,
   visibleVacanciesFilter,
@@ -8,7 +9,7 @@ import {
 import { hashPassword } from "@/lib/auth/password";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import { decimalToNumber } from "@/lib/services/agreements";
-import { InviteError } from "@/lib/services/invitations";
+import { InviteError, inviteTokenForDisplay } from "@/lib/services/invitations";
 import { presenceFor } from "@/lib/services/messages";
 import type { ClientInput } from "@/lib/validation/client";
 import { recordAuthEvent } from "@/lib/services/auth-events";
@@ -70,14 +71,19 @@ export async function listClientTeam(clientId: string, viewer?: Actor) {
     prisma.invitation.findMany({
       where: { clientId, acceptedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, email: true, role: true, token: true, expiresAt: true },
+      select: { id: true, email: true, role: true, token: true, tokenEnc: true, expiresAt: true },
     }),
   ]);
 
   return {
     // Без смотрящего статус не отдаётся вовсе: presence: null
     users: users.map((user) => withPresence(viewer, user)),
-    invitations,
+    invitations: await Promise.all(
+      invitations.map(async ({ tokenEnc, ...invitation }) => ({
+        ...invitation,
+        token: await inviteTokenForDisplay({ id: invitation.id, token: invitation.token, tokenEnc }),
+      })),
+    ),
   };
 }
 
@@ -185,6 +191,10 @@ export async function listClients(actor: Actor, filters: { query?: string } = {}
  * организации — вызывающий обязан превратить это в 404 (BR-28).
  */
 export async function getClient(actor: Actor, clientId: string) {
+  // Клиентская роль видит только свою компанию; чужая карточка (реквизиты, ИНН,
+  // договоры) недоступна даже при совпадении организации (BR-28)
+  if (!isAgency(actor) && actor.clientId !== clientId) return null;
+
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId: actor.organizationId },
     select: {
@@ -297,6 +307,8 @@ export async function updateClient(
   clientId: string,
   input: ClientInput,
 ) {
+  assertCanDo(actor, "client.manage", { clientId });
+
   const existing = await prisma.client.findFirst({
     where: { id: clientId, organizationId: actor.organizationId },
     select: { id: true },

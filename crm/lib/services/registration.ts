@@ -5,7 +5,12 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { maskPhone, normalizeRuPhone, PhoneFormatError } from "@/lib/auth/phone";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import { REGISTRATION_CONSENT_VERSION } from "@/lib/legal/registration-consent";
-import { mailLimitMessage, reserveMail } from "@/lib/security/mail-limit";
+import {
+  mailLimitMessage,
+  reserveMail,
+  reserveStrangerMail,
+  STRANGER_MAIL_MESSAGE,
+} from "@/lib/security/mail-limit";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { isDeliverableEmail } from "@/lib/notifications/deliverable";
 import { brandedEmail } from "@/lib/notifications/email-brand";
@@ -79,6 +84,11 @@ export async function requestCompanyRegistration(params: {
     throw new RegistrationError(
       "Этот email уже зарегистрирован. Войдите или восстановите пароль.",
     );
+  }
+
+  // Потолок по IP и за сутки: код уходит на любой названный адрес
+  if (!(await reserveStrangerMail("register", params.ip))) {
+    throw new RegistrationError(STRANGER_MAIL_MESSAGE);
   }
 
   await prisma.pendingClientRegistration.updateMany({

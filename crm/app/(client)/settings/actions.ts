@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
+import type { FormState as FormStateBase } from "@/lib/form-state";
 import {
   authorize,
   authorizeOrThrow,
@@ -29,9 +30,10 @@ import {
   InviteError,
 } from "@/lib/services/invitations";
 import { inviteUserSchema } from "@/lib/validation/client";
+import { invalidForm } from "@/lib/validation/form-errors";
 import { workEmailSchema } from "@/lib/validation/registration";
 
-export type FormState = { error?: string; ok?: string };
+export type FormState = FormStateBase;
 
 /**
  * Потолок на команду клиента: активные пользователи плюс ещё не принятые
@@ -67,9 +69,7 @@ export async function inviteTeammateAction(
   const actor = await requireClientActor();
 
   const parsed = inviteUserSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   if (!actor.clientId) return { error: "Недостаточно прав" };
 
@@ -98,8 +98,9 @@ export async function inviteTeammateAction(
     if (error instanceof AccessDeniedError) {
       return { error: "Недостаточно прав" };
     }
+    // Адрес занят или уже приглашён — у поля почты, а не общей строкой
     if (error instanceof InviteError) {
-      return { error: error.message };
+      return { fields: { email: error.message } };
     }
     throw error;
   }
@@ -199,8 +200,9 @@ export async function requestEmailAction(
   const actor = await requireClientActor();
 
   const parsed = workEmailSchema.safeParse(formData.get("email"));
+  // Схема одного значения: ошибка относится к полю почты, а не к форме
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте адрес почты" };
+    return { fields: { email: parsed.error.issues[0]?.message ?? "Проверьте адрес почты" } };
   }
 
   const rate = await guardRate("emailConfirm", actor.id);
@@ -215,7 +217,10 @@ export async function requestEmailAction(
     revalidatePath("/settings");
     return { ok: `Ссылка отправлена на ${sentTo} — откройте письмо и подтвердите адрес` };
   } catch (error) {
-    if (error instanceof EmailConfirmError) return { error: error.message };
+    // «Адрес занят» — про поле почты и стоит под ним; остальное — общее сообщение формы
+    if (error instanceof EmailConfirmError) {
+      return error.field ? { fields: { [error.field]: error.message } } : { error: error.message };
+    }
     throw error;
   }
 }

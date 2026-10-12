@@ -1,6 +1,7 @@
 import { createTransport, type Transporter } from "nodemailer";
 
 import { isDeliverableEmail } from "./deliverable";
+import { secureSmtpUrl } from "./smtp-url";
 import {
   LoggingEmailTransport,
   LoggingVkTransport,
@@ -21,7 +22,7 @@ class SmtpEmailTransport implements EmailTransport {
   private transporter: Transporter;
 
   constructor(url: string, private readonly from: string) {
-    this.transporter = createTransport(url);
+    this.transporter = createTransport(secureSmtpUrl(url));
   }
 
   async send(message: EmailMessage): Promise<void> {

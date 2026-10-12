@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
@@ -9,29 +8,48 @@ import {
   setLeadStatusAction,
   type LeadActionState,
 } from "./actions";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
+
+/**
+ * Роль кнопки в ряду.
+ *
+ * - `primary` — следующий шаг, ради которого открыта заявка: слева, залита
+ *   цветом;
+ * - `secondary` — отказ или обратный ход («Спам», «Не сложилось»): тихая,
+ *   с рамкой, отодвинута к правому краю карточки — подальше от основной,
+ *   чтобы не нажать её вместо «Взять в работу» по привычке или промахом;
+ * - `single` — единственная кнопка («Вернуть в новые»): слева, без заливки.
+ *
+ * Раньше «Взять в работу» и «Спам» были одного размера и стояли вплотную
+ * (gap-2), а «Спам» ещё и прозрачный — выглядел как подпись, а не кнопка.
+ * На телефоне — каждая на всю ширину, основная первой.
+ *
+ * Размер у всех `sm`, как у кнопок кабинета везде: выше кнопки не делаем — решение
+ * заказчицы про высоту ≈31px на телефоне (правило 2.4em в globals.css). Роль
+ * различают заливка, порядок и положение, а не размер.
+ */
+const TONES = {
+  primary: { variant: "default", size: "sm", className: "w-full sm:w-auto" },
+  secondary: { variant: "outline", size: "sm", className: "w-full sm:ml-auto sm:w-auto" },
+  single: { variant: "outline", size: "sm", className: "w-full sm:w-auto" },
+} as const;
 
 function StatusButton({
   status,
   label,
-  variant = "outline",
+  tone,
 }: {
   status: string;
   label: string;
-  variant?: "default" | "outline" | "ghost";
+  tone: keyof typeof TONES;
 }) {
-  const { pending } = useFormStatus();
+  // Форма одна на все статусы: блокируются все кнопки, а индикатор — только
+  // у нажатой (SubmitButton сверяет имя и значение с данными формы)
+  const { variant, size, className } = TONES[tone];
   return (
-    <Button
-      type="submit"
-      name="status"
-      value={status}
-      size="sm"
-      variant={variant}
-      disabled={pending}
-    >
+    <SubmitButton name="status" value={status} size={size} variant={variant} className={className}>
       {label}
-    </Button>
+    </SubmitButton>
   );
 }
 
@@ -60,25 +78,25 @@ export function LeadActions({
   }, [state]);
 
   return (
-    <form action={action} className="flex flex-wrap gap-2">
+    <form action={action} className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <input type="hidden" name="leadId" value={leadId} />
 
       {status === "NEW" && (
         <>
-          <StatusButton status="IN_PROGRESS" label="Взять в работу" variant="default" />
-          <StatusButton status="SPAM" label="Спам" variant="ghost" />
+          <StatusButton status="IN_PROGRESS" label="Взять в работу" tone="primary" />
+          <StatusButton status="SPAM" label="Спам" tone="secondary" />
         </>
       )}
 
       {status === "IN_PROGRESS" && (
         <>
-          <StatusButton status="CONVERTED" label="Стал клиентом" variant="default" />
-          <StatusButton status="REJECTED" label="Не сложилось" />
+          <StatusButton status="CONVERTED" label="Стал клиентом" tone="primary" />
+          <StatusButton status="REJECTED" label="Не сложилось" tone="secondary" />
         </>
       )}
 
       {status !== "NEW" && status !== "IN_PROGRESS" && (
-        <StatusButton status="NEW" label="Вернуть в новые" variant="ghost" />
+        <StatusButton status="NEW" label="Вернуть в новые" tone="single" />
       )}
     </form>
   );

@@ -6,6 +6,7 @@ import { useRef } from "react";
 
 import { useScrollActiveIntoView } from "@/lib/hooks/use-scroll-active-into-view";
 import { cn } from "@/lib/utils";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /** Разделы студенческой платформы внутри CRM: вакансии, отклики, кандидаты, сообщения. */
 export function StudentsTabs({
@@ -24,14 +25,14 @@ export function StudentsTabs({
   const onMessages = pathname.startsWith("/students/messages");
   const tabs = [
     // Вакансии — сам список, форма новой вакансии и правка (/students/new, /students/<id>)
-    { href: "/students", label: "Вакансии", badge: 0, active: !onApplications && !onCandidates && !onMessages },
-    { href: "/students/applications", label: "Отклики", badge: newApplications, active: onApplications },
-    { href: "/students/candidates", label: "Кандидаты", badge: 0, active: onCandidates },
-    { href: "/students/messages", label: "Сообщения", badge: unreadMessages, active: onMessages },
+    { href: "/students", label: "Вакансии", badge: 0, badgeLabel: "", active: !onApplications && !onCandidates && !onMessages },
+    { href: "/students/applications", label: "Отклики", badge: newApplications, badgeLabel: "новых", active: onApplications },
+    { href: "/students/candidates", label: "Кандидаты", badge: 0, badgeLabel: "", active: onCandidates },
+    { href: "/students/messages", label: "Сообщения", badge: unreadMessages, badgeLabel: "непрочитанных", active: onMessages },
   ];
 
   return (
-    <nav ref={navRef} className="pill-scroller flex gap-2">
+    <nav ref={navRef} aria-label="Студенческая платформа" className="pill-scroller flex gap-2">
       {tabs.map((tab) => (
         <Link
           key={tab.href}
@@ -46,14 +47,11 @@ export function StudentsTabs({
         >
           {tab.label}
           {tab.badge > 0 && (
-            <span
-              className={cn(
-                "grid min-w-[18px] place-items-center rounded-full px-1 text-[10.5px] font-semibold leading-[18px]",
-                tab.active ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground",
-              )}
-            >
-              {tab.badge > 9 ? "9+" : tab.badge}
-            </span>
+            <CountBadge
+              count={tab.badge}
+              label={tab.badgeLabel}
+              tone={tab.active ? "onPrimary" : "primary"}
+            />
           )}
         </Link>
       ))}

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 
 import { requireActor } from "@/lib/auth/session";
+import type { FormState } from "@/lib/form-state";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
 import {
   changePassword,
@@ -15,8 +16,9 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "@/lib/validation/password";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type PasswordState = { error?: string; ok?: string; sent?: boolean };
+export type PasswordState = FormState & { sent?: boolean };
 
 function formToObject(formData: FormData): Record<string, unknown> {
   return Object.fromEntries(
@@ -42,9 +44,7 @@ export async function changePasswordAction(
   if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
 
   const parsed = changePasswordSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     await changePassword({
@@ -53,7 +53,10 @@ export async function changePasswordAction(
       newPassword: parsed.data.newPassword,
     });
   } catch (error) {
-    if (error instanceof PasswordError) return { error: error.message };
+    // Неверный текущий пароль и слабый новый — разные поля: сообщение встаёт у своего
+    if (error instanceof PasswordError) {
+      return error.field ? { fields: { [error.field]: error.message } } : { error: error.message };
+    }
     throw error;
   }
 
@@ -97,9 +100,7 @@ export async function resetPasswordAction(
   if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
 
   const parsed = resetPasswordSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     await resetPassword({

@@ -1,13 +1,14 @@
 import { HeroOffer } from "./hero-offer";
 import { HeroVideo } from "./hero-video";
 import { Button } from "@/components/ui/button";
+import { SITE_CONTAINER, SPLIT_MAIN_FROM_XL } from "./layout";
 
 /**
  * Первый экран.
  *
- * Композиция несимметричная: текст слева, фирменный знак справа крупно
- * на сланце. Центрированный заголовок на тёмном фоне читается как
- * презентация, а не как страница услуги.
+ * Композиция несимметричная: заголовок на всю ширину контейнера, под ним
+ * абзац с кнопками слева и ценник справа. Центрированный заголовок на
+ * тёмном фоне читается как презентация, а не как страница услуги.
  *
  * Внутри ровно четыре текстовых элемента: надзаголовок, заголовок,
  * подзаголовок, кнопки. Ни строчки о сроках, ни полосы с логотипами,
@@ -17,14 +18,15 @@ import { Button } from "@/components/ui/button";
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-brand-slate text-white">
-      {/* Видео вместо статичной картинки на широких экранах: тот же кроп,
-          то же место. На узких и при reduced-motion — кадр постера: см.
-          комментарий в HeroVideo про пропорции и предпочтение движения. */}
-      <HeroVideo />
+      {/* Статичный кадр лежит всегда, ролик ложится поверх него на широких экранах:
+          тот же кроп, то же место. Без ролика (телефон, reduced-motion) остаётся кадр;
+          до загрузки и запуска ролика на компьютере вместо чёрного фона тоже он.
+          Условия показа ролика — комментарий в HeroVideo. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-speckle.jpg')] bg-cover bg-center md:hidden motion-reduce:md:block"
+        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-speckle.jpg')] bg-cover bg-center"
       />
+      <HeroVideo />
       {/* Плотнее, чем было у статичной картинки: собственные куб и надпись
           в ролике иначе читаются вторым логотипом рядом с ценником и
           спорят с ним за внимание — ролику место фоновой текстуры, а не
@@ -34,48 +36,72 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(8,12,16,0.94)_0%,rgba(8,12,16,0.85)_46%,rgba(8,12,16,0.72)_100%)]"
       />
 
-      <div className="relative mx-auto grid max-w-[2200px] items-center gap-10 px-5 md:px-8 xl:px-14 py-14 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12 lg:py-28">
-        <div>
-          <div className="text-sm font-medium tracking-[0.14em] text-white/65 uppercase">
-            Внешняя функция найма
-          </div>
-
-          {/* Переносы отданы text-balance. Жёсткий <br> тут стоял и делал
-              хуже: он фиксировал первую строку, браузер добивал остаток
-              по ширине, и последним словом на отдельной строке висело
-              «нанимать.» Балансировщик распределяет ровнее сам */}
-          <h1 className="mt-5 text-4xl leading-[1.08] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl lg:text-[4.25rem] xl:text-[5rem] 2xl:text-[6rem]">
-            Отдел найма, который не нужно нанимать.
-          </h1>
-
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 md:text-xl xl:max-w-2xl xl:text-2xl">
-            Выделенная команда из трёх человек, 30+ источников поиска
-            и прозрачная воронка. Без найма, адаптации и постоянных расходов.
-          </p>
-
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="secondary">
-              <a href="#diagnostic">Получить план найма</a>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-            >
-              <a href="#pricing">Как устроена подписка</a>
-            </Button>
-          </div>
+      {/* Отступы героя — тот же шаг, что у раздела (`Section`, `py-8 md:py-10`), а не исключение
+          из него; тест сверяет обе строки. Раньше было `lg:py-14` (70px сверху и снизу), и кнопка
+          не влезала над сгибом на 1280x720 */}
+      <div className={`relative ${SITE_CONTAINER} py-8 md:py-10`}>
+        <div className="text-sm font-medium tracking-[0.14em] text-white/65 uppercase">
+          Внешняя функция найма
         </div>
 
-        {/*
-          Справа ценник, а не фирменный знак. Знак красив, но на решение
-          читать дальше не влияет, а разница в деньгах влияет. На узких
-          экранах он идёт под текстом: там это первое, что видно после
-          заголовка, и это правильный порядок.
-        */}
-        <div className="mt-10 lg:mt-0">
-          <HeroOffer />
+        {/* Заголовок — на всю ширину контейнера, а не в левой колонке. В колонке шириной 556px
+            (на 1280 её сжимал ценник справа) он занимал пять строк по 108px, то есть 540px, и
+            кнопки уезжали за сгиб на 337px. На всю ширину те же 100px — две строки, 216px.
+            Размер акцента и абзаца под ним не менялся (абзац — 30px с 1280, как было): сменилась
+            компоновка, а не шкала. Цена за 30px: на 1280 и 1366 абзац в колонке 556–642px идёт в
+            четыре строки, и кнопки заканчиваются на 693px при окне 720 (запас до цели «высота
+            минус 24» — 3px); с 1440 — три строки, кнопки на 644px.
+
+            Переносы отданы text-balance. Жёсткий <br> тут стоял и делал хуже: он фиксировал
+            первую строку, браузер добивал остаток по ширине, и последним словом на отдельной
+            строке висело «нанимать.» Балансировщик распределяет ровнее сам */}
+        <h1 className="mt-4 text-7xl leading-[1.08] font-semibold tracking-tight text-balance">
+          Отдел найма, который не нужно нанимать.
+        </h1>
+
+        {/* Под заголовком: слева абзац и кнопки, справа ценник. Кнопки стоят выше ценника, а не
+            под ним, поэтому видны целиком, даже когда ценник уходит за нижний край окна */}
+        <div className={`${SPLIT_MAIN_FROM_XL} mt-6 xl:items-start`}>
+          <div>
+            <p className="max-w-xl text-lg leading-relaxed text-white/70 md:text-xl xl:max-w-2xl xl:text-2xl">
+              Выделенная команда из трёх человек, 30+ источников поиска
+              и прозрачная воронка. Без найма, адаптации и постоянных расходов.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="secondary">
+                <a href="#diagnostic">Получить план найма</a>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              >
+                <a href="#pricing">Как устроена подписка</a>
+              </Button>
+            </div>
+          </div>
+
+          {/*
+            Справа ценник, а не фирменный знак. Знак красив, но на решение
+            читать дальше не влияет, а разница в деньгах влияет. На узких
+            экранах он идёт под текстом: там это первое, что видно после
+            заголовка, и это правильный порядок.
+
+            Обёртка обязательна: у самой карточки `overflow-hidden`, а у элемента сетки с таким
+            значением автоматический минимум ширины — ноль, и без обёртки колонка сжимается по
+            пропорции 1.15/0.85 и срезает «₽» у цены в 100px (на 1280 колонка 463px, а карточке
+            нужно 534; замер 12.10.2026: «₽» выходит за содержимое на 70px, срез 41px). У обёртки
+            значение обычное, её минимум — ширина содержимого; `xl:min-w-min` называет это
+            явно, при обёртке без него ничего не меняется. До 1440 правая колонка поэтому чуть
+            шире пропорции — ровно на ширину цены. Колонки — с 1280 (`SPLIT_MAIN_FROM_XL`), ниже
+            ценник идёт под кнопками не шире 720px. Сторож — `site-first-screen.spec.ts`: он
+            меряет сам знак «₽», а не число рядом с ним.
+          */}
+          <div className="max-w-xl xl:max-w-none xl:min-w-min">
+            <HeroOffer />
+          </div>
         </div>
       </div>
     </section>

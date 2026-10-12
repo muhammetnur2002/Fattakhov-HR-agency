@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CandidateProfile } from "@/components/applications/candidate-profile";
@@ -11,7 +10,6 @@ import {
 } from "@/components/applications/present-form";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -35,6 +33,8 @@ import { findValidDisclosure } from "@/lib/services/disclosure-consent";
 import { InterviewSection } from "@/components/interviews/interview-section";
 import { listApplicationComments } from "@/lib/services/comments";
 import { listApplicationInterviews } from "@/lib/services/interviews";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export async function generateMetadata({
   params,
@@ -70,6 +70,8 @@ export default async function AgencyApplicationPage({
 
   const comments = await listApplicationComments(actor, application.id);
   const interviews = await listApplicationInterviews(actor, application.id);
+  // Часы спрашиваем один раз на страницу — от них зависит, когда карточка встречи просит оценку
+  const now = new Date();
 
   // На встречу зовут и людей клиента, и команду агентства
   const interviewParticipants = await prisma.user.findMany({
@@ -107,16 +109,14 @@ export default async function AgencyApplicationPage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href={`/a/vacancies/${application.vacancy.id}`}>
-            ← №{application.vacancy.number} {application.vacancy.title}
-          </Link>
-        </Button>
+        <BackLink href={`/a/vacancies/${application.vacancy.id}`}>
+          №{application.vacancy.number} {application.vacancy.title}
+        </BackLink>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             {application.candidate.fullName}
-          </h1>
+          </PageTitle>
           <Badge>{application.stage.name}</Badge>
           {closed && (
             <Badge variant="secondary">
@@ -351,6 +351,7 @@ export default async function AgencyApplicationPage({
           <InterviewSection
             applicationId={application.id}
             canManage={canDo(actor, "interview.proposeSlots")}
+            now={now.getTime()}
             participants={interviewParticipants}
             interviews={interviews.map((i) => ({
               id: i.id,

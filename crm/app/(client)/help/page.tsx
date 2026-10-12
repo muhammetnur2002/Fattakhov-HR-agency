@@ -4,6 +4,7 @@ import { GuideList } from "@/components/help/guide-list";
 import { requireClientActor } from "@/lib/auth/session";
 import { guideFor } from "@/lib/help/guide";
 import { ROLE_LABELS } from "@/lib/labels";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata: Metadata = { title: "Помощь" };
 
@@ -22,9 +23,9 @@ export default async function ClientHelpPage() {
   const guide = guideFor(actor.role);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Помощь</h1>
+        <PageTitle>Помощь</PageTitle>
         <p className="mt-1 max-w-3xl text-muted-foreground">{guide.intro}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Показано для роли «{ROLE_LABELS[actor.role]}».

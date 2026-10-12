@@ -10,11 +10,16 @@ import {
 } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { CountBadge } from "@/components/ui/count-badge";
+
+/** Кольцо фокуса внутри панели: наружное срезалось бы краем прокручиваемого списка. */
+const FOCUS_INSET =
+  "focus-visible:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset";
 
 export type BellNotification = {
   id: string;
@@ -30,6 +35,14 @@ export type BellNotification = {
  *
  * Показывает и прочитанные тоже: список нужен не только чтобы отметить
  * новое, но и чтобы вспомнить, что было вчера. Непрочитанные выделены.
+ *
+ * Выпадающая панель (Popover), а не меню (DropdownMenu). В меню Radix
+ * по Tab не ходят: он перехватывает клавишу, а стрелками доходит только до
+ * настоящих пунктов меню (menuitem). Здесь же внутри ссылки, а не пункты, —
+ * с клавиатуры до уведомлений нельзя было добраться вовсе (проверка
+ * 11.10.2026). В панели обычный порядок Tab: фокус уходит внутрь при
+ * открытии, Tab идёт по уведомлениям, Enter открывает, Esc закрывает и
+ * возвращает фокус на колокольчик.
  */
 export function NotificationBell({
   notifications,
@@ -42,9 +55,13 @@ export function NotificationBell({
 }) {
   const [items, setItems] = useState(notifications);
   const [unread, setUnread] = useState(unreadCount);
+  const [open, setOpen] = useState(false);
+  // Переход по ссылке уведомления закрывает панель: Popover сам этого не знает
+  const close = () => setOpen(false);
 
-  async function handleOpen(open: boolean) {
-    if (!open) return;
+  async function handleOpen(next: boolean) {
+    setOpen(next);
+    if (!next) return;
     const fresh = items.filter((n) => !n.isRead).map((n) => n.id);
     if (fresh.length === 0) return;
 
@@ -56,8 +73,8 @@ export function NotificationBell({
   }
 
   return (
-    <DropdownMenu onOpenChange={handleOpen}>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -66,18 +83,22 @@ export function NotificationBell({
         >
           <Bell className="size-4" />
           {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-medium text-white">
-              {unread > 9 ? "9+" : unread}
-            </span>
+            <CountBadge
+              count={unread}
+              tone="alert"
+              className="absolute -right-1 -top-1"
+            />
           )}
         </Button>
-      </DropdownMenuTrigger>
+      </PopoverTrigger>
 
       {/* w-96 фиксированный вылезал за край экрана на телефонах уже 375px —
-          ограничиваем шириной вьюпорта с отступами */}
-      <DropdownMenuContent
+          ограничиваем шириной вьюпорта с отступами. gap-0 и p-0: у заготовки
+          Popover свои отступы, а разметка списка рассчитана на край в край */}
+      <PopoverContent
         align="end"
-        className="w-[calc(100vw-2rem)] max-w-96 p-0"
+        aria-label="Уведомления"
+        className="flex max-h-(--radix-popover-content-available-height) w-[calc(100vw-2rem)] max-w-96 flex-col gap-0 overflow-hidden p-0"
       >
         <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-medium">Уведомления</span>
@@ -96,15 +117,17 @@ export function NotificationBell({
           )}
         </div>
 
+        {/* Панель ограничена доступной высотой (низкий экран, телефон в горизонтали); шапка и
+            ссылка «Все уведомления» остаются на месте, прокручивается только список */}
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             Пока ничего не произошло.
           </p>
         ) : (
-          <ul className="max-h-96 overflow-y-auto">
+          <ul className="max-h-96 min-h-0 flex-1 overflow-y-auto">
             {items.map((n) => (
               <li key={n.id}>
-                <Item notification={n} />
+                <Item notification={n} onNavigate={close} />
               </li>
             ))}
           </ul>
@@ -112,16 +135,26 @@ export function NotificationBell({
 
         <Link
           href={historyHref}
-          className="block border-t px-3 py-2 text-center text-xs text-muted-foreground hover:text-foreground"
+          onClick={close}
+          className={cn(
+            "block border-t px-3 py-2 text-center text-xs text-muted-foreground hover:text-foreground",
+            FOCUS_INSET,
+          )}
         >
           Все уведомления
         </Link>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function Item({ notification }: { notification: BellNotification }) {
+function Item({
+  notification,
+  onNavigate,
+}: {
+  notification: BellNotification;
+  onNavigate: () => void;
+}) {
   const content = (
     <div
       className={cn(
@@ -151,7 +184,7 @@ function Item({ notification }: { notification: BellNotification }) {
   if (!notification.linkUrl) return content;
 
   return (
-    <Link href={notification.linkUrl} className="block hover:bg-muted/70">
+    <Link href={notification.linkUrl} onClick={onNavigate} className={cn("block hover:bg-muted/70", FOCUS_INSET)}>
       {content}
     </Link>
   );

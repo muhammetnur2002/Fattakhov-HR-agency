@@ -6,6 +6,7 @@ import { ROLE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { DirectConversation } from "@/lib/services/messages";
 import type { UserRole } from "@/lib/generated/prisma/enums";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Список личных переписок — компактные строки для боковой колонки
@@ -53,8 +54,8 @@ export function DirectConversationList({
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <div className="truncate text-[13.5px] font-medium">{c.user.fullName}</div>
-              <div className="shrink-0 text-[11px] text-muted-foreground">
+              <div className="truncate text-sm font-medium">{c.user.fullName}</div>
+              <div className="shrink-0 text-xs text-muted-foreground">
                 {formatWhen(c.lastMessage.createdAt)}
               </div>
             </div>
@@ -64,7 +65,7 @@ export function DirectConversationList({
             {c.user.presence && (
               <PresenceLabel
                 lastSeenAt={c.user.presence.lastSeenAt}
-                className="flex text-[11px] text-muted-foreground"
+                className="flex text-xs text-muted-foreground"
               />
             )}
             <div className="mt-0.5 flex items-center gap-1.5">
@@ -74,11 +75,7 @@ export function DirectConversationList({
                 {c.lastMessage.fromMe && <span className="text-foreground">Вы: </span>}
                 {c.lastMessage.body}
               </div>
-              {c.unreadCount > 0 && (
-                <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                  {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                </span>
-              )}
+              {c.unreadCount > 0 && <CountBadge count={c.unreadCount} label="непрочитанных" />}
             </div>
           </div>
         </Link>

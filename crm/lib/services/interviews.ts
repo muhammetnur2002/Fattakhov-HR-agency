@@ -348,7 +348,12 @@ export async function transitionInterview(
   options: { reason?: string } = {},
 ) {
   const interview = await prisma.interview.findFirst({
-    where: { id: interviewId, organizationId: actor.organizationId },
+    // Видимость вакансии, а не только организация: чужую встречу не отменить (BR-28)
+    where: {
+      id: interviewId,
+      organizationId: actor.organizationId,
+      vacancy: visibleVacanciesFilter(actor),
+    },
     select: { id: true, status: true },
   });
   if (!interview) throw new InterviewError("Встреча не найдена");

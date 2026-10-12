@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CandidateProfile } from "@/components/applications/candidate-profile";
@@ -8,7 +7,6 @@ import { UndoRejectButton } from "@/components/applications/undo-reject-button";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -25,6 +23,8 @@ import {
 } from "@/lib/labels";
 import { getApplication } from "@/lib/services/applications";
 import { listApplicationComments } from "@/lib/services/comments";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export async function generateMetadata({
   params,
@@ -76,13 +76,12 @@ export default async function ClientApplicationPage({
         <div className="flex items-start justify-between gap-2">
           {/* min-w-0 + truncate: длинное название вакансии на телефоне
               обрезалось не само, а выталкивало кнопку печати за экран */}
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 min-w-0 print:hidden">
-            <Link href={`/vacancies/${application.vacancy.id}`} className="min-w-0">
-              <span className="truncate">
-                ← №{application.vacancy.number} {application.vacancy.title}
-              </span>
-            </Link>
-          </Button>
+          <BackLink
+            href={`/vacancies/${application.vacancy.id}`}
+            className="print:hidden"
+          >
+            №{application.vacancy.number} {application.vacancy.title}
+          </BackLink>
           {/* Печать/PDF отдаёт только профиль и краткое обоснование —
               внутреннее решение и переписку с рекрутером наружу не отдаём
               (см. print:hidden ниже на этих блоках) */}
@@ -90,9 +89,9 @@ export default async function ClientApplicationPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             {application.candidate.fullName}
-          </h1>
+          </PageTitle>
           <Badge>{application.stage.name}</Badge>
           {closed && (
             <Badge variant="secondary">

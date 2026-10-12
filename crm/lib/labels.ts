@@ -8,6 +8,7 @@
 import type {
   ApplicationOutcome,
   CandidateSource,
+  CandidateStatus,
   ClientDecision,
   ClientStatus,
   EmploymentType,
@@ -227,8 +228,31 @@ export const CANDIDATE_SOURCE_LABELS: Record<CandidateSource, string> = {
   OWN_BASE: "Своя база",
   DIRECT_SEARCH: "Прямой поиск",
   INBOUND: "Входящий отклик",
+  STUDENT_PLATFORM: "Студплатформа",
   OTHER: "Другое",
 };
+
+/** Рабочий статус кандидата в общей базе (ставится вручную). */
+export const CANDIDATE_STATUS_LABELS: Record<CandidateStatus, string> = {
+  NEW: "Новый",
+  IN_PROGRESS: "В работе",
+  WAITING_CLIENT: "Ждёт клиента",
+  RESERVE: "В резерве",
+  HIRED: "Нанят",
+  NOT_RELEVANT: "Не актуален",
+  ON_HOLD: "На паузе",
+};
+
+/** Порядок статусов в списках и фильтрах: от начала работы к её итогу. */
+export const CANDIDATE_STATUS_ORDER: CandidateStatus[] = [
+  "NEW",
+  "IN_PROGRESS",
+  "WAITING_CLIENT",
+  "RESERVE",
+  "ON_HOLD",
+  "HIRED",
+  "NOT_RELEVANT",
+];
 
 export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
   FULL_TIME: "Полная занятость",

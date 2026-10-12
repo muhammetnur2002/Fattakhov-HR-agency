@@ -1,8 +1,10 @@
 import { cookies } from 'next/headers';
+import { after } from 'next/server';
 import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { getStore } from '@/lib/db';
 import { hashToken } from '@/lib/security/crypto';
 import { audit, assertSameOrigin } from '@/lib/security/guards';
+import { noteLoginDevice } from '@/lib/security/login-device';
 import { clientIp, rateLimit } from '@/lib/security/rate-limit';
 import { HOME_BY_ROLE, SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
 import { employerCodeSchema } from '@/lib/validation';
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
     (await cookies()).set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
     await store.accessCodes.markUsed(record.id);
     await store.accounts.touchLogin(account.id);
+    after(() => noteLoginDevice(account, { userAgent: request.headers.get('user-agent'), ip: clientIp(request.headers) }));
     await audit(session, { action: 'auth.employer', entity: 'Employer', entityId: employer?.id ?? null }, request.headers);
 
     return ok({ redirectTo: HOME_BY_ROLE.EMPLOYER, company: session.name });

@@ -253,7 +253,7 @@ export async function searchStaffStudents(
     cmp(b.createdAt, a.createdAt) || cmp(a.id, b.id);
   const byText = (a: string, b: string) => a.localeCompare(b, 'ru');
   if (query.sort === 'seen') {
-    // Скрывшие показ уже с lastSeenAt = null: по порядку они не отличаются от тех, кто не заходил
+    // Не заходившие (lastSeenAt = null) идут в конце
     items.sort((a, b) => cmp(b.lastSeenAt ?? '', a.lastSeenAt ?? '') || byNew(a, b));
   } else if (query.sort === 'name') {
     items.sort((a, b) => byText(a.fullName, b.fullName) || byNew(a, b));

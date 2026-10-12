@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fail, handle } from '@/lib/api';
 import { getStore } from '@/lib/db';
+import { auditFileRead } from '@/lib/file-read-audit';
 import { getSession } from '@/lib/security/guards';
 import { hasServiceAuth } from '@/lib/security/service-auth';
 import { staffCan } from '@/lib/staff-permissions';
@@ -19,6 +20,10 @@ export const dynamic = 'force-dynamic';
  * видит только свои файлы, работодатель — фото и резюме тех, кто
  * откликнулся на его вакансии, администратор — все. Справку об обучении
  * работодатель не видит никогда: учёбу за него проверяет агентство.
+ *
+ * Чтение файла студента сотрудником (администратором) и служебным вызовом CRM пишется в журнал
+ * аудита — lib/file-read-audit.ts: кто, какой вид файла, чей профиль, с какого IP; не чаще
+ * раза в 10 минут на пару «актор — файл».
  */
 export async function GET(
   request: Request,
@@ -49,6 +54,8 @@ export async function GET(
     }
 
     const { body, type } = await readStored(params.kind, params.name);
+    // После успешного чтения, а не до: запрос несуществующего файла следа не оставляет
+    await auditFileRead({ session, service: serviceAccess, kind: params.kind, name: params.name, headers: request.headers });
     return new NextResponse(new Uint8Array(body), {
       headers: {
         'Content-Type': type,

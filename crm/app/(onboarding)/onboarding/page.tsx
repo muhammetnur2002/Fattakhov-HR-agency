@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isDeliverableEmail } from "@/lib/notifications/deliverable";
 import { hasAgreement } from "@/lib/services/agreements";
 import { isPlaceholderName, needsBrief } from "@/lib/services/registration";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Начало работы" };
 
@@ -40,7 +41,7 @@ export default async function OnboardingPage() {
     return (
       <div className="mx-auto max-w-xl space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Несколько вопросов — и начнём</h1>
+          <PageTitle>Несколько вопросов — и начнём</PageTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             О компании и о том, кого ищете. По одному вопросу, займёт пару минут.
           </p>
@@ -67,7 +68,7 @@ export default async function OnboardingPage() {
     return (
       <Card>
         <CardContent className="space-y-2 p-8 text-center">
-          <h1 className="text-2xl font-semibold">Условия ещё не выбраны</h1>
+          <PageTitle>Условия ещё не выбраны</PageTitle>
           <p className="text-sm text-muted-foreground">
             Администратор вашей компании должен выбрать условия сотрудничества.
             После этого кабинет откроется — вы увидите вакансии и кандидатов.
@@ -78,11 +79,11 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">
+        <PageTitle>
           Добро пожаловать{client?.name ? `, ${client.name}` : ""}
-        </h1>
+        </PageTitle>
         <p className="mt-1 text-sm text-muted-foreground">
           Осталось выбрать, как мы работаем и как считается вознаграждение.
           Это займёт минуту, потом можно отправлять первую заявку на подбор.

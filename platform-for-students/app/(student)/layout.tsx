@@ -2,9 +2,11 @@ import { redirect } from 'next/navigation';
 import { History, Inbox, Layers, MessageCircle } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
+import { ConsentRenewalBanner } from '@/components/student/ConsentRenewalBanner';
 import { countUnread } from '@/lib/chat';
 import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
+import { needsConsentRenewal } from '@/lib/legal';
 import { getSessionWithRole, redirectIfRevoked } from '@/lib/security/guards';
 import { listWaitingSwipes } from '@/lib/services';
 
@@ -51,6 +53,9 @@ export default async function StudentLayout({ children }: { children: React.Reac
     <AppShell
       user={{ name: studentName(student), photoUrl: student.photoUrl, subtitle: student.university, href: '/profile' }}
       bell={<NotificationsBell />}
+      // Дали согласие под прежней редакцией — плашка «Обновлён текст согласия», пока не нажмут «Принимаю».
+      // Разделы при этом не блокируются
+      notice={needsConsentRenewal(student) ? <ConsentRenewalBanner /> : undefined}
       nav={[
         // Все вкладки — иконками: с текстом разной длины подложка активной
         // вкладки при переезде между ними меняла ширину, дёргаясь. «Профиль»

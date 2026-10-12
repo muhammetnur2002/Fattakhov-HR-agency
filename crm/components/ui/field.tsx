@@ -1,238 +1,181 @@
 "use client"
 
-import { useMemo } from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import * as React from "react"
+import { CircleAlertIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 
-function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
-  return (
-    <fieldset
-      data-slot="field-set"
-      className={cn(
-        "flex flex-col gap-4 has-[>[data-slot=checkbox-group]]:gap-3 has-[>[data-slot=radio-group]]:gap-3",
-        className
-      )}
-      {...props}
-    />
-  )
+/**
+ * Поле формы: подпись, поле, подсказка и ошибка — одним компонентом.
+ *
+ * Зачем. Ошибка «ИНН — 10 цифр» стояла общей строкой над кнопкой, и человек искал, какое из
+ * восьми полей неверно. Теперь текст ошибки лежит под самим полем, а поле связано с ним для
+ * читалки: `aria-invalid` и `aria-describedby` (подсказка и ошибка по очереди) ставит `Field`,
+ * не разметка формы. Красную рамку рисуют сами `Input`, `Textarea` и `SelectTrigger` по
+ * `aria-invalid` (токен `--destructive`, в покое кольцо, на фокусе обычное).
+ *
+ * Два способа подключить поле:
+ *
+ * ```tsx
+ * <Field label="Почта" error={fields.email} hint="Рабочий адрес">
+ *   <Input name="email" type="email" />          // id, aria-* добавит Field
+ * </Field>
+ *
+ * <Field label="Роль" error={fields.role}>
+ *   {(control) => (                              // поле лежит глубже: Select → SelectTrigger
+ *     <Select name="role"><SelectTrigger {...control} /> … </Select>
+ *   )}
+ * </Field>
+ * ```
+ *
+ * Пара «подпись — поле» — `space-y-2` (правило `form-spacing`); подсказка и ошибка стоят в той
+ * же стопке. Ошибка без `role="alert"` намеренно: после отправки фокус уходит на первое неверное
+ * поле (`useFormAction`) и читалка зачитывает ошибку вместе с полем; десяток объявлений подряд
+ * заглушили бы друг друга. Общая сводка над кнопкой — `FormMessage`, она объявляется.
+ */
+
+export type FieldControl = {
+  id: string
+  "aria-invalid"?: true
+  "aria-describedby"?: string
 }
 
-function FieldLegend({
-  className,
-  variant = "legend",
-  ...props
-}: React.ComponentProps<"legend"> & { variant?: "legend" | "label" }) {
-  return (
-    <legend
-      data-slot="field-legend"
-      data-variant={variant}
-      className={cn(
-        "mb-1.5 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base",
-        className
-      )}
-      {...props}
-    />
-  )
+type ControlProps = {
+  id?: string
+  "aria-invalid"?: boolean | "true" | "false"
+  "aria-describedby"?: string
 }
 
-function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="field-group"
-      className={cn(
-        "group/field-group @container/field-group flex w-full flex-col gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-const fieldVariants = cva(
-  "group/field flex w-full gap-2 data-[invalid=true]:text-destructive",
-  {
-    variants: {
-      orientation: {
-        vertical: "flex-col *:w-full [&>.sr-only]:w-auto",
-        horizontal:
-          "flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
-        responsive:
-          "flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
-      },
-    },
-    defaultVariants: {
-      orientation: "vertical",
-    },
+/**
+ * Атрибуты поля для читалки: `id`, `aria-invalid` при ошибке и `aria-describedby` на подсказку и
+ * ошибку. Нужны там, где `Field` как обёртка не подходит — поля стоят в своей сетке (subgrid
+ * приглашения), а тексты ошибок выводятся отдельно, под рядом. Ошибка при этом — `FieldError`
+ * с `id={`${id}-error`}`, подсказка — `${id}-hint`.
+ */
+function controlProps(
+  id: string,
+  { error, hint, describedBy }: { error?: string | null; hint?: boolean; describedBy?: string } = {},
+): FieldControl {
+  const ids = [describedBy, hint ? `${id}-hint` : undefined, error ? `${id}-error` : undefined]
+    .filter(Boolean)
+    .join(" ")
+  return {
+    id,
+    ...(error ? { "aria-invalid": true as const } : {}),
+    ...(ids ? { "aria-describedby": ids } : {}),
   }
-)
+}
 
 function Field({
+  label,
+  error,
+  hint,
+  id,
+  required,
   className,
-  orientation = "vertical",
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
+  children,
+}: {
+  /** Подпись. Нет — у поля свой `aria-label`. */
+  label?: React.ReactNode
+  /** Текст ошибки под полем. Пусто — поле в порядке. */
+  error?: string | null
+  /** Пояснение под полем: формат, ограничение, что произойдёт. */
+  hint?: React.ReactNode
+  /** Если у поля уже есть свой `id` (на него ссылаются снаружи) — он сохраняется. */
+  id?: string
+  /** Звёздочка у подписи. Читалке она не нужна: «обязательное» ей говорит `required` самого поля. */
+  required?: boolean
+  className?: string
+  children: React.ReactElement<ControlProps> | ((control: FieldControl) => React.ReactNode)
+}) {
+  const generated = React.useId()
+  const own = typeof children === "function" ? undefined : children.props.id
+  const controlId = id ?? own ?? generated
+  const ownDescribedBy =
+    typeof children === "function" ? undefined : children.props["aria-describedby"]
+  const control = controlProps(controlId, { error, hint: Boolean(hint), describedBy: ownDescribedBy })
+  const errorId = error ? `${controlId}-error` : undefined
+  const hintId = hint ? `${controlId}-hint` : undefined
+
   return (
     <div
-      role="group"
       data-slot="field"
-      data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
-      {...props}
-    />
+      data-invalid={error ? "true" : undefined}
+      className={cn("space-y-2", className)}
+    >
+      {label ? (
+        <Label htmlFor={controlId}>
+          {label}
+          {required ? <span aria-hidden="true"> *</span> : null}
+        </Label>
+      ) : null}
+      {typeof children === "function" ? children(control) : React.cloneElement(children, control)}
+      {hint ? (
+        <p id={hintId} data-slot="field-hint" className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
+      {error ? <FieldError id={errorId}>{error}</FieldError> : null}
+    </div>
   )
 }
 
-function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="field-content"
-      className={cn(
-        "group/field-content flex flex-1 flex-col gap-0.5 leading-snug",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function FieldLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof Label>) {
-  return (
-    <Label
-      data-slot="field-label"
-      className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-lg has-[>[data-slot=field]]:border *:data-[slot=field]:p-2.5 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
-        "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="field-label"
-      className={cn(
-        "flex w-fit items-center gap-2 text-sm font-medium group-data-[disabled=true]/field:opacity-50",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
+/** Ошибка под полем: значок «!» и текст, красным (`--destructive`, ≥4,5:1 на карточке). */
+function FieldError({ className, children, ...props }: React.ComponentProps<"p">) {
+  if (!children) return null
   return (
     <p
-      data-slot="field-description"
-      className={cn(
-        "text-left text-sm leading-normal font-normal text-muted-foreground group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5",
-        "last:mt-0 nth-last-2:-mt-1",
-        "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function FieldSeparator({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<"div"> & {
-  children?: React.ReactNode
-}) {
-  return (
-    <div
-      data-slot="field-separator"
-      data-content={!!children}
-      className={cn(
-        "relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2",
-        className
-      )}
-      {...props}
-    >
-      <Separator className="absolute inset-0 top-1/2" />
-      {children && (
-        <span
-          className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
-          data-slot="field-separator-content"
-        >
-          {children}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function FieldError({
-  className,
-  children,
-  errors,
-  ...props
-}: React.ComponentProps<"div"> & {
-  errors?: Array<{ message?: string } | undefined>
-}) {
-  const content = useMemo(() => {
-    if (children) {
-      return children
-    }
-
-    if (!errors?.length) {
-      return null
-    }
-
-    const uniqueErrors = [
-      ...new Map(errors.map((error) => [error?.message, error])).values(),
-    ]
-
-    if (uniqueErrors?.length == 1) {
-      return uniqueErrors[0]?.message
-    }
-
-    return (
-      <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map(
-          (error, index) =>
-            error?.message && <li key={index}>{error.message}</li>
-        )}
-      </ul>
-    )
-  }, [children, errors])
-
-  if (!content) {
-    return null
-  }
-
-  return (
-    <div
-      role="alert"
       data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
+      className={cn("flex items-start gap-1.5 text-sm text-destructive", className)}
       {...props}
     >
-      {content}
-    </div>
+      <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <span>{children}</span>
+    </p>
   )
 }
 
-export {
-  Field,
-  FieldLabel,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLegend,
-  FieldSeparator,
-  FieldSet,
-  FieldContent,
-  FieldTitle,
+/**
+ * Группа полей (галочки, переключатели): легенда сверху, подсказка и ошибка — под всей группой.
+ * Ошибку группы читалка получает через `aria-describedby` самой группы.
+ */
+function FieldSet({
+  legend,
+  error,
+  hint,
+  id,
+  className,
+  children,
+}: {
+  legend: React.ReactNode
+  error?: string | null
+  hint?: React.ReactNode
+  id: string
+  className?: string
+  children: React.ReactNode
+}) {
+  const hintId = hint ? `${id}-hint` : undefined
+  const errorId = error ? `${id}-error` : undefined
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined
+  return (
+    <fieldset
+      id={id}
+      data-slot="field-set"
+      data-invalid={error ? "true" : undefined}
+      aria-describedby={describedBy}
+      className={cn("space-y-3", className)}
+    >
+      <legend className="mb-1 text-sm font-medium">{legend}</legend>
+      {children}
+      {hint ? (
+        <p id={hintId} data-slot="field-hint" className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
+      {error ? <FieldError id={errorId}>{error}</FieldError> : null}
+    </fieldset>
+  )
 }
+
+export { Field, FieldError, FieldSet, controlProps }

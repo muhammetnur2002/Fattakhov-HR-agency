@@ -2,26 +2,35 @@ import Link from "next/link";
 
 import { CompanyActions } from "./company-actions";
 import { ClientList } from "@/components/clients/client-list";
+import { ListRegion } from "@/components/shell/list-pending";
+import { ListToolbar } from "@/components/shell/list-toolbar";
 import { SearchField } from "@/components/shell/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import {
+  countClientsByStatus,
+  filterClientsByStatus,
+  parseClientStatusFilter,
+} from "@/lib/clients/status-filter";
 import { listAccountManagers, listClients } from "@/lib/services/clients";
 import { fetchApprovedCompanies, fetchCrmLinkRequests } from "@/lib/students-service";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Клиенты" };
 
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const actor = await requireAgencyActor();
   authorize(actor, "client.view");
 
-  const { q } = await searchParams;
+  const { q, status } = await searchParams;
   const canManage = canDo(actor, "client.manage");
   const [clients, linkRequests, approvedCompanies, managers] = await Promise.all([
     listClients(actor, { query: q }),
@@ -31,6 +40,20 @@ export default async function ClientsPage({
     canManage ? fetchApprovedCompanies().catch(() => []) : Promise.resolve([]),
     canManage ? listAccountManagers(actor) : Promise.resolve([]),
   ]);
+
+  // Фильтр по статусу: «Лиды» — завели, договор не подписан; «Активные» —
+  // работаем по договору. Паузы и архив видны только в «Все». Числа на
+  // кнопках считаются по тому же поиску q, что и список, чтобы сумма сходилась
+  const statusFilter = parseClientStatusFilter(status);
+  const counts = countClientsByStatus(clients);
+  const shownClients = filterClientsByStatus(clients, statusFilter);
+  const withStatus = (value?: "lead" | "active") => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (value) params.set("status", value);
+    const qs = params.toString();
+    return qs ? `/a/clients?${qs}` : "/a/clients";
+  };
 
   // Служебный вызов не умеет фильтровать по имени — компаний тут обычно
   // немного, поэтому фильтруем здесь же, тем же запросом q, что и клиентов
@@ -50,7 +73,7 @@ export default async function ClientsPage({
           теперь кнопки переносятся под заголовок и между собой */}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div>
-          <h1 className="text-2xl font-semibold">Клиенты</h1>
+          <PageTitle>Клиенты</PageTitle>
           <p className="text-sm text-muted-foreground">
             {clients.length === 0
               ? "Пока ни одного клиента"
@@ -78,16 +101,31 @@ export default async function ClientsPage({
         )}
       </div>
 
-      <SearchField placeholder="Название, город, отрасль…" />
+      {/* Лиды и активные клиенты по отдельности; «Все» — как было */}
+      <FilterChipGroup label="Статус клиента">
+        <FilterChip href={withStatus()} selected={!statusFilter}>
+          Все · {counts.all}
+        </FilterChip>
+        <FilterChip href={withStatus("lead")} selected={statusFilter === "LEAD"}>
+          Лиды · {counts.leads}
+        </FilterChip>
+        <FilterChip href={withStatus("active")} selected={statusFilter === "ACTIVE"}>
+          Активные · {counts.active}
+        </FilterChip>
+      </FilterChipGroup>
 
-      <ClientList
-        clients={clients}
-        emptyText={
-          q
-            ? "Ничего не нашлось по этому запросу."
-            : "Заведите первого клиента, чтобы принимать от него заявки на подбор."
-        }
-      />
+      <ListToolbar search={<SearchField placeholder="Название, город, отрасль…" />} />
+
+      <ListRegion>
+        <ClientList
+          clients={shownClients}
+          emptyText={
+            q || statusFilter
+              ? "Ничего не нашлось по этим условиям."
+              : "Заведите первого клиента, чтобы принимать от него заявки на подбор."
+          }
+        />
+      </ListRegion>
 
       {canManage && filteredCompanies.length > 0 && (
         <div className="space-y-3 pt-4">
@@ -102,7 +140,7 @@ export default async function ClientsPage({
           <div className="grid gap-3">
             {filteredCompanies.map((c) => (
               <Card key={c.employerId}>
-                <CardContent className="space-y-4 p-5">
+                <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{c.companyName}</span>
                     <Badge variant="secondary">Студенческая платформа</Badge>

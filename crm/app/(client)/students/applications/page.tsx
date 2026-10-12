@@ -6,6 +6,7 @@ import {
   type EmployerApplication,
 } from "@/lib/students-service";
 import { ApplicationsList } from "./applications-list";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Отклики студентов" };
 
@@ -29,9 +30,9 @@ export default async function StudentsApplicationsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Отклики студентов</h1>
+        <PageTitle>Отклики студентов</PageTitle>
         <p className="text-sm text-muted-foreground">
           Студенты, которые откликнулись на ваши вакансии. Новый отклик станет «просмотренным», когда вы откроете карточку.
         </p>

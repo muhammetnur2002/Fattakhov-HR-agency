@@ -1,7 +1,5 @@
 import Link from "next/link";
-
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import {
   CandidatesLockedError,
@@ -11,8 +9,10 @@ import {
   type EmployerVacancyDTO,
   type StudentCandidate,
 } from "@/lib/students-service";
-import { cn } from "@/lib/utils";
 import { CandidatesList } from "./candidates-list";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Поиск студентов" };
 
@@ -55,27 +55,28 @@ export default async function StudentsCandidatesPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Поиск студентов</h1>
+        <PageTitle>Поиск студентов</PageTitle>
         <p className="text-sm text-muted-foreground">
           Подтверждённые студенты, которые ещё не откликались на выбранную вакансию. Найдите подходящего и пригласите.
         </p>
       </div>
 
       {locked && (
-        <Card>
-          <CardContent className="space-y-2 py-10 text-center text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Поиск студентов откроется после договора</p>
-            <p>
-              Анкеты студентов доступны компаниям, которые заключили договор с агентством.{" "}
-              <Link href="/documents" className="underline underline-offset-4">
-                Договор — в «Документах»
-              </Link>
-              .
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState>
+          <p className="font-medium text-foreground">
+            Поиск студентов откроется после договора
+          </p>
+          <p>
+            Анкеты студентов доступны компаниям, которые заключили договор с
+            агентством.{" "}
+            <Link href="/documents" className="underline underline-offset-4">
+              Договор — в «Документах»
+            </Link>
+            .
+          </p>
+        </EmptyState>
       )}
 
       {error && !locked && (
@@ -85,32 +86,20 @@ export default async function StudentsCandidatesPage({
       )}
 
       {!error && !locked && vacancies.length === 0 && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Чтобы искать студентов, сначала опубликуйте вакансию.
-          </CardContent>
-        </Card>
+        <EmptyState>
+          Чтобы искать студентов, сначала опубликуйте вакансию.
+        </EmptyState>
       )}
 
       {selected && (
         <>
-          <div className="pill-scroller flex gap-2">
+          <FilterChipGroup label="Вакансия" className="pill-scroller flex-nowrap">
             {vacancies.map((v) => (
-              <Link
-                key={v.id}
-                href={`/students/candidates?vacancy=${v.id}`}
-                aria-current={v.id === selected.id ? "true" : undefined}
-                className={cn(
-                  "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-                  v.id === selected.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:text-foreground",
-                )}
-              >
+              <FilterChip key={v.id} href={`/students/candidates?vacancy=${v.id}`} selected={v.id === selected.id}>
                 {v.title}
-              </Link>
+              </FilterChip>
             ))}
-          </div>
+          </FilterChipGroup>
           <CandidatesList key={selected.id} vacancyId={selected.id} candidates={candidates} />
         </>
       )}

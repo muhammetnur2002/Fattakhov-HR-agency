@@ -16,8 +16,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { navLinkLabel } from "@/lib/nav-links";
 import type { NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { CountBadge } from "@/components/ui/count-badge";
+import { useReturnFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Плашка под активной вкладкой. Объявлена здесь, а не внутри BottomTabs:
@@ -180,6 +183,8 @@ export function BottomTabs({
   const pathname = usePathname();
   const reduced = useReducedMotion();
   const [more, setMore] = useState(false);
+  // Шторка открывается кнопкой «Ещё», но не через SheetTrigger: фокус возвращаем сами
+  const returnFocus = useReturnFocus();
   const navRef = useRef<HTMLElement>(null);
   useFadeWhenIdle(navRef, pathname);
 
@@ -222,6 +227,7 @@ export function BottomTabs({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              aria-label={navLinkLabel(item)}
               // Для прозрачного вида панели: плашка почти исчезает, и активную
               // вкладку красит акцентом сам текст (globals.css)
               data-active={active || undefined}
@@ -249,17 +255,18 @@ export function BottomTabs({
                     />
                   )}
                   {!!item.badge && (
-                    <span
+                    <CountBadge
                       data-badge
+                      aria-hidden
+                      count={item.badge}
+                      tone="alert"
                       className={cn(
-                        "absolute -top-1 -right-2.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-destructive px-1 text-[9.5px] leading-none font-semibold text-white tabular-nums",
+                        "absolute -top-1.5 -right-3",
                         // Кольцо цвета плашки, а не панели: значок садится
                         // «в вырез», а не лежит поверх плашки заплаткой
                         active ? "ring-2 ring-primary" : "ring-2 ring-background",
                       )}
-                    >
-                      {item.badge > 9 ? "9+" : item.badge}
-                    </span>
+                    />
                   )}
                 </span>
                 <span className="max-w-full truncate px-0.5">{item.label}</span>
@@ -270,7 +277,10 @@ export function BottomTabs({
 
         <button
           type="button"
-          onClick={() => setMore(true)}
+          onClick={(e) => {
+            returnFocus.remember(e.currentTarget);
+            setMore(true);
+          }}
           aria-haspopup="dialog"
           data-active={moreActive || undefined}
           className={cn(
@@ -291,6 +301,7 @@ export function BottomTabs({
           side="bottom"
           showCloseButton={false}
           className="max-h-[88svh] gap-0 rounded-t-[28px] border-none bg-brand-graphite p-0 text-white"
+          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
         >
           {/* Ручка: подсказка, что шторку можно закрыть, потянув вниз */}
           <div aria-hidden className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-white/25" />
@@ -303,10 +314,10 @@ export function BottomTabs({
           <SheetHeader className="flex-row items-center gap-3 px-4 pt-2.5 pb-2.5">
             <Logo variant="mark" tone="light" className="h-6 shrink-0" />
             <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-[15px] leading-tight font-semibold text-white">
+              <SheetTitle className="truncate text-sm leading-tight font-semibold text-white">
                 {title}
               </SheetTitle>
-              <SheetDescription className="text-[11px] leading-tight text-white/60">
+              <SheetDescription className="text-xs leading-tight text-white/60">
                 {roleLabel}
               </SheetDescription>
             </div>
@@ -329,8 +340,9 @@ export function BottomTabs({
                     href={item.href}
                     onClick={() => setMore(false)}
                     aria-current={active ? "page" : undefined}
+                    aria-label={navLinkLabel(item)}
                     className={cn(
-                      "relative flex min-h-[68px] touch-manipulation flex-col items-center justify-center gap-1.5 rounded-2xl p-2 text-center text-[12px] leading-tight transition-colors [-webkit-tap-highlight-color:transparent] active:bg-white/[0.16]",
+                      "relative flex min-h-[68px] touch-manipulation flex-col items-center justify-center gap-1.5 rounded-2xl p-2 text-center text-xs leading-tight transition-colors [-webkit-tap-highlight-color:transparent] active:bg-white/[0.16]",
                       active
                         ? "bg-white/[0.16] font-medium text-white ring-1 ring-white/25"
                         : "bg-white/[0.06] text-white/85",
@@ -345,9 +357,12 @@ export function BottomTabs({
                       />
                     )}
                     {!!item.badge && (
-                      <span className="absolute top-1.5 right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-brand-graphite">
-                        {item.badge > 9 ? "9+" : item.badge}
-                      </span>
+                      <CountBadge
+                        aria-hidden
+                        count={item.badge}
+                        tone="inverse"
+                        className="absolute top-1.5 right-1.5"
+                      />
                     )}
                   </Link>
                 );
@@ -356,7 +371,7 @@ export function BottomTabs({
 
             <a
               href={siteHref}
-              className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-2xl text-[13px] text-white/55 transition-colors active:bg-white/[0.08]"
+              className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-2xl text-sm text-white/55 transition-colors active:bg-white/[0.08]"
             >
               <ArrowLeft className="size-4" />
               На сайт

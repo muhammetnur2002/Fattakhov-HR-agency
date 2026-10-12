@@ -1,18 +1,20 @@
 "use client";
 
-import { ArrowLeft, ArrowUp, Search } from "lucide-react";
+import { ArrowLeft, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StudentThreadMessage } from "@/lib/students-service";
 import { draftPreview, threadActivityAt, withDraft } from "@/lib/students-threads";
 import type { StudentThreadItem, StudentThreadView } from "@/lib/students-threads";
 import { useDraftAutosave } from "@/lib/hooks/use-draft-autosave";
 import { useKeyboardViewport, useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 import {
   loadThreadAction,
@@ -21,6 +23,11 @@ import {
   saveStudentDraftAction,
   sendStudentMessageAction,
 } from "../actions";
+import { CountBadge } from "@/components/ui/count-badge";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
+import { PageTitle } from "@/components/ui/page-title";
+import { enterSendsMessage } from "@/lib/chat-keys";
+import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
 
 /** Как часто сверяемся с платформой. SSE между приложениями — отдельная задача, опроса здесь достаточно. */
 const POLL_MS = 10_000;
@@ -156,29 +163,19 @@ export function StudentMessages({
     >
       <aside className={cn("flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r", activeId && "hidden md:flex")}>
         <div className="border-b p-4">
-          <h1 className="text-lg font-semibold">Сообщения студентам</h1>
+          <PageTitle compact>Сообщения студентам</PageTitle>
         </div>
 
         <div className="space-y-2.5 px-3 pb-3 pt-3">
-          <div className="flex h-9 items-center gap-2 rounded-xl border bg-muted/40 px-3">
-            <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск"
-              aria-label="Поиск по диалогам"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none touch:text-base placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="flex gap-2">
-            <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+          <SearchField value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск" aria-label="Поиск по диалогам" />
+          <FilterChipGroup label="Какие диалоги">
+            <FilterChip selected={filter === "all"} onClick={() => setFilter("all")}>
               Все
             </FilterChip>
-            <FilterChip active={filter === "unread"} onClick={() => setFilter("unread")}>
+            <FilterChip selected={filter === "unread"} onClick={() => setFilter("unread")}>
               Непрочитанные{unreadCount > 0 ? ` · ${unreadCount}` : ""}
             </FilterChip>
-          </div>
+          </FilterChipGroup>
         </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto border-t p-3">
@@ -236,22 +233,6 @@ export function StudentMessages({
   );
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-        active ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 function ThreadCard({ thread, active, onClick }: { thread: StudentThreadItem; active: boolean; onClick: () => void }) {
   // Время в списке — последняя активность: сообщение или правка черновика
   const activityAt = threadActivityAt(thread);
@@ -272,11 +253,11 @@ function ThreadCard({ thread, active, onClick }: { thread: StudentThreadItem; ac
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <div className="truncate text-[13.5px] font-medium">{thread.counterpartName}</div>
+          <div className="truncate text-sm font-medium">{thread.counterpartName}</div>
           {activityAt > 0 && (
             // Время — по часовому поясу того, кто смотрит: у сервера он другой, и без
             // метки React при сверке разметки выбрасывал дерево и собирал заново
-            <div suppressHydrationWarning className="shrink-0 text-[11px] text-muted-foreground">
+            <div suppressHydrationWarning className="shrink-0 text-xs text-muted-foreground">
               {formatWhen(new Date(activityAt).toISOString())}
             </div>
           )}
@@ -294,11 +275,7 @@ function ThreadCard({ thread, active, onClick }: { thread: StudentThreadItem; ac
               {thread.lastMessageBody ?? "Переписки ещё не было"}
             </div>
           )}
-          {thread.unread > 0 && (
-            <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-              {thread.unread > 9 ? "9+" : thread.unread}
-            </span>
-          )}
+          {thread.unread > 0 && <CountBadge count={thread.unread} label="непрочитанных" />}
         </div>
       </div>
     </button>
@@ -341,24 +318,41 @@ function Conversation({
     if (node && stick.current) node.scrollTop = node.scrollHeight;
   }, [thread.messages.length]);
 
+  // Идёт отправка. Ссылка, а не только состояние pending: два Enter подряд приходят
+  // раньше, чем React перерисует компонент, и по состоянию второй ещё видел бы «не занято»
+  const sending = useRef(false);
+  const guardStale = useStaleGuard();
+
   async function send() {
     const body = draft.trim();
-    if (!body || pending) return;
+    if (!body || pending || sending.current) return;
+    sending.current = true;
     setPending(true);
     setError(null);
-    // Запись черновика, что ещё в пути, должна завершиться до отправки: иначе она
-    // дописалась бы после удаления и вернула черновик уже отправленного сообщения
-    await settle();
-    const result = await sendStudentMessageAction(thread.applicationId, body);
-    setPending(false);
-    if (result.error) {
-      setError(result.error);
+    try {
+      // Запись черновика, что ещё в пути, должна завершиться до отправки: иначе она
+      // дописалась бы после удаления и вернула черновик уже отправленного сообщения
+      await settle();
+      const result = await sendStudentMessageAction(thread.applicationId, body);
+      if (result.error) {
+        setError(result.error);
+        void flush();
+        return;
+      }
+      // Черновик на сервере удалён самим действием отправки
+      clear();
+      stick.current = true;
+    } catch (error) {
+      if (guardStale(error)) return;
+      // Нет связи: действие бросает, а не возвращает отказ. Без перехвата pending
+      // оставался true навсегда, и кнопка «Отправить» больше не оживала. Текст остаётся
+      setError("Не отправилось: нет связи с сервером. Попробуйте ещё раз");
       void flush();
       return;
+    } finally {
+      sending.current = false;
+      setPending(false);
     }
-    // Черновик на сервере удалён самим действием отправки
-    clear();
-    stick.current = true;
     await onSent();
   }
 
@@ -417,7 +411,7 @@ function Conversation({
                   >
                     <div className="whitespace-pre-line break-words">{m.body}</div>
                     {lastInBurst && (
-                      <div className={cn("mt-1 text-right text-xs", m.mine ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                      <div className={cn("mt-1 text-right text-xs", m.mine ? "text-primary-foreground" : "text-muted-foreground")}>
                         {timeOnly(m.createdAt)}
                       </div>
                     )}
@@ -447,23 +441,29 @@ function Conversation({
               placeholder="Сообщение"
               aria-label="Текст сообщения"
               className="max-h-32 min-h-11 flex-1 resize-none rounded-3xl px-4 py-2.5"
+              // Подсказка клавиатуре: на телефоне Enter переносит строку, а не отправляет
+              enterKeyHint="enter"
               onKeyDown={(e) => {
-                // Enter отправляет, Shift+Enter — перенос строки
-                if (e.key === "Enter" && !e.shiftKey) {
+                // На компьютере Enter отправляет, Shift+Enter — перенос; на телефоне — всегда перенос
+                if (enterSendsMessage(e)) {
                   e.preventDefault();
-                  formRef.current?.requestSubmit();
+                  if (!sending.current) formRef.current?.requestSubmit();
                 }
               }}
             />
-            <Button type="submit" size="icon" className="size-11 shrink-0 rounded-full" disabled={pending || !draft.trim()} aria-label="Отправить">
+            <SubmitButton
+              size="icon"
+              className="size-11 shrink-0 rounded-full"
+              loading={pending}
+              disabled={!draft.trim()}
+              aria-label="Отправить"
+              // Пока идёт отправка, на месте стрелки — индикатор
+              pendingLabel={<span className="sr-only">Отправляем…</span>}
+            >
               <ArrowUp className="size-5" />
-            </Button>
+            </SubmitButton>
           </div>
-          {error && (
-            <Alert variant="destructive" className="mt-2 py-2">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <FormMessage error={error} className="mt-2 py-2" />
         </form>
       ) : (
         <p className="shrink-0 border-t p-4 text-center text-sm text-muted-foreground">{thread.lockedReason ?? "Переписка недоступна"}</p>

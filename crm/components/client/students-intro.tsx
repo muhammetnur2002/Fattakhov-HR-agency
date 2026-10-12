@@ -7,6 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { panelClass } from "@/components/ui/panel";
 
 const STORAGE_KEY = "students-intro-seen";
 
@@ -78,8 +79,10 @@ export function StudentsIntro({ contracted }: { contracted: boolean }) {
   }
 
   return (
-    <Card className="border-primary/30">
-      <CardContent className="relative space-y-4 p-5 pr-12">
+    // Блок стоит в раскладке раньше страницы, поэтому заголовком он быть не может
+    // (h2 до h1): это именованная область, а название — обычный абзац
+    <Card role="region" aria-label="Что такое студенческая платформа" className="border-primary/30">
+      <CardContent className="relative space-y-4 pr-12">
         <button
           type="button"
           onClick={close}
@@ -90,10 +93,10 @@ export function StudentsIntro({ contracted }: { contracted: boolean }) {
         </button>
 
         <div className="space-y-1.5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <p className="flex items-center gap-2 text-lg font-semibold">
             <GraduationCap className="size-5" aria-hidden />
             Что такое студенческая платформа
-          </h2>
+          </p>
           <p className="text-sm text-muted-foreground">
             Это раздел, где вы сами находите студентов для подработки, стажировок и разовых задач — без подбора от
             агентства. Студенты бывают разные: одни уже с опытом, другие только начинают. Учёбу каждого студента
@@ -103,7 +106,7 @@ export function StudentsIntro({ contracted }: { contracted: boolean }) {
 
         <ol className="grid gap-3 sm:grid-cols-2">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="flex gap-3 rounded-xl border p-3">
+            <li key={step.title} className={panelClass("plain", "flex gap-3 space-y-0")}>
               <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
                 {index + 1}
               </span>

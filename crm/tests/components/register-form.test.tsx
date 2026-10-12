@@ -162,3 +162,77 @@ describe("вкладка «Почта» — прежняя регистраци�
     expect(sent.get("email")).toBe("hr@example.com");
   });
 });
+
+describe("согласие: подпись только у галочки", () => {
+  // Раньше «Текст согласия» и ссылка на политику лежали внутри label: имя галочки
+  // разрасталось до «Согласен(на)… Текст согласия · Политика…» и всего развёрнутого текста,
+  // а нажатие на раскрывашку читалки считали нажатием на саму галочку
+  it("имя галочки — короткая фраза, раскрывашка и политика в него не входят", () => {
+    renderForm();
+
+    const box = screen.getByRole("checkbox", { name: "Согласен(на) на обработку персональных данных." });
+    const label = box.closest("label")!;
+    expect(label).toHaveTextContent("Согласен(на) на обработку персональных данных.");
+    expect(label.querySelector("button, a")).toBeNull();
+  });
+
+  it("раскрывашка и ссылка на политику — рядом, вне подписи, и описывают галочку", () => {
+    renderForm();
+
+    const box = screen.getByRole("checkbox");
+    const toggle = screen.getByRole("button", { name: "Текст согласия" });
+    const policy = screen.getByRole("link", { name: "Политика обработки данных" });
+    expect(toggle.closest("label")).toBeNull();
+    expect(policy.closest("label")).toBeNull();
+
+    const describedBy = box.getAttribute("aria-describedby")!.split(" ");
+    const described = describedBy.map((id) => document.getElementById(id)!);
+    expect(described.some((node) => node.contains(toggle) && node.contains(policy))).toBe(true);
+  });
+
+  it("нажатие на подпись ставит галочку, нажатие на раскрывашку и на политику — нет", () => {
+    renderForm();
+    const box = screen.getByRole("checkbox");
+
+    fireEvent.click(screen.getByText("Согласен(на) на обработку персональных данных."));
+    expect(box).toBeChecked();
+    fireEvent.click(screen.getByText("Согласен(на) на обработку персональных данных."));
+    expect(box).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Текст согласия" }));
+    fireEvent.click(screen.getByRole("link", { name: "Политика обработки данных" }));
+    expect(box).not.toBeChecked();
+  });
+
+  it("дословный текст раскрывается без изменений, состояние видно читалке", () => {
+    renderForm({ consentText: "Я, субъект ПДн, даю согласие оператору…" });
+
+    const toggle = screen.getByRole("button", { name: "Текст согласия" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Я, субъект ПДн, даю согласие оператору…")).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Скрыть текст" })).toHaveAttribute("aria-expanded", "true");
+    const text = screen.getByText("Я, субъект ПДн, даю согласие оператору…");
+    expect(text.textContent).toBe("Я, субъект ПДн, даю согласие оператору…");
+    expect(text.closest("label")).toBeNull();
+    // Раскрытый текст — часть описания галочки
+    const box = screen.getByRole("checkbox");
+    const describedBy = box.getAttribute("aria-describedby")!.split(" ");
+    expect(describedBy.some((id) => document.getElementById(id)?.contains(text))).toBe(true);
+  });
+
+  it("подсказка «отметьте согласие» тоже описывает галочку, пока согласия нет", () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText("Номер телефона"), { target: { value: "+7 900 123-45-67" } });
+    fireEvent.click(screen.getByRole("button", { name: "Получить код по SMS" }));
+
+    const box = screen.getByRole("checkbox");
+    const alert = screen.getByRole("alert");
+    expect(box.getAttribute("aria-describedby")!.split(" ")).toContain(alert.id);
+    expect(alert.closest("label")).toBeNull();
+
+    fireEvent.click(box);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

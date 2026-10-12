@@ -29,7 +29,7 @@ export default async function TwoFactorSetupPage() {
   // Заглянувшему сюда с уже включённой 2FA компонент покажет ссылку в кабинет
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent>
         <TwoFactorRequired status={status} enabled={status.enabled} homeHref={AGENCY_HOME} />
       </CardContent>
     </Card>

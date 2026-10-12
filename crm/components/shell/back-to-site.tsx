@@ -22,7 +22,7 @@ export function BackToSite({
     <a
       href={href}
       className={cn(
-        "group flex items-center gap-3 rounded-lg py-2 pr-3 pl-4 text-sm text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/85",
+        "group flex items-center gap-3 rounded-lg py-2 pr-3 pl-4 text-sm text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white/85",
         className,
       )}
     >

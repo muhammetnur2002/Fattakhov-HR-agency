@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useState } from "react";
 
 import type { FormState } from "@/app/(agency)/a/clients/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 export type AccountManagerOption = { id: string; fullName: string };
 
@@ -34,12 +34,11 @@ export type ClientFormValues = {
   accountManagerId?: string | null;
 };
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function SubmitButton({ label, loading }: { label: string; loading: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Сохраняем…" : label}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel="Сохраняем…">
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -59,16 +58,17 @@ export function ClientForm({
   managers: AccountManagerOption[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState<FormState, FormData>(action, {});
+  // Набранное остаётся после отказа, ошибки — у своих полей («ИНН — 10 цифр», «Ссылка должна начинаться с https://»)
+  const { state, fields, pending, formProps } = useFormAction(action, {});
   const [managerId, setManagerId] = useState(values.accountManagerId ?? NO_MANAGER);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form {...formProps} className="space-y-6">
       {clientId && <input type="hidden" name="clientId" value={clientId} />}
       {employerId && <input type="hidden" name="employerId" value={employerId} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Название" htmlFor="name" required className="sm:col-span-2">
+        <Field label="Название" required className="sm:col-span-2" error={fields.name}>
           <Input
             id="name"
             name="name"
@@ -78,7 +78,7 @@ export function ClientForm({
           />
         </Field>
 
-        <Field label="Юридическое название" htmlFor="legalName">
+        <Field label="Юридическое название" error={fields.legalName}>
           <Input
             id="legalName"
             name="legalName"
@@ -87,7 +87,7 @@ export function ClientForm({
           />
         </Field>
 
-        <Field label="ИНН" htmlFor="inn">
+        <Field label="ИНН" error={fields.inn}>
           <Input
             id="inn"
             name="inn"
@@ -97,7 +97,7 @@ export function ClientForm({
           />
         </Field>
 
-        <Field label="Отрасль" htmlFor="industry">
+        <Field label="Отрасль" error={fields.industry}>
           <Input
             id="industry"
             name="industry"
@@ -106,11 +106,11 @@ export function ClientForm({
           />
         </Field>
 
-        <Field label="Город" htmlFor="city">
+        <Field label="Город" error={fields.city}>
           <Input id="city" name="city" defaultValue={values.city ?? ""} />
         </Field>
 
-        <Field label="Сайт" htmlFor="website" className="sm:col-span-2">
+        <Field label="Сайт" className="sm:col-span-2" error={fields.website}>
           <Input
             id="website"
             name="website"
@@ -122,34 +122,39 @@ export function ClientForm({
 
         <Field
           label="Ответственный менеджер"
-          htmlFor="accountManagerId"
+          id="accountManagerId"
           className="sm:col-span-2"
+          error={fields.accountManagerId}
         >
-          <input
-            type="hidden"
-            name="accountManagerId"
-            value={managerId === NO_MANAGER ? "" : managerId}
-          />
-          <Select value={managerId} onValueChange={setManagerId}>
-            <SelectTrigger id="accountManagerId" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_MANAGER}>Не назначен</SelectItem>
-              {managers.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.fullName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {(control) => (
+            <>
+              <input
+                type="hidden"
+                name="accountManagerId"
+                value={managerId === NO_MANAGER ? "" : managerId}
+              />
+              <Select value={managerId} onValueChange={setManagerId}>
+                <SelectTrigger {...control} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_MANAGER}>Не назначен</SelectItem>
+                  {managers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </Field>
 
         <Field
           label="О компании"
-          htmlFor="description"
           className="sm:col-span-2"
           hint="Чем рекрутер будет продавать вакансию кандидату: продукт, команда, чем интересно"
+          error={fields.description}
         >
           <Textarea
             id="description"
@@ -160,45 +165,9 @@ export function ClientForm({
         </Field>
       </div>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
-      <SubmitButton label={submitLabel} />
+      <SubmitButton label={submitLabel} loading={pending} />
     </form>
-  );
-}
-
-function Field({
-  label,
-  htmlFor,
-  children,
-  required,
-  hint,
-  className,
-}: {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-  required?: boolean;
-  hint?: string;
-  className?: string;
-}) {
-  return (
-    <div className={`space-y-2 ${className ?? ""}`}>
-      <Label htmlFor={htmlFor}>
-        {label}
-        {required && <span> *</span>}
-      </Label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
   );
 }

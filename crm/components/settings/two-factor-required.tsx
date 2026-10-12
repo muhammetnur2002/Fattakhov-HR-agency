@@ -12,9 +12,11 @@ import {
   type TwoFactorSetupData,
 } from "@/components/settings/two-factor";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { TwoFactorStatus } from "@/lib/services/two-factor";
+import { PageTitle } from "@/components/ui/page-title";
 
 /**
  * Принудительная настройка 2FA сотрудника агентства.
@@ -47,7 +49,7 @@ export function TwoFactorRequired({
   if (enabled && !codes) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">Двухфакторная защита включена</h1>
+        <PageTitle>Двухфакторная защита включена</PageTitle>
         <p className="text-sm text-muted-foreground">
           Настройка завершена, дальше при входе спрашивается код из приложения.
         </p>
@@ -65,7 +67,7 @@ export function TwoFactorRequired({
           <ShieldCheck className="size-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-xl font-semibold">Включите двухфакторную защиту</h1>
+          <PageTitle>Включите двухфакторную защиту</PageTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             Для сотрудников агентства она обязательна: в кабинете персональные
             данные кандидатов, и одного пароля для них мало. Это нужно сделать
@@ -120,9 +122,9 @@ export function TwoFactorRequired({
 
       {step < 3 && (
         <form action={logout} className="border-t pt-4">
-          <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
+          <SubmitButton variant="ghost" size="sm" className="text-muted-foreground">
             Выйти из кабинета
-          </Button>
+          </SubmitButton>
         </form>
       )}
     </div>

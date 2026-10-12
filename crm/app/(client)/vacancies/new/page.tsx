@@ -1,9 +1,8 @@
-import Link from "next/link";
-
 import { VacancyWizard } from "@/components/vacancies/vacancy-wizard";
-import { Button } from "@/components/ui/button";
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Новая заявка" };
 
@@ -25,10 +24,8 @@ export default async function NewVacancyPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/vacancies">← Вакансии</Link>
-        </Button>
-        <h1 className="text-2xl font-semibold">Заявка на подбор</h1>
+        <BackLink href="/vacancies">Вакансии</BackLink>
+        <PageTitle>Заявка на подбор</PageTitle>
         <p className="text-sm text-muted-foreground">
           Чем точнее бриф, тем меньше нерелевантных кандидатов. Черновик
           сохраняется сам — можно прерваться и вернуться.

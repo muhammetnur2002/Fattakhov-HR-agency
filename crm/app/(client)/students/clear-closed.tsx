@@ -4,9 +4,10 @@ import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { vacancyActionAction } from "./actions";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * «Удалить снятые и отклонённые»: одним нажатием убирает из списка вакансии,
@@ -16,6 +17,7 @@ import { vacancyActionAction } from "./actions";
 export function ClearClosed({ ids }: { ids: string[] }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,15 +38,11 @@ export function ClearClosed({ ids }: { ids: string[] }) {
   if (!confirming) {
     return (
       <div className="space-y-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>
+        <Button ref={triggerRef} type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>
           <Trash2 className="mr-1 size-4" aria-hidden />
           Удалить снятые и отклонённые ({ids.length})
         </Button>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={error} />
       </div>
     );
   }
@@ -53,10 +51,10 @@ export function ClearClosed({ ids }: { ids: string[] }) {
     <div className="space-y-2">
       <p className="text-sm">Удалить снятые и отклонённые вакансии ({ids.length}) из списка? Это нельзя отменить.</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={run}>
+        <Button type="button" size="sm" variant="destructive" loading={pending} onClick={run}>
           {pending ? "Удаляем…" : "Да, удалить"}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+        <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
           Отмена
         </Button>
       </div>

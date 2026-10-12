@@ -27,12 +27,16 @@ import { recordPulse } from '../lib/presence-pulse';
 import { RATE_LIMITS } from '../lib/security/rate-limit';
 import { RECHECK_EVERY_TICKS, createStreamGuard } from '../lib/security/stream-guard';
 import { devOutbox } from '../lib/mail/transport';
+import { deviceKey, noteLoginDevice } from '../lib/security/login-device';
+import { getThread, markThreadRead, postMessage } from '../lib/chat';
+import { listCandidatesForVacancy } from '../lib/services';
 import { confirmPendingRegistration, resendPendingRegistration } from '../lib/pending-registration';
 import { hashPassword, verifyPassword } from '../lib/security/password';
 import type { DataStore } from '../lib/db/types';
 import { GET as staffStudentsList } from '../app/api/service/staff/students/route';
 import { GET as staffStudentProfile } from '../app/api/service/staff/students/[id]/route';
 import { searchStaffStudents, parseStaffSearch, MAX_PAGE_SIZE } from '../lib/staff-students';
+import { runPiiFixTests } from './pii-fixes';
 
 let passed = 0;
 const failures: string[] = [];
@@ -284,6 +288,113 @@ async function main() {
     });
     assert.equal((await resetPassword(token, 'Sirenevyj-Rassvet-31')).status, 'INVALID');
   });
+
+  // ---------- 2а. Защита от кражи cookie: «выйти на всех устройствах» и новое устройство ----------
+  console.log('\nКража сессии');
+  await test('«выйти на всех устройствах» гасит выданную сессию, пароль остаётся прежним', async () => {
+    const email = `revoke-${unique()}@demo.ru`;
+    const { account } = await newStudent(store, email);
+    const before = (await store.accounts.findById(account.id))?.passwordHash;
+    const stolen = await signSession({ accountId: account.id, role: 'STUDENT', profileId: null, name: 'Проверкин' });
+    assert.equal((await resolveSession(stolen, store.accounts)).user?.accountId, account.id);
+    await sleep(3200); // iat в секундах и допуск две секунды
+    await store.accounts.revokeSessions(account.id);
+    assert.deepEqual(await resolveSession(stolen, store.accounts), { user: null, account: null, revoked: true });
+    assert.equal((await store.accounts.findById(account.id))?.passwordHash, before);
+    const fresh = await signSession({ accountId: account.id, role: 'STUDENT', profileId: null, name: 'Проверкин' });
+    assert.equal((await resolveSession(fresh, store.accounts)).user?.accountId, account.id);
+  });
+
+  const CHROME_WIN = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  const CHROME_WIN_NEW = CHROME_WIN.replace('Chrome/126', 'Chrome/131');
+  const SAFARI_IPHONE =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
+  await test('устройство: версия браузера не важна, система и браузер важны', () => {
+    assert.equal(deviceKey(CHROME_WIN), 'Chrome, Windows');
+    assert.equal(deviceKey(CHROME_WIN_NEW), 'Chrome, Windows');
+    assert.equal(deviceKey(SAFARI_IPHONE), 'Safari, iOS');
+    assert.equal(deviceKey(null), 'Другой браузер');
+  });
+  await test('первый вход после выкладки письма не шлёт, тот же браузер новой версии — тоже', async () => {
+    const email = `dev1-${unique()}@demo.ru`;
+    const { account } = await newStudent(store, email);
+    assert.equal(await noteLoginDevice(account, { userAgent: CHROME_WIN, ip: '198.51.100.7' }), false);
+    assert.equal(await noteLoginDevice(account, { userAgent: CHROME_WIN_NEW, ip: '198.51.100.8' }), false);
+    assert.equal(devOutbox(email).filter((m) => m.subject === 'Вход с нового устройства').length, 0);
+  });
+  await test('другой браузер или система — письмо владельцу, повторный вход с него уже знакомый', async () => {
+    const email = `dev2-${unique()}@demo.ru`;
+    const { account } = await newStudent(store, email);
+    await noteLoginDevice(account, { userAgent: CHROME_WIN, ip: '198.51.100.7' });
+    assert.equal(await noteLoginDevice(account, { userAgent: SAFARI_IPHONE, ip: '203.0.113.9' }), true);
+    const mails = devOutbox(email).filter((m) => m.subject === 'Вход с нового устройства');
+    assert.equal(mails.length, 1);
+    assert.ok(mails[0].text.includes('Safari, iOS'));
+    assert.ok(mails[0].text.includes('Выйти на всех устройствах'));
+    assert.equal(await noteLoginDevice(account, { userAgent: SAFARI_IPHONE, ip: '203.0.113.10' }), false);
+    assert.equal(devOutbox(email).filter((m) => m.subject === 'Вход с нового устройства').length, 1);
+  });
+  await test('устройства разных аккаунтов не смешиваются', async () => {
+    const a = await newStudent(store, `dev3a-${unique()}@demo.ru`);
+    const b = await newStudent(store, `dev3b-${unique()}@demo.ru`);
+    await noteLoginDevice(a.account, { userAgent: CHROME_WIN, ip: null });
+    await noteLoginDevice(b.account, { userAgent: SAFARI_IPHONE, ip: null });
+    // у b известно только «Safari, iOS»: вход с Chrome для него новый, для a — знакомый
+    assert.equal(await noteLoginDevice(a.account, { userAgent: CHROME_WIN, ip: null }), false);
+    assert.equal(await noteLoginDevice(b.account, { userAgent: CHROME_WIN, ip: null }), true);
+  });
+
+  // ---------- 2б. Изоляция: чужой студент и чужой работодатель по прямому идентификатору ----------
+  console.log('\nИзоляция пользователей');
+  {
+    const employers = await store.employers.list();
+    const withVacancies: { employerId: string; vacancyId: string }[] = [];
+    for (const employer of employers) {
+      const vacancies = await store.vacancies.listByEmployer(employer.id);
+      if (vacancies.length > 0) withVacancies.push({ employerId: employer.id, vacancyId: vacancies[0].id });
+    }
+    assert.ok(withVacancies.length >= 2, 'в демо-данных меньше двух работодателей с вакансиями — проверять нечего');
+    const [ownerE, otherE] = withVacancies;
+
+    const { student: studentA } = await newStudent(store, `iso-a-${unique()}@demo.ru`);
+    const { student: studentB } = await newStudent(store, `iso-b-${unique()}@demo.ru`);
+    const application = await store.applications.upsert({ studentId: studentA.id, vacancyId: ownerE.vacancyId });
+
+    const participantStudent = { role: 'STUDENT' as const, profileId: studentA.id };
+    const participantEmployer = { role: 'EMPLOYER' as const, profileId: ownerE.employerId };
+    const strangerStudent = { role: 'STUDENT' as const, profileId: studentB.id };
+    const strangerEmployer = { role: 'EMPLOYER' as const, profileId: otherE.employerId };
+
+    await test('контроль: участники отклика видят ветку (проверка не вхолостую)', async () => {
+      assert.ok(await getThread(application.id, participantStudent));
+      assert.ok(await getThread(application.id, participantEmployer));
+    });
+    await test('чужой студент не читает ветку чужого отклика', async () => {
+      assert.equal(await getThread(application.id, strangerStudent), null);
+    });
+    await test('чужой работодатель не читает ветку отклика на чужую вакансию', async () => {
+      assert.equal(await getThread(application.id, strangerEmployer), null);
+    });
+    await test('чужие не пишут в ветку и не отмечают её прочитанной', async () => {
+      const before = (await store.messages.listByApplication(application.id)).length;
+      for (const stranger of [strangerStudent, strangerEmployer]) {
+        assert.equal(await postMessage(application.id, stranger, 'взлом').catch(() => null), null);
+        assert.equal(await markThreadRead(application.id, stranger), null);
+      }
+      assert.equal((await store.messages.listByApplication(application.id)).length, before, 'чужое сообщение попало в ветку');
+    });
+    await test('несуществующий отклик — то же «нет», что и чужой', async () => {
+      assert.equal(await getThread('нет-такого-отклика', participantStudent), null);
+    });
+    await test('работодатель не открывает список кандидатов чужой вакансии', async () => {
+      // Владелец проходит проверку принадлежности: дальше либо список, либо «поиск закрыт договором»,
+      // но не «вакансия не найдена». Чужой получает null раньше любой другой проверки
+      const own = await listCandidatesForVacancy(ownerE.employerId, ownerE.vacancyId).catch((error: { code?: string }) => error.code);
+      assert.ok(own !== null, 'владелец не должен получить «нет такой вакансии»');
+      assert.equal(await listCandidatesForVacancy(otherE.employerId, ownerE.vacancyId), null);
+    });
+  }
 
   // ---------- 3. Счётчики попыток ----------
   console.log('\nПеребор кодов');
@@ -791,23 +902,23 @@ async function main() {
       assert.deepEqual(names(await list('q=ия&gender=FEMALE&study=verified&city=казань&speciality=информ&sort=name')), ['Петрова Мария', 'Шарипова Алия']);
       assert.deepEqual(names(await list('q=лия&gender=MALE')), []);
     });
-    await test('присутствие: скрывший показ — null, как и не заходивший; видимый — время', async () => {
+    await test('присутствие: сохранённое прежде «скрыто» ничего не значит; null — только у не заходивших', async () => {
       const r = await list('');
       const by = (id: string) => r.items.find((i) => i.id === id)!;
-      assert.equal(by(petrova.student.id).lastSeenAt, null);
+      assert.ok(by(petrova.student.id).lastSeenAt);
       assert.equal(by(elkin.student.id).lastSeenAt, null);
       assert.ok(by(sidorova.student.id).lastSeenAt);
       assert.ok(by(testov.student.id).lastSeenAt);
     });
-    await test('«в сети за N минут» не находит скрывшего показ', async () => {
-      assert.deepEqual(names(await list('onlineWithin=10')), ['Сидорова Анна']);
-      assert.deepEqual(names(await list('onlineWithin=10000&sort=seen')), ['Сидорова Анна', 'Тестов Тест']);
+    await test('«в сети за N минут» находит и того, у кого сохранено прежнее «скрыто»', async () => {
+      assert.deepEqual([...names(await list('onlineWithin=10'))].sort(), ['Петрова Мария', 'Сидорова Анна']);
+      assert.deepEqual([...names(await list('onlineWithin=10000&sort=seen'))].sort(), ['Петрова Мария', 'Сидорова Анна', 'Тестов Тест']);
     });
-    await test('сортировка по входу: скрывшие и не заходившие в конце, порядок по скрытому времени не выдаёт', async () => {
+    await test('сортировка по входу: недавние первыми, не заходившие в конце', async () => {
       const r = await list('sort=seen');
-      assert.deepEqual(names(r).slice(0, 2), ['Сидорова Анна', 'Тестов Тест']);
-      // Петрова заходила минуту назад, но скрыла показ — места среди видимых у неё нет
-      assert.ok(names(r).indexOf('Петрова Мария') >= 2);
+      // Сидорова и Петрова заходили минуту назад, Тестов — трое суток назад
+      assert.deepEqual([...names(r).slice(0, 2)].sort(), ['Петрова Мария', 'Сидорова Анна']);
+      assert.equal(names(r)[2], 'Тестов Тест');
     });
     await test('сортировка по имени, по вузу и новые регистрации первыми', async () => {
       assert.deepEqual(names(await list('sort=name')), ['Ёлкин Пётр', 'Иванов Иван', 'Петрова Мария', 'Сидорова Анна', 'Тестов Тест', 'Шарипова Алия']);
@@ -927,9 +1038,9 @@ async function main() {
       assert.equal((await call(staffStudentProfile, profileUrl('no-such-student', '?contacts=1'), { actor })).status, 404);
       assert.equal((await readAudit('student.profile.read.contacts', 'no-such-student', actor)).length, 0);
     });
-    await test('профиль скрывшего показ: lastSeenAt = null', async () => {
+    await test('профиль: lastSeenAt есть у зашедшего, даже если прежде сохранено «скрыто»', async () => {
       const profile = await (await call(staffStudentProfile, profileUrl(petrova.student.id), { actor: `pr-${A}` })).json();
-      assert.equal(profile.lastSeenAt, null);
+      assert.ok(profile.lastSeenAt);
       const seen = await (await call(staffStudentProfile, profileUrl(sidorova.student.id), { actor: `pr-${A}` })).json();
       assert.ok(seen.lastSeenAt);
     });
@@ -1009,6 +1120,9 @@ async function main() {
     assertSameOrigin(req('GET', {}));
     assertSameOrigin(req('HEAD', {}));
   });
+
+  // ---------- ПДн студентов: согласие, журнал, файлы ----------
+  await runPiiFixTests(test, store);
 
   console.log(`\n${passed} проверок пройдено, ${failures.length} провалено`);
   if (failures.length) {

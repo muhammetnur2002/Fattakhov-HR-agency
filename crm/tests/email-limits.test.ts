@@ -14,6 +14,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { prismaRaw as db } from "@/lib/db/prisma";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { requestPasswordReset } from "@/lib/services/passwords";
+import { STRANGER_MAIL_MESSAGE } from "@/lib/security/mail-limit";
 import { RegistrationError, requestCompanyRegistration } from "@/lib/services/registration";
 
 const MARK = "test-maillimit";
@@ -24,6 +25,11 @@ const address = (name: string) => `${MARK}-${name}@example.com`;
 
 async function cleanup() {
   await db.authFailure.deleteMany({ where: { key: { contains: MARK } } });
+  // Общие потолки писем незнакомцам не содержат адреса в ключе, а накопленные
+  // прошлыми прогонами сделали бы тесты зависящими от того, что было до них
+  await db.authFailure.deleteMany({
+    where: { OR: [{ key: { startsWith: "mail:day:" } }, { key: { startsWith: "mail:ip:", contains: "198.51.100." } }] },
+  });
   await db.pendingClientRegistration.deleteMany({ where: { email: { startsWith: MARK } } });
   await db.passwordReset.deleteMany({ where: { user: { email: { startsWith: MARK } } } });
   await db.user.deleteMany({ where: { email: { startsWith: MARK } } });
@@ -177,6 +183,51 @@ describe("письма восстановления пароля", () => {
     try {
       await Promise.all(Array.from({ length: 10 }, () => requestPasswordReset({ email })));
       expect(send.mock.calls).toHaveLength(3);
+    } finally {
+      send.mockRestore();
+    }
+  });
+});
+
+describe("письма незнакомым адресам: потолок по IP и за сутки", () => {
+  const IP = "198.51.100.20";
+
+  async function strangerResets(ip: string, count: number, tag: string): Promise<number> {
+    const send = vi.spyOn(getEmailTransport(), "send");
+    try {
+      for (let i = 0; i < count; i++) await requestPasswordReset({ email: address(`${tag}-${i}`), ip });
+      return send.mock.calls.length;
+    } finally {
+      send.mockRestore();
+    }
+  }
+
+  it("с одного IP на разные чужие адреса уходит не больше десяти писем «аккаунта нет»", async () => {
+    expect(await strangerResets(IP, 15, "ip")).toBe(10);
+    // другой IP не наказывается за чужой
+    expect(await strangerResets("198.51.100.21", 3, "other-ip")).toBe(3);
+  });
+
+  it("код регистрации: с одного IP не больше десяти писем, дальше — понятный отказ", async () => {
+    const send = vi.spyOn(getEmailTransport(), "send");
+    try {
+      for (let i = 0; i < 10; i++) {
+        await requestCompanyRegistration({
+          email: address(`reg-${i}`),
+          phone: "+79001112233",
+          password: PASSWORD,
+          ip: IP,
+        });
+      }
+      await expect(
+        requestCompanyRegistration({
+          email: address("reg-11"),
+          phone: "+79001112233",
+          password: PASSWORD,
+          ip: IP,
+        }),
+      ).rejects.toThrow(STRANGER_MAIL_MESSAGE);
+      expect(send.mock.calls).toHaveLength(10);
     } finally {
       send.mockRestore();
     }

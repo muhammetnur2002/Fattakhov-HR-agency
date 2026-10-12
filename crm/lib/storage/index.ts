@@ -11,6 +11,8 @@
  * once попавшая в чужие руки, работает вечно.
  */
 
+import { MAX_FILE_SIZE } from "@/lib/upload-limits";
+
 export type StoredFile = {
   storageKey: string;
   fileName: string;
@@ -42,8 +44,8 @@ export const ALLOWED_MIME_TYPES = new Set([
   "application/zip",
 ]);
 
-/** Максимальный размер файла — 20 МБ (BR-23). */
-export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+/** Максимальный размер файла — 20 МБ (BR-23), значение в `lib/upload-limits.ts`. */
+export { MAX_FILE_SIZE };
 
 export class FileValidationError extends Error {}
 

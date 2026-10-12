@@ -123,8 +123,8 @@ function useLiveMessagesBadge(items: NavItem[]): number | null {
       try {
         const response = await fetch('/api/messages');
         if (!response.ok || cancelled) return;
-        const data = (await response.json()) as { threads: { unread: number }[] };
-        if (!cancelled) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0));
+        const data = (await response.json()) as { threads: { unread: number }[]; agencyUnread?: number };
+        if (!cancelled) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0) + (data.agencyUnread ?? 0));
       } catch {
         /* сеть моргнула — следующее событие сверит заново */
       }
@@ -140,8 +140,8 @@ function useLiveMessagesBadge(items: NavItem[]): number | null {
   useLiveMessagesEvents(hasMessagesTab, () => {
     fetch('/api/messages')
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { threads: { unread: number }[] } | null) => {
-        if (data) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0));
+      .then((data: { threads: { unread: number }[]; agencyUnread?: number } | null) => {
+        if (data) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0) + (data.agencyUnread ?? 0));
       })
       .catch(() => {});
   });

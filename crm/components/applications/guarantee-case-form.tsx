@@ -1,18 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import {
   recordGuaranteeCaseAction,
   type CandidateState,
 } from "@/app/(agency)/a/candidates/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import { GUARANTEE_BREAK_REASON_LABELS } from "@/lib/labels";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 /**
  * Гарантийный случай: нанятый ушёл в гарантийный срок.
@@ -21,12 +19,11 @@ import { GUARANTEE_BREAK_REASON_LABELS } from "@/lib/labels";
  * значений четыре, а родной элемент работает с клавиатуры и на телефоне
  * без единой строки кода.
  */
-function SaveButton() {
-  const { pending } = useFormStatus();
+function SaveButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "Записываем…" : "Записать гарантийный случай"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" loading={loading} pendingLabel="Записываем…">
+      Записать гарантийный случай
+    </SubmitButtonBase>
   );
 }
 
@@ -38,18 +35,14 @@ export function GuaranteeCaseForm({
   /** YYYY-MM-DD — верхняя граница даты ухода в поле */
   guaranteeUntil: string;
 }) {
-  const [state, formAction] = useActionState<CandidateState, FormData>(
-    recordGuaranteeCaseAction,
-    {},
-  );
+  const { state, fields, pending, formProps } = useFormAction<CandidateState>(recordGuaranteeCaseAction, {});
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="gc-left">Когда ушёл</Label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Когда ушёл" error={fields.leftAt}>
           <Input
             id="gc-left"
             name="leftAt"
@@ -57,37 +50,37 @@ export function GuaranteeCaseForm({
             max={guaranteeUntil}
             required
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="gc-reason">Причина</Label>
-          <select
-            id="gc-reason"
-            name="reason"
-            required
-            defaultValue=""
-            className="h-8 w-full rounded-md border bg-transparent px-2 text-sm"
-          >
-            <option value="" disabled>
-              Выберите
-            </option>
-            {Object.entries(GUARANTEE_BREAK_REASON_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+        </Field>
+        <Field label="Причина" id="gc-reason" error={fields.reason}>
+          {(control) => (
+            <select
+              {...control}
+              name="reason"
+              required
+              defaultValue=""
+              className="h-8 w-full rounded-lg border border-field bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring aria-invalid:border-destructive aria-invalid:not-focus-visible:ring-3 aria-invalid:not-focus-visible:ring-destructive/20 touch:text-base dark:bg-input/30"
+            >
+              <option value="" disabled>
+                Выберите
               </option>
-            ))}
-          </select>
-        </div>
+              {Object.entries(GUARANTEE_BREAK_REASON_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="gc-comment">Что известно</Label>
+      <Field label="Что известно" error={fields.comment}>
         <Textarea
           id="gc-comment"
           name="comment"
           rows={2}
           placeholder="Со слов клиента: что случилось и когда он узнал"
         />
-      </div>
+      </Field>
 
       <label className="flex items-start gap-2 text-sm">
         <input
@@ -105,18 +98,9 @@ export function GuaranteeCaseForm({
         </span>
       </label>
 
-      <SaveButton />
+      <SaveButton loading={pending} />
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

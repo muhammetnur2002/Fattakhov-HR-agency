@@ -3,26 +3,25 @@
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   giveDisclosureAction,
   type DisclosureState,
 } from "@/app/(public)/disclosure/[token]/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { PRIVACY_POLICY_PATH } from "@/lib/legal/consent-texts";
 import {
   DISCLOSURE_CONSENT_CHECKBOX_LABEL,
   DISCLOSURE_CONTACT_MODE_LABELS,
 } from "@/lib/legal/disclosure-consent";
+import { panelClass } from "@/components/ui/panel";
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending}>
-      {pending ? "Отправляем…" : "Подтверждаю"}
-    </Button>
+    <SubmitButtonBase size="lg" className="w-full" pendingLabel="Отправляем…">
+      Подтверждаю
+    </SubmitButtonBase>
   );
 }
 
@@ -81,7 +80,7 @@ export function DisclosureForm({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-5">
+    <form action={handleSubmit} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
       <p className="text-sm text-muted-foreground">
@@ -90,7 +89,7 @@ export function DisclosureForm({
       </p>
 
       {/* Реквизиты до текста: это то, на что человек соглашается */}
-      <dl className="space-y-2 rounded-md border p-4 text-sm">
+      <dl className={panelClass("plain", "text-sm")}>
         <div>
           <dt className="text-xs tracking-[0.08em] text-muted-foreground uppercase">
             Работодатель
@@ -160,11 +159,7 @@ export function DisclosureForm({
         </span>
       </label>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <SubmitButton />
 

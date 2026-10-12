@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { URGENCY_LABELS, VACANCY_STATUS_LABELS } from "@/lib/labels";
 import { formatNumber } from "@/lib/pricing";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type VacancyListItem = {
   id: string;
@@ -62,13 +63,7 @@ export function VacancyList({
   emptyText: string;
 }) {
   if (vacancies.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          {emptyText}
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>{emptyText}</EmptyState>;
   }
 
   return (

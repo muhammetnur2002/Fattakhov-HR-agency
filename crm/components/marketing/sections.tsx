@@ -5,6 +5,8 @@ import {
   Stagger,
   StaggerItem,
 } from "@/components/motion/primitives";
+import { ScrollRegion } from "@/components/ui/scroll-region";
+import { SECTION_HEAD_GAP, SITE_CONTAINER, SPLIT_EVEN, SPLIT_MAIN } from "./layout";
 
 /**
  * Заголовок раздела.
@@ -17,6 +19,10 @@ import {
  * без исключения разделом, страница читается сплошной лентой одинаковых
  * шапок. Выравнивание по центру тоже не украшение, а способ сбить ритм
  * там, где раздел короткий и живёт сам по себе.
+ *
+ * Интервал до содержимого ставит сам заголовок (`SECTION_HEAD_GAP`, 50px на ноутбуке),
+ * поэтому у содержимого сразу под ним нет своего `mt-*`: раньше каждый компонент писал
+ * его по-своему — 50px на главной, 30 на тарифах, аудите и кейсах (11.10.2026).
  */
 export function SectionHead({
   eyebrow,
@@ -24,18 +30,23 @@ export function SectionHead({
   lead,
   tone = "light",
   align = "left",
+  as: Heading = "h2",
 }: {
   eyebrow?: string;
   title: string;
   lead?: string;
   tone?: "light" | "dark";
   align?: "left" | "center";
+  /** h1 — у страницы, где другого заголовка верхнего уровня нет (политика). */
+  as?: "h1" | "h2";
 }) {
   const dark = tone === "dark";
   const center = align === "center";
 
   return (
-    <Reveal className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
+    <Reveal
+      className={`${SECTION_HEAD_GAP} ${center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}`}
+    >
       {eyebrow && (
         <div
           className={
@@ -47,13 +58,13 @@ export function SectionHead({
           {eyebrow}
         </div>
       )}
-      <h2
-        className={`text-4xl leading-tight font-semibold tracking-tight text-balance md:text-5xl ${
+      <Heading
+        className={`text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl ${
           eyebrow ? "mt-4" : ""
         } ${dark ? "text-white" : "text-foreground"}`}
       >
         {title}
-      </h2>
+      </Heading>
       {lead && (
         <p
           className={`mt-4 text-lg leading-relaxed ${
@@ -70,11 +81,18 @@ export function SectionHead({
 /**
  * Раздел страницы.
  *
- * Ширина и вертикальные отступы вынесены в параметры не ради гибкости,
- * а против однообразия: двенадцать разделов одинаковой ширины с
- * одинаковым воздухом сливаются в простыню, сколько бы разного текста
- * в них ни лежало. Узкий раздел читается как пауза, широкий как
- * витрина, и глаз получает опору.
+ * Тон фона и ширина колонки меняются от раздела к разделу намеренно: двенадцать блоков
+ * одной формы читаются сплошной лентой, и глазу не за что зацепиться. Вертикальный шаг —
+ * нет: он один (`py-8 md:py-10`), и пустые «паузы» между разделами выбирают не разработчики
+ * вручную, а тон и ширина. Сверка 11.10.2026: три отступа (`tight`, `normal`, `tall`) отличались
+ * на 10px, каждая страница выбирала их по вкусу, и ритм читался как случайный.
+ *
+ * `pad="tight"` — единственное исключение: раздел, внутри которого лежит одна карточка с
+ * собственным отступом (призыв к аудиту, блок студентов): там воздух уже даёт сама карточка.
+ * Новое исключение вписывается в `tests/site-rhythm.test.ts` с причиной.
+ *
+ * Левый край содержимого лежит на оси шапки (`SITE_CONTAINER`); `width="narrow"` — колонка
+ * для чтения: по центру, на ту же ось не встаёт.
  */
 export function Section({
   id,
@@ -86,8 +104,8 @@ export function Section({
   id?: string;
   children: React.ReactNode;
   tone?: "light" | "muted" | "dark";
-  width?: "narrow" | "normal" | "wide";
-  pad?: "tight" | "normal" | "tall";
+  width?: "narrow" | "normal";
+  pad?: "normal" | "tight";
 }) {
   const bg =
     tone === "dark"
@@ -96,19 +114,10 @@ export function Section({
         ? "bg-muted/45"
         : "bg-background";
 
-  const maxW =
-    width === "narrow"
-      ? "max-w-3xl"
-      : width === "wide"
-        ? "max-w-[2200px]"
-        : "max-w-[2200px]";
+  const column =
+    width === "narrow" ? "mx-auto max-w-3xl px-5" : SITE_CONTAINER;
 
-  const padding =
-    pad === "tight"
-      ? "py-14 md:py-16"
-      : pad === "tall"
-        ? "py-24 md:py-32"
-        : "py-20 md:py-24";
+  const padding = pad === "tight" ? "py-8" : "py-8 md:py-10";
 
   return (
     <section id={id} className={`relative overflow-hidden ${bg}`}>
@@ -118,11 +127,7 @@ export function Section({
           className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
         />
       )}
-      <div
-        className={`relative mx-auto ${maxW} ${maxW === "max-w-3xl" ? "px-5" : "px-5 md:px-8 xl:px-14"} ${padding}`}
-      >
-        {children}
-      </div>
+      <div className={`relative ${column} ${padding}`}>{children}</div>
     </section>
   );
 }
@@ -146,10 +151,14 @@ export function Facts() {
 
   return (
     <div className="border-y bg-card">
-      <div className="mx-auto max-w-[2200px] md:px-3 xl:px-9">
-        <Stagger className="grid grid-cols-2 gap-y-2 lg:grid-cols-4">
+      {/* Ось сайта — тот же `SITE_CONTAINER`, что у шапки и разделов. Ячейкам нужен свой отступ
+          `px-5`, и сетка шире контейнера ровно на него (`-mx-5`): два отступа гасят друг друга, поэтому
+          левый край цифр равен полю сайта при любом его значении. Раньше здесь лежала копия поля
+          (`md:px-3 xl:px-9` плюс `px-5`), которая совпадала с ним только по сумме и съехала бы при правке */}
+      <div className={SITE_CONTAINER}>
+        <Stagger className="-mx-5 grid grid-cols-2 gap-y-2 lg:grid-cols-4">
           {facts.map((f) => (
-            <StaggerItem key={f.label} className="px-5 py-7">
+            <StaggerItem key={f.label} className="px-5 py-5">
               <div className="text-4xl font-semibold tracking-tight tabular-nums">
                 {f.count === null ? (
                   f.value
@@ -195,11 +204,11 @@ export function WhenSubscription() {
   ];
 
   return (
-    <div className="mt-12 grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-3">
+    <div className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-3">
       {items.map((it) => (
         <div key={it.title} className="bg-card p-6">
           <div className="text-lg font-medium">{it.title}</div>
-          <p className="mt-2.5 text-base leading-relaxed text-muted-foreground">
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">
             {it.body}
           </p>
         </div>
@@ -244,7 +253,7 @@ export function HowItWorks() {
   ];
 
   return (
-    <ol className="mt-12 space-y-0 border-l border-white/15 pl-6 md:pl-8">
+    <ol className="space-y-0 border-l border-white/15 pl-6 md:pl-8">
       {steps.map((s) => (
         <li key={s.name} className="pb-10 last:pb-0">
           <div className="text-sm font-medium tracking-[0.12em] text-white/65 uppercase">
@@ -271,10 +280,10 @@ export function Responsibility() {
   ];
 
   return (
-    <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_auto]">
+    <div className={SPLIT_MAIN}>
       <ul className="divide-y">
         {items.map((it) => (
-          <li key={it} className="py-3.5 text-lg">
+          <li key={it} className="py-3 text-lg">
             {it}
           </li>
         ))}
@@ -323,7 +332,7 @@ export function Cases() {
   ];
 
   return (
-    <div className="mt-14 space-y-5">
+    <div className="space-y-5">
       {cases.map((c, i) => {
         // Первый кейс на графите: два одинаковых светлых прямоугольника
         // подряд читаются как таблица, а это витрина
@@ -332,8 +341,8 @@ export function Cases() {
         return (
           <Reveal key={c.name} delay={i * 0.06}>
             <article
-              className={`grid gap-8 overflow-hidden rounded-2xl p-7 md:p-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 ${
-                тёмный ? "bg-brand-graphite text-white" : "border bg-card"
+              className={`${SPLIT_EVEN} overflow-hidden rounded-2xl p-6 md:p-8 ${
+                тёмный ? "border border-white/25 bg-brand-graphite text-white" : "border bg-card"
               }`}
             >
               <div>
@@ -346,8 +355,9 @@ export function Cases() {
                 </div>
 
                 {/* Крупно: имя клиента здесь работает как доказательство,
-                    и мелким кеглем его никто не заметит */}
-                <h3 className="mt-3 text-5xl leading-[1.05] font-semibold tracking-tight text-balance md:text-6xl">
+                    и мелким кеглем его никто не заметит. Но не крупнее h2 раздела
+                    (28 на телефоне, 45 на ноутбуке): было text-4xl — 36 при h2 28 */}
+                <h3 className="mt-3 text-3xl leading-[1.05] font-semibold tracking-tight text-balance md:text-4xl">
                   {c.name}
                 </h3>
                 <p
@@ -362,7 +372,7 @@ export function Cases() {
                   {c.roles.map((r) => (
                     <span
                       key={r}
-                      className={`rounded-md px-2.5 py-1 text-sm ${
+                      className={`rounded-md px-3 py-1 text-sm ${
                         тёмный
                           ? "bg-white/12 text-white"
                           : "bg-secondary text-secondary-foreground"
@@ -399,7 +409,7 @@ export function Cases() {
                 </dl>
 
                 <p
-                  className={`mt-8 border-t pt-5 text-lg font-medium ${
+                  className={`mt-6 border-t pt-5 text-lg font-medium ${
                     тёмный ? "border-white/15" : "border-border"
                   }`}
                 >
@@ -451,38 +461,56 @@ export function Comparison() {
   const cols = ["Штатный рекрутер", "Разовый подбор", "Команда по подписке"];
 
   return (
-    <div className="mt-12 overflow-x-auto">
+    <ScrollRegion label="Сравнение: штатный рекрутер, разовый подбор и команда по подписке" className="overflow-x-auto">
       {/* Ширины в rem, а не в px: текст ячеек растёт вместе с базовым
           размером (125% с 640px, app/globals.css), а пиксельный минимум
           таблицы — нет. На 640–768 последняя колонка не влезала в 680px
           и молча срезалась на 14px overflow'ом рамки; теперь таблица
           шире экрана просто прокручивается вбок, как и задумано */}
-      <div className="min-w-[42.5rem] overflow-hidden rounded-xl border">
-        <div className="grid grid-cols-[10rem_repeat(3,1fr)] gap-px bg-border">
-          <div className="bg-card px-5 py-4" />
-          {cols.map((c, i) => (
-            <div
-              key={c}
-              className={`px-5 py-4 text-base font-medium ${
-                i === 2 ? "bg-primary text-primary-foreground" : "bg-card"
-              }`}
-            >
-              {c}
+      {/* overflow-clip, а не hidden: hidden делает рамку своим контейнером прокрутки,
+          и колонка названий внутри неё не «прилипает» при сдвиге вбок */}
+      <div className="min-w-[42.5rem] overflow-clip rounded-xl border">
+        {/* Сетка из div-ов размечена как таблица ролями: без них читалка
+            видела россыпь текста и не связывала значение с его столбцом
+            и строкой. «Строка» display: contents ниже роль не теряет */}
+        <div
+          role="table"
+          aria-label="Сравнение моделей найма"
+          className="grid grid-cols-[10rem_repeat(3,1fr)] gap-px bg-border"
+        >
+          <div role="row" className="contents">
+            <div role="columnheader" className="sticky left-0 z-10 bg-card px-5 py-4">
+              <span className="sr-only">Показатель</span>
             </div>
-          ))}
+            {cols.map((c, i) => (
+              <div
+                key={c}
+                role="columnheader"
+                className={`px-5 py-4 text-base font-medium ${
+                  i === 2 ? "bg-primary text-primary-foreground" : "bg-card"
+                }`}
+              >
+                {c}
+              </div>
+            ))}
+          </div>
 
           {rows.map((r) => (
-            <div key={r.label} className="contents">
+            <div key={r.label} role="row" className="contents">
               {/* Это заголовок строки, а не подпись мелким шрифтом — он
                   стоял мельче и бледнее самих данных рядом (14px, серый
                   47% светлоты), и терялся на белой карточке. Теперь
                   того же размера, что данные, и заметно темнее */}
-              <div className="bg-card px-5 py-4 text-base font-medium tracking-wide text-foreground/85 uppercase">
+              <div
+                role="rowheader"
+                className="sticky left-0 z-10 bg-card px-5 py-4 text-base font-medium tracking-wide text-foreground/85 uppercase"
+              >
                 {r.label}
               </div>
               {r.values.map((v, i) => (
                 <div
                   key={`${r.label}-${i}`}
+                  role="cell"
                   className={`px-5 py-4 text-base ${
                     i === 2 ? "bg-accent font-medium" : "bg-card"
                   }`}
@@ -494,7 +522,7 @@ export function Comparison() {
           ))}
         </div>
       </div>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -520,7 +548,7 @@ export function Faq() {
   ];
 
   return (
-    <div className="mt-12 divide-y overflow-hidden rounded-xl border bg-card">
+    <div className="divide-y overflow-hidden rounded-xl border bg-card">
       {items.map((it) => (
         <details
           key={it.q}

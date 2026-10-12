@@ -1,20 +1,22 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useEffect, useState, useTransition, type ReactNode } from "react";
 
 import {
   confirmCompanyRegistrationAction,
   requestCompanyRegistrationAction,
   type RegisterState,
 } from "./actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 
 type Contact = { email: string; phone: string; password: string };
+
+/** Через сколько секунд можно запросить код повторно: письма идут не мгновенно, и частый повтор только путает. */
+const RESEND_SECONDS = 60;
 
 function SubmitButton({
   pendingLabel,
@@ -26,11 +28,16 @@ function SubmitButton({
   /** Блеклая, пока нет согласия: нажать можно — подсветится галочка. */
   dimmed?: boolean;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" className={cn("w-full", dimmed && "opacity-50")} disabled={pending}>
-      {pending ? pendingLabel : label}
-    </Button>
+    <SubmitButtonBase
+      className="w-full"
+      // Не disabled: нажатие подсвечивает галочку согласия. aria-disabled
+      // говорит читателю экрана «пока недоступна», вид — серая плашка с читаемым текстом
+      aria-disabled={dimmed || undefined}
+      pendingLabel={pendingLabel}
+    >
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -56,6 +63,35 @@ export function EmailRegistration({
   // только на один вызов входа после подтверждения кода, второй раз
   // хешировать его незачем, поэтому в БД между экранами он не заезжает.
   const [contact, setContact] = useState<Contact | null>(null);
+  // «Указать другую почту» возвращает к первой форме, но введённое остаётся: телефон и пароль
+  // (10 и больше знаков) заново набирать незачем, меняется обычно одна почта
+  const [editing, setEditing] = useState(false);
+  const [resendIn, setResendIn] = useState(RESEND_SECONDS);
+  const [resend, setResend] = useState<{ ok?: boolean; error?: string }>({});
+  const [resending, startResend] = useTransition();
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  function resendCode() {
+    if (!contact) return;
+    const data = new FormData();
+    data.set("email", contact.email);
+    data.set("phone", contact.phone);
+    data.set("password", contact.password);
+    startResend(async () => {
+      const result = await requestCompanyRegistrationAction({}, data);
+      if (result.sent) {
+        setResend({ ok: true });
+        setResendIn(RESEND_SECONDS);
+      } else {
+        setResend({ error: result.error ?? "Не удалось отправить код. Попробуйте ещё раз" });
+      }
+    });
+  }
 
   const [requestState, requestAction] = useActionState<RegisterState, FormData>(
     async (prev, formData) => {
@@ -66,6 +102,9 @@ export function EmailRegistration({
           phone: String(formData.get("phone") ?? ""),
           password: String(formData.get("password") ?? ""),
         });
+        setEditing(false);
+        setResend({});
+        setResendIn(RESEND_SECONDS);
       }
       return result;
     },
@@ -77,7 +116,7 @@ export function EmailRegistration({
     {},
   );
 
-  if (requestState.sent && contact) {
+  if (requestState.sent && contact && !editing) {
     return (
       <form action={confirmAction} className="space-y-4">
         <input type="hidden" name="email" value={contact.email} />
@@ -102,20 +141,32 @@ export function EmailRegistration({
           />
         </div>
 
-        {confirmState.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{confirmState.error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={confirmState.error} />
 
         <SubmitButton pendingLabel="Проверяем…" label="Подтвердить и войти" />
+
+        <FormMessage
+          error={resend.error}
+          ok={resend.ok ? "Код отправлен ещё раз. Проверьте и папку «Спам»." : null}
+        />
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={resending || resendIn > 0}
+          onClick={resendCode}
+        >
+          {resendIn > 0 ? `Прислать код ещё раз через ${resendIn} с` : "Прислать код ещё раз"}
+        </Button>
 
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="w-full"
-          onClick={() => setContact(null)}
+          onClick={() => setEditing(true)}
         >
           Указать другую почту
         </Button>
@@ -138,7 +189,7 @@ export function EmailRegistration({
     >
       <div className="space-y-2">
         <Label htmlFor="email">Рабочая почта</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Input id="email" name="email" type="email" autoComplete="email" defaultValue={contact?.email} required />
       </div>
 
       <div className="space-y-2">
@@ -149,6 +200,7 @@ export function EmailRegistration({
           type="tel"
           autoComplete="tel"
           placeholder="+7 999 000-00-00"
+          defaultValue={contact?.phone}
           required
         />
       </div>
@@ -161,6 +213,7 @@ export function EmailRegistration({
           type="password"
           autoComplete="new-password"
           minLength={10}
+          defaultValue={contact?.password}
           required
         />
         <p className="text-xs text-muted-foreground">
@@ -171,11 +224,7 @@ export function EmailRegistration({
 
       {consentBox}
 
-      {requestState.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{requestState.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={requestState.error} />
 
       <SubmitButton
         pendingLabel="Отправляем код…"

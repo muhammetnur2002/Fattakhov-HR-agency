@@ -2,12 +2,11 @@
 
 import { Check } from "lucide-react";
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { submitLeadAction, type LeadState } from "@/app/(marketing)/actions";
 import { ConsentFields } from "@/components/marketing/consent-fields";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,14 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { VACANCY_COUNT_OPTIONS } from "@/lib/validation/lead";
+import { VACANCY_COUNT_OPTIONS } from "@/lib/validation/lead-options";
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" disabled={pending} className="w-full">
-      {pending ? "Отправляем…" : "Отправить заявку"}
-    </Button>
+    <SubmitButtonBase size="lg" className="w-full" pendingLabel="Отправляем…">
+      Отправить заявку
+    </SubmitButtonBase>
   );
 }
 
@@ -136,11 +134,7 @@ export function LeadForm() {
 
       <ConsentFields idPrefix="lead" />
 
-      {state.error && (
-        <Alert variant="destructive" className="mt-5">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} className="mt-5" />
 
       <div className="mt-6">
         <SubmitButton />

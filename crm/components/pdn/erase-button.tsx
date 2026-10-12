@@ -1,23 +1,24 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   erasePersonalDataAction,
   type PdnState,
 } from "@/app/(agency)/a/settings/pdn/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { panelClass } from "@/components/ui/panel";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="destructive" disabled={pending}>
-      {pending ? "Удаляем…" : "Удалить безвозвратно"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="destructive" pendingLabel="Удаляем…">
+      Удалить безвозвратно
+    </SubmitButtonBase>
   );
 }
 
@@ -44,7 +45,7 @@ export function EraseButton({
   const [open, setOpen] = useState(false);
 
   if (state.ok) {
-    return <p className="text-sm text-muted-foreground">{state.ok}</p>;
+    return <FormMessage ok={state.ok} />;
   }
 
   if (!open) {
@@ -61,7 +62,7 @@ export function EraseButton({
   }
 
   return (
-    <form action={formAction} className="space-y-3 rounded-md border p-3">
+    <form action={formAction} className={panelClass("plain", "space-y-4")}>
       <input type="hidden" name="candidateId" value={candidateId} />
 
       <p className="text-sm">
@@ -72,7 +73,7 @@ export function EraseButton({
       </p>
 
       {activeApplications > 0 && (
-        <Alert variant="destructive">
+        <Alert variant="warning">
           <AlertDescription>
             Кандидат сейчас участвует в {activeApplications} активных
             воронках. Возможно, стоит продлить согласие, а не удалять
@@ -105,11 +106,7 @@ export function EraseButton({
         </Button>
       </div>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
     </form>
   );
 }

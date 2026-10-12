@@ -21,6 +21,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { AccessDeniedError, type Actor } from "@/lib/access";
+import { inviteTokenHash } from "@/lib/auth/invite-token";
 import { prismaRaw as db } from "@/lib/db/prisma";
 import {
   getClient,
@@ -99,7 +100,7 @@ async function invite(clientId: string | null, suffix = "") {
     createdById: owner.id,
   });
   const { id } = await db.invitation.findFirstOrThrow({
-    where: { token },
+    where: { tokenHash: inviteTokenHash(token) },
     select: { id: true },
   });
   return { id, token, email };

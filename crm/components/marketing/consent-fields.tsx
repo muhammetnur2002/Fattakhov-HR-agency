@@ -54,7 +54,7 @@ export function ConsentFields({ idPrefix }: { idPrefix: string }) {
             name="consent"
             type="checkbox"
             required
-            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-brand-graphite"
+            className="mt-0.5 size-4 shrink-0 cursor-pointer"
           />
           <span className="text-sm leading-relaxed text-muted-foreground">
             {before}
@@ -89,7 +89,7 @@ export function ConsentFields({ idPrefix }: { idPrefix: string }) {
           id={`${idPrefix}-marketing`}
           name="marketingConsent"
           type="checkbox"
-          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-brand-graphite"
+          className="mt-0.5 size-4 shrink-0 cursor-pointer"
         />
         <span className="text-sm leading-relaxed text-muted-foreground">
           {withEmailOff(MARKETING_CONSENT_TEXT, PRIVACY_EMAIL)}

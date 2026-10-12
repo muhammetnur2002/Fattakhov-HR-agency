@@ -2,7 +2,6 @@
 
 import { CalendarClock, Copy, Check, Video, MapPin } from "lucide-react";
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   proposeSlotsAction,
@@ -11,8 +10,10 @@ import {
   type InterviewState,
 } from "@/app/actions/interviews";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,7 +29,7 @@ import type {
   InterviewStatus,
 } from "@/lib/generated/prisma/enums";
 import { INTERVIEW_STATUS_LABELS, INTERVIEW_TYPE_LABELS } from "@/lib/labels";
-import { cn } from "@/lib/utils";
+import { Panel, panelClass } from "@/components/ui/panel";
 
 export type InterviewView = {
   id: string;
@@ -48,12 +49,7 @@ export type InterviewView = {
 export type Participant = { id: string; fullName: string };
 
 function Submit({ label, size = "sm" }: { label: string; size?: "sm" | "lg" }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" size={size} disabled={pending}>
-      {pending ? "…" : label}
-    </Button>
-  );
+  return <SubmitButtonBase size={size}>{label}</SubmitButtonBase>;
 }
 
 /**
@@ -68,11 +64,17 @@ export function InterviewSection({
   interviews,
   participants,
   canManage,
+  now,
 }: {
   applicationId: string;
   interviews: InterviewView[];
   participants: Participant[];
   canManage: boolean;
+  /**
+   * Момент отрисовки со страницы (мс). Часы не берутся здесь: в клиентском компоненте
+   * сервер и гидратация увидели бы разные «сейчас», как в CalendarView.
+   */
+  now: number;
 }) {
   if (interviews.length === 0) {
     return (
@@ -92,6 +94,7 @@ export function InterviewSection({
           interview={interview}
           participants={participants}
           canManage={canManage}
+          now={now}
         />
       ))}
     </div>
@@ -103,16 +106,25 @@ function InterviewCard({
   interview,
   participants,
   canManage,
+  now,
 }: {
   applicationId: string;
   interview: InterviewView;
   participants: Participant[];
   canManage: boolean;
+  now: number;
 }) {
   const [state, setState] = useState<InterviewState>({});
   const [proposing, setProposing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rating, setRating] = useState("");
+  const [editingFeedback, setEditingFeedback] = useState(false);
+
+  // Оценку спрашиваем только у встречи, которая уже прошла (так же, как в календаре):
+  // у будущей такой вопрос выглядит как ошибка интерфейса. Закрытая встреча — всегда
+  const isPast = interview.scheduledAt != null && new Date(interview.scheduledAt).getTime() < now;
+  const canGiveFeedback =
+    interview.status === "COMPLETED" || (interview.status === "CONFIRMED" && isPast);
 
   const needsSlots =
     interview.status === "SLOTS_REQUESTED" ||
@@ -129,16 +141,13 @@ function InterviewCard({
   }
 
   async function handleFeedback(formData: FormData) {
-    setState(await submitFeedbackAction({}, formData));
+    const result = await submitFeedbackAction({}, formData);
+    setState(result);
+    if (result.ok) setEditingFeedback(false);
   }
 
   return (
-    <div
-      className={cn(
-        "space-y-3 rounded-md border p-4",
-        needsSlots && "border-primary/50",
-      )}
-    >
+    <div className={panelClass("plain", needsSlots ? "border-primary/50" : undefined)}>
       <div className="flex flex-wrap items-center gap-2">
         <CalendarClock className="size-4" />
         <span className="text-sm font-medium">
@@ -194,12 +203,27 @@ function InterviewCard({
           {interview.feedbackNote && (
             <p className="mt-1 whitespace-pre-line">{interview.feedbackNote}</p>
           )}
+          {/* Нажали не ту оценку — исправить можно: она идёт в аналитику клиента */}
+          {canGiveFeedback && !editingFeedback && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 -ml-2.5"
+              onClick={() => {
+                setRating(String(interview.feedbackRating));
+                setEditingFeedback(true);
+              }}
+            >
+              Изменить оценку
+            </Button>
+          )}
         </div>
       )}
 
       {/* Ссылка для кандидата: рассылки пока нет, рекрутер отправляет сам */}
       {state.scheduleUrl && (
-        <div className="space-y-2 rounded-md border bg-muted/50 p-3">
+        <Panel tone="muted">
           <div className="text-sm font-medium">Ссылка для кандидата</div>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs">
@@ -221,7 +245,7 @@ function InterviewCard({
           <p className="text-xs text-muted-foreground">
             Действует 7 дней. Кандидат откроет её с телефона и выберет время.
           </p>
-        </div>
+        </Panel>
       )}
 
       {state.conflicts && state.conflicts.length > 0 && (
@@ -284,8 +308,7 @@ function InterviewCard({
       )}
 
       {/* Обратная связь: после встречи её ждут от того, кто на ней был */}
-      {(interview.status === "CONFIRMED" || interview.status === "COMPLETED") &&
-        !interview.feedbackRating && (
+      {canGiveFeedback && (!interview.feedbackRating || editingFeedback) && (
           <form action={handleFeedback} className="space-y-2 border-t pt-3">
             <input type="hidden" name="interviewId" value={interview.id} />
             <input type="hidden" name="applicationId" value={applicationId} />
@@ -308,21 +331,18 @@ function InterviewCard({
             <Textarea
               name="note"
               rows={2}
+              defaultValue={editingFeedback ? (interview.feedbackNote ?? "") : undefined}
               placeholder="Что важно запомнить по итогам встречи"
             />
+            {editingFeedback && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditingFeedback(false)}>
+                Отмена
+              </Button>
+            )}
           </form>
         )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && !state.scheduleUrl && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.scheduleUrl ? null : state.ok} />
     </div>
   );
 }
@@ -351,7 +371,7 @@ function SlotForm({
   const [format, setFormat] = useState<InterviewFormat>("ONLINE");
 
   return (
-    <form action={onSubmit} className="space-y-4 rounded-md border p-3">
+    <form action={onSubmit} className={panelClass("plain", "space-y-4")}>
       <input type="hidden" name="interviewId" value={interviewId} />
       <input type="hidden" name="applicationId" value={applicationId} />
 
@@ -387,7 +407,7 @@ function SlotForm({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="timezone">Часовой пояс</Label>
           <Select name="timezone" defaultValue="Europe/Moscow">

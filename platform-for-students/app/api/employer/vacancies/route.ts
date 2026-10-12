@@ -3,6 +3,7 @@ import { fail, handle, ok } from '@/lib/api';
 import { notifyCrm } from '@/lib/notify-crm';
 import { assertCompanyProfileComplete, assertEmailVerified, assertSameOrigin, audit, requireEmployer } from '@/lib/security/guards';
 import { listEmployerVacancies } from '@/lib/services';
+import { verifyVideoIfChanged } from '@/lib/storage';
 import { skipsModeration, VACANCY_LIMITS, vacancyInputSchema, vacancySaveSchema } from '@/lib/vacancy';
 
 export const runtime = 'nodejs';
@@ -53,6 +54,9 @@ export async function POST(request: Request) {
     // moderatedAt и publishedAt остаются на значениях по умолчанию схемы —
     // так же, как и у вакансий, которые агентство синкает из CRM напрямую
     // (syncFromCrm): человек решения не принимал, отмечать нечего
+    // Видео льётся в S3 мимо сервера: перед сохранением ссылки смотрим размер и первые байты
+    await verifyVideoIfChanged(input.videoUrl, null);
+
     const autoPublish = submit && skipsModeration(employer);
     const vacancy = await store.vacancies.create({
       ...input,

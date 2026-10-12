@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type { PendingStudyStudent } from "@/lib/students-service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
+import { FormMessage } from "@/components/ui/form-message";
 
 export function StudyBoard({ students: initial }: { students: PendingStudyStudent[] }) {
   const router = useRouter();
@@ -50,13 +53,7 @@ export function StudyBoard({ students: initial }: { students: PendingStudyStuden
   }
 
   if (students.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          Справок на проверке нет.
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>Справок на проверке нет.</EmptyState>;
   }
 
   return (
@@ -99,6 +96,8 @@ function StudentCard({
   onDecide: (decision: "APPROVE" | "REJECT", note?: string) => Promise<boolean>;
 }) {
   const [rejecting, setRejecting] = useState(false);
+  // «Вернуть с причиной» заменяет кнопки полем причины: фокус — в поле, после «Отмены» — на кнопку
+  const { triggerRef, focusRef } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
@@ -116,7 +115,7 @@ function StudentCard({
 
   return (
     <Card>
-      <CardContent className="space-y-3 p-5">
+      <CardContent className="space-y-3">
         <div className="flex items-center gap-3">
           <Avatar>
             {student.photoUrl && <AvatarImage src={studentsFileProxyUrl(student.photoUrl)} alt="" />}
@@ -148,6 +147,7 @@ function StudentCard({
         {rejecting ? (
           <div className="space-y-2">
             <Textarea
+              ref={focusRef}
               value={note}
               rows={2}
               placeholder="Причина — студент увидит её в профиле"
@@ -156,7 +156,7 @@ function StudentCard({
                 setError(undefined);
               }}
             />
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            <FormMessage compact error={error} />
             <div className="flex gap-2">
               <Button variant="destructive" size="sm" disabled={busy} onClick={() => void reject()}>
                 <X /> Вернуть справку
@@ -171,7 +171,7 @@ function StudentCard({
             <Button size="sm" disabled={busy} onClick={() => void onDecide("APPROVE")}>
               <Check /> Подтвердить учёбу
             </Button>
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
+            <Button ref={triggerRef} variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
               <X /> Вернуть с причиной
             </Button>
           </div>

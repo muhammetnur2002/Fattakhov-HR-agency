@@ -8,6 +8,7 @@ import type { InvoiceStatus } from "@/lib/generated/prisma/enums";
 import { formatMoney } from "@/lib/pricing";
 import type { InvoiceView } from "@/lib/services/invoices";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
   DRAFT: "Черновик",
@@ -46,13 +47,7 @@ export function InvoiceList({
   renderActions?: (invoice: InvoiceView) => React.ReactNode;
 }) {
   if (invoices.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          {emptyText}
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>{emptyText}</EmptyState>;
   }
 
   return (
@@ -62,7 +57,7 @@ export function InvoiceList({
           key={invoice.id}
           className={cn(invoice.status === "OVERDUE" && "border-destructive/50")}
         >
-          <CardContent className="space-y-3 p-4">
+          <CardContent className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="font-medium">

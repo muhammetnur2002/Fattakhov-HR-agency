@@ -6,6 +6,8 @@ import { useState, useTransition } from "react";
 import { regenerateCalendarLinkAction } from "@/app/actions/calendar";
 
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Подписка на календарь.
@@ -18,6 +20,7 @@ export function CalendarSubscription({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -30,7 +33,7 @@ export function CalendarSubscription({ url }: { url: string }) {
   }
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <Panel>
       <div className="text-sm font-medium">Ссылка для календаря</div>
       <div className="flex items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
@@ -63,7 +66,7 @@ export function CalendarSubscription({ url }: { url: string }) {
         Ссылка личная, не пересылайте её.
       </p>
       {confirming ? (
-        <div className="space-y-2 rounded-md border border-destructive/40 p-2">
+        <Panel tone="danger">
           <p className="text-xs">
             Прежняя ссылка перестанет работать, а подписку в календаре придётся добавить заново. Обновить?
           </p>
@@ -72,7 +75,7 @@ export function CalendarSubscription({ url }: { url: string }) {
               type="button"
               size="sm"
               variant="destructive"
-              disabled={pending}
+              loading={pending}
               onClick={() =>
                 startTransition(async () => {
                   const result = await regenerateCalendarLinkAction();
@@ -83,17 +86,17 @@ export function CalendarSubscription({ url }: { url: string }) {
             >
               {pending ? "Обновляем…" : "Да, обновить"}
             </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+            <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
               Отмена
             </Button>
           </div>
-        </div>
+        </Panel>
       ) : (
-        <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+        <Button ref={triggerRef} type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
           Обновить ссылку
         </Button>
       )}
       {message && <p className="text-xs text-muted-foreground">{message}</p>}
-    </div>
+    </Panel>
   );
 }

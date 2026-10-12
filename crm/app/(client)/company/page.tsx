@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { canDo } from "@/lib/access";
 import { requireClientActor } from "@/lib/auth/session";
 import { getCompanyProfile } from "@/lib/services/company-profile";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Профиль компании" };
 
@@ -22,9 +23,9 @@ export default async function CompanyPage() {
   const editable = canDo(actor, "org.manageClientUsers", { clientId: actor.clientId });
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Профиль компании</h1>
+        <PageTitle>Профиль компании</PageTitle>
         <p className="text-sm text-muted-foreground">
           Так компанию видят агентство и студенты. Заполните ИНН и описание — без них вакансию на студенческую
           платформу отправить нельзя.

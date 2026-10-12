@@ -30,6 +30,7 @@ export async function AppShell({
   children,
   wide = false,
   bell,
+  notice,
 }: {
   nav?: NavItem[];
   user?: { name: string; photoUrl?: string | null; subtitle?: string; href?: string };
@@ -37,6 +38,8 @@ export async function AppShell({
   wide?: boolean;
   /** Кнопка справа в шапке вместо «Выйти» (колокольчик студента) */
   bell?: React.ReactNode;
+  /** Плашка над содержимым, которая не пропадает при переходах между разделами (обновлённое согласие) */
+  notice?: React.ReactNode;
 }) {
   const session = await getSession();
   const unverifiedEmail = await pendingEmail(session);
@@ -76,6 +79,7 @@ export async function AppShell({
 
       <main className={cn('page-x mx-auto w-full flex-1 pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
         {unverifiedEmail && <EmailVerifyBanner email={unverifiedEmail} />}
+        {notice}
         {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && (
           <PushPrompt accountId={session.accountId} audience={session.role === 'EMPLOYER' ? 'company' : 'student'} />
         )}

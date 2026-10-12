@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { revealStudentContactsAction } from "../actions";
 import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
 
 type Contacts = { email: string; phone: string | null };
 
@@ -35,15 +36,11 @@ export function RevealContacts({ studentId }: { studentId: string }) {
   if (!contacts) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={reveal} disabled={pending} aria-busy={pending}>
-          <Eye data-icon="inline-start" />
+        <Button type="button" onClick={reveal} loading={pending}>
+          {!pending && <Eye data-icon="inline-start" />}
           {pending ? "Открываем…" : "Показать контакты"}
         </Button>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <FormMessage compact error={error} className="text-sm" />
         <p className="text-xs text-muted-foreground">
           Показ записывается в журнал доступа к персональным данным.
         </p>

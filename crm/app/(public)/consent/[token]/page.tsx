@@ -31,7 +31,7 @@ export default async function ConsentPage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Возможно, согласие уже получено или срок ссылки истёк.
             Напишите рекрутеру — он пришлёт новую.
@@ -44,7 +44,7 @@ export default async function ConsentPage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Согласие на обработку данных</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Согласие на обработку данных</CardTitle>
       </CardHeader>
       <CardContent>
         <ConsentForm

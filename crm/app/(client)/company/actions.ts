@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
+import type { FormState } from "@/lib/form-state";
 import { authorizeOrThrow, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { companyProfileSchema, updateCompanyProfile } from "@/lib/services/company-profile";
 import { pushCompanyProfile } from "@/lib/services/company-sync";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type CompanyProfileState = { error?: string; ok?: string; fields?: Record<string, string> };
+export type CompanyProfileState = FormState;
 
 /** Сохранить профиль компании и передать его на студенческую платформу. */
 export async function saveCompanyProfileAction(
@@ -19,11 +21,7 @@ export async function saveCompanyProfileAction(
   if (!actor.clientId) return { error: "Кабинет не привязан к компании" };
 
   const parsed = companyProfileSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!parsed.success) {
-    const fields: Record<string, string> = {};
-    for (const issue of parsed.error.issues) fields[String(issue.path[0])] ??= issue.message;
-    return { error: "Проверьте заполнение полей", fields };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     authorizeOrThrow(actor, "org.manageClientUsers", { clientId: actor.clientId });

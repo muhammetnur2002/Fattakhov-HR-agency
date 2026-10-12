@@ -10,8 +10,10 @@ import {
   terminateAgreementAction,
   type FormState,
 } from "@/app/(agency)/a/clients/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { oversizeMessage } from "@/lib/upload-limits";
 
 function Submit({
   label,
@@ -22,11 +24,10 @@ function Submit({
   pendingLabel: string;
   variant?: "default" | "outline";
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant={variant} disabled={pending}>
-      {pending ? pendingLabel : label}
-    </Button>
+    <SubmitButtonBase size="sm" variant={variant} pendingLabel={pendingLabel}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -48,11 +49,7 @@ export function ConfirmAgreementButton({
       <input type="hidden" name="agreementId" value={agreementId} />
       <input type="hidden" name="clientId" value={clientId} />
       <Submit label="Подтвердить условия" pendingLabel="Подтверждаем…" />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
     </form>
   );
 }
@@ -78,11 +75,7 @@ export function TerminateAgreementButton({
         pendingLabel="Расторгаем…"
         variant="outline"
       />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
     </form>
   );
 }
@@ -96,8 +89,14 @@ function FileInput({ formRef }: { formRef: React.RefObject<HTMLFormElement | nul
       name="file"
       accept=".pdf,.doc,.docx,.rtf,.odt,image/jpeg,image/png"
       disabled={pending}
-      onChange={() => formRef.current?.requestSubmit()}
-      className="text-xs file:mr-2 file:rounded-md file:border file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
+      onChange={(event) => {
+        // Больше предела запрос не дойдёт до сервера — говорим сразу, а не страницей с ошибкой
+        const message = oversizeMessage(event.target.files?.[0]);
+        event.target.setCustomValidity(message);
+        if (message) event.target.reportValidity();
+        else formRef.current?.requestSubmit();
+      }}
+      className="text-xs file:mr-2 file:rounded-md file:border file:border-field file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
     />
   );
 }
@@ -128,15 +127,14 @@ export function AgreementFileUpload({
           </a>
         </Button>
       )}
-      <form ref={formRef} action={formAction} className="flex flex-col gap-1">
+      <form ref={formRef} action={formAction} className="flex flex-col gap-2">
         <input type="hidden" name="agreementId" value={agreementId} />
         <input type="hidden" name="clientId" value={clientId} />
         <span className="text-xs text-muted-foreground">
           {fileUrl ? "Заменить скан" : "Прикрепить скан подписанного договора"}
         </span>
         <FileInput formRef={formRef} />
-        {state.error && <p className="text-xs text-destructive">{state.error}</p>}
-        {state.ok && <p className="text-xs text-muted-foreground">{state.ok}</p>}
+        <FormMessage compact error={state.error} ok={state.ok} />
       </form>
     </div>
   );

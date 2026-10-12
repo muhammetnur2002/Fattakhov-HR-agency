@@ -2,29 +2,27 @@
 
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { resetPasswordAction, type PasswordState } from "@/app/actions/passwords";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить пароль"}
-    </Button>
+    <SubmitButtonBase className="w-full" loading={loading} pendingLabel="Сохраняем…">
+      Сохранить пароль
+    </SubmitButtonBase>
   );
 }
 
 export function ResetForm({ token }: { token: string }) {
-  const [state, action] = useActionState<PasswordState, FormData>(
-    resetPasswordAction,
-    {},
-  );
+  // Пароль остаётся в странице после отказа («пароли не совпадают») — стирать оба поля незачем;
+  // наружу он не уходит никуда, кроме запроса
+  const { state, fields, pending, formProps } = useFormAction<PasswordState>(resetPasswordAction, {});
 
   if (state.ok) {
     return (
@@ -43,11 +41,14 @@ export function ResetForm({ token }: { token: string }) {
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
-      <div className="space-y-2">
-        <Label htmlFor="newPassword">Новый пароль</Label>
+      <Field
+        label="Новый пароль"
+        error={fields.newPassword}
+        hint="Не короче 10 символов. Длинная фраза надёжнее короткого набора символов и запоминается легче."
+      >
         <Input
           id="newPassword"
           name="newPassword"
@@ -56,14 +57,9 @@ export function ResetForm({ token }: { token: string }) {
           required
           autoFocus
         />
-        <p className="text-xs text-muted-foreground">
-          Не короче 10 символов. Длинная фраза надёжнее короткого набора
-          символов и запоминается легче.
-        </p>
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <Label htmlFor="newPasswordConfirm">Повторите пароль</Label>
+      <Field label="Повторите пароль" error={fields.newPasswordConfirm}>
         <Input
           id="newPasswordConfirm"
           name="newPasswordConfirm"
@@ -71,15 +67,11 @@ export function ResetForm({ token }: { token: string }) {
           autoComplete="new-password"
           required
         />
-      </div>
+      </Field>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
-      <SubmitButton />
+      <SubmitButton loading={pending} />
     </form>
   );
 }

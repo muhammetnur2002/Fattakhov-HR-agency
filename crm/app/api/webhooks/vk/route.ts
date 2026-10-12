@@ -1,12 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { recordVkEvent } from "@/lib/notifications/vk-events";
-import { vkMessageOf, vkSendMessage, type VkMessage } from "@/lib/notifications/vk-api";
-import {
-  consumeVkLinkCode,
-  secretsMatch,
-  vkLinkReply,
-} from "@/lib/notifications/vk-link";
+import { handleVkMessage } from "@/lib/notifications/vk-inbox";
+import { vkMessageOf, type VkMessage } from "@/lib/notifications/vk-api";
+import { secretsMatch } from "@/lib/notifications/vk-link";
 
 /**
  * Callback API сообщества ВКонтакте: сюда ВК присылает события сообщества.
@@ -34,9 +31,6 @@ type VkEvent = {
   secret?: string;
   object?: { message?: VkMessage } & VkMessage;
 };
-
-/** Короткий срок на ответ человеку: ВК ждёт наше «ok» и при задержке повторит событие. */
-const REPLY_TIMEOUT_MS = 4000;
 
 export async function POST(request: NextRequest) {
   const groupId = process.env.VK_GROUP_ID?.trim().replace(/^-/, "");
@@ -71,45 +65,17 @@ export async function POST(request: NextRequest) {
   }
 
   if (type === "message_new") {
-    await answerMessage(type, vkMessageOf(event.object));
+    const message = vkMessageOf(event.object);
+    await handleVkMessage({
+      type,
+      fromId: message?.from_id ?? 0,
+      text: message?.text ?? "",
+      payload: message?.payload,
+      cmid: message?.conversation_message_id ?? null,
+    });
   } else {
     await recordVkEvent(type, "ignored");
   }
 
   return new NextResponse("ok", { status: 200 });
-}
-
-/**
- * Обработать сообщение и ответить человеку. Не бросает: сбой ВК или базы
- * не должен превращаться в повтор события.
- */
-async function answerMessage(type: string, message: VkMessage | undefined) {
-  const fromId = message?.from_id;
-  // Сообщения от самого сообщества и от других сообществ не привязываем
-  if (!fromId || fromId <= 0) {
-    await recordVkEvent(type, "ignored");
-    return;
-  }
-
-  try {
-    const outcome = await consumeVkLinkCode(String(fromId), message?.text ?? "", new Date(), {
-      payload: message?.payload,
-    });
-    await recordVkEvent(type, outcome.status);
-
-    const token = process.env.VK_BOT_TOKEN?.trim();
-    if (!token) return;
-    const reply = await vkSendMessage(
-      token,
-      String(fromId),
-      vkLinkReply(outcome),
-      REPLY_TIMEOUT_MS,
-    );
-    if (!reply.ok) {
-      await recordVkEvent(type, "reply-failed", reply.code);
-      console.error(`vk-link: ответить не вышло, код ВК ${reply.code ?? "—"}`);
-    }
-  } catch (error) {
-    console.error("vk-link: не удалось обработать сообщение", error instanceof Error ? error.name : "");
-  }
 }

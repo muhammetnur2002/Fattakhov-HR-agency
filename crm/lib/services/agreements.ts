@@ -1,4 +1,4 @@
-import type { Actor } from "@/lib/access";
+import { assertCanDo, type Actor } from "@/lib/access";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import { findPreset, type PricingParams } from "@/lib/pricing";
@@ -182,6 +182,7 @@ export async function confirmAgreement(actor: Actor, agreementId: string) {
   });
 
   if (!agreement) throw new AgreementError("Договор не найден или уже подтверждён");
+  assertCanDo(actor, "agreement.manage", { clientId: agreement.clientId });
 
   await prisma.$transaction([
     prisma.agreement.update({
@@ -209,6 +210,7 @@ export async function terminateAgreement(actor: Actor, agreementId: string) {
   });
 
   if (!agreement) throw new AgreementError("Договор не найден");
+  assertCanDo(actor, "agreement.manage", { clientId: agreement.clientId });
 
   await prisma.$transaction([
     prisma.agreement.update({

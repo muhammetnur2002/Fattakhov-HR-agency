@@ -52,7 +52,7 @@ export function CandidateCard({
    */
   movable?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+  const { listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id, disabled: !draggable });
 
   /*
@@ -82,7 +82,16 @@ export function CandidateCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      {...attributes}
+      /*
+        Атрибуты доступности dnd-kit (role="button", tabIndex, aria-disabled,
+        aria-describedby) намеренно не подключены. Они делали из всей карточки
+        одну кнопку: в кабинете клиента, где карточки неподвижны, она получала
+        aria-disabled="true", и экранный диктор считал недоступными ссылку
+        с именем, меню этапа и галочку выбора внутри. А «нажмите пробел, чтобы
+        поднять» обещало перенос с клавиатуры, которого на доске нет (датчиков
+        только два — мышь и касание). Без мыши кандидата переводит меню
+        «Переместить на этап» на самой карточке.
+      */
       {...listeners}
       onPointerDownCapture={() => {
         dragged.current = false;
@@ -113,7 +122,7 @@ export function CandidateCard({
           "cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] active:cursor-grabbing",
         isDragging && "opacity-40",
         overdue && "border-destructive/50",
-        rejected && "opacity-60",
+        rejected && "border-dashed bg-muted/50",
       )}
     >
       <div className="flex items-start gap-2">

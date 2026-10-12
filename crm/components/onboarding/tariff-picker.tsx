@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import type { OnboardingState } from "@/app/(onboarding)/onboarding/actions";
 import { acceptTariffAction } from "@/app/(onboarding)/onboarding/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectionCheck } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,11 +22,10 @@ import {
 import { cn } from "@/lib/utils";
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" disabled={disabled || pending}>
-      {pending ? "Отправляем…" : "Выбрать эти условия"}
-    </Button>
+    <SubmitButtonBase size="lg" disabled={disabled} pendingLabel="Отправляем…">
+      Выбрать эти условия
+    </SubmitButtonBase>
   );
 }
 
@@ -55,7 +54,7 @@ export function TariffPicker() {
   const cheapestPerHire = perHireFees.length ? Math.min(...perHireFees) : null;
 
   return (
-    <form action={formAction} className="space-y-8">
+    <form action={formAction} className="space-y-6">
       <section className="space-y-4">
         <div>
           <h2 className="text-lg font-medium">Ваша вилка</h2>
@@ -72,7 +71,6 @@ export function TariffPicker() {
               id="salary"
               type="number"
               min={0}
-              step={10_000}
               value={salary}
               onChange={(e) => setSalary(Math.max(0, Number(e.target.value) || 0))}
             />
@@ -83,7 +81,6 @@ export function TariffPicker() {
               id="bonus"
               type="number"
               min={0}
-              step={50_000}
               value={bonus}
               onChange={(e) => setBonus(Math.max(0, Number(e.target.value) || 0))}
             />
@@ -114,11 +111,7 @@ export function TariffPicker() {
 
       <input type="hidden" name="presetKey" value={selected ?? ""} />
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <div className="flex flex-wrap items-center gap-4">
         <SubmitButton disabled={!selected} />
@@ -169,14 +162,18 @@ function TariffCard({
         }
       }}
       className={cn(
-        "cursor-pointer transition-colors",
-        selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/40",
+        "relative cursor-pointer transition-colors",
+        selected ? "border-primary ring-2 ring-primary" : "hover:border-primary/40",
       )}
     >
-      <CardContent className="space-y-3 p-4">
-        <div>
-          <div className="font-medium">{preset.title}</div>
-          <div className="text-xs text-muted-foreground">{preset.bestFor}</div>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="font-medium">{preset.title}</div>
+            <div className="text-xs text-muted-foreground">{preset.bestFor}</div>
+          </div>
+          {/* Выбор — не только цвет рамки: галочка видна и без различения оттенков */}
+          {selected && <SelectionCheck />}
         </div>
 
         <div>

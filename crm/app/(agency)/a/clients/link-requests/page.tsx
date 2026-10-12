@@ -1,12 +1,12 @@
-import Link from "next/link";
-
 import { LinkRequestActions } from "./link-request-actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { listAccountManagers, listClients } from "@/lib/services/clients";
 import { fetchCrmLinkRequests } from "@/lib/students-service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Заявки на привязку к CRM" };
 
@@ -35,14 +35,14 @@ export default async function LinkRequestsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/a/clients">← Клиенты</Link>
-        </Button>
+      <div className="flex">
+        <BackLink href="/a/clients" className="mb-0">
+          Клиенты
+        </BackLink>
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold">Заявки на привязку к CRM</h1>
+        <PageTitle>Заявки на привязку к CRM</PageTitle>
         <p className="text-sm text-muted-foreground">
           {requests.length === 0
             ? "Заявок пока нет"
@@ -51,20 +51,18 @@ export default async function LinkRequestsPage() {
       </div>
 
       {requests.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Сюда попадают компании, которые зарегистрировались сами на
-            студенческой платформе и оставили заявку «у нас уже есть
-            профиль в CRM».
-          </CardContent>
-        </Card>
+        <EmptyState>
+          Сюда попадают компании, которые зарегистрировались сами на
+          студенческой платформе и оставили заявку «у нас уже есть профиль в
+          CRM».
+        </EmptyState>
       ) : (
         <div className="grid gap-3">
           {requests.map((r) => {
             const moderation = MODERATION_LABELS[r.moderationStatus] ?? MODERATION_LABELS.PENDING;
             return (
               <Card key={r.employerId}>
-                <CardContent className="space-y-4 p-5">
+                <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{r.companyName}</span>
                     <Badge variant={moderation.variant}>{moderation.label}</Badge>

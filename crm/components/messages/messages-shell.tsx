@@ -1,7 +1,5 @@
 "use client";
 
-import { Search } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -9,11 +7,13 @@ import { ConversationList } from "./conversation-list";
 import { DirectConversationList } from "./direct-conversation-list";
 import { NewMessageDialog } from "./new-message-dialog";
 import { PresenceRefresh } from "@/components/presence/presence-refresh";
-import { Button } from "@/components/ui/button";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { useKeyboardViewport } from "@/lib/hooks/use-keyboard-viewport";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/lib/services/comments";
 import type { Correspondent, DirectConversation } from "@/lib/services/messages";
+import { PageTitle } from "@/components/ui/page-title";
 
 /**
  * Раздел «Сообщения» целиком: список диалогов слева, открытая переписка
@@ -105,50 +105,40 @@ export function MessagesShell({
         )}
       >
         <div className="flex items-center justify-between gap-3 border-b p-4">
-          <h1 className="text-lg font-semibold">Сообщения</h1>
+          <PageTitle compact>Сообщения</PageTitle>
           <NewMessageDialog correspondents={correspondents} hrefBase={hrefBase} />
         </div>
 
-        <div className="flex gap-2 px-3 pb-3 pt-1">
-          <Button asChild variant={workTab ? "outline" : "secondary"} size="sm">
-            <Link href={listBase}>Личные{directUnread > 0 ? ` · ${directUnread}` : ""}</Link>
-          </Button>
-          <Button asChild variant={workTab ? "secondary" : "outline"} size="sm">
-            <Link href={`${listBase}?tab=work`}>По работе{workUnread > 0 ? ` · ${workUnread}` : ""}</Link>
-          </Button>
-        </div>
+        <FilterChipGroup label="Раздел сообщений" className="px-3 pb-3 pt-1">
+          <FilterChip href={listBase} selected={!workTab}>
+            Личные{directUnread > 0 ? ` · ${directUnread}` : ""}
+          </FilterChip>
+          <FilterChip href={`${listBase}?tab=work`} selected={workTab}>
+            По работе{workUnread > 0 ? ` · ${workUnread}` : ""}
+          </FilterChip>
+        </FilterChipGroup>
 
         {!workTab && direct.length > 0 && (
           <div className="space-y-2.5 px-3 pb-3">
-            <div className="flex h-9 items-center gap-2 rounded-xl border bg-muted/40 px-3">
-              <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Поиск"
-                aria-label="Поиск по диалогам"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none touch:text-base placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="pill-scroller flex gap-2">
-              <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+            <SearchField value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск" aria-label="Поиск по диалогам" />
+            <FilterChipGroup label="Какие диалоги" className="pill-scroller flex-nowrap">
+              <FilterChip selected={filter === "all"} onClick={() => setFilter("all")}>
                 Все
               </FilterChip>
-              <FilterChip active={filter === "unread"} onClick={() => setFilter("unread")}>
+              <FilterChip selected={filter === "unread"} onClick={() => setFilter("unread")}>
                 Непрочитанные{directUnread > 0 ? ` · ${directUnread}` : ""}
               </FilterChip>
               {isAgency && (
                 <>
-                  <FilterChip active={filter === "clients"} onClick={() => setFilter("clients")}>
+                  <FilterChip selected={filter === "clients"} onClick={() => setFilter("clients")}>
                     Клиенты
                   </FilterChip>
-                  <FilterChip active={filter === "team"} onClick={() => setFilter("team")}>
+                  <FilterChip selected={filter === "team"} onClick={() => setFilter("team")}>
                     Команда
                   </FilterChip>
                 </>
               )}
-            </div>
+            </FilterChipGroup>
           </div>
         )}
 
@@ -182,32 +172,6 @@ export function MessagesShell({
 }
 
 type DirectFilter = "all" | "unread" | "clients" | "team";
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-background text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 function hrefForWork(c: ConversationSummary, hrefBase: string): string {
   if (hrefBase === "/a") {

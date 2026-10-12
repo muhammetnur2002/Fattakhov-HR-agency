@@ -1,9 +1,10 @@
 "use client";
 
-import { Search } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useListNavigation } from "@/components/shell/list-pending";
+import { ListSearchInput, ListToolbar } from "@/components/shell/list-toolbar";
 import { Input } from "@/components/ui/input";
 import { cn, NO_NUMBER_SPINNER } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ const STORAGE_KEY = "candidateFilters";
  * иначе поиск и вилку приходилось набирать заново при каждом визите.
  */
 export function CandidateFilters() {
-  const router = useRouter();
+  const { navigate, pending } = useListNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -72,7 +73,7 @@ export function CandidateFilters() {
       // Новый фильтр — заново с первой страницы: иначе можно листать
       // страницу 3 узкого списка и не увидеть, что в нём всего 5 карточек
       params.delete("page");
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      navigate(`${pathname}?${params.toString()}`);
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({ q: query, sf: salaryFrom, st: salaryTo }),
@@ -83,44 +84,45 @@ export function CandidateFilters() {
   }, [query, salaryFrom, salaryTo]);
 
   return (
-    // Колонкой до lg: боковая панель кабинета съедает ~240px в любую
-    // ширину экрана, и на sm (640px) — обычном планшете с открытым
-    // сайдбаром — поиск и диапазон всё равно не помещались в ряд
-    // и переносились сами, просто без видимой причины
-    <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-      <div className="relative w-full lg:max-w-xs">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
+    // Тот же шаблон, что у вакансий, клиентов и заявок (ListToolbar): поиск
+    // первой строкой одной ширины со всеми списками, вилка зарплаты под ним.
+    // Раньше поиск и вилка стояли рядом с lg и до него переносились сами —
+    // и поле поиска было уже, чем у соседних разделов
+    <ListToolbar
+      search={
+        <ListSearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Имя, должность, компания…"
-          aria-label="Поиск по кандидатам"
-          className="pl-8"
+          label="Поиск по кандидатам"
+          pending={pending}
         />
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={salaryFrom}
-          onChange={(e) => setSalaryFrom(e.target.value)}
-          placeholder="ЗП от"
-          aria-label="Зарплата от"
-          className={cn(NO_NUMBER_SPINNER, "min-w-0 flex-1 lg:w-28 lg:flex-none")}
-        />
-        <span className="shrink-0 text-sm text-muted-foreground">—</span>
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={salaryTo}
-          onChange={(e) => setSalaryTo(e.target.value)}
-          placeholder="до"
-          aria-label="Зарплата до"
-          className={cn(NO_NUMBER_SPINNER, "min-w-0 flex-1 lg:w-28 lg:flex-none")}
-        />
-      </div>
-    </div>
+      }
+      filters={
+        <div className="flex w-full items-center gap-1.5 sm:w-auto">
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={salaryFrom}
+            onChange={(e) => setSalaryFrom(e.target.value)}
+            placeholder="ЗП от"
+            aria-label="Зарплата от"
+            className={cn(NO_NUMBER_SPINNER, "min-w-0 flex-1 sm:w-28 sm:flex-none")}
+          />
+          <span className="shrink-0 text-sm text-muted-foreground">—</span>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={salaryTo}
+            onChange={(e) => setSalaryTo(e.target.value)}
+            placeholder="до"
+            aria-label="Зарплата до"
+            className={cn(NO_NUMBER_SPINNER, "min-w-0 flex-1 sm:w-28 sm:flex-none")}
+          />
+        </div>
+      }
+    />
   );
 }

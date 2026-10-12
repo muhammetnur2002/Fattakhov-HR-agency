@@ -21,7 +21,7 @@ export function CookieBanner() {
     <div
       role="region"
       aria-label="Уведомление о файлах cookie"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--hairline)] bg-ink/95 backdrop-blur"
+      className="clear-theme-toggle fixed inset-x-0 bottom-0 z-50 border-t border-[var(--hairline)] bg-ink/95 backdrop-blur"
     >
       <div className="page-x mx-auto flex max-w-[2200px] flex-col gap-4 py-4 sm:flex-row sm:items-center">
         <p className="flex-1 text-[12.5px] leading-relaxed text-paper-dim">

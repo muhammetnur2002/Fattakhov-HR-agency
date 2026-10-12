@@ -1,13 +1,15 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { ImagePlus, Trash2 } from "lucide-react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import type { VacancyDetail, VacancyFields } from "@/lib/students-service";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type { VacancyFormState } from "./actions";
@@ -150,10 +153,11 @@ export function PhotosField({ initialPhotos }: { initialPhotos: string[] }) {
             type="button"
             variant="outline"
             size="sm"
-            disabled={busy || photos.length >= MAX_PHOTOS}
+            loading={busy}
+            disabled={photos.length >= MAX_PHOTOS}
             onClick={() => input.current?.click()}
           >
-            <ImagePlus className="mr-1 size-4" aria-hidden />
+            {!busy && <ImagePlus className="mr-1 size-4" aria-hidden />}
             {busy ? "Загружаем…" : photos.length === 0 ? "Добавить фото" : "Добавить ещё"}
           </Button>
           <p className="text-xs text-muted-foreground">
@@ -171,21 +175,47 @@ export function PhotosField({ initialPhotos }: { initialPhotos: string[] }) {
           aria-label="Файлы фото"
           onChange={(event) => void upload(event.target.files)}
         />
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        <FormMessage compact error={error} className="text-sm" />
       </CardContent>
     </Card>
   );
 }
 
-function SubmitButtons({ submitLabel, pending }: { submitLabel: string; pending: boolean }) {
+/**
+ * Две кнопки в одной форме: индикатор и «идёт» — только у нажатой (`pressed` — её значение),
+ * вторая просто блокируется. Форма уходит вручную, `useFormStatus` её не видит, поэтому
+ * состояние приходит снаружи.
+ */
+function SubmitButtons({
+  submitLabel,
+  pending,
+  pressed,
+}: {
+  submitLabel: string;
+  pending: boolean;
+  pressed: string | null;
+}) {
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="submit" name="submit" value="false" variant="outline" disabled={pending}>
-        {pending ? "Сохраняем…" : "Сохранить черновик"}
-      </Button>
-      <Button type="submit" name="submit" value="true" disabled={pending}>
-        {pending ? "Отправляем…" : submitLabel}
-      </Button>
+      <SubmitButton
+        name="submit"
+        value="false"
+        variant="outline"
+        loading={pending && pressed === "false"}
+        disabled={pending}
+        pendingLabel="Сохраняем…"
+      >
+        Сохранить черновик
+      </SubmitButton>
+      <SubmitButton
+        name="submit"
+        value="true"
+        loading={pending && pressed === "true"}
+        disabled={pending}
+        pendingLabel="Отправляем…"
+      >
+        {submitLabel}
+      </SubmitButton>
     </div>
   );
 }
@@ -202,21 +232,24 @@ export function VacancyForm({
   skipsModeration: boolean;
   fieldErrors?: Record<string, string>;
 }) {
-  const [state, formAction, pending] = useActionState<VacancyFormState, FormData>(action, {});
-
-  // Отправляем вручную, а не через action формы: React 19 после action очищает все
+  // Отправка через useFormAction, а не через action формы: React 19 после action очищает все
   // поля формы, и при любой ошибке («заполните ИНН», «выберите день») клиент терял бы
-  // всё, что успел ввести
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
-    const data = new FormData(event.currentTarget, submitter);
-    startTransition(() => formAction(data));
-  }
+  // всё, что успел ввести. Фокус после отказа уходит на первое неверное поле
+  const { state, pending, formProps } = useFormAction<VacancyFormState>(action, {});
+  // Какая из двух кнопок нажата — чтобы индикатор крутился на ней, а не на обеих
+  const [pressed, setPressed] = useState<string | null>(null);
   const errors = state.fields ?? fieldErrors ?? {};
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      {...formProps}
+      onSubmit={(event) => {
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+        setPressed(submitter?.getAttribute("value") ?? null);
+        formProps.onSubmit(event);
+      }}
+      className="space-y-6"
+    >
       <PhotosField initialPhotos={initial?.photos ?? []} />
 
       <Card>
@@ -224,16 +257,12 @@ export function VacancyForm({
           <CardTitle className="text-base">Основное</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Должность</Label>
+          <Field label="Должность" error={errors.title}>
             <Input id="title" name="title" defaultValue={initial?.title} required />
-            {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="summary">Описание</Label>
+          </Field>
+          <Field label="Описание" error={errors.summary}>
             <Textarea id="summary" name="summary" rows={4} defaultValue={initial?.summary} required />
-            {errors.summary && <p className="text-sm text-destructive">{errors.summary}</p>}
-          </div>
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="requirements">Требования (по строке на пункт)</Label>
@@ -276,11 +305,9 @@ export function VacancyForm({
               <Label htmlFor="salaryFrom">Оплата от</Label>
               <Input id="salaryFrom" name="salaryFrom" type="number" min={0} defaultValue={initial?.salaryFrom ?? ""} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="salaryTo">Оплата до</Label>
+            <Field label="Оплата до" error={errors.salaryTo}>
               <Input id="salaryTo" name="salaryTo" type="number" min={0} defaultValue={initial?.salaryTo ?? ""} />
-              {errors.salaryTo && <p className="text-sm text-destructive">{errors.salaryTo}</p>}
-            </div>
+            </Field>
             <div className="space-y-2">
               <Label htmlFor="salaryPeriod">За период</Label>
               <Select name="salaryPeriod" defaultValue={initial?.salaryPeriod ?? "MONTH"}>
@@ -332,18 +359,16 @@ export function VacancyForm({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Город</Label>
-              <Input name="city" defaultValue={initial?.city ?? "Казань"} required />
-            </div>
+            <Field label="Город" className="sm:col-span-2" error={errors.city}>
+              <Input id="city" name="city" defaultValue={initial?.city ?? "Казань"} required />
+            </Field>
             <div className="space-y-2">
               <Label htmlFor="hoursPerWeek">Часов в неделю</Label>
               <Input id="hoursPerWeek" name="hoursPerWeek" type="number" min={4} max={60} defaultValue={initial?.hoursPerWeek ?? ""} />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Дни</Label>
+          <FieldSet id="shiftDays-group" legend="Дни" error={errors.shiftDays} className="space-y-2">
             <div className="flex flex-wrap gap-3">
               {WEEKDAYS.map((day) => (
                 <label key={day} className="flex items-center gap-1.5 text-sm">
@@ -352,16 +377,17 @@ export function VacancyForm({
                 </label>
               ))}
             </div>
-            {errors.shiftDays && <p className="text-sm text-destructive">{errors.shiftDays}</p>}
-          </div>
+          </FieldSet>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="address">Адрес (улица, дом)</Label>
+            <Field
+              label="Адрес (улица, дом)"
+              className="sm:col-span-2"
+              hint="Не нужен для удалённой работы."
+              error={errors.address}
+            >
               <Input id="address" name="address" defaultValue={initial?.address ?? ""} />
-              {errors.address && <p className="text-sm text-destructive">{errors.address}</p>}
-              <p className="text-xs text-muted-foreground">Не нужен для удалённой работы.</p>
-            </div>
+            </Field>
             <div className="space-y-2">
               <Label htmlFor="addressDetails">Этаж, офис</Label>
               <Input id="addressDetails" name="addressDetails" defaultValue={initial?.addressDetails ?? ""} />
@@ -386,13 +412,9 @@ export function VacancyForm({
         </CardContent>
       </Card>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
-      <SubmitButtons submitLabel={skipsModeration ? "Опубликовать" : "Отправить на проверку"} pending={pending} />
+      <SubmitButtons submitLabel={skipsModeration ? "Опубликовать" : "Отправить на проверку"} pending={pending} pressed={pressed} />
       <p className="text-xs text-muted-foreground">
         {skipsModeration
           ? "По вашему договору вакансия публикуется сразу, без проверки агентством."

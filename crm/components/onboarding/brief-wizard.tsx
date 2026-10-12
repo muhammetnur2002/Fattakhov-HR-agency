@@ -6,7 +6,9 @@ import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 
 import { completeBriefAction } from "@/app/(onboarding)/onboarding/actions";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -338,16 +340,18 @@ export function BriefWizard({
   const progress = done ? 100 : Math.round((index / steps.length) * 100);
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="relative overflow-hidden">
       {/* Прогресс — полоса и слова. Полоса одна не говорит, сколько
-          осталось; «3 из 8» говорит */}
+          осталось; «3 из 8» говорит. Полоса лежит поверх верхнего края и
+          места не занимает: иначе сверху до содержимого было на её высоту
+          и зазор карточки больше, чем снизу */}
       <div
         role="progressbar"
         aria-label="Анкета"
         aria-valuemin={0}
         aria-valuemax={steps.length}
         aria-valuenow={done ? steps.length : index}
-        className="h-1 bg-muted"
+        className="absolute inset-x-0 top-0 h-1 bg-muted"
       >
         <motion.div
           className="h-full bg-primary"
@@ -357,7 +361,10 @@ export function BriefWizard({
         />
       </div>
 
-      <CardContent className="p-6 sm:p-10">
+      <CardContent>
+        {/* Свободные поля анкеты — внутренней обёрткой, не отступом CardContent:
+            верх и низ равны (правило карточек, tests/ui-scale-rules.test.ts) */}
+        <div className="px-3 py-3 sm:px-7 sm:py-7">
         <AnimatePresence mode="wait" custom={direction} initial={false}>
           {done ? (
             <motion.div
@@ -401,7 +408,7 @@ export function BriefWizard({
                 {step.fields.map((field, i) => {
                   const invalid = error?.field === field.key;
                   return (
-                    <div key={field.key} className="space-y-1.5">
+                    <div key={field.key} className="space-y-2">
                       <Label
                         htmlFor={`f-${field.key}`}
                         // Один вопрос — одно поле: подпись повторила бы
@@ -433,9 +440,9 @@ export function BriefWizard({
               </div>
 
               {error && (
-                <p id="brief-error" role="alert" className="text-sm text-destructive">
+                <FieldError id="brief-error" role="alert">
                   {error.message}
-                </p>
+                </FieldError>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -456,14 +463,15 @@ export function BriefWizard({
                       Пропустить
                     </Button>
                   )}
-                  <Button type="submit" disabled={pending}>
-                    {pending ? "Сохраняем…" : last ? "Готово" : "Далее"}
-                  </Button>
+                  <SubmitButton loading={pending} pendingLabel="Сохраняем…">
+                    {last ? "Готово" : "Далее"}
+                  </SubmitButton>
                 </div>
               </div>
             </motion.form>
           )}
         </AnimatePresence>
+        </div>
       </CardContent>
     </Card>
   );

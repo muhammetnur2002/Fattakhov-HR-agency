@@ -1,5 +1,6 @@
 import 'server-only';
 import { agencySiteUrl } from '@/lib/agency';
+import { auditCutoff } from '@/lib/audit-retention';
 import { appUrl } from '@/lib/app-url';
 import { getStore } from '@/lib/db';
 import type {
@@ -10,6 +11,7 @@ import type {
   VacancyRecord,
 } from '@/lib/db/types';
 import {
+  agencyMessageMail,
   applicationStatusMail,
   closedVacancyReminderMail,
   companyDecisionMail,
@@ -23,6 +25,7 @@ import {
   type MailContent,
 } from '@/lib/mail/templates';
 import { sendMail } from '@/lib/mail/transport';
+import { sweepOrphanFiles } from '@/lib/stored-files';
 import { notifyCrm } from '@/lib/notify-crm';
 import { sendPushToAccount, type PushMessage } from '@/lib/push/send';
 import { decryptSafe } from '@/lib/security/crypto';
@@ -298,7 +301,19 @@ export interface NotificationRunResult {
   messageDigests: number;
   closedVacancyReminders: number;
   closedVacancyDeletions: number;
+  /** Суточная уборка (журнал аудита старше срока, файлы-сироты) выполнялась в этом проходе */
+  maintenanceRan: boolean;
+  /** Записей журнала аудита старше 12 месяцев удалено */
+  auditPurged: number;
+  /** Файлов-сирот удалено из хранилища */
+  orphanFilesDeleted: number;
 }
+
+/**
+ * Суточная уборка запускается не чаще раза в это время, как бы часто ни вызывали проход:
+ * напоминания можно гонять каждые 10 минут, а лимит удаления файлов рассчитан на сутки.
+ */
+export const MAINTENANCE_EVERY_MS = 20 * 60 * 60_000;
 
 /**
  * Один проход напоминаний: срок справки, отклики, которые скоро удалятся,
@@ -306,7 +321,10 @@ export interface NotificationRunResult {
  * отправленное — отметки лежат в NotificationLog. Запускается по расписанию
  * (npm run notify:run) или HR-менеджером из панели.
  */
-export async function runNotificationJobs(now: Date = new Date()): Promise<NotificationRunResult> {
+export async function runNotificationJobs(
+  now: Date = new Date(),
+  options: { forceMaintenance?: boolean } = {},
+): Promise<NotificationRunResult> {
   const store = await getStore();
   const result: NotificationRunResult = {
     studyDeadline: 0,
@@ -314,6 +332,9 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
     messageDigests: 0,
     closedVacancyReminders: 0,
     closedVacancyDeletions: 0,
+    maintenanceRan: false,
+    auditPurged: 0,
+    orphanFilesDeleted: 0,
   };
 
   for (const student of await store.students.list()) {
@@ -428,7 +449,44 @@ export async function runNotificationJobs(now: Date = new Date()): Promise<Notif
     }
   }
 
+  await runDailyMaintenance(store, now, options.forceMaintenance === true, result);
+
   return result;
+}
+
+/**
+ * Суточная уборка персональных данных, которая не про напоминания, но живёт в той же ночной
+ * задаче (отдельного планировщика нет): журнал аудита старше срока хранения и загруженные
+ * файлы без владельца. Отметка о запуске — запись в журнале; не чаще раза в MAINTENANCE_EVERY_MS.
+ * Шаги независимы: сбой одного не мешает другому и не ломает рассылку напоминаний.
+ */
+async function runDailyMaintenance(
+  store: Awaited<ReturnType<typeof getStore>>,
+  now: Date,
+  force: boolean,
+  result: NotificationRunResult,
+): Promise<void> {
+  try {
+    const key = { action: 'maintenance.daily', actorLabel: 'SYSTEM', entityId: 'daily' };
+    if (!force && (await store.audit.recentExists({ ...key, since: new Date(now.getTime() - MAINTENANCE_EVERY_MS) }))) return;
+    // Отметка ставится до работы: упавший посреди уборки запуск не должен повторяться каждые 10 минут
+    await store.audit.log({ accountId: null, ...key, entity: null, ip: null, userAgent: null, meta: null });
+    result.maintenanceRan = true;
+  } catch (error) {
+    console.error('[уборка] не удалось проверить суточный запуск:', error);
+    return;
+  }
+
+  try {
+    result.auditPurged = await store.audit.purgeOlderThan(auditCutoff(now));
+  } catch (error) {
+    console.error('[уборка] журнал аудита не очищен:', error);
+  }
+  try {
+    result.orphanFilesDeleted = (await sweepOrphanFiles(store, { now })).deleted;
+  } catch (error) {
+    console.error('[уборка] файлы-сироты не убраны:', error);
+  }
 }
 
 /**
@@ -480,4 +538,39 @@ export async function notifyStudentNewMessage(applicationId: string): Promise<vo
   } catch (error) {
     console.error('[уведомление] сообщение работодателя не передано в колокольчик:', error);
   }
+}
+
+
+/**
+ * Агентство написало студенту: колокольчик, пуш и письмо. Пока по этой беседе
+ * есть непрочитанное уведомление, новое не заводим: пять реплик подряд — один
+ * пункт в списке и одно письмо, а не пять.
+ */
+export async function notifyStudentAgencyMessage(studentId: string): Promise<void> {
+  try {
+    const store = await getStore();
+    const student = await store.students.findById(studentId);
+    if (!student) return;
+
+    const href = '/messages/agency';
+    const recent = await store.studentNotifications.listByStudent(studentId, 20);
+    if (recent.some((n) => n.kind === 'message' && n.href === href && !n.readAt)) return;
+
+    await pushStudent(studentId, { kind: 'message', title: 'Новое сообщение от агентства', href });
+    await deliver(student.accountId, agencyMessageMail({ url: appUrl(href) }), 'reminder');
+  } catch (error) {
+    console.error('[уведомление] сообщение агентства не передано студенту:', error);
+  }
+}
+
+/** Студент ответил агентству: пинг в CRM — колокольчик сотрудникам, которые с ним работают. */
+export async function notifyCrmStudentReply(studentId: string): Promise<void> {
+  await notifyCrm(
+    'agency-message',
+    'Студент ответил в переписке',
+    undefined,
+    `agency-message:${studentId}`,
+    undefined,
+    studentId,
+  );
 }

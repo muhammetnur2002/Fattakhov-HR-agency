@@ -102,10 +102,11 @@ function TileCard({ tile }: { tile: Tile }) {
   return (
     <article
       className={cn(
-        "group relative flex h-full min-h-48 flex-col justify-between overflow-hidden rounded-2xl p-5 md:min-h-56",
-        tile.tone === "light" && "border bg-card",
-        tile.tone === "graphite" && "bg-brand-graphite text-white",
-        tile.tone === "slate" && "bg-brand-slate text-white",
+        "group relative flex h-full min-h-40 flex-col justify-between overflow-hidden rounded-2xl border p-5 md:min-h-44",
+        // Контур у каждой плитки: у тёмных он светлый, иначе в тёмной теме они сливаются с фоном
+        tile.tone === "light" && "bg-card",
+        tile.tone === "graphite" && "border-white/25 bg-brand-graphite text-white",
+        tile.tone === "slate" && "border-white/25 bg-brand-slate text-white",
       )}
     >
       {tile.tone === "slate" && (
@@ -135,12 +136,14 @@ function TileCard({ tile }: { tile: Tile }) {
 
       <h3
         className={cn(
-          "relative mt-8 leading-[1.03] font-semibold tracking-tight text-balance",
+          "relative mt-6 leading-[1.03] font-semibold tracking-tight text-balance",
           // Остальные — text-4xl только с 2xl: на 1280 при корне 125%
-          // «Системный» в плитку из трёх колонок не помещался на 7px
+          // «Системный» в плитку из трёх колонок не помещался на 7px.
+          // Выделенная — не крупнее h2 раздела (28/45), иначе подзаголовок
+          // «перекрикивает» заголовок: было text-4xl md:text-6xl, то есть 36 и 60
           tile.featured
-            ? "text-4xl md:text-6xl"
-            : "text-3xl 2xl:text-4xl",
+            ? "text-3xl md:text-4xl"
+            : "text-2xl 2xl:text-4xl",
         )}
       >
         {tile.title}
@@ -151,7 +154,7 @@ function TileCard({ tile }: { tile: Tile }) {
 
 export function RoleMosaic() {
   return (
-    <div className="mt-12 space-y-3">
+    <div className="space-y-3">
       {ROWS.map((row, i) => (
         <div key={i} className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
           {row.map((tile, j) => (

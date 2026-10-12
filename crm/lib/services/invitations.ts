@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
 
 import { hashPassword } from "@/lib/auth/password";
+import {
+  inviteTokenColumns,
+  inviteTokenHash,
+  openInviteToken,
+  sealInviteToken,
+} from "@/lib/auth/invite-token";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
@@ -127,7 +133,7 @@ export async function createInvitation(params: {
         clientId: params.clientId ?? null,
         position: params.position ?? null,
         grants: [...(params.grants ?? [])],
-        token: newToken,
+        ...inviteTokenColumns(newToken),
         expiresAt,
         createdById: params.createdById,
       },
@@ -231,9 +237,8 @@ export async function getInvitation(
   token: string,
 ): Promise<InviteDetails | null> {
   const invite = await prisma.invitation.findFirst({
-    where: { token, acceptedAt: null, expiresAt: { gt: new Date() } },
+    where: { tokenHash: inviteTokenHash(token), acceptedAt: null, expiresAt: { gt: new Date() } },
     select: {
-      token: true,
       email: true,
       role: true,
       clientId: true,
@@ -258,7 +263,8 @@ export async function getInvitation(
   ]);
 
   return {
-    token: invite.token,
+    // Тот, что принесла ссылка: в базе открытого токена уже нет
+    token,
     email: invite.email,
     role: invite.role,
     organizationName: organization?.name ?? "",
@@ -304,7 +310,7 @@ export async function acceptInvitation(params: {
   const passwordHash = await hashPassword(params.password);
 
   const full = await prisma.invitation.findFirst({
-    where: { token: params.token },
+    where: { tokenHash: inviteTokenHash(params.token) },
     select: {
       id: true,
       organizationId: true,
@@ -336,7 +342,8 @@ export async function acceptInvitation(params: {
       }),
       prisma.invitation.update({
         where: { id: full.id },
-        data: { acceptedAt: new Date() },
+        // Принятая ссылка не нужна никому, в том числе в виде шифра
+        data: { acceptedAt: new Date(), token: null, tokenEnc: null },
       }),
     ]);
   } catch (error) {
@@ -350,4 +357,28 @@ export async function acceptInvitation(params: {
   }
 
   return { email: invite.email };
+}
+
+/**
+ * Токен для показа команде в списке «Ждут принятия».
+ *
+ * У приглашений, созданных до перехода на хеши, токен ещё лежит открытым
+ * текстом. При первом показе он переезжает под шифр, а открытое поле
+ * стирается: так ссылка перестаёт храниться открыто, не дожидаясь срока.
+ * Сбой записи показ не ломает — ссылка просто останется как была.
+ */
+export async function inviteTokenForDisplay(row: {
+  id: string;
+  token: string | null;
+  tokenEnc: string | null;
+}): Promise<string | null> {
+  if (row.token && !row.tokenEnc) {
+    const sealed = sealInviteToken(row.token);
+    if (sealed) {
+      await prisma.invitation
+        .update({ where: { id: row.id }, data: { tokenEnc: sealed, token: null } })
+        .catch((error) => console.error("[приглашение] не удалось перенести токен под шифр", error));
+    }
+  }
+  return openInviteToken(row);
 }

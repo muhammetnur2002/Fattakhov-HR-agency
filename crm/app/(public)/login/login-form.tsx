@@ -1,20 +1,18 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { login, type LoginState } from "./actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Входим…" : label}
-    </Button>
+    <SubmitButtonBase className="w-full" pendingLabel="Входим…">
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -91,11 +89,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
         </div>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <SubmitButton label={state.needsCode ? "Подтвердить" : "Войти"} />
     </form>

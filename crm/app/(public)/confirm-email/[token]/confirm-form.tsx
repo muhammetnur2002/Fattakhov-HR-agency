@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { confirmEmailAction, type ConfirmEmailState } from "./actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Подтверждаем…" : "Подтвердить почту"}
-    </Button>
+    <SubmitButtonBase className="w-full" pendingLabel="Подтверждаем…">
+      Подтвердить почту
+    </SubmitButtonBase>
   );
 }
 
@@ -40,11 +39,7 @@ export function ConfirmEmailForm({ token }: { token: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="token" value={token} />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
       <Submit />
     </form>
   );

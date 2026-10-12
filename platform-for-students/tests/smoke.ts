@@ -14,6 +14,9 @@
  */
 
 import crypto from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { STUDENT_CONSENT_VERSION } from '../lib/legal';
 
 const BASE = process.env.SMOKE_URL ?? 'http://localhost:3007';
 
@@ -914,6 +917,87 @@ async function main() {
     partial.status === 200 && String(afterPartial.body).includes('Бот расписания для группы'),
     partial.status,
   );
+
+  // ---------- ПДн: согласие, замена файлов, видео, журнал чтения ----------
+  console.log('\nПДн студента');
+  const consentUrl = '/api/students/me/consent';
+  check('гость не принимает согласие', (await new Session().post(consentUrl, { version: STUDENT_CONSENT_VERSION })).status === 401);
+  const staleVersion = await owner.post(consentUrl, { version: '2026-09-30' });
+  check('устаревшая версия согласия отклонена', staleVersion.status === 409 && staleVersion.body?.code === 'CONSENT_STALE', staleVersion.body);
+  const freshConsent = await owner.post(consentUrl, { version: STUDENT_CONSENT_VERSION });
+  check('у зарегистрированного сейчас согласие уже текущее', freshConsent.status === 200 && freshConsent.body?.renewed === false, freshConsent.body);
+  check('плашки обновления у него нет', !String((await owner.request('/profile')).body).includes('Обновлён текст согласия'));
+
+  // Демо-студент student2 дал согласие под прежней редакцией (lib/db/seed-data.ts)
+  const stale = new Session();
+  const staleLogin = await stale.post('/api/auth/login', { email: 'student2@demo.ru', password: 'Demo12345!' });
+  if (staleLogin.status !== 200) {
+    console.log('  демо-студент student2 не входит — раздел повторного согласия пропущен');
+  } else if (!String((await stale.request('/profile')).body).includes('Обновлён текст согласия')) {
+    console.log('  у student2 согласие уже обновлено прошлым прогоном — раздел повторного согласия пропущен');
+  } else {
+    check('студент со старым согласием видит плашку на любом разделе', String((await stale.request('/applications')).body).includes('Обновлён текст согласия'));
+    check('до принятия разделы открыты', (await stale.request('/api/applications')).status === 200);
+    const accepted = await stale.post(consentUrl, { version: STUDENT_CONSENT_VERSION });
+    check('согласие принято: версия записана', accepted.status === 200 && accepted.body?.renewed === true && accepted.body?.version === STUDENT_CONSENT_VERSION, accepted.body);
+    check('после принятия плашки нет', !String((await stale.request('/profile')).body).includes('Обновлён текст согласия'));
+    const renewedAudit = ((await admin.request('/api/admin/stats')).body?.audit ?? []).find((e: any) => e.action === 'student.consent.renewed');
+    check('принятие согласия записано в журнал', !!renewedAudit, renewedAudit);
+  }
+
+  // Замена фото: прежний файл удаляется (проверка по диску — только при запуске на той же машине)
+  const jpeg = new Blob([Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 7)])], { type: 'image/jpeg' });
+  const uploadFile = async (who: Session, kind: string, blob: Blob, name: string) => {
+    const fd = new FormData();
+    fd.append('kind', kind);
+    fd.append('file', blob, name);
+    const res = await fetch(`${BASE}/api/upload`, { method: 'POST', headers: { Origin: BASE, Cookie: (who as any).cookie }, body: fd });
+    return { status: res.status, body: (await res.json().catch(() => ({}))) as { url?: string } };
+  };
+  const photoA = await uploadFile(owner, 'photo', jpeg, 'a.jpg');
+  const photoB = await uploadFile(owner, 'photo', jpeg, 'b.jpg');
+  const ownerBase = { ...ownerProfile, fullName: 'Профиль Изменённый', city: 'Москва' };
+  const setA = await owner.patch('/api/students/me', { ...ownerBase, photoUrl: photoA.body.url });
+  check('фото сохраняется', photoA.status === 201 && setA.status === 200, [photoA.status, setA.status]);
+  const uploads = path.resolve(process.env.UPLOAD_DIR ?? '.uploads');
+  const onDisk = (url?: string) => existsSync(path.join(uploads, ...String(url).replace('/api/files/', '').split('/')));
+  const setB = await owner.patch('/api/students/me', { ...ownerBase, photoUrl: photoB.body.url });
+  check('фото заменено', setB.status === 200, setB.body);
+  check('новое фото читается владельцем', (await owner.request(photoB.body.url!)).status === 200);
+  if (onDisk(photoB.body.url)) {
+    check('прежний файл фото удалён при замене', !onDisk(photoA.body.url));
+  } else {
+    console.log('  каталог загрузок не на этой машине — проверка удаления прежнего файла по диску пропущена');
+  }
+
+  // Журнал чтения: администратор открывает чужой файл — запись есть, не больше одной за 10 минут, имени нет
+  const readStats = async () => ((await admin.request('/api/admin/stats')).body?.audit ?? []) as Array<Record<string, any>>;
+  const fileKey = String(photoB.body.url).replace('/api/files/', '');
+  const readsOf = async () => (await readStats()).filter((e) => e.action === 'student.file.read' && e.entityId === fileKey);
+  check('администратор открывает фото студента', (await admin.request(photoB.body.url!)).status === 200);
+  check('повторное открытие тоже отдаёт файл', (await admin.request(photoB.body.url!)).status === 200);
+  const reads = await readsOf();
+  check('чтение файла администратором записано в журнал ровно один раз', reads.length === 1, reads.length);
+  check('в записи чтения нет ФИО студента и сотрудника', !JSON.stringify(reads).match(/Профиль Изменённый|Сотрудник Проверкин/), reads);
+  await owner.request(photoB.body.url!);
+  check('чтение своего файла студентом в журнал не попадает', (await readsOf()).length === 1);
+
+  // Видео-файл: ссылку на несуществующий объект не сохраняем
+  const ghostVideo = await owner.patch('/api/students/me', {
+    ...ownerBase,
+    videoUrl: `/api/files/studentVideo/${crypto.randomUUID()}.mp4`,
+  });
+  check('ссылка на видео, которого нет в хранилище, отклонена', ghostVideo.status === 400 && ghostVideo.body?.code === 'BAD_VIDEO', ghostVideo.body);
+  const mp4 = new Blob([Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(64, 1)])], { type: 'video/mp4' });
+  const realVideo = await uploadFile(owner, 'studentVideo', mp4, 'v.mp4');
+  const withVideo = await owner.patch('/api/students/me', { ...ownerBase, videoUrl: realVideo.body.url });
+  check('настоящее видео-файл сохраняется', realVideo.status === 201 && withVideo.status === 200, [realVideo.status, withVideo.status, withVideo.body]);
+  const videoWasOnDisk = onDisk(realVideo.body.url);
+  await owner.patch('/api/students/me', { ...ownerBase, videoUrl: 'https://example.org/video' });
+  if (videoWasOnDisk) {
+    // файл видео уже не используется — как и фото, он должен исчезнуть при замене ссылки
+    check('видео-файл удалён после замены на внешнюю ссылку', !onDisk(realVideo.body.url));
+  }
 
   // ---------- Учебные заведения ----------
   const institutionsList = await new Session().request('/api/institutions');

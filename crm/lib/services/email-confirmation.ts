@@ -23,7 +23,15 @@ import { appUrl } from "@/lib/urls";
 
 const TTL_HOURS = 24;
 
-export class EmailConfirmError extends Error {}
+export class EmailConfirmError extends Error {
+  /** Отказ относится к адресу из формы (занят) — страница покажет его под полем почты. */
+  constructor(
+    message: string,
+    readonly field?: "email",
+  ) {
+    super(message);
+  }
+}
 
 function signingSecret(): string {
   const value = process.env.AUTH_SECRET;
@@ -73,7 +81,7 @@ async function assertFree(organizationId: string, email: string, userId: string)
     where: { organizationId, email, id: { not: userId } },
     select: { id: true },
   });
-  if (taken) throw new EmailConfirmError(TAKEN);
+  if (taken) throw new EmailConfirmError(TAKEN, "email");
 }
 
 /** Проверка до записи — чтобы анкета сказала «адрес занят» сразу, а не письмом. */
@@ -186,7 +194,7 @@ export async function confirmEmail(token: string): Promise<{ email: string }> {
     ]);
   } catch (error) {
     // Кто-то занял адрес между проверкой и записью
-    if (isUniqueViolation(error)) throw new EmailConfirmError(TAKEN);
+    if (isUniqueViolation(error)) throw new EmailConfirmError(TAKEN, "email");
     throw error;
   }
   return { email: claims.email };

@@ -9,45 +9,37 @@ import {
   transitionInvoiceAction,
   type FinanceState,
 } from "@/app/(agency)/a/finance/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/format-date";
 import { formatMoney } from "@/lib/pricing";
 import type { BillableHire } from "@/lib/services/invoices";
+import { Panel } from "@/components/ui/panel";
+import { useFormAction } from "@/lib/hooks/use-form-action";
+import { oversizeMessage } from "@/lib/upload-limits";
+import { FormMessage } from "@/components/ui/form-message";
 
 function Submit({
   label,
   variant = "default",
+  loading,
 }: {
   label: string;
   variant?: "default" | "outline";
+  /** Форма уходит через useFormAction: useFormStatus её не видит. */
+  loading?: boolean;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant={variant} disabled={pending}>
-      {pending ? "…" : label}
-    </Button>
+    <SubmitButtonBase size="sm" variant={variant} loading={loading}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
 function Feedback({ state }: { state: FinanceState }) {
-  if (state.error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{state.error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (state.ok) {
-    return (
-      <Alert>
-        <AlertDescription>{state.ok}</AlertDescription>
-      </Alert>
-    );
-  }
-  return null;
+  return <FormMessage error={state.error} ok={state.ok} />;
 }
 
 /**
@@ -65,14 +57,13 @@ export function BillableHireRow({
   /** Без права выставлять счёт строка остаётся справкой: кто закрыт и на сколько. */
   canManage?: boolean;
 }) {
-  const [state, formAction] = useActionState<FinanceState, FormData>(
-    createInvoiceAction,
-    {},
-  );
+  // Сумма и назначение подставлены заранее и правятся: после отказа сервера React 19 вернул бы
+  // подставленное и стёр правку, useFormAction её оставляет
+  const { state, pending, formProps } = useFormAction<FinanceState>(createInvoiceAction, {});
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="space-y-3 rounded-md border p-4">
+    <Panel>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="font-medium">{hire.candidateName}</div>
@@ -115,11 +106,11 @@ export function BillableHireRow({
           {hire.fee === null ? "Нет договора или оффера" : "Выставить счёт"}
         </Button>
       ) : (
-        <form action={formAction} className="space-y-3 border-t pt-3">
+        <form {...formProps} className="space-y-4 border-t pt-3">
           <input type="hidden" name="clientId" value={hire.clientId} />
           <input type="hidden" name="vacancyIds" value={hire.vacancyId} />
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={`amount-${hire.applicationId}`}>Сумма, ₽</Label>
               <Input
@@ -147,7 +138,7 @@ export function BillableHireRow({
           </div>
 
           <div className="flex gap-2">
-            <Submit label="Создать счёт" />
+            <Submit label="Создать счёт" loading={pending} />
             <Button
               type="button"
               size="sm"
@@ -161,7 +152,7 @@ export function BillableHireRow({
           <Feedback state={state} />
         </form>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -180,8 +171,14 @@ function FileInput({ formRef }: { formRef: React.RefObject<HTMLFormElement | nul
       name="file"
       accept=".pdf,.doc,.docx,.rtf,.odt"
       disabled={pending}
-      onChange={() => formRef.current?.requestSubmit()}
-      className="text-xs file:mr-2 file:rounded-md file:border file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
+      onChange={(event) => {
+        // Больше предела запрос не дойдёт до сервера — говорим сразу, а не страницей с ошибкой
+        const message = oversizeMessage(event.target.files?.[0]);
+        event.target.setCustomValidity(message);
+        if (message) event.target.reportValidity();
+        else formRef.current?.requestSubmit();
+      }}
+      className="text-xs file:mr-2 file:rounded-md file:border file:border-field file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
     />
   );
 }
@@ -207,7 +204,7 @@ function FileUploadField({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-2"
     >
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <input type="hidden" name="kind" value={kind} />
@@ -220,8 +217,7 @@ function FileUploadField({
         </span>
       </label>
       <FileInput formRef={formRef} />
-      {state.error && <p className="text-xs text-destructive">{state.error}</p>}
-      {state.ok && <p className="text-xs text-muted-foreground">{state.ok}</p>}
+      <FormMessage compact error={state.error} ok={state.ok} />
     </form>
   );
 }
@@ -271,7 +267,7 @@ export function InvoiceActions({
       )}
 
       {status !== "CANCELLED" && (
-        <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
+        <div className="grid gap-4 border-t pt-3 sm:grid-cols-2">
           <FileUploadField
             invoiceId={invoiceId}
             kind="INVOICE"

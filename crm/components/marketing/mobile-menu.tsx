@@ -80,7 +80,10 @@ export function MarketingMobileMenu({
           </SheetDescription>
         </SheetHeader>
 
-        <nav aria-label="Разделы сайта" className="flex flex-col px-2 py-3">
+        {/* Список разделов прокручивается внутри шторки, а блок с кнопками ниже закреплён:
+            в горизонтальном телефоне (высота ~375) «Обсудить найм» уезжал за экран, и о нём
+            не было ни намёка. Закреплённый блок виден всегда, под ним прокручивается список */}
+        <nav aria-label="Разделы сайта" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3">
           {MARKETING_LINKS.map((l) => (
             <Link
               key={l.href}
@@ -102,10 +105,10 @@ export function MarketingMobileMenu({
           )}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-2 border-t px-5 py-5">
+        <div className="mt-auto flex shrink-0 flex-col gap-2 border-t bg-background px-5 py-5 [@media(max-height:500px)]:grid [@media(max-height:500px)]:grid-cols-2 [@media(max-height:500px)]:py-3">
           <a
             href={phoneHref}
-            className="flex items-center gap-2 py-2 text-base text-foreground"
+            className="flex items-center gap-2 py-2 text-base text-foreground [@media(max-height:500px)]:col-span-2 [@media(max-height:500px)]:py-0"
           >
             <Phone className="size-4 text-muted-foreground" />
             {phoneDisplay}

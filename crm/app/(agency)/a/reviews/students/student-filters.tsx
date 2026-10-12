@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/lib/students-search-params";
 
 const SELECT_CLASS =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 dark:[&>option]:bg-popover";
+  "h-8 w-full min-w-0 rounded-lg border border-field bg-transparent px-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring md:text-sm dark:bg-input/30 dark:[&>option]:bg-popover";
 
 function Field({
   label,
@@ -31,7 +32,7 @@ function Field({
   wide?: boolean;
 }) {
   return (
-    <div className={`min-w-0 space-y-1${wide ? " col-span-2 sm:col-span-1" : ""}`}>
+    <div className={`min-w-0 space-y-2${wide ? " col-span-2 sm:col-span-1" : ""}`}>
       <Label htmlFor={htmlFor} className="text-xs text-muted-foreground">
         {label}
       </Label>
@@ -70,7 +71,7 @@ export function StudentFilters({
   const active = countActiveFilters(params) - (params.q ? 1 : 0);
 
   return (
-    <form method="get" action="/a/reviews/students" className="space-y-3" role="search">
+    <form method="get" action="/a/reviews/students" className="space-y-4" role="search">
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -83,7 +84,7 @@ export function StudentFilters({
             className="pl-8"
           />
         </div>
-        <Button type="submit">Найти</Button>
+        <SubmitButton>Найти</SubmitButton>
       </div>
 
       <div>
@@ -95,7 +96,7 @@ export function StudentFilters({
         />
         <label
           htmlFor="student-filters-toggle"
-          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-input px-3 text-sm select-none peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 md:hidden"
+          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-field px-3 text-sm select-none peer-focus-visible:ring-3 peer-focus-visible:ring-ring peer-focus-visible:outline-2 peer-focus-visible:outline-transparent md:hidden"
         >
           Фильтры{active > 0 ? ` · ${active}` : ""}
         </label>
@@ -207,7 +208,7 @@ export function StudentFilters({
             </select>
           </Field>
           <div className="col-span-2 flex items-end gap-2 lg:col-span-4">
-            <Button type="submit">Применить</Button>
+            <SubmitButton>Применить</SubmitButton>
             {(active > 0 || params.q) && (
               <Button asChild variant="ghost">
                 <Link href="/a/reviews/students">Сбросить</Link>

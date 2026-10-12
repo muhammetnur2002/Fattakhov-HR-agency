@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
+import type { FormState as FormStateBase } from "@/lib/form-state";
 import {
   authorize,
   authorizeOrThrow,
@@ -36,8 +37,9 @@ import {
   createClientUserSchema,
   resetClientUserPasswordSchema,
 } from "@/lib/validation/client";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type FormState = { error?: string; ok?: string };
+export type FormState = FormStateBase;
 
 /** Приводит поля формы к объекту для zod. */
 function formToObject(formData: FormData): Record<string, unknown> {
@@ -52,7 +54,7 @@ export async function createClientAction(
 
   const parsed = clientSchema.safeParse(formToObject(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   let clientId: string;
@@ -79,7 +81,7 @@ export async function updateClientAction(
 
   const parsed = clientSchema.safeParse(formToObject(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
@@ -111,7 +113,7 @@ export async function createClientUserAction(
 
   const parsed = createClientUserSchema.safeParse(formToObject(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
@@ -129,8 +131,9 @@ export async function createClientUserAction(
     if (error instanceof AccessDeniedError) {
       return { error: "Недостаточно прав" };
     }
+    // Единственная беда сервиса здесь — «адрес уже занят»: показываем её у поля почты
     if (error instanceof ClientUserError) {
-      return { error: error.message };
+      return { fields: { email: error.message } };
     }
     throw error;
   }
@@ -150,7 +153,7 @@ export async function resetClientUserPasswordAction(
 
   const parsed = resetClientUserPasswordSchema.safeParse(formToObject(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {

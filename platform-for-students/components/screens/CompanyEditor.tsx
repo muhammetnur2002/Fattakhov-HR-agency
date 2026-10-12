@@ -1,6 +1,7 @@
 'use client';
 
 import { NotificationToggle } from '@/components/account/NotificationToggle';
+import { SessionsRevoke } from '@/components/account/SessionsRevoke';
 import { PushToggle } from '@/components/account/PushToggle';
 
 import { useState } from 'react';
@@ -140,7 +141,16 @@ export function CompanyEditor({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[42rem] pb-28">
+    // Корень — форма: Enter в текстовом поле сохраняет (когда есть что сохранять), а на экранной
+    // клавиатуре телефона есть рабочая кнопка отправки. Раньше форм не было, Enter не делал ничего
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!saving) void save();
+      }}
+      className="mx-auto w-full max-w-[42rem] pb-28"
+    >
       <header className="mb-8">
         <h1 className="text-display-md text-paper">Страница компании</h1>
         <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
@@ -353,6 +363,10 @@ export function CompanyEditor({
           <NotificationToggle audience="company" bordered={false} />
           <PushToggle audience="company" />
         </Section>
+
+        <Section title="Безопасность">
+          <SessionsRevoke />
+        </Section>
       </div>
 
       <AnimatePresence>
@@ -364,7 +378,7 @@ export function CompanyEditor({
             transition={{ duration: durations.base, ease: easeOutExpo }}
             className="page-x fixed inset-x-0 bottom-0 z-40 border-t border-[var(--hairline)] bg-ink/85 py-4 backdrop-blur-glass"
           >
-            <div className="mx-auto flex max-w-[42rem] items-center justify-between gap-4">
+            <div className="clear-theme-toggle mx-auto flex max-w-[42rem] items-center justify-between gap-4">
               <span className="text-[13px] text-paper-dim">Есть несохранённые изменения</span>
               <div className="flex gap-2">
                 <Button
@@ -378,7 +392,7 @@ export function CompanyEditor({
                 >
                   Отменить
                 </Button>
-                <Button size="sm" loading={saving} onClick={() => void save()} icon={<Check />}>
+                <Button size="sm" type="submit" loading={saving} icon={<Check />}>
                   Сохранить
                 </Button>
               </div>
@@ -386,7 +400,7 @@ export function CompanyEditor({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </form>
   );
 }
 

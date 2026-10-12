@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "./login-form";
 import { QuickLogin } from "./quick-login";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { getActor } from "@/lib/auth/session";
 import { smsConfigured } from "@/lib/notifications/sms";
@@ -20,22 +21,37 @@ export const metadata = { title: "Вход" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; expired?: string; sessions?: string }>;
 }) {
   // Уже вошедшего разворачиваем: маршрутизацию по ролям сделает middleware
   if (await getActor()) redirect("/dashboard");
 
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, expired, sessions } = await searchParams;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Вход в платформу</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Вход в платформу</CardTitle>
         <CardDescription>
           Кабинет клиента и рабочее место рекрутера
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {expired === "1" && (
+          <Alert className="mb-4" role="status">
+            <AlertDescription>
+              Сессия закончилась, и последнее действие не выполнилось. Войдите снова — вы вернётесь на ту
+              же страницу, а то, что успели ввести в форму, придётся ввести заново.
+            </AlertDescription>
+          </Alert>
+        )}
+        {sessions === "revoked" && (
+          <Alert className="mb-4" role="status">
+            <AlertDescription>
+              Все сессии завершены. Войдите заново; если подозреваете чужой доступ, смените пароль.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Пароль — главный способ; телефон — запасной под ним:
             у зарегистрированных по телефону пароля нет, и без этого способа
             через 30 дней (срок сессии) они остались бы снаружи */}

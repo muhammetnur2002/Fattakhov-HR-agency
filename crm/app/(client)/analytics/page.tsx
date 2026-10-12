@@ -1,10 +1,10 @@
 import { FileText } from "lucide-react";
-import Link from "next/link";
 
 import { FunnelChart } from "@/components/analytics/funnel-chart";
 import { RejectionChart } from "@/components/analytics/rejection-chart";
 import { StatCard, StatRow } from "@/components/shell/stat-card";
 import { Button } from "@/components/ui/button";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import {
   clientAnalytics,
   defaultPeriod,
 } from "@/lib/services/analytics/queries";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Аналитика" };
 
@@ -42,7 +43,7 @@ export default async function ClientAnalyticsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Аналитика</h1>
+          <PageTitle>Аналитика</PageTitle>
           <p className="text-sm text-muted-foreground">
             Что происходит по вашим вакансиям и сколько это занимает
           </p>
@@ -55,20 +56,13 @@ export default async function ClientAnalyticsPage({
         </Button>
       </div>
 
-      <div className="flex gap-2">
+      <FilterChipGroup label="Период">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
-          <Button
-            key={r}
-            asChild
-            size="sm"
-            variant={key === r ? "default" : "outline"}
-          >
-            <Link href={`/analytics?range=${r}`}>
-              {r === "month" ? "Месяц" : r === "quarter" ? "Квартал" : "Год"}
-            </Link>
-          </Button>
+          <FilterChip key={r} href={`/analytics?range=${r}`} selected={key === r}>
+            {r === "month" ? "Месяц" : r === "quarter" ? "Квартал" : "Год"}
+          </FilterChip>
         ))}
-      </div>
+      </FilterChipGroup>
 
       {/* Та же StatRow, что на дашборде — россыпь одинаковых по смыслу
           цифр без общей рамки читалась как другой экран другого продукта */}
@@ -155,7 +149,7 @@ export default async function ClientAnalyticsPage({
               </p>
             ) : (
               <div>
-                <div className="text-3xl font-semibold tabular-nums">
+                <div className="text-4xl font-semibold tabular-nums">
                   {Math.round(data.avgDecisionHours)}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -174,7 +168,7 @@ export default async function ClientAnalyticsPage({
 function Metric({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div className="text-3xl font-semibold tabular-nums">{value}</div>
+      <div className="text-4xl font-semibold tabular-nums">{value}</div>
       <div className="text-sm text-muted-foreground">{label}</div>
     </div>
   );

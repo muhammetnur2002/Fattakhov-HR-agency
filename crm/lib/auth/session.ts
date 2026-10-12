@@ -13,6 +13,7 @@ import {
 } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
+import { isSessionTooOld, readSessionLimits } from "@/lib/auth/session-policy";
 import { twoFactorGate } from "@/lib/services/two-factor";
 
 /**
@@ -40,6 +41,8 @@ const loadSession = cache(
         grants: true,
         passwordChangedAt: true,
         totpEnabledAt: true,
+        // Предел сессии задаёт владелец (lib/auth/session-policy.ts)
+        organization: { select: { settings: true } },
       },
     });
     if (!user) return null;
@@ -55,14 +58,23 @@ const loadSession = cache(
       }
     }
 
+    const actor: Actor = {
+      id: user.id,
+      organizationId: user.organizationId,
+      role: user.role,
+      clientId: user.clientId,
+      grants: user.grants,
+    };
+
+    // Предельный возраст сессии: украденная cookie не живёт бесконечно,
+    // даже если ею пользуются каждый день (см. lib/auth/session-policy.ts)
+    const limits = readSessionLimits(user.organization?.settings);
+    if (isSessionTooOld(session.user.issuedAt, isAgency(actor) ? "agency" : "client", Date.now(), limits)) {
+      return null;
+    }
+
     return {
-      actor: {
-        id: user.id,
-        organizationId: user.organizationId,
-        role: user.role,
-        clientId: user.clientId,
-        grants: user.grants,
-      },
+      actor,
       // Состояние 2FA читается тем же запросом, что и роль: лишней
       // нагрузки ворота не добавляют (см. twoFactorGate)
       twoFactor: twoFactorGate(user),

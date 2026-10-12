@@ -13,6 +13,8 @@ import {
   type EmployerVacancyDTO,
   type StudentsVacancyStatus,
 } from "@/lib/students-service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Студенческая платформа" };
 
@@ -55,7 +57,7 @@ export default async function StudentsVacanciesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Студенческая платформа</h1>
+          <PageTitle>Студенческая платформа</PageTitle>
           <p className="text-sm text-muted-foreground">
             Вакансии для подработки — студенты откликаются сами, без поиска от агентства.
           </p>
@@ -75,11 +77,7 @@ export default async function StudentsVacanciesPage() {
       )}
 
       {!error && vacancies.length === 0 && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Вакансий пока нет — создайте первую.
-          </CardContent>
-        </Card>
+        <EmptyState>Вакансий пока нет — создайте первую.</EmptyState>
       )}
 
       {/* Из CRM-вакансий (fromCrm) удалить нельзя — их ведёт агентство */}
@@ -98,7 +96,7 @@ export default async function StudentsVacanciesPage() {
                 vacancy.fromCrm ? undefined : "transition-colors hover:border-primary/40 cursor-pointer"
               }
             >
-              <CardContent className="flex flex-wrap items-start justify-between gap-3 py-4">
+              <CardContent className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{vacancy.title}</span>

@@ -9,7 +9,8 @@ import { useAppViewport } from './useAppViewport';
 import { useLiveThreads } from '@/lib/hooks/useLiveThreads';
 import { durations, easeOutExpo } from '@/lib/motion';
 import { cn, plural } from '@/lib/utils';
-import type { MessageAuthor, MessageDTO, ThreadDTO, ThreadSummaryDTO } from '@/lib/types';
+import { apiErrorMessage } from '@/lib/api-client';
+import type { MessageAuthor, PendingMessageDTO, ThreadDTO, ThreadSummaryDTO } from '@/lib/types';
 
 /**
  * Экран переписки: список слева, диалог справа.
@@ -32,7 +33,7 @@ export function ChatScreen({
   const [threads, setThreads] = useState(initialThreads);
   const [thread, setThread] = useState<ThreadDTO | null>(initialThread);
   const [activeId, setActiveId] = useState<string | null>(initialThread?.applicationId ?? null);
-  const [pending, setPending] = useState<MessageDTO[]>([]);
+  const [pending, setPending] = useState<PendingMessageDTO[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   useAppViewport(rootRef);
   const [query, setQuery] = useState('');
@@ -69,7 +70,8 @@ export function ChatScreen({
   const open = useCallback(
     async (id: string) => {
       setActiveId(id);
-      setPending([]);
+      // Неотправленные сообщения других веток не сбрасываем: у каждого свой applicationId,
+      // а набранный текст терять нельзя
       await refreshThread(id);
       markRead(id);
       // Счётчик непрочитанного меняется сразу после открытия
@@ -105,11 +107,32 @@ export function ChatScreen({
     }
   });
 
-  async function send(body: string) {
+  /** Отправка одной реплики. При отказе реплика остаётся в ленте, помеченная «не отправлено». */
+  async function deliver(item: PendingMessageDTO) {
+    try {
+      const response = await fetch(`/api/messages/${item.applicationId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: item.body }),
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'Не удалось отправить'));
+      await refreshThread(item.applicationId);
+      void refreshThreads();
+      setPending((current) => current.filter((m) => m.id !== item.id));
+    } catch (error) {
+      setPending((current) => current.map((m) => (m.id === item.id ? { ...m, failed: true } : m)));
+      toast.error(
+        'Сообщение не отправлено',
+        error instanceof Error && error.message ? error.message : 'Проверьте соединение: текст остался в диалоге',
+      );
+    }
+  }
+
+  function send(body: string) {
     if (!activeId) return;
-    const id = `pending-${++sequence.current}`;
-    const optimistic: MessageDTO = {
-      id,
+    const item: PendingMessageDTO = {
+      id: `pending-${++sequence.current}`,
+      applicationId: activeId,
       author: viewerRole,
       body,
       createdAt: new Date().toISOString(),
@@ -118,28 +141,20 @@ export function ChatScreen({
     };
     // Реплика появляется мгновенно: ждать сервер ради собственного текста,
     // который уже набран, — значит превратить чат в форму
-    setPending((current) => [...current, optimistic]);
+    setPending((current) => [...current, item]);
+    void deliver(item);
+  }
 
-    try {
-      const response = await fetch(`/api/messages/${activeId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? 'Не удалось отправить');
-      }
-      await refreshThread(activeId);
-      void refreshThreads();
-    } catch (error) {
-      toast.error(
-        'Сообщение не отправлено',
-        error instanceof Error ? error.message : 'Проверьте соединение',
-      );
-    } finally {
-      setPending((current) => current.filter((m) => m.id !== id));
-    }
+  function retry(id: string) {
+    const item = pending.find((m) => m.id === id);
+    if (!item) return;
+    const next = { ...item, failed: false, createdAt: new Date().toISOString() };
+    setPending((current) => current.map((m) => (m.id === id ? next : m)));
+    void deliver(next);
+  }
+
+  function discard(id: string) {
+    setPending((current) => current.filter((m) => m.id !== id));
   }
 
   const totalUnread = threads.reduce((sum, t) => sum + t.unread, 0);
@@ -261,8 +276,10 @@ export function ChatScreen({
       <section className={cn('min-h-0 min-w-0', activeId ? 'flex flex-col' : 'hidden lg:flex lg:flex-col')}>
         <Conversation
           thread={thread}
-          pending={pending}
+          pending={pending.filter((m) => m.applicationId === activeId)}
           onSend={send}
+          onRetry={retry}
+          onDiscard={discard}
           onBack={() => {
             setActiveId(null);
             setThread(null);

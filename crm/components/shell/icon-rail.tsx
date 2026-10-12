@@ -5,11 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NAV_ICONS, type NavIconName } from "./icons";
+import { navLinkLabel } from "@/lib/nav-links";
 import type { NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Узкая панель разделов на планшете — от md до xl.
+ *
+ * Подписи — 12px при любом указателе (`text-[12px]`, исключение в
+ * tests/ui-scale-rules.test.ts, как у нижней панели). От стандартного
+ * `text-xs` пришлось отказаться: на мыши и от 1024px он 17,5px, и
+ * «Кандидаты», «Сообщения», «Студенческая» (95–122px) не помещаются в
+ * подпись шириной 85px — края резало у 7 пунктов из 14. Правка дня 1
+ * (10px → text-xs) эту поломку и принесла; ширину подписей проверяет
+ * tests/e2e/rail-labels.spec.ts.
+ *
  *
  * Полный сайдбар шириной 240px на iPad съедал почти треть экрана (300px
  * из 820 при увеличенном шрифте — замер 21.09.2026 в CRM агентства),
@@ -34,11 +45,11 @@ export function IconRail({
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 hidden h-svh w-20 shrink-0 flex-col self-start bg-brand-graphite px-1.5 py-3 md:flex xl:hidden print:hidden">
+    <aside data-slot="icon-rail" className="sticky top-0 hidden h-svh w-[5.25rem] shrink-0 flex-col self-start bg-brand-graphite px-1 py-3 md:flex xl:hidden print:hidden">
       <a
         href={siteHref}
         title="На сайт"
-        className="mb-2 flex min-h-12 flex-col items-center justify-center gap-1 border-b border-white/10 pb-2 text-[10px] text-white/45 hover:text-white/85"
+        className="mb-2 flex min-h-12 flex-col items-center justify-center gap-1 border-b border-white/10 pb-2 text-[12px] text-white/60 hover:text-white/85"
       >
         <ArrowLeft className="size-4" />
         На сайт
@@ -57,9 +68,10 @@ export function IconRail({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              aria-label={navLinkLabel(item)}
               title={item.locked ? `${item.label} — откроется после договора` : item.label}
               className={cn(
-                "relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center text-[10px] leading-tight transition-colors",
+                "relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-center text-[12px] leading-tight transition-colors",
                 active
                   ? "bg-white/[0.09] text-white"
                   : "text-white/60 hover:bg-white/[0.05] hover:text-white/90",
@@ -74,12 +86,15 @@ export function IconRail({
                   />
                 )}
                 {!!item.badge && (
-                  <span className="absolute -top-1.5 -right-2.5 flex min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-medium text-brand-graphite">
-                    {item.badge > 9 ? "9+" : item.badge}
-                  </span>
+                  <CountBadge
+                    aria-hidden
+                    count={item.badge}
+                    tone="inverse"
+                    className="absolute -top-1.5 -right-2.5"
+                  />
                 )}
               </span>
-              <span className="line-clamp-2">{item.label}</span>
+              <span className="line-clamp-2">{item.railLabel ?? item.label}</span>
             </Link>
           );
         })}

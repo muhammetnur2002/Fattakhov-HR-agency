@@ -65,7 +65,12 @@ export const vacancyStep1Schema = z.object({
     .max(200, "Слишком длинное название"),
   department: optionalText(150),
   hiringManagerId: optionalText(40),
-  headcount: z.coerce.number().int().min(1, "Минимум 1").max(500).default(1),
+  headcount: z.coerce
+    .number({ message: "Сколько человек нужно: укажите число" })
+    .int("Сколько человек нужно: целое число")
+    .min(1, "Сколько человек нужно: минимум 1")
+    .max(500, "Сколько человек нужно: не больше 500")
+    .default(1),
   reasonForHire: optionalText(500),
   urgency: z.enum(["LOW", "NORMAL", "HIGH", "CRITICAL"]).default("NORMAL"),
   desiredStartDate: optionalDate,

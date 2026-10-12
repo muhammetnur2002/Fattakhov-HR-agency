@@ -1,6 +1,7 @@
 import { Check, Clock, MessageSquare } from "lucide-react";
 
 import { Reveal } from "@/components/motion/primitives";
+import { SPLIT_MAIN } from "./layout";
 
 /**
  * Личный кабинет на лендинге.
@@ -55,8 +56,8 @@ const ABILITIES = [
 
 export function PlatformPreview() {
   return (
-    <Reveal className="mt-12">
-      <div className="grid gap-10 lg:grid-cols-[1.35fr_1fr] lg:items-center">
+    <Reveal>
+      <div className={`${SPLIT_MAIN} lg:items-center`}>
         {/* Подложка светлая: на графите секции она читается как окно
             приложения, а не как ещё один блок текста */}
         <div className="rounded-2xl bg-background p-4 shadow-2xl ring-1 ring-white/10 sm:p-5">

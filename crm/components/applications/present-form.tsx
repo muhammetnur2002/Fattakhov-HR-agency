@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   createConsentLinkAction,
@@ -14,9 +13,11 @@ import {
 } from "@/app/(agency)/a/candidates/actions";
 import { CopyableLink } from "@/components/shared/copyable-link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { useFormAction } from "@/lib/hooks/use-form-action";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -32,32 +33,27 @@ import {
   REJECTION_REASONS_BY_SIDE,
   REJECTION_SIDE_LABELS,
 } from "@/lib/labels";
+import { Panel } from "@/components/ui/panel";
 
-function Submit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
-  const { pending } = useFormStatus();
+function Submit({
+  label,
+  pendingLabel,
+  loading,
+}: {
+  label: string;
+  pendingLabel: string;
+  /** Форма уходит через useFormAction: useFormStatus её не видит. */
+  loading?: boolean;
+}) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? pendingLabel : label}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel={pendingLabel}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
 function Feedback({ state }: { state: CandidateState }) {
-  if (state.error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{state.error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (state.ok) {
-    return (
-      <Alert>
-        <AlertDescription>{state.ok}</AlertDescription>
-      </Alert>
-    );
-  }
-  return null;
+  return <FormMessage error={state.error} ok={state.ok} />;
 }
 
 /**
@@ -84,10 +80,8 @@ export function PresentForm({
   hasDisclosure: boolean;
   defaultSalary: number | null;
 }) {
-  const [state, formAction] = useActionState<CandidateState, FormData>(
-    presentAction,
-    {},
-  );
+  // Саммари «почему подходит» — от ста символов, и пропадать после отказа («нет согласия») ему нельзя
+  const { state, fields, pending, formProps } = useFormAction<CandidateState>(presentAction, {});
   const [consentState, consentAction] = useActionState<CandidateState, FormData>(
     markConsentAction,
     {},
@@ -124,7 +118,7 @@ export function PresentForm({
       )}
 
       {!hasConsent && (
-        <div className="space-y-3 rounded-md border p-3">
+        <Panel>
           <p className="text-sm font-medium">
             Нужно согласие на обработку персональных данных
           </p>
@@ -140,11 +134,7 @@ export function PresentForm({
                 hint="Действует 14 дней. Кандидат откроет с телефона и подтвердит."
               />
             )}
-            {linkState.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{linkState.error}</AlertDescription>
-              </Alert>
-            )}
+            <FormMessage error={linkState.error} />
           </form>
 
           {/* Запасной путь: согласие взято на бумаге. Спрятан за ссылкой,
@@ -158,9 +148,9 @@ export function PresentForm({
                 Без подтверждённого следа — используйте, только если
                 согласие правда уже получено на бумаге или письмом.
               </p>
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButtonBase size="sm" variant="outline">
                 Отметить вручную
-              </Button>
+              </SubmitButtonBase>
               <Feedback state={consentState} />
             </form>
           ) : (
@@ -172,7 +162,7 @@ export function PresentForm({
               Согласие уже получено на бумаге или письмом
             </button>
           )}
-        </div>
+        </Panel>
       )}
 
       {/*
@@ -183,7 +173,7 @@ export function PresentForm({
         документ считает подтверждением воли кандидата.
       */}
       {!hasDisclosure && (
-        <div className="space-y-3 rounded-md border p-3">
+        <Panel>
           <p className="text-sm font-medium">
             Нужно подтверждение передачи данных работодателю
           </p>
@@ -202,15 +192,11 @@ export function PresentForm({
                 hint="Действует 14 дней. Кандидат откроет с телефона и подтвердит."
               />
             )}
-            {disclosureState.error && (
-              <Alert variant="destructive">
-                <AlertDescription>{disclosureState.error}</AlertDescription>
-              </Alert>
-            )}
+            <FormMessage error={disclosureState.error} />
           </form>
 
           {showManualDisclosure ? (
-            <form action={manualDisclosureAction} className="space-y-3 border-t pt-3">
+            <form action={manualDisclosureAction} className="space-y-4 border-t pt-3">
               <input type="hidden" name="applicationId" value={applicationId} />
               <p className="text-xs text-muted-foreground">
                 Без подтверждённого следа — используйте, только если
@@ -237,9 +223,9 @@ export function PresentForm({
                   </label>
                 ))}
               </fieldset>
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButtonBase size="sm" variant="outline">
                 Отметить вручную
-              </Button>
+              </SubmitButtonBase>
               <Feedback state={manualDisclosureState} />
             </form>
           ) : (
@@ -251,14 +237,17 @@ export function PresentForm({
               Кандидат уже подтвердил письмом или в разговоре
             </button>
           )}
-        </div>
+        </Panel>
       )}
 
-      <form action={formAction} className="space-y-4">
+      <form {...formProps} className="space-y-4">
         <input type="hidden" name="applicationId" value={applicationId} />
 
-        <div className="space-y-2">
-          <Label htmlFor="presentationSummary">Почему подходит</Label>
+        <Field
+          label="Почему подходит"
+          hint="Это первое, что прочитает клиент. Минимум 100 символов."
+          error={fields.presentationSummary}
+        >
           <Textarea
             id="presentationSummary"
             name="presentationSummary"
@@ -267,13 +256,9 @@ export function PresentForm({
             required
             placeholder="Что за человек, чем занимался, почему он под эту вакансию, что важно знать до интервью"
           />
-          <p className="text-xs text-muted-foreground">
-            Это первое, что прочитает клиент. Минимум 100 символов.
-          </p>
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="salaryExpectation">Зарплатное ожидание, ₽</Label>
+        <Field label="Зарплатное ожидание, ₽" error={fields.salaryExpectation}>
           <Input
             id="salaryExpectation"
             name="salaryExpectation"
@@ -281,9 +266,9 @@ export function PresentForm({
             required
             defaultValue={defaultSalary ?? ""}
           />
-        </div>
+        </Field>
 
-        <Submit label="Представить клиенту" pendingLabel="Представляем…" />
+        <Submit label="Представить клиенту" pendingLabel="Представляем…" loading={pending} />
         <Feedback state={state} />
       </form>
     </div>
@@ -292,73 +277,73 @@ export function PresentForm({
 
 /** Отказ с обязательной причиной (BR-11). */
 export function RejectForm({ applicationId }: { applicationId: string }) {
-  const [state, formAction] = useActionState<CandidateState, FormData>(
-    rejectAction,
-    {},
-  );
+  const { state, fields, pending, formProps } = useFormAction<CandidateState>(rejectAction, {});
   const [side, setSide] = useState<RejectionSide>("CLIENT");
   const [reason, setReason] = useState("");
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
 
-      <div className="space-y-2">
-        <Label htmlFor="rejectedBy">Кто отказал</Label>
-        <Select
-          name="rejectedBy"
-          value={side}
-          onValueChange={(v) => {
-            setSide(v as RejectionSide);
-            setReason("");
-          }}
-        >
-          <SelectTrigger id="rejectedBy" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(REJECTION_SIDE_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Field label="Кто отказал" id="rejectedBy" error={fields.rejectedBy}>
+        {(control) => (
+          <Select
+            name="rejectedBy"
+            value={side}
+            onValueChange={(v) => {
+              setSide(v as RejectionSide);
+              setReason("");
+            }}
+          >
+            <SelectTrigger {...control} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(REJECTION_SIDE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
 
-      <div className="space-y-2">
-        <Label htmlFor="rejectionReason">Причина</Label>
-        <Select name="rejectionReason" value={reason} onValueChange={setReason}>
-          <SelectTrigger id="rejectionReason" className="w-full">
-            <SelectValue placeholder="Выберите причину" />
-          </SelectTrigger>
-          <SelectContent>
-            {REJECTION_REASONS_BY_SIDE[side].map((code) => (
-              <SelectItem key={code} value={code}>
-                {REJECTION_REASON_LABELS[code]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Из причин собирается отчёт, по которому калибруется поиск.
-          «Не очень» в комментарии такой пользы не даёт.
-        </p>
-      </div>
+      <Field
+        label="Причина"
+        id="rejectionReason"
+        error={fields.rejectionReason}
+        hint="Из причин собирается отчёт, по которому калибруется поиск. «Не очень» в комментарии такой пользы не даёт."
+      >
+        {(control) => (
+          <Select name="rejectionReason" value={reason} onValueChange={setReason}>
+            <SelectTrigger {...control} className="w-full">
+              <SelectValue placeholder="Выберите причину" />
+            </SelectTrigger>
+            <SelectContent>
+              {REJECTION_REASONS_BY_SIDE[side].map((code) => (
+                <SelectItem key={code} value={code}>
+                  {REJECTION_REASON_LABELS[code]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
 
-      <div className="space-y-2">
-        <Label htmlFor="rejectionComment">
-          Комментарий{reason === "OTHER" ? "" : " (необязательно)"}
-        </Label>
+      <Field
+        label={`Комментарий${reason === "OTHER" ? "" : " (необязательно)"}`}
+        error={fields.rejectionComment}
+      >
         <Textarea
           id="rejectionComment"
           name="rejectionComment"
           rows={3}
           required={reason === "OTHER"}
         />
-      </div>
+      </Field>
 
-      <Submit label="Зафиксировать отказ" pendingLabel="Сохраняем…" />
+      <Submit label="Зафиксировать отказ" pendingLabel="Сохраняем…" loading={pending} />
       <Feedback state={state} />
     </form>
   );

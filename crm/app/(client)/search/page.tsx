@@ -1,9 +1,10 @@
 import { ApplicationList } from "@/components/candidates/application-list";
 import { VacancyList } from "@/components/vacancies/vacancy-list";
 import { GlobalSearchField } from "@/components/shell/global-search-field";
-import { Card, CardContent } from "@/components/ui/card";
 import { requireClientActor } from "@/lib/auth/session";
 import { globalSearch } from "@/lib/services/search";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Поиск" };
 
@@ -25,20 +26,18 @@ export default async function ClientSearchPage({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold">Поиск</h1>
-        <GlobalSearchField hrefBase="" defaultValue={query} className="w-full max-w-sm" />
+        <PageTitle>Поиск</PageTitle>
+        <GlobalSearchField hrefBase="" defaultValue={query} placement="page" />
         {query && (
           <p className="text-sm text-muted-foreground">По запросу «{query}»</p>
         )}
       </div>
 
       {query && nothing && (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Ничего не нашлось. Попробуйте имя кандидата, компанию или
-            название вакансии.
-          </CardContent>
-        </Card>
+        <EmptyState>
+          Ничего не нашлось. Попробуйте имя кандидата, компанию или название
+          вакансии.
+        </EmptyState>
       )}
 
       {vacancies.length > 0 && (

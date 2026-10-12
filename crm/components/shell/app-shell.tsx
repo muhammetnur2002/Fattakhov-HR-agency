@@ -2,11 +2,14 @@ import { BackToSite } from "./back-to-site";
 import { BottomTabs } from "./bottom-tabs";
 import { GlobalSearchField, MobileSearchLink } from "./global-search-field";
 import { IconRail } from "./icon-rail";
+import { ListPendingProvider } from "./list-pending";
 import { NotificationBell } from "./notification-bell";
 import { SidebarNav } from "./sidebar-nav";
+import { SkipLink } from "./skip-link";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { Logo } from "@/components/brand/logo";
+import { MAIN_LANDMARK_PROPS } from "@/lib/a11y";
 import {
   countUnreadNotifications,
   listNotifications,
@@ -97,6 +100,9 @@ export async function AppShell({
     // Отступы слева и справа — под вырез камеры в альбомной ориентации
     // (viewport-fit=cover в макетах кабинетов); в портрете они нулевые
     <div className="cabinet-shell flex min-h-svh pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+      {/* Первый элемент для Tab: мимо шапки и меню сразу к странице.
+          Встаёт под липкой шапкой, а не поверх неё */}
+      <SkipLink below="var(--cabinet-header-h)" />
       {/*
         Графит сайдбара - фирменный цвет знака, а не просто «тёмная тема».
         Тёмная панель рядом со светлой рабочей областью даёт продукту
@@ -125,7 +131,7 @@ export async function AppShell({
           <Logo variant="lockup" tone="light" className="h-7" priority />
           {/* Кабинет клиента открывает заказчик: ему важно, чьей компанией
               подписан экран, а не как называется его собственная */}
-          <div className="mt-2.5 text-[11px] leading-tight text-white/65">
+          <div className="mt-2.5 text-xs leading-tight text-white/65">
             {title}
             <br />
             {roleLabel}
@@ -143,7 +149,7 @@ export async function AppShell({
       <IconRail items={items} siteHref={siteHref} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header data-app-header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:sticky md:top-0 md:z-30 print:hidden">
+        <header data-app-header className="flex h-(--cabinet-header-h) items-center justify-between gap-4 border-b bg-background px-4 md:sticky md:top-0 md:z-30 print:hidden">
           {/* Разделы на телефоне — в нижней панели (BottomTabs), на
               планшете — в узкой панели иконок (IconRail). Бургер остался
               без дела и убран; в шапке до xl — только знак: у панели
@@ -174,7 +180,14 @@ export async function AppShell({
         {/* Снизу на телефоне — место под нижнюю панель и полосу «Домой»
             (--tabbar-space, globals.css): иначе последняя карточка страницы
             уходила бы под панель */}
-        <main className="flex-1 p-4 pb-(--tabbar-space) md:p-6 print:p-0">{children}</main>
+        <main
+          {...MAIN_LANDMARK_PROPS}
+          className="flex-1 p-4 pb-(--tabbar-space) md:p-6 print:p-0"
+        >
+          {/* Ожидание списков и единственная живая область «Список обновлён» —
+              одна на весь кабинет (list-pending.tsx) */}
+          <ListPendingProvider>{children}</ListPendingProvider>
+        </main>
       </div>
 
       <BottomTabs items={items} title={title} roleLabel={roleLabel} siteHref={siteHref} />

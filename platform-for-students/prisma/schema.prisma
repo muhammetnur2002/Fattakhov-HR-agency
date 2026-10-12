@@ -301,6 +301,7 @@ model Student {
   swipes               Swipe[]
   applications         Application[]
   studentNotifications StudentNotification[]
+  agencyMessages       AgencyMessage[]
 
   @@index([status])
   @@index([createdAt])
@@ -557,6 +558,37 @@ model Message {
   @@index([applicationId, author, readAt])
 }
 
+enum AgencyMessageAuthor {
+  STUDENT
+  AGENCY
+}
+
+/// Сообщение в переписке студента с агентством (сотрудники и владелец из CRM).
+///
+/// Отдельно от `Message`: та переписка привязана к отклику на вакансию
+/// работодателя, а здесь беседа одна на студента и вакансии не требует.
+/// Работодателю она недоступна.
+model AgencyMessage {
+  id String @id @default(cuid())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  author AgencyMessageAuthor
+
+  /// Как студент видит автора из агентства («Мария К.»). У студента пусто.
+  staffName String?
+
+  /// AES-256-GCM, как и у `Message`.
+  bodyEnc String @db.Text
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([studentId, createdAt])
+  @@index([studentId, author, readAt])
+}
+
 // ============ СЛУЖЕБНОЕ ============
 
 model SyncRun {
@@ -582,8 +614,8 @@ model AuditLog {
   accountId String?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
-  /// Подпись актора на момент события: аккаунт могут удалить, а запись
-  /// в журнале обязана остаться читаемой
+  /// Подпись актора: «РОЛЬ:accountId», без имени. Аккаунт могут удалить — тогда
+  /// запись остаётся, а подпись, ip и userAgent стираются (подпись становится DELETED)
   actorLabel String
 
   action   String
@@ -598,6 +630,7 @@ model AuditLog {
   @@index([createdAt])
   @@index([action])
   @@index([accountId])
+  @@index([entityId, createdAt])
 }
 
 /// Учебное заведение: справочник для выбора вуза и публичная страница.

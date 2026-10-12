@@ -1,12 +1,12 @@
 "use client";
-
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { markReadAction } from "@/app/actions/notifications";
+import { ListRegion } from "@/components/shell/list-pending";
 import { LoadMore } from "@/components/shell/load-more";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type HistoryNotification = {
   id: string;
@@ -47,24 +47,20 @@ export function NotificationHistory({
   }, []);
 
   if (items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          Пока ничего не было.
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>Пока ничего не было.</EmptyState>;
   }
 
   return (
     <div className="space-y-3">
-      <ul className="divide-y rounded-lg border">
-        {items.map((n) => (
-          <li key={n.id}>
-            <Item notification={n} />
-          </li>
-        ))}
-      </ul>
+      <ListRegion>
+        <ul className="divide-y rounded-lg border">
+          {items.map((n) => (
+            <li key={n.id}>
+              <Item notification={n} />
+            </li>
+          ))}
+        </ul>
+      </ListRegion>
       {hasMore && <LoadMore href={loadMoreHref} />}
     </div>
   );

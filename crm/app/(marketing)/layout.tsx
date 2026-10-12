@@ -4,6 +4,8 @@ import { CookieBanner } from "@/components/analytics/cookie-banner";
 import { YandexMetrika } from "@/components/analytics/metrika";
 import { MarketingHeader } from "@/components/marketing/header";
 import { MarketingFooter } from "@/components/marketing/footer";
+import { SkipLink } from "@/components/shell/skip-link";
+import { MAIN_LANDMARK_PROPS } from "@/lib/a11y";
 import { siteOrigin } from "@/lib/urls";
 
 export const metadata: Metadata = {
@@ -57,8 +59,12 @@ export default function MarketingLayout({
   // marketing-shell — точка входа для мобильной шкалы шрифта, см. globals.css
   return (
     <div className="marketing-shell flex min-h-svh flex-col bg-background">
+      {/* Плашка встаёт под липкой шапкой сайта, а не поверх логотипа и меню */}
+      <SkipLink below="var(--site-header-h) + 1px" />
       <MarketingHeader />
-      <main className="flex-1">{children}</main>
+      <main {...MAIN_LANDMARK_PROPS} className="flex-1">
+        {children}
+      </main>
       <MarketingFooter />
       <CookieBanner />
       <YandexMetrika />

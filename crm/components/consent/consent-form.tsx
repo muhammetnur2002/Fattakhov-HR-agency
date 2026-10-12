@@ -2,21 +2,19 @@
 
 import { Check } from "lucide-react";
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   giveConsentAction,
   type ConsentState,
 } from "@/app/(public)/consent/[token]/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending}>
-      {pending ? "Отправляем…" : "Согласен"}
-    </Button>
+    <SubmitButtonBase size="lg" className="w-full" pendingLabel="Отправляем…">
+      Согласен
+    </SubmitButtonBase>
   );
 }
 
@@ -63,7 +61,7 @@ export function ConsentForm({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-5">
+    <form action={handleSubmit} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
       <p className="text-sm text-muted-foreground">
@@ -86,11 +84,7 @@ export function ConsentForm({
         <span>Я прочитал текст выше и даю согласие</span>
       </label>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <SubmitButton />
 

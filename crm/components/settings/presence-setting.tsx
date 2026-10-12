@@ -1,19 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { savePresenceAction } from "@/app/actions/profile";
 import type { ProfileState } from "@/app/actions/profile";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить"}
-    </Button>
+    <SubmitButtonBase size="sm" pendingLabel="Сохраняем…">
+      Сохранить
+    </SubmitButtonBase>
   );
 }
 
@@ -46,16 +44,7 @@ export function PresenceSetting({ showPresence }: { showPresence: boolean }) {
         </span>
       </label>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
       <Submit />
     </form>

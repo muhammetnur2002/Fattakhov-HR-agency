@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
-import { Lock } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import {
 } from "@/app/(agency)/a/candidates/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -40,6 +41,11 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { ClientDecision, RejectionReason } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
+import { useReturnFocus } from "@/lib/hooks/use-return-focus";
+
+/** Ответ на сбой связи при переносе: действие не дошло, карточка вернулась на место. */
+const MOVE_FAILED_MESSAGE = "Не удалось перенести кандидата: нет связи с сервером. Карточка вернулась на место, попробуйте ещё раз";
 
 /** Куда переезжает карточка после решения клиента — см. setClientDecision. */
 const DECISION_TARGET_STAGE_CODE: Partial<Record<ClientDecision, string>> = {
@@ -65,6 +71,8 @@ export function KanbanBoard({
   compareEnabled = false,
   canDecide = false,
   bulkEnabled = false,
+  seatStageIds,
+  onSeatHere,
   now,
 }: {
   stages: KanbanStage[];
@@ -85,8 +93,17 @@ export function KanbanBoard({
   canDecide?: boolean;
   /** Агентство с правом application.moveStage: перевод пачкой. */
   bulkEnabled?: boolean;
+  /**
+   * Этапы, куда можно посадить кандидата прямо из колонки («+ Посадить
+   * сюда»). Сервер сажает только на внутренние этапы, поэтому список
+   * приходит со страницы, а не выводится здесь.
+   */
+  seatStageIds?: string[];
+  onSeatHere?: (stageId: string) => void;
 }) {
+  const seatable = new Set(onSeatHere ? (seatStageIds ?? []) : []);
   const [cards, setCards] = useState(initialCards);
+  const guardStale = useStaleGuard();
   // Синхронизация с сервером при смене пропа — не в эффекте, а во время
   // рендера (react.dev, «Adjusting state when props change»): без этого
   // доска не замечала карточку, добавленную тем же действием на этой же
@@ -101,6 +118,8 @@ export function KanbanBoard({
   const [, startTransition] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
+  // Сравнение открывает кнопка «Сравнить», а не SheetTrigger: фокус возвращаем сами
+  const returnFocus = useReturnFocus();
   const [bulkStageId, setBulkStageId] = useState("");
   const [bulkComment, setBulkComment] = useState("");
 
@@ -257,6 +276,7 @@ export function KanbanBoard({
     }
 
     const previousStageId = card.stageId;
+    const previousEnteredAt = card.stageEnteredAt;
 
     // Оптимистично двигаем сразу: ждать ответа сервера на перетаскивании
     // ощущается как залипание
@@ -268,18 +288,32 @@ export function KanbanBoard({
       ),
     );
 
-    startTransition(async () => {
-      const result = await moveStageAction({ applicationId, toStageId });
+    // Сервер отказал или не ответил — возвращаем карточку на место, иначе
+    // интерфейс будет врать о том, где кандидат на самом деле
+    const putBack = () =>
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === applicationId
+            ? { ...c, stageId: previousStageId, stageEnteredAt: previousEnteredAt }
+            : c,
+        ),
+      );
 
-      if (result.error) {
-        // Сервер отказал — возвращаем карточку на место, иначе интерфейс
-        // будет врать о том, где кандидат на самом деле
-        setCards((prev) =>
-          prev.map((c) =>
-            c.id === applicationId ? { ...c, stageId: previousStageId } : c,
-          ),
-        );
-        toast.error(result.error);
+    startTransition(async () => {
+      // try/catch обязателен: пока сеть не отвечает, действие не возвращает
+      // отказ, а бросает исключение. Без перехвата карточка оставалась в новой
+      // колонке (на сервере её там нет), а ошибка уезжала в экран «Что-то
+      // пошло не так»
+      try {
+        const result = await moveStageAction({ applicationId, toStageId });
+        if (result.error) {
+          putBack();
+          toast.error(result.error);
+        }
+      } catch (error) {
+        if (guardStale(error)) return;
+        putBack();
+        toast.error(MOVE_FAILED_MESSAGE);
       }
     });
   }
@@ -328,11 +362,23 @@ export function KanbanBoard({
     const comment = bulkComment.trim() || undefined;
 
     startTransition(async () => {
-      const result = await moveStageBulkAction({
-        applicationIds: ids,
-        toStageId: target.id,
-        comment,
-      });
+      let result: Awaited<ReturnType<typeof moveStageBulkAction>>;
+      try {
+        result = await moveStageBulkAction({
+          applicationIds: ids,
+          toStageId: target.id,
+          comment,
+        });
+      } catch (error) {
+        if (guardStale(error)) return;
+        // Ответа нет: ни про одну карточку неизвестно, что с ней на сервере.
+        // Возвращаем все на места и оставляем выбранными — повторить в один клик
+        setCards((prev) =>
+          prev.map((c) => (previous.has(c.id) ? { ...c, ...previous.get(c.id)! } : c)),
+        );
+        toast.error(MOVE_FAILED_MESSAGE);
+        return;
+      }
 
       const failed = new Set(result.failedIds ?? []);
       if (failed.size > 0) {
@@ -389,6 +435,8 @@ export function KanbanBoard({
       */}
       <MobileStageList
         stages={stages}
+        seatable={seatable}
+        onSeatHere={onSeatHere}
         cards={cards}
         hrefBase={hrefBase}
         movable={draggable}
@@ -453,6 +501,8 @@ export function KanbanBoard({
                   selected={selected}
                   onToggleSelect={toggleSelect}
                   onMoveToStage={moveCard}
+                  canSeatHere={seatable.has(stage.id)}
+                  onSeatHere={onSeatHere}
                   now={now}
                 />
               ))}
@@ -537,7 +587,13 @@ export function KanbanBoard({
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               Сбросить
             </Button>
-            <Button size="sm" onClick={() => setCompareOpen(true)}>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                returnFocus.remember(e.currentTarget);
+                setCompareOpen(true);
+              }}
+            >
               Сравнить →
             </Button>
           </div>
@@ -554,7 +610,8 @@ export function KanbanBoard({
       <Sheet open={compareOpen} onOpenChange={setCompareOpen}>
         <SheetContent
           side="bottom"
-          className="h-[88vh] w-full gap-0 overflow-y-auto p-4 sm:max-w-none"
+          className="w-full gap-0 overflow-y-auto p-4 data-[side=bottom]:h-[88svh] sm:max-w-none"
+          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
         >
           <SheetTitle className="sr-only">Сравнение кандидатов</SheetTitle>
           <CompareView
@@ -590,6 +647,8 @@ function Column({
   selected,
   onToggleSelect,
   onMoveToStage,
+  canSeatHere,
+  onSeatHere,
   now,
 }: {
   stage: KanbanStage;
@@ -597,6 +656,8 @@ function Column({
   cards: KanbanCard[];
   hrefBase: string;
   draggable: boolean;
+  canSeatHere?: boolean;
+  onSeatHere?: (stageId: string) => void;
   /** Момент отрисовки — один на всю доску, см. KanbanBoard. */
   now: number;
   selectable?: boolean;
@@ -658,6 +719,19 @@ function Column({
           )}
         </div>
       </SortableContext>
+
+      {canSeatHere && onSeatHere && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="mt-2 justify-start text-muted-foreground"
+          onClick={() => onSeatHere(stage.id)}
+        >
+          <Plus className="size-4" />
+          Посадить сюда
+        </Button>
+      )}
     </div>
   );
 }
@@ -753,6 +827,8 @@ function MovingCard({
  */
 function MobileStageList({
   stages,
+  seatable,
+  onSeatHere,
   cards,
   hrefBase,
   movable,
@@ -763,6 +839,8 @@ function MobileStageList({
   now,
 }: {
   stages: KanbanStage[];
+  seatable: Set<string>;
+  onSeatHere?: (stageId: string) => void;
   cards: KanbanCard[];
   hrefBase: string;
   movable: boolean;
@@ -791,27 +869,19 @@ function MobileStageList({
           const count = cards.filter((c) => c.stageId === s.id).length;
           const active = s.id === stage.id;
           return (
-            <button
+            <FilterChip
               key={s.id}
-              type="button"
               role="tab"
-              aria-selected={active}
+              tall
+              selected={active}
               onClick={() => setStageId(s.id)}
-              className={cn(
-                // min-h-10 — тот же ориентир, что у остальных элементов
-                // управления на сенсорном экране (globals.css, 40px)
-                "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm transition-colors",
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "text-muted-foreground",
-                // Скрытые от клиента этапы отличаются и здесь — граница
-                // кабинета клиента видна рекрутеру и на телефоне
-                !s.visibleToClient && !active && "border-dashed",
-              )}
+              // Скрытые от клиента этапы отличаются и здесь — граница
+              // кабинета клиента видна рекрутеру и на телефоне
+              className={cn(!s.visibleToClient && !active && "border-dashed")}
             >
               {s.name}
-              <span className="tabular-nums opacity-70">{count}</span>
-            </button>
+              <span className="font-medium tabular-nums">{count}</span>
+            </FilterChip>
           );
         })}
       </div>
@@ -844,6 +914,17 @@ function MobileStageList({
           <div className="py-8 text-center text-sm text-muted-foreground">
             На этом этапе никого
           </div>
+        )}
+        {onSeatHere && seatable.has(stage.id) && (
+          <Button
+            type="button"
+            variant="outline"
+            className="justify-center"
+            onClick={() => onSeatHere(stage.id)}
+          >
+            <Plus className="size-4" />
+            Посадить сюда
+          </Button>
         )}
       </div>
     </div>

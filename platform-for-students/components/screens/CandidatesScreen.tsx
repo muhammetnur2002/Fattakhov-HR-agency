@@ -6,11 +6,13 @@ import { Check, Clock, Filter, GraduationCap, MapPin, Search, Users } from 'luci
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip, Tag } from '@/components/ui/Chip';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { SelectField, TextField } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Toast';
 import { CubeMark } from '@/components/brand/CubeMark';
 import { springSoft } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { apiErrorMessage } from '@/lib/api-client';
 import {
   GENDERS,
   WEEKDAY_LABEL,
@@ -52,6 +54,9 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const [days, setDays] = useState<Weekday[]>([]);
   const [genders, setGenders] = useState<Gender[]>([]);
   const [invited, setInvited] = useState(0);
+  // Список не загрузился: это не «кандидаты закончились», и повторить можно кнопкой
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!vacancyId) {
@@ -60,15 +65,22 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     }
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     setDecided(new Set());
     setInvited(0);
     fetch(`/api/employer/candidates/${vacancyId}`)
-      .then((r) => r.json())
-      .then((data: { candidates?: StudentProfileDTO[] }) => {
+      .then(async (r) => {
+        // Статус смотрим до разбора: 401/403/500 раньше превращались в «Кандидаты закончились»
+        if (!r.ok) throw new Error(await apiErrorMessage(r, 'Не удалось загрузить кандидатов'));
+        return r.json() as Promise<{ candidates?: StudentProfileDTO[] }>;
+      })
+      .then((data) => {
         if (!cancelled) setPool(data.candidates ?? []);
       })
-      .catch(() => {
-        if (!cancelled) toast.error('Не удалось загрузить кандидатов');
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setPool([]);
+        setLoadError(error instanceof Error && error.message ? error.message : 'Проверьте соединение и попробуйте ещё раз');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -76,8 +88,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vacancyId]);
+  }, [vacancyId, reloadKey]);
 
   const query = search.trim().toLowerCase();
   const filtered = useMemo(
@@ -93,33 +104,37 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     [pool, decided, days, genders, query],
   );
 
-  function invite(student: StudentProfileDTO) {
+  async function invite(student: StudentProfileDTO) {
     setInviting((prev) => new Set(prev).add(student.id));
-    void fetch(`/api/employer/candidates/${vacancyId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: student.id }),
-    })
-      .then((r) => r.json())
-      .then((data: { invited?: boolean; reason?: string }) => {
-        setDecided((prev) => new Set(prev).add(student.id));
-        if (!data.invited && data.reason === 'ALREADY_DECIDED') {
-          toast.success('Уже не в списке', 'Студент уже откликнулся или приглашён на эту вакансию');
-        } else {
-          setInvited((n) => n + 1);
-          toast.success('Приглашение отправлено', student.fullName);
-        }
-      })
-      .catch(() => {
-        toast.error('Не удалось пригласить', 'Проверьте соединение и попробуйте ещё раз');
-      })
-      .finally(() => {
-        setInviting((prev) => {
-          const next = new Set(prev);
-          next.delete(student.id);
-          return next;
-        });
+    try {
+      const response = await fetch(`/api/employer/candidates/${vacancyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: student.id }),
       });
+      // Сначала статус: при отказе сервера (лимит приглашений, 404, 400) студент остаётся
+      // в списке, счётчик не растёт, а человек видит причину, а не «Приглашение отправлено»
+      if (!response.ok) {
+        toast.error('Не удалось пригласить', await apiErrorMessage(response, 'Попробуйте ещё раз'));
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as { invited?: boolean; reason?: string };
+      setDecided((prev) => new Set(prev).add(student.id));
+      if (!data.invited && data.reason === 'ALREADY_DECIDED') {
+        toast.success('Уже не в списке', 'Студент уже откликнулся или приглашён на эту вакансию');
+      } else {
+        setInvited((n) => n + 1);
+        toast.success('Приглашение отправлено', student.fullName);
+      }
+    } catch {
+      toast.error('Не удалось пригласить', 'Проверьте соединение и попробуйте ещё раз');
+    } finally {
+      setInviting((prev) => {
+        const next = new Set(prev);
+        next.delete(student.id);
+        return next;
+      });
+    }
   }
 
   const activeFilters = days.length + genders.length;
@@ -257,11 +272,19 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && loadError && (
+          <EmptyState
+            title="Не удалось загрузить кандидатов"
+            description={loadError}
+            action={<Button onClick={() => setReloadKey((n) => n + 1)}>Повторить</Button>}
+          />
+        )}
+
+        {!loading && !loadError && filtered.length === 0 && (
           <EmptyList hasFilters={activeFilters > 0 || query.length > 0} invited={invited} />
         )}
 
-        {!loading && (
+        {!loading && !loadError && (
           <AnimatePresence initial={false}>
             {filtered.map((student) => (
               <CandidateRow

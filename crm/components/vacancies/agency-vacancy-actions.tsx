@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   activateVacancyAction,
@@ -12,8 +11,8 @@ import {
   saveAgencyNotesAction,
   type AgencyVacancyState,
 } from "@/app/(agency)/a/vacancies/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,6 +25,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
+import { panelClass } from "@/components/ui/panel";
+import { FormMessage } from "@/components/ui/form-message";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 type Recruiter = {
   id: string;
@@ -69,35 +71,23 @@ function Submit({
   label,
   variant = "default",
   size = "sm",
+  loading,
 }: {
   label: string;
   variant?: "default" | "outline";
   size?: "sm" | "default";
+  /** Форма уходит через useFormAction: useFormStatus её не видит. */
+  loading?: boolean;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size={size} variant={variant} disabled={pending}>
-      {pending ? "…" : label}
-    </Button>
+    <SubmitButtonBase size={size} variant={variant} loading={loading}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
 function Feedback({ state }: { state: AgencyVacancyState }) {
-  if (state.error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{state.error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (state.ok) {
-    return (
-      <Alert>
-        <AlertDescription>{state.ok}</AlertDescription>
-      </Alert>
-    );
-  }
-  return null;
+  return <FormMessage error={state.error} ok={state.ok} />;
 }
 
 /**
@@ -121,14 +111,10 @@ export function VacancyIntake({
     activateVacancyAction,
     {},
   );
-  const [estimateState, estimate] = useActionState<AgencyVacancyState, FormData>(
-    estimateVacancyAction,
-    {},
-  );
-  const [clarifyState, clarify] = useActionState<AgencyVacancyState, FormData>(
-    clarifyVacancyAction,
-    {},
-  );
+  // Вопрос и сроки набираются текстом: React 19 стирал их после любого ответа сервера, в том числе
+  // отказа («Вопрос слишком короткий»), а useFormAction оставляет
+  const estimateForm = useFormAction<AgencyVacancyState>(estimateVacancyAction, {});
+  const clarifyForm = useFormAction<AgencyVacancyState>(clarifyVacancyAction, {});
   const [mode, setMode] = useState<"none" | "estimate" | "clarify">("none");
   const [lead, setLead] = useState(NO_RECRUITER);
 
@@ -148,7 +134,7 @@ export function VacancyIntake({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-2">
         <form action={activate} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="vacancyId" value={vacancyId} />
@@ -156,7 +142,7 @@ export function VacancyIntake({
           {/* Ведущий выбирается здесь же: запуск без ответственного —
               самый тихий способ потерять вакансию на неделю */}
           {canAssign && recruiters.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="intakeLead" className="text-xs">
                 Ведущий рекрутер
               </Label>
@@ -210,7 +196,7 @@ export function VacancyIntake({
       {/* Вопрос пишется здесь же: отдельный поход в обсуждение ради
           одной фразы — самый частый способ его вовсе не задать */}
       {mode === "clarify" && status === "SUBMITTED" && (
-        <form action={clarify} className="space-y-3 rounded-md border p-3">
+        <form {...clarifyForm.formProps} className={panelClass("plain", "space-y-4")}>
           <input type="hidden" name="vacancyId" value={vacancyId} />
           <div className="space-y-2">
             <Label htmlFor="question">Что нужно уточнить</Label>
@@ -227,7 +213,7 @@ export function VacancyIntake({
             </p>
           </div>
           <div className="flex gap-2">
-            <Submit label="Отправить вопрос" />
+            <Submit label="Отправить вопрос" loading={clarifyForm.pending} />
             <Button
               type="button"
               size="sm"
@@ -243,9 +229,9 @@ export function VacancyIntake({
       {/* Сроки уже названы — форму прячем, иначе она висит открытой
           после успешной отправки */}
       {mode === "estimate" && status === "SUBMITTED" && (
-        <form action={estimate} className="space-y-3 rounded-md border p-3">
+        <form {...estimateForm.formProps} className={panelClass("plain", "space-y-4")}>
           <input type="hidden" name="vacancyId" value={vacancyId} />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="estimatedFirstCandidatesAt">
                 Первые кандидаты к
@@ -266,13 +252,13 @@ export function VacancyIntake({
             Дата первых кандидатов обязательна — именно её увидит клиент
             в своём кабинете.
           </p>
-          <Submit label="Отправить клиенту" />
+          <Submit label="Отправить клиенту" loading={estimateForm.pending} />
         </form>
       )}
 
       <Feedback state={activateState} />
-      <Feedback state={estimateState} />
-      <Feedback state={clarifyState} />
+      <Feedback state={estimateForm.state} />
+      <Feedback state={clarifyForm.state} />
     </div>
   );
 }
@@ -288,7 +274,9 @@ export function VacancyStatusActions({
   /** Закрытую вакансию можно убрать из списков — право vacancy.delete. */
   canDelete?: boolean;
 }) {
-  const [state, formAction] = useActionState<AgencyVacancyState, FormData>(
+  // Кнопки «приостановить» и «вернуть в работу» — формы без полей (action); причина закрытия набирается
+  // текстом и не должна пропадать, если сервер отказал
+  const { state, pending, formAction, formProps } = useFormAction<AgencyVacancyState>(
     agencyTransitionAction,
     {},
   );
@@ -347,7 +335,7 @@ export function VacancyStatusActions({
       </div>
 
       {closing && (
-        <form action={formAction} className="space-y-2 rounded-md border p-3">
+        <form {...formProps} className={panelClass("plain", "space-y-2")}>
           <input type="hidden" name="vacancyId" value={vacancyId} />
           <input type="hidden" name="to" value={closing} />
           <Label htmlFor="closeReason">Причина закрытия</Label>
@@ -362,7 +350,7 @@ export function VacancyStatusActions({
             вакансии.
           </p>
           <div className="flex gap-2">
-            <Submit label="Закрыть" />
+            <Submit label="Закрыть" loading={pending} />
             <Button
               type="button"
               size="sm"
@@ -391,10 +379,7 @@ export function AssignRecruitersForm({
   leadRecruiterId: string | null;
   recruiterIds: string[];
 }) {
-  const [state, formAction] = useActionState<AgencyVacancyState, FormData>(
-    assignRecruitersAction,
-    {},
-  );
+  const { state, pending, formProps } = useFormAction<AgencyVacancyState>(assignRecruitersAction, {});
   const [leadRecruiter, setLeadRecruiter] = useState(
     leadRecruiterId ?? NO_RECRUITER,
   );
@@ -405,7 +390,7 @@ export function AssignRecruitersForm({
     // подхватит — и селект показывал бы «не назначен» при назначенном
     <form
       key={`${leadRecruiterId ?? "none"}:${recruiterIds.join(",")}`}
-      action={formAction}
+      {...formProps}
       className="space-y-4"
     >
       <input type="hidden" name="vacancyId" value={vacancyId} />
@@ -454,7 +439,7 @@ export function AssignRecruitersForm({
         ))}
       </fieldset>
 
-      <Submit label="Сохранить" />
+      <Submit label="Сохранить" loading={pending} />
       <Feedback state={state} />
     </form>
   );
@@ -468,13 +453,11 @@ export function AgencyNotesForm({
   vacancyId: string;
   notes: string | null;
 }) {
-  const [state, formAction] = useActionState<AgencyVacancyState, FormData>(
-    saveAgencyNotesAction,
-    {},
-  );
+  // Заметки набирают долго: после отказа сервера они остаются в поле
+  const { state, pending, formProps } = useFormAction<AgencyVacancyState>(saveAgencyNotesAction, {});
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="vacancyId" value={vacancyId} />
       <Textarea
         name="agencyNotes"
@@ -485,7 +468,7 @@ export function AgencyNotesForm({
       <p className="text-xs text-muted-foreground">
         Видно только агентству. Клиент этих заметок не увидит никогда.
       </p>
-      <Submit label="Сохранить заметки" />
+      <Submit label="Сохранить заметки" loading={pending} />
       <Feedback state={state} />
     </form>
   );

@@ -17,9 +17,10 @@
  */
 import "dotenv/config";
 
-import { prisma } from "../../../lib/db/prisma";
+import { prisma, prismaRaw } from "../../../lib/db/prisma";
 
 type Input =
+  | { op: "cleanupDraftVacancies"; titlePrefix: string }
   | {
       op: "createCandidate";
       organizationId: string;
@@ -63,7 +64,20 @@ type Input =
     }
   | { op: "getApplicationStage"; applicationId: string }
   | { op: "getInterviewStatus"; interviewId: string }
-  | { op: "cleanupCandidate"; candidateId: string };
+  | { op: "cleanupCandidate"; candidateId: string }
+  | {
+      op: "createLeads";
+      leads: {
+        name: string;
+        contact: string;
+        company?: string;
+        website?: string;
+        vacancies?: string;
+        note?: string;
+        status: "NEW" | "IN_PROGRESS" | "SPAM" | "CONVERTED" | "REJECTED";
+      }[];
+    }
+  | { op: "cleanupLeads"; namePrefix: string };
 
 async function run(input: Input) {
   switch (input.op) {
@@ -288,6 +302,34 @@ async function run(input: Input) {
         select: { status: true, scheduledAt: true },
       });
       return { status: interview.status, scheduledAt: interview.scheduledAt };
+    }
+
+    case "cleanupDraftVacancies": {
+      // Черновики, которые мастер заявки сохранил сам во время теста: заявок и встреч у них нет
+      // Физически (prismaRaw): обычный клиент лишь помечает удалённым, а такая строка остаётся
+      // видна «сырым» запросам других тестов и ломает сверки с seed
+      const drafts = await prismaRaw.vacancy.findMany({
+        where: { title: { startsWith: input.titlePrefix }, status: "DRAFT" },
+        select: { id: true },
+      });
+      await prismaRaw.vacancy.deleteMany({ where: { id: { in: drafts.map((v) => v.id) } } });
+      return { removed: drafts.length };
+    }
+
+    case "createLeads": {
+      // Заявки с сайта — для проверки раскладки карточки: у части заполнены все поля,
+      // у части нет ни вакансий, ни сайта, ни заметки. createdAt — по умолчанию (сейчас)
+      const ids: string[] = [];
+      for (const lead of input.leads) {
+        const created = await prismaRaw.lead.create({ data: lead, select: { id: true } });
+        ids.push(created.id);
+      }
+      return { ids };
+    }
+
+    case "cleanupLeads": {
+      const removed = await prismaRaw.lead.deleteMany({ where: { name: { startsWith: input.namePrefix } } });
+      return { removed: removed.count };
     }
 
     case "cleanupCandidate": {

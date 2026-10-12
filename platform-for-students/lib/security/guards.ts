@@ -10,6 +10,7 @@ import { SESSION_COOKIE } from './session';
 import { resolveSession, type ResolvedSession } from './session-resolve';
 import { staffCan, type StaffPermission } from '@/lib/staff-permissions';
 import { clientIp } from './rate-limit';
+import { recordAudit, type AuditInput } from './audit-log';
 import { HttpError } from './http-error';
 import { assertSameOrigin } from './origin';
 
@@ -206,41 +207,25 @@ export async function requireAdminPage(next = '/admin', permission?: StaffPermis
   return session;
 }
 
-export interface AuditInput {
-  action: string;
-  entity?: string | null;
-  entityId?: string | null;
-  meta?: Record<string, unknown> | null;
-}
+export type { AuditInput };
 
 /**
- * Запись в журнал аудита.
- *
- * Никогда не бросает: провал логирования не должен отменять действие,
- * которое пользователь уже совершил. Но и молчать нельзя — ошибка уходит
- * в консоль сервера.
+ * Запись в журнал аудита. Подпись актора и правила записи — в lib/security/audit-log.ts;
+ * здесь только заголовки текущего запроса, если вызывающий не передал свои.
  */
 export async function audit(
   session: SessionUser | null,
   input: AuditInput,
   requestHeaders?: Headers,
 ): Promise<void> {
+  let h: Headers;
   try {
-    const store = await getStore();
-    const h = requestHeaders ?? (await headers());
-    await store.audit.log({
-      accountId: session?.accountId ?? null,
-      actorLabel: session ? `${session.role}:${session.name || session.accountId}` : 'ANONYMOUS',
-      action: input.action,
-      entity: input.entity ?? null,
-      entityId: input.entityId ?? null,
-      ip: clientIp(h),
-      userAgent: h.get('user-agent'),
-      meta: input.meta ?? null,
-    });
+    h = requestHeaders ?? (await headers());
   } catch (err) {
     console.error('[audit] не удалось записать событие:', err);
+    return;
   }
+  await recordAudit(session, input, h);
 }
 
 /**

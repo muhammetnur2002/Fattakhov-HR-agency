@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { AreaField, SelectField, TextField } from "./wizard-fields";
@@ -9,6 +9,7 @@ import {
   submitVacancyAction,
 } from "@/app/actions/vacancies";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -18,6 +19,7 @@ import {
 } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { BRIEF_MIN_CHARS } from "@/lib/validation/brief-limits";
+import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
 
 export type WizardValues = Record<string, string>;
 
@@ -174,7 +176,12 @@ export function VacancyWizard({
     setClientId(next);
     router.replace(next ? `?clientId=${encodeURIComponent(next)}` : "?");
   }
-  const [step, setStep] = useState(1);
+  // Шаг живёт и в адресе (?step=3): «Назад» браузера возвращает на прошлый шаг мастера, а не уводит
+  // из него целиком. Восстанавливаем его только у уже сохранённого черновика — у новой заявки
+  // после обновления страницы значений всё равно нет, и шаг 4 с пустыми полями никому не нужен
+  const searchParams = useSearchParams();
+  const [step, setStep] = useState(() => (initialVacancyId ? stepFromParam(searchParams.get("step")) : 1));
+  const [triedNext, setTriedNext] = useState(false);
   // Незаданные ключи из initialValues пропускаем, иначе они затрут значения
   // по умолчанию (например, urgency) на undefined
   const [values, setValues] = useState<WizardValues>(() => {
@@ -200,6 +207,10 @@ export function VacancyWizard({
   // иначе таймер будет молотить в базу на открытой вкладке
   const dirty = useRef(false);
   const saving = useRef(false);
+  const guardStale = useStaleGuard();
+  // Последнее автосохранение не дошло (сеть, перезапуск сервера): черновик
+  // остаётся несохранённым, и следующий тик таймера повторит попытку
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const set = useCallback((key: string, value: string) => {
     setValues((v) => ({ ...v, [key]: value }));
@@ -211,18 +222,31 @@ export function VacancyWizard({
     if (!values.title.trim()) return; // без названия сохранять нечего
 
     saving.current = true;
-    const result = await saveDraftAction(values, vacancyId, clientId);
-    saving.current = false;
+    // try/finally обязателен: пропавшая сеть бросает исключение, и без finally
+    // флаг saving навсегда оставался true — каждый следующий тик таймера
+    // выходил на первой строке, а черновик молча переставал сохраняться
+    try {
+      const result = await saveDraftAction(values, vacancyId, clientId);
 
-    if (result.error) {
-      setError(result.error);
-      return;
+      if (result.error) {
+        // Ответ сервера получен: сеть работает, и «не удалось сохранить, повторим» уже неправда
+        setSaveFailed(false);
+        setError(result.error);
+        return;
+      }
+      dirty.current = false;
+      setSaveFailed(false);
+      setError(null);
+      if (result.vacancyId && !vacancyId) setVacancyId(result.vacancyId);
+      if (result.savedAt) setSavedAt(result.savedAt);
+    } catch (error) {
+      if (guardStale(error)) return;
+      // dirty остаётся true — повторим при следующем тике
+      setSaveFailed(true);
+    } finally {
+      saving.current = false;
     }
-    dirty.current = false;
-    setError(null);
-    if (result.vacancyId && !vacancyId) setVacancyId(result.vacancyId);
-    if (result.savedAt) setSavedAt(result.savedAt);
-  }, [values, vacancyId, clientId]);
+  }, [values, vacancyId, clientId, guardStale]);
 
   useEffect(() => {
     const t = setInterval(save, AUTOSAVE_MS);
@@ -230,11 +254,38 @@ export function VacancyWizard({
   }, [save]);
 
   function goTo(next: number) {
-    if (next > step && !validateStep(step, values, setError)) return;
+    if (next > step && !validateStep(step, values, setError)) {
+      setTriedNext(true);
+      return;
+    }
     setError(null);
     void save();
     setStep(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("step", String(next));
+    window.history.pushState(null, "", url);
   }
+
+  // Кнопки «Назад» и «Вперёд» браузера двигают по шагам мастера
+  useEffect(() => {
+    const onPop = () => {
+      setStep(stepFromParam(new URL(window.location.href).searchParams.get("step")));
+      setError(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // Закрыли вкладку или ушли по ссылке раньше, чем сработало автосохранение (раз в 10 с)
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirty.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   function submit() {
     if (clients && !clientId) {
@@ -285,7 +336,7 @@ export function VacancyWizard({
           // здесь означала бы, что сохранённая заявка уедет к другому.
           // Поэтому просто показываем, кому она принадлежит
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <div className="text-sm text-muted-foreground">Клиент</div>
               <div className="mt-1 font-medium">
                 {clients.find((c) => c.id === clientId)?.name ?? "Не выбран"}
@@ -298,7 +349,7 @@ export function VacancyWizard({
           </Card>
         ) : (
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <SelectField
                 id="wizard-client"
                 label="Клиент"
@@ -315,9 +366,18 @@ export function VacancyWizard({
       <StepBar step={step} onSelect={(n) => goTo(n)} />
 
       <Card>
-        <CardContent className="space-y-5 pt-6">
+        <CardContent className="space-y-4">
           {step === 1 && (
-            <Step1 values={values} set={set} hiringManagers={hiringManagers} />
+            <Step1
+              values={values}
+              set={set}
+              hiringManagers={hiringManagers}
+              // Явно неверное число (0, 501, дробь) называем сразу, пустое — после попытки идти дальше:
+              // пустым поле бывает, пока человек перепечатывает значение
+              headcountError={
+                values.headcount !== "" || triedNext ? headcountProblem(values.headcount) : undefined
+              }
+            />
           )}
           {step === 2 && <Step2 values={values} set={set} gapFor={gapFor} />}
           {step === 3 && <Step3 values={values} set={set} />}
@@ -349,11 +409,7 @@ export function VacancyWizard({
         </Alert>
       )}
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={error} />
 
       <div className="flex flex-wrap items-center gap-3">
         {step > 1 && (
@@ -364,16 +420,21 @@ export function VacancyWizard({
         {step < 5 ? (
           <Button onClick={() => goTo(step + 1)}>Далее</Button>
         ) : (
-          <Button onClick={submit} disabled={pending} size="lg">
+          <Button onClick={submit} loading={pending} size="lg">
             {pending ? "Отправляем…" : "Отправить в работу"}
           </Button>
         )}
 
-        <span className="text-xs text-muted-foreground">
-          {savedAt
-            ? `Черновик сохранён в ${new Date(savedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
-            : "Черновик сохранится автоматически"}
-        </span>
+        {saveFailed ? (
+          // alert: сбой объявляется сразу; обычные «сохранён в 12:03» читалку не будят
+          <FormMessage compact error="Не удалось сохранить черновик, повторим" />
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            {savedAt
+              ? `Черновик сохранён в ${new Date(savedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+              : "Черновик сохранится автоматически"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -409,6 +470,24 @@ function StepBar({
   );
 }
 
+/** Номер шага из адреса: не число и не из диапазона — первый шаг. */
+function stepFromParam(raw: string | null): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= STEPS.length ? n : 1;
+}
+
+/** Сколько человек нужно: целое от 1 до 500 (так же, как в vacancyBaseSchema). */
+export const HEADCOUNT_MIN = 1;
+export const HEADCOUNT_MAX = 500;
+const HEADCOUNT_MESSAGE = `Укажите число от ${HEADCOUNT_MIN} до ${HEADCOUNT_MAX}`;
+
+export function headcountProblem(value: string): string | undefined {
+  const n = Number(value);
+  return value.trim() !== "" && Number.isInteger(n) && n >= HEADCOUNT_MIN && n <= HEADCOUNT_MAX
+    ? undefined
+    : HEADCOUNT_MESSAGE;
+}
+
 /** Проверки, которые нельзя пропустить, двигаясь вперёд. */
 function validateStep(
   step: number,
@@ -417,6 +496,12 @@ function validateStep(
 ): boolean {
   if (step === 1 && v.title.trim().length < 3) {
     setError("Укажите название позиции");
+    return false;
+  }
+  // Пустое поле для сервера — 0 и безымянное «Минимум 1», а черновик при этом тихо
+  // перестаёт сохраняться: останавливаем здесь и называем поле
+  if (step === 1 && headcountProblem(v.headcount)) {
+    setError(`Сколько человек нужно: ${headcountProblem(v.headcount)!.toLowerCase()}`);
     return false;
   }
   if (step === 3 && v.salaryFrom && v.salaryTo) {
@@ -437,9 +522,10 @@ function Step1({
   values,
   set,
   hiringManagers,
-}: StepProps & { hiringManagers: HiringManager[] }) {
+  headcountError,
+}: StepProps & { hiringManagers: HiringManager[]; headcountError?: string }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       <TextField
         id="title"
         label="Название позиции"
@@ -479,7 +565,10 @@ function Step1({
         id="headcount"
         label="Сколько человек нужно"
         type="number"
+        min={HEADCOUNT_MIN}
+        max={HEADCOUNT_MAX}
         value={values.headcount}
+        error={headcountError}
         onChange={(v) => set("headcount", v)}
       />
       <SelectField
@@ -535,7 +624,7 @@ function Step2({
   gapFor,
 }: StepProps & { gapFor: (field: string) => string | undefined }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <AreaField
         id="responsibilities"
         label="Обязанности"
@@ -589,7 +678,7 @@ function Step2({
 
 function Step3({ values, set }: StepProps) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       <TextField
         id="salaryFrom"
         label="Вилка от, ₽"
@@ -700,7 +789,7 @@ function Preview({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium">{values.title || "Без названия"}</h3>
+        <h2 className="text-lg font-medium">{values.title || "Без названия"}</h2>
         <p className="text-sm text-muted-foreground">
           Проверьте бриф — после отправки правки идут через обсуждение
           с рекрутером.

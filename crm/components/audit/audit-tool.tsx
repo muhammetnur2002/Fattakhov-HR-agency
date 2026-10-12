@@ -5,6 +5,7 @@ import { useMemo, useSyncExternalStore } from "react";
 
 import { AuditLeadForm } from "./audit-lead-form";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   answeredCount,
   bandFor,
@@ -103,7 +104,7 @@ export function AuditTool() {
                         {stage.criteria.map((c) => (
                           <li
                             key={c}
-                            className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground"
+                            className="flex gap-3 text-sm leading-relaxed text-muted-foreground"
                           >
                             <span
                               aria-hidden
@@ -118,25 +119,19 @@ export function AuditTool() {
                         <legend className="text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">
                           Ваша оценка
                         </legend>
-                        <div className="mt-2.5 flex gap-2">
+                        <div className="mt-3 flex gap-2">
                           {SCALE.map((option) => {
                             const active = answers[stage.number] === option.value;
                             return (
-                              <button
+                              <FilterChip
                                 key={option.value}
-                                type="button"
-                                aria-pressed={active}
+                                shape="square"
+                                selected={active}
                                 onClick={() => set(stage.number, option.value)}
                                 title={option.title}
-                                className={cn(
-                                  "size-11 rounded-lg border text-base font-semibold tabular-nums transition-colors",
-                                  active
-                                    ? "border-brand-graphite bg-brand-graphite text-white"
-                                    : "bg-background hover:border-foreground/40",
-                                )}
                               >
                                 {option.value}
-                              </button>
+                              </FilterChip>
                             );
                           })}
                         </div>
@@ -259,8 +254,10 @@ function Result({
     );
   }
 
+  // scroll-mt-8: высоту липкой шапки уже даёт scroll-padding документа
+  // (app/globals.css), прежние scroll-mt-32 сложились бы с ним
   return (
-    <div id="result" className="mt-14 scroll-mt-32">
+    <div id="result" className="mt-14 scroll-mt-8">
       <div className="overflow-hidden rounded-2xl bg-brand-graphite text-white">
         <div className="p-8 md:p-10">
           <div className="text-xs font-medium tracking-[0.14em] text-white/65 uppercase">

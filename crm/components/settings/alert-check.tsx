@@ -1,15 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   checkAlertsAction,
   type AlertCheckState,
 } from "@/app/(agency)/a/settings/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
 import type { ChannelResult } from "@/lib/monitoring/alert-check";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 /**
  * Проверка канала оповещений о сбоях.
@@ -25,11 +24,10 @@ const STATE_LABELS = {
 } as const;
 
 function CheckButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "Отправляем…" : "Отправить проверочное сообщение"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" pendingLabel="Отправляем…">
+      Отправить проверочное сообщение
+    </SubmitButtonBase>
   );
 }
 
@@ -56,11 +54,7 @@ export function AlertCheck() {
         <CheckButton />
       </form>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       {state.result && (
         <div className="space-y-3 border-t pt-4">

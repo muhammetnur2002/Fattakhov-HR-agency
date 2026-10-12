@@ -432,7 +432,7 @@ for (const c of NAV_CASES) {
           const asides = [...document.querySelectorAll(".cabinet-shell > aside")];
           return {
             tabs: visible(document.querySelector("nav[data-bottom-tabs]")),
-            rail: visible(asides.find((a) => a.classList.contains("w-20"))),
+            rail: visible(asides.find((a) => a.getAttribute("data-slot") === "icon-rail")),
             sidebar: visible(asides.find((a) => a.classList.contains("w-60"))),
             burger: !!document.querySelector('[aria-label="Открыть меню"]'),
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -626,9 +626,9 @@ test.describe("отступ внутри карточки на мыши — не
 
 /*
   Сырой <input type="checkbox">. Дефект чисто в WebKit на iOS, показать
-  его этим тестом нельзя. Тест проверяет, что правило подключено
-  и не расширяется за pointer: coarse — страховка от того, что кто-то
-  уберёт appearance: none и баг незаметно вернётся.
+  его этим тестом нельзя. Тест проверяет, что правило подключено — страховка
+  от того, что кто-то уберёт appearance: none и баг незаметно вернётся.
+  С 11.10.2026 правило действует и на мыши (см. блок ниже): вид один.
 */
 test.describe("сырой чекбокс на сенсорном экране", () => {
   // /register уводит вошедшего в кабинет — здесь нужен анонимный контекст
@@ -664,7 +664,9 @@ test("галочки в кабинете на сенсорном экране �
   expect(new Set(appearances)).toEqual(new Set(["none"]));
 });
 
-test.describe("сырой чекбокс на мыши — как было, без сброса", () => {
+test.describe("сырой чекбокс на мыши — тот же вид, что и пальцем", () => {
+  // 11.10.2026: правило больше не ограничено `pointer: coarse`. Раньше на мыши оставался системный
+  // квадрат браузера рядом со своими галочками обёртки shadcn; теперь вид один (аудит, states-15)
   test.use({
     viewport: { width: 1280, height: 800 },
     hasTouch: false,
@@ -672,13 +674,36 @@ test.describe("сырой чекбокс на мыши — как было, бе
     storageState: { cookies: [], origins: [] },
   });
 
-  test("на ноутбуке чекбокс остаётся нативным", async ({ page }) => {
+  test("на ноутбуке чекбокс тоже без системной отрисовки: appearance none, рамка 1px, скругление 4px", async ({ page }) => {
     await page.goto("/register");
     const cb = await page.evaluate(() => {
       const el = document.querySelector('input[name="consent"]') as HTMLElement;
-      return { coarse: matchMedia("(pointer: coarse)").matches, appearance: getComputedStyle(el).appearance };
+      const cs = getComputedStyle(el);
+      return {
+        coarse: matchMedia("(pointer: coarse)").matches,
+        appearance: cs.appearance,
+        border: cs.borderTopWidth,
+        radius: cs.borderTopLeftRadius,
+      };
     });
     expect(cb.coarse).toBe(false);
-    expect(cb.appearance).toBe("auto");
+    expect(cb.appearance).toBe("none");
+    expect(cb.border).toBe("1px");
+    expect(cb.radius).toBe("4px");
+  });
+
+  test("отмеченный чекбокс заливается основным цветом, а галочка — залитый многоугольник, не картинка", async ({ page }) => {
+    await page.goto("/register");
+    const box = page.locator('input[name="consent"]');
+    await box.check();
+    const after = await box.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const tick = getComputedStyle(el, "::after");
+      return { bg: cs.backgroundColor, tick: tick.content, tickBg: tick.backgroundColor, clip: tick.clipPath };
+    });
+    expect(after.bg).toBe("rgb(84, 110, 136)");
+    expect(after.tick).not.toBe("none");
+    expect(after.tickBg).toBe("rgb(248, 248, 248)");
+    expect(after.clip).toContain("polygon");
   });
 });

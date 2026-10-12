@@ -10,6 +10,9 @@ import {
   vkLinkStatusAction,
 } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
+import { FormMessage } from "@/components/ui/form-message";
 
 /** Как часто спрашиваем, дошёл ли код. Чаще незачем: человек ещё переключается в ВК. */
 const POLL_MS = 3000;
@@ -42,6 +45,7 @@ export function VkLinkBlock({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingUnlink, setConfirmingUnlink] = useState(false);
+  const { triggerRef: unlinkTrigger, focusRef: unlinkFocus } = useConfirmFocus(confirmingUnlink);
   const [copied, setCopied] = useState(false);
 
   // «Скопировано» гаснет само, чтобы кнопка снова была готова к нажатию
@@ -140,7 +144,7 @@ export function VkLinkBlock({
       )}
 
       {code ? (
-        <div className="space-y-3 rounded-lg border bg-muted/40 p-3">
+        <Panel tone="muted">
           <div className="flex items-center gap-2">
             <p
               aria-label={`Код привязки: ${code.value}`}
@@ -199,7 +203,7 @@ export function VkLinkBlock({
               Отмена
             </Button>
           </div>
-        </div>
+        </Panel>
       ) : confirmingUnlink ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm">
@@ -209,6 +213,7 @@ export function VkLinkBlock({
             Да, отвязать
           </Button>
           <Button
+            ref={unlinkFocus}
             type="button"
             variant="ghost"
             size="sm"
@@ -225,6 +230,7 @@ export function VkLinkBlock({
           </Button>
           {vkUserId && (
             <Button
+              ref={unlinkTrigger}
               type="button"
               variant="ghost"
               size="sm"
@@ -240,7 +246,7 @@ export function VkLinkBlock({
         </div>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      <FormMessage error={error} />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   createConsentLinkAction,
@@ -10,8 +9,8 @@ import {
   type CandidateState,
 } from "@/app/(agency)/a/candidates/actions";
 import { CopyableLink } from "@/components/shared/copyable-link";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function Submit({
   label,
@@ -22,30 +21,15 @@ function Submit({
   pendingLabel: string;
   variant?: "outline";
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant={variant} disabled={pending}>
-      {pending ? pendingLabel : label}
-    </Button>
+    <SubmitButtonBase size="sm" variant={variant} pendingLabel={pendingLabel}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
 function Feedback({ state }: { state: CandidateState }) {
-  if (state.error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{state.error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (state.ok) {
-    return (
-      <Alert>
-        <AlertDescription>{state.ok}</AlertDescription>
-      </Alert>
-    );
-  }
-  return null;
+  return <FormMessage error={state.error} ok={state.ok} />;
 }
 
 /**
@@ -112,11 +96,7 @@ export function SourcingPanel({
               hint={`Действует ${consentLinkDays} дней. Кандидат откроет с телефона и подтвердит.`}
             />
           )}
-          {linkState.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{linkState.error}</AlertDescription>
-            </Alert>
-          )}
+          <FormMessage error={linkState.error} />
         </form>
 
         {showManual ? (

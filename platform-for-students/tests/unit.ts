@@ -10,6 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { verifyStaffTicket } from '../lib/security/staff-ticket';
 import { crmQueueSignature, verifyCrmQueueRequest } from '../lib/security/crm-queue-signature';
 import { buildCrmReviewItems } from '../lib/crm-review-queue';
@@ -32,6 +33,8 @@ import { BANNER_VERSION, isAccepted, isAnswered } from '../lib/analytics/consent
 import bcryptjs from 'bcryptjs';
 import { hashPassword, verifyPassword } from '../lib/security/password';
 import { formatWait } from '../lib/wait-format';
+import nodemailer from 'nodemailer';
+import { secureSmtpUrl } from '../lib/mail/smtp-url';
 import {
   PRESENCE_TICK_MS,
   effectiveShowPresence,
@@ -40,8 +43,11 @@ import {
   shouldWritePresence,
   visibleLastSeen,
 } from '../lib/presence';
+import { apiErrorMessage } from '../lib/api-client';
+import { isMeaningfulDraft, NEVER_STORED, parseDraft, serializeDraft } from '../lib/registration-draft';
 import { vapidProblem } from '../lib/push/config';
 import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guard';
+import { PRIVACY, STUDENT_CONSENT, STUDENT_CONSENT_VERSION, needsConsentRenewal } from '../lib/legal';
 import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
 
 let passed = 0;
@@ -692,6 +698,270 @@ test('строка «в сети» пересчитывается чаще ра�
   const base = PRESENCE_TICK_MS * 40_000_000;
   assert.equal(tick(base), tick(base + PRESENCE_TICK_MS - 1));
   assert.equal(tick(base + PRESENCE_TICK_MS) - tick(base), PRESENCE_TICK_MS);
+});
+
+console.log('Согласие студента: текст и повторное согласие');
+const consentText = (doc: { intro: string; sections: Array<{ title: string; paragraphs?: string[]; items?: string[] }> }) =>
+  [doc.intro, ...doc.sections.flatMap((s) => [s.title, ...(s.paragraphs ?? []), ...(s.items ?? [])])].join('\n');
+test('версия согласия новее прежней: старым студентам текст показывается заново', () => {
+  assert.ok(STUDENT_CONSENT_VERSION > '2026-09-30', STUDENT_CONSENT_VERSION);
+  assert.match(STUDENT_CONSENT_VERSION, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(STUDENT_CONSENT.version, STUDENT_CONSENT_VERSION);
+});
+test('согласие больше не обещает «работодателю только после отклика»', () => {
+  const text = consentText(STUDENT_CONSENT);
+  assert.ok(!/только после моего отклика/.test(text), 'старая формулировка осталась');
+});
+test('согласие говорит, что видно до отклика: клиентам с договором и проверенным компаниям', () => {
+  const text = consentText(STUDENT_CONSENT);
+  assert.match(text, /договор/);
+  assert.match(text, /прошедш[а-я]+ проверку/);
+  assert.match(text, /до (моего |какого-либо )?отклика/);
+  // Что именно видно в списке кандидатов — перечень из lib/services.ts (listCandidatesForVacancy)
+  for (const word of ['возраст', 'учебное заведение', 'навыки', 'о себе', 'проекты', 'увлечения', 'ссылки']) {
+    assert.ok(text.toLowerCase().includes(word), `в согласии нет «${word}»`);
+  }
+});
+test('согласие говорит, когда открываются контакты: приглашение работодателя или отклик студента', () => {
+  const text = consentText(STUDENT_CONSENT);
+  assert.match(text, /приглас/);
+  assert.match(text, /откликнул/);
+  assert.match(text, /почт/);
+  assert.match(text, /телефон/);
+  // Приглашение открывает контакты сразу, до ответа студента — так работает код, так и сказано
+  assert.match(text, /до моего ответа|сразу при приглашении/);
+});
+test('политика не повторяет старое «только после отклика»', () => {
+  const text = consentText(PRIVACY);
+  assert.ok(!/видит данные студента только после его отклика/.test(text));
+  assert.ok(!/^работодателю — после отклика студента на его вакансию;$/m.test(text));
+  assert.match(text, /приглаш/);
+  assert.match(text, /договор/);
+});
+test('needsConsentRenewal: другая версия — нужно принять заново, та же — нет', () => {
+  assert.equal(needsConsentRenewal({ consentVersion: '2026-09-30' }), true);
+  assert.equal(needsConsentRenewal({ consentVersion: 'test' }), true);
+  assert.equal(needsConsentRenewal({ consentVersion: STUDENT_CONSENT_VERSION }), false);
+});
+
+console.log('Статусные цвета в обеих темах');
+{
+  // Читаем реальные токены из app/globals.css и считаем контраст по формуле WCAG: цвета статусов
+  // раньше были одним hex на обе темы и в светлой давали 1,3–2,6:1 (сверка 08.10.2026)
+  const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const block = (selector: string) => {
+    const start = css.indexOf(`${selector} {`);
+    assert.ok(start >= 0, `нет блока ${selector}`);
+    return css.slice(start, css.indexOf('\n}', start));
+  };
+  const token = (body: string, name: string): [number, number, number] => {
+    const m = new RegExp(`--color-${name}:\\s*(\\d+)\\s+(\\d+)\\s+(\\d+);`).exec(body);
+    assert.ok(m, `нет токена --color-${name}`);
+    return [Number(m[1]), Number(m[2]), Number(m[3])];
+  };
+  const lin = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lum = (c: number[]) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const ratio = (a: number[], b: number[]) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const over = (fg: number[], bg: number[], alpha: number) => fg.map((f, i) => Math.round(f * alpha + bg[i] * (1 - alpha)));
+
+  for (const [theme, selector] of [['светлая', ':root'], ['тёмная', '.dark']] as const) {
+    const body = block(selector);
+    const ink = token(body, 'ink');
+    const raise = token(body, 'ink-raise');
+    const [warn, yes, glow, danger] = [token(body, 'warn'), token(body, 'yes'), token(body, 'yes-glow'), token(body, 'danger')];
+
+    test(`${theme} тема: текст статусов на полотне и на карточке — не ниже 4,5:1`, () => {
+      for (const [name, color] of [['warn', warn], ['yes', yes], ['yes-glow', glow], ['danger', danger]] as const) {
+        for (const [on, bg] of [['полотне', ink], ['карточке', raise]] as const) {
+          assert.ok(ratio(color, bg) >= 4.5, `${name} на ${on}: ${ratio(color, bg).toFixed(2)}`);
+        }
+      }
+    });
+    test(`${theme} тема: подписи на плашках статусов (приглашён, вышел на работу, отклонена) — не ниже 4,5:1`, () => {
+      const pairs: [string, number[], number[]][] = [
+        ['INVITED: warn на warn/12', warn, over(warn, raise, 0.12)],
+        ['HIRED: yes-glow на yes/14', glow, over(yes, raise, 0.14)],
+        ['REJECTED: danger на danger/15', danger, over(danger, raise, 0.15)],
+        ['кнопка danger при наведении: danger на danger/25', danger, over(danger, raise, 0.25)],
+      ];
+      for (const [name, text, bg] of pairs) assert.ok(ratio(text, bg) >= 4.5, `${name}: ${ratio(text, bg).toFixed(2)}`);
+    });
+  }
+
+  test('tailwind читает статусные цвета из переменных темы, а не из одного hex', () => {
+    const config = readFileSync(new URL('../tailwind.config.ts', import.meta.url), 'utf8');
+    for (const name of ['yes', 'yes-glow', 'yes-deep', 'warn', 'danger']) {
+      assert.ok(config.includes(`withOpacity('--color-${name}')`), name);
+    }
+    assert.equal(/#C9A227|#4FA37F|#B4534F/i.test(config), false, 'старые hex вернулись');
+  });
+}
+
+console.log('Страницы ошибок, клавиатура и подтверждение отказа');
+{
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+  test('у каждого раздела есть своя страница ошибки, а корень — ещё и global-error (раньше не было ни одной)', () => {
+    for (const file of ['app/error.tsx', 'app/global-error.tsx', 'app/(student)/error.tsx', 'app/employer/error.tsx', 'app/admin/error.tsx']) {
+      assert.ok(read(file).length > 0, file);
+    }
+    for (const file of ['app/error.tsx', 'app/(student)/error.tsx', 'app/employer/error.tsx', 'app/admin/error.tsx']) {
+      assert.ok(read(file).includes('ErrorScreen'), file);
+    }
+  });
+  test('страница ошибки не показывает текст исключения и различает «страница устарела»', () => {
+    const screen = read('components/ui/ErrorScreen.tsx');
+    assert.equal(/error\.message/.test(screen), false, 'текст исключения не выводится');
+    assert.ok(screen.includes('unstable_isUnrecognizedActionError'));
+    assert.ok(screen.includes('Страница устарела'));
+  });
+  test('мастер регистрации и редакторы — формы: Enter идёт дальше, у кнопки type=submit', () => {
+    const wizard = read('components/screens/RegistrationWizard.tsx');
+    assert.ok(wizard.includes('id="registration-step-form"') && wizard.includes('form="registration-step-form"'));
+    assert.ok(/type="submit"/.test(wizard));
+    for (const file of ['components/screens/ProfileEditor.tsx', 'components/screens/CompanyEditor.tsx']) {
+      const source = read(file);
+      assert.ok(/<form\s[^>]*onSubmit/s.test(source), `${file}: корень — форма`);
+      assert.ok(/<Button size="sm" type="submit"/.test(source), `${file}: «Сохранить» — кнопка отправки`);
+    }
+  });
+  test('«Отказ» работодателя идёт через подтверждение, текущий этап — aria-pressed, «Новый» выбрать нельзя', () => {
+    const board = read('components/screens/EmployerBoard.tsx');
+    assert.ok(board.includes("if (status === 'REJECTED')"));
+    assert.ok(board.includes('title="Отказать студенту?"'));
+    assert.ok(board.includes('aria-pressed={status === application.status}'));
+    assert.ok(board.includes("filter((status) => status !== 'NEW')"));
+    assert.equal(/disabled=\{pending \|\| status === application\.status\}/.test(board), false, 'текущий этап не выключается');
+  });
+}
+
+console.log('Отказ сервера и черновик анкеты');
+testAsync('apiErrorMessage: текст отказа берётся из поля error, иначе запасной', async () => {
+  assert.equal(await apiErrorMessage({ json: async () => ({ error: 'Слишком много попыток. Повторите через 2 мин.' }) }, 'запасной'), 'Слишком много попыток. Повторите через 2 мин.');
+  assert.equal(await apiErrorMessage({ json: async () => ({}) }, 'запасной'), 'запасной');
+  assert.equal(await apiErrorMessage({ json: async () => ({ error: '   ' }) }, 'запасной'), 'запасной');
+  assert.equal(await apiErrorMessage({ json: async () => ({ error: 42 }) }, 'запасной'), 'запасной');
+  assert.equal(await apiErrorMessage({ json: async () => { throw new Error('не JSON'); } }, 'запасной'), 'запасной');
+});
+
+const DRAFT_INITIAL = {
+  fullName: '',
+  photoUrl: null as string | null,
+  workDays: [] as string[],
+  hoursPerWeek: 20 as number | null,
+  email: '',
+  password: '',
+  consent: false,
+  terms: false,
+  marketing: false,
+};
+test('черновик: пароль и все согласия в сохранённое не попадают', () => {
+  const raw = serializeDraft(3, { ...DRAFT_INITIAL, fullName: 'Анна', password: 'секрет-1', consent: true, terms: true, marketing: true });
+  for (const key of NEVER_STORED) assert.equal(raw.includes(`"${key}"`), false, key);
+  assert.equal(raw.includes('секрет-1'), false);
+});
+test('черновик: после разбора шаг и ответы на месте, а пароль и согласия — пустые', () => {
+  const raw = serializeDraft(2, { ...DRAFT_INITIAL, fullName: 'Анна Петрова', workDays: ['MON', 'WED'], hoursPerWeek: 12, photoUrl: '/uploads/a.jpg' });
+  const draft = parseDraft(raw, DRAFT_INITIAL, 5);
+  assert.ok(draft);
+  assert.equal(draft.step, 2);
+  assert.equal(draft.form.fullName, 'Анна Петрова');
+  assert.deepEqual(draft.form.workDays, ['MON', 'WED']);
+  assert.equal(draft.form.hoursPerWeek, 12);
+  assert.equal(draft.form.photoUrl, '/uploads/a.jpg');
+  assert.equal(draft.form.password, '');
+  assert.equal(draft.form.consent, false);
+});
+test('черновик: подменённое содержимое хранилища форму не ломает', () => {
+  assert.equal(parseDraft(null, DRAFT_INITIAL, 5), null);
+  assert.equal(parseDraft('не json', DRAFT_INITIAL, 5), null);
+  assert.equal(parseDraft(JSON.stringify({ v: 99, step: 1, form: {} }), DRAFT_INITIAL, 5), null);
+  const tampered = parseDraft(
+    JSON.stringify({ v: 1, step: 99, form: { fullName: 123, workDays: [1, 2], hoursPerWeek: 'много', password: 'x', consent: true, чужое: 'поле' } }),
+    DRAFT_INITIAL,
+    5,
+  );
+  assert.ok(tampered);
+  assert.equal(tampered.step, 4, 'шаг ограничен числом шагов');
+  assert.equal(tampered.form.fullName, '', 'число вместо строки отброшено');
+  assert.deepEqual(tampered.form.workDays, [], 'массив не из строк отброшен');
+  assert.equal(tampered.form.hoursPerWeek, 20, 'строка вместо числа отброшена');
+  assert.equal(tampered.form.password, '');
+  assert.equal(tampered.form.consent, false, 'согласие подменой не включить');
+  assert.equal('чужое' in tampered.form, false);
+  assert.equal(parseDraft(JSON.stringify({ v: 1, step: -3, form: {} }), DRAFT_INITIAL, 5)?.step, 0);
+});
+test('черновик: «значимый» только если ушли с первого шага или что-то ввели', () => {
+  assert.equal(isMeaningfulDraft(0, DRAFT_INITIAL, DRAFT_INITIAL), false);
+  assert.equal(isMeaningfulDraft(1, DRAFT_INITIAL, DRAFT_INITIAL), true);
+  assert.equal(isMeaningfulDraft(0, { ...DRAFT_INITIAL, fullName: 'А' }, DRAFT_INITIAL), true);
+  assert.equal(isMeaningfulDraft(0, { ...DRAFT_INITIAL, password: 'введён' }, DRAFT_INITIAL), false, 'один пароль — не повод восстанавливать');
+});
+test('SMTP: у внешнего сервера шифрование обязательно, откат на открытый обмен запрещён', () => {
+  const url = secureSmtpUrl('smtp://login:pass@smtp.reg.ru:587');
+  assert.ok(url.includes('requireTLS=true'));
+  // и nodemailer действительно читает параметр из адреса, а не молча игнорирует
+  const transport = nodemailer.createTransport(url) as unknown as { options: { requireTLS?: boolean } };
+  assert.equal(transport.options.requireTLS, true);
+});
+test('SMTP: smtps, локальные адреса и явная настройка владельца не трогаются', () => {
+  for (const same of [
+    'smtps://u:p@smtp.reg.ru:465',
+    'smtp://localhost:1025',
+    'smtp://127.0.0.1:1025',
+    'smtp://u:p@smtp.reg.ru:587?requireTLS=false',
+    'smtp://u:p@smtp.reg.ru:587?ignoreTLS=true',
+    'не-адрес',
+  ]) {
+    assert.equal(secureSmtpUrl(same), same);
+  }
+});
+
+// ---------- Тема, первый экран без JS, кнопка темы (09.10.2026) ----------
+const readSrc = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('тема: скрипт в <head> и провайдер берут один и тот же выбор по умолчанию', () => {
+  // Скрипт ставил тёмную, провайдер после загрузки пересчитывал в системную:
+  // на светлом телефоне страница секунды стояла чёрной и вспыхивала светлой
+  const script = /localStorage\.getItem\("theme"\) \|\| "(\w+)"/.exec(readSrc('app/layout.tsx'));
+  const provider = /\?\? '(\w+)';\s*\} catch/.exec(readSrc('components/theme/ThemeProvider.tsx'));
+  assert.ok(script && provider, 'оба значения по умолчанию найдены');
+  assert.equal(script[1], provider[1]);
+});
+test('первый экран появляется CSS-анимацией: не ждёт JS и не остаётся пустым без него', () => {
+  const landing = readSrc('components/screens/Landing.tsx');
+  const hero = landing.slice(landing.indexOf('ПЕРВЫЙ ЭКРАН'), landing.indexOf('ЦИФРЫ'));
+  // В первом экране нет JS-анимации с невидимым стартом: такой блок пуст, пока не загрузятся скрипты
+  assert.equal(/<motion\./.test(hero), false, 'на первом экране нет motion-элементов');
+  assert.ok(hero.includes('rise-in'));
+  const split = readSrc('components/motion/SplitText.tsx');
+  const splitText = split.slice(split.indexOf('export function SplitText({'), split.indexOf('export function SplitTextInView'));
+  assert.equal(/motion\.span/.test(splitText), false, 'заголовок первого экрана — на CSS');
+  const css = readSrc('app/globals.css');
+  // Без движения анимация выключена целиком: одна сокращённая длительность оставила бы задержку,
+  // и текст до неё был бы невидим
+  assert.match(css, /prefers-reduced-motion: reduce\)\s*\{\s*\.rise-in,\s*\.word-rise\s*\{\s*animation: none;/);
+});
+test('без JS: блоки с анимацией появления помечены и показываются как есть', () => {
+  const layout = readSrc('app/layout.tsx');
+  assert.match(layout, /\[data-reveal\]\{opacity:1!important/);
+  assert.match(layout, /<noscript>/);
+  for (const file of ['components/motion/Reveal.tsx', 'components/motion/SplitText.tsx']) {
+    const src = readSrc(file);
+    const hidden = (src.match(/initial=/g) ?? []).length;
+    const marked = (src.match(/data-reveal/g) ?? []).length;
+    assert.ok(marked >= hidden, `${file}: у каждого невидимого старта есть data-reveal (${marked} из ${hidden})`);
+  }
+});
+test('нижние панели оставляют место под кнопку темы', () => {
+  const css = readSrc('app/globals.css');
+  assert.match(css, /\.clear-theme-toggle\s*\{[^}]*padding-right: max\(0px/);
+  for (const file of ['components/analytics/CookieBanner.tsx', 'components/screens/ProfileEditor.tsx', 'components/screens/CompanyEditor.tsx']) {
+    assert.ok(readSrc(file).includes('clear-theme-toggle'), `${file}: панель освобождает угол кнопки темы`);
+  }
 });
 
 void Promise.all(pending).then(() => {

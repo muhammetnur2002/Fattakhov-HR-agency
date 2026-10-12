@@ -600,6 +600,16 @@ export interface MessageDTO {
   mine: boolean;
 }
 
+/**
+ * Своя реплика, которая ещё не подтверждена сервером (только в браузере).
+ * `failed` — отправка не удалась: сообщение остаётся в ленте с «Повторить» и «Удалить»,
+ * а не пропадает вместе с набранным текстом.
+ */
+export interface PendingMessageDTO extends MessageDTO {
+  applicationId: string;
+  failed?: boolean;
+}
+
 export interface ThreadSummaryDTO {
   applicationId: string;
   vacancyId: string;

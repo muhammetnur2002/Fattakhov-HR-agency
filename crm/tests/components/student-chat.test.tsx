@@ -21,6 +21,8 @@ const actions = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.pathname,
   useRouter: () => ({ push: nav.push, refresh: nav.refresh }),
+  // useStaleGuard: «устаревшей вкладки» в этих сценариях нет
+  unstable_isUnrecognizedActionError: () => false,
 }));
 vi.mock("@/app/(client)/students/actions", () => actions);
 

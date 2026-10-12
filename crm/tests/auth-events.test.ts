@@ -10,6 +10,7 @@ import type { Actor } from "@/lib/access";
 import { hashPassword } from "@/lib/auth/password";
 import { totp } from "@/lib/auth/totp";
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { clearStrangerMailCaps } from "./helpers/mail-caps";
 import { resetRateLimits } from "@/lib/security/rate-limit";
 import {
   describeUserAgent,
@@ -33,6 +34,7 @@ const EMAIL = `${MARK}-user@example.com`;
 let userId = "";
 
 async function cleanup() {
+  await clearStrangerMailCaps();
   await db.authFailure.deleteMany({ where: { key: { contains: MARK } } });
   const users = await db.user.findMany({ where: { email: { startsWith: MARK } }, select: { id: true } });
   const ids = users.map((u) => u.id);

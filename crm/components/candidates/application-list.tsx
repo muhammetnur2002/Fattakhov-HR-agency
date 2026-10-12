@@ -5,6 +5,13 @@ import { Stagger, StaggerItem } from "@/components/motion/primitives";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ClientDecision } from "@/lib/generated/prisma/enums";
 import { formatNumber } from "@/lib/pricing";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
+
+/** Звено цепочки subgrid: занимает все колонки списка и берёт их себе (на xl). */
+// column-gap: normal — у звеньев цепочки своего промежутка нет: Card несёт gap-(--card-spacing),
+// и на subgrid он иначе перекрывает gap-x-6 списка (20px вместо 30px между колонками)
+const ROW = "xl:col-span-full xl:grid xl:grid-cols-subgrid xl:[column-gap:normal]";
 
 export type ApplicationListItem = {
   id: string;
@@ -46,17 +53,29 @@ export function ApplicationList({
   showClient?: boolean;
 }) {
   if (applications.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          {emptyText}
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>{emptyText}</EmptyState>;
   }
 
   return (
-    <Stagger className="grid gap-3">
+    /*
+      Колонки — общие для всего списка, а не у каждой карточки свои.
+
+      Раньше сетка `xl:grid-cols-[2fr 1fr 2fr auto auto]` объявлялась внутри
+      каждой карточки, и две колонки `auto` (ожидание и этап) считались по
+      тексту этой карточки: у «Ждёт 12 дней» с этапом «Интервью с клиентом»
+      они были шире, чем у «Ждёт 8 дней» с «Представлен клиенту», остаток
+      делили заново, и зарплата с вакансией «плыли» от строки к строке до
+      41 точки — левые края одноимённых колонок не совпадали.
+
+      Теперь сетка одна, на списке, а карточка на xl берёт её колонки себе
+      через subgrid (`grid-cols-subgrid`) — цепочка обёрток StaggerItem →
+      Link → Card → CardContent целиком, каждое звено занимает все колонки
+      (`col-span-full`). `auto` при этом — самый широкий текст среди всех
+      строк списка, и он один на всех. Промежуток между колонками задаёт
+      только родитель (`gap-x-6`): у subgrid своего нет — см. invite-form.
+      Ниже xl сетки нет вовсе, там перенос строк (flex-wrap).
+    */
+    <Stagger className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_auto_auto] xl:gap-x-6">
       {applications.map((a) => {
         const waiting =
           a.presentedAt !== null && a.clientDecision === null
@@ -64,9 +83,9 @@ export function ApplicationList({
             : null;
 
         return (
-          <StaggerItem key={a.id}>
-          <Link href={`${hrefBase}/${a.id}`}>
-            <Card className="transition-colors hover:border-primary/40">
+          <StaggerItem key={a.id} className={ROW}>
+          <Link href={`${hrefBase}/${a.id}`} className={cn("block", ROW)}>
+            <Card className={cn("transition-colors hover:border-primary/40", ROW)}>
               {/*
                 Сетка на широком экране, перенос строк на узком — как
                 в VacancyList. Без неё весь избыток ширины уходил в две
@@ -81,16 +100,12 @@ export function ApplicationList({
                 из колонки и срезался краем карточки — без многоточия, без
                 полосы прокрутки, человек видел «Интервью с кли» и не знал,
                 что текст продолжается. auto отдаёт этим колонкам ровно
-                столько, сколько нужно содержимому, а остаток делят имя
-                и вакансия. Выравнивание бейджей между карточками сохраняется:
-                они прижаты к правому краю, а он у всех карточек общий.
+                столько, сколько нужно самому длинному тексту списка, а остаток
+                делят имя и вакансия. Колонки общие (subgrid, см. выше), поэтому
+                «ровно столько» — один размер на все карточки, и бейджи стоят
+                на одной вертикали.
               */}
-              <CardContent
-                className="
-                  flex flex-wrap items-center gap-x-6 gap-y-2 p-4
-                  xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_auto_auto]
-                "
-              >
+              <CardContent className={cn("flex flex-wrap items-center max-xl:gap-x-6 max-xl:gap-y-2", ROW)}>
                 <div className="min-w-56 flex-1 xl:min-w-0">
                   <div className="font-medium">{a.candidate.fullName}</div>
                   {/* Должность и компания в одну строку через один
@@ -143,13 +158,12 @@ export function ApplicationList({
                 {/*
                   Этап усекается многоточием, а не срезается краем карточки.
 
-                  На широком экране строка — сетка, и колонке этапа достаётся
-                  доля ширины: около 129px. Названия вроде «Финальный этап /
-                  тестовое» требуют 259px, вылезали за колонку и обрезались
-                  overflow'ом карточки — без многоточия и без полосы прокрутки,
-                  то есть человек видел «Финальный этап / те» и не знал, что
-                  текст продолжается. Отдать колонке недостающие 130px нельзя:
-                  их пришлось бы забрать у имени кандидата и вакансии.
+                  Колонка этапа — auto: ширина по самому длинному названию в
+                  списке («Финальный этап / тестовое» — до 259px), одна на все
+                  карточки. Потолка у неё нарочно нет: он усекал и обычные «Интервью
+                  с клиентом» и «Представлен клиенту» (около 185px), а имя кандидата
+                  от этого не выигрывало. Если название всё же не помещается — оно
+                  усекается многоточием, а не срезается краем карточки молча.
                   Полное название остаётся в подсказке и на карточке кандидата.
 
                   max-w-full — самому бейджу (у него уже overflow-hidden),

@@ -19,6 +19,7 @@ import {
   listInvoices,
   receivables,
 } from "@/lib/services/invoices";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Финансы" };
 
@@ -38,7 +39,7 @@ export default async function FinancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Финансы</h1>
+        <PageTitle>Финансы</PageTitle>
         <p className="text-sm text-muted-foreground">
           Закрытые позиции, счета и дебиторка
         </p>

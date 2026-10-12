@@ -16,6 +16,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Actor } from "@/lib/access";
 import { maskPhone } from "@/lib/auth/phone";
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { clearStrangerMailCaps } from "./helpers/mail-caps";
 import { REGISTRATION_CONSENT_VERSION } from "@/lib/legal/registration-consent";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { resolveQuickSignIn } from "@/lib/services/quick-registration";
@@ -52,6 +53,7 @@ function brief(overrides: Partial<BriefInput> = {}): BriefInput {
 }
 
 async function cleanup() {
+  await clearStrangerMailCaps();
   const users = await db.user.findMany({
     where: {
       OR: [{ email: { startsWith: MARK } }, { email: "phone-79990000303@users.invalid" }],

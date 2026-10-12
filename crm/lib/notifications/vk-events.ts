@@ -29,7 +29,9 @@ export type VkEventOutcome =
   | "too-many-attempts"
   | "forbidden-secret"
   | "ignored"
-  | "reply-failed";
+  | "reply-failed"
+  | "poll-started"
+  | "poll-failed";
 
 /** Сколько живут записи. */
 export const VK_EVENT_RETENTION_DAYS = 30;
@@ -89,6 +91,8 @@ export const VK_EVENT_TYPE_LABELS: Record<string, string> = {
   message_allow: "Разрешил сообщения",
   message_deny: "Запретил сообщения",
   message_reply: "Ответ сообщества",
+  poll_message: "Сообщение сообществу (опрос)",
+  poll: "Опрос сообщений",
 };
 
 /** Что значит исход — и что делать, если он тревожный. */
@@ -110,4 +114,6 @@ export const VK_EVENT_OUTCOME_LABELS: Record<
   },
   ignored: { text: "событие принято, ничего делать не нужно", tone: "ok" },
   "reply-failed": { text: "не удалось ответить человеку", tone: "bad" },
+  "poll-started": { text: "бот запущен и сам проверяет сообщения сообщества", tone: "ok" },
+  "poll-failed": { text: "не удалось прочитать сообщения сообщества", tone: "bad" },
 };

@@ -1,24 +1,25 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useState } from "react";
 
 import {
   clientTransitionAction,
   type VacancyActionState,
 } from "@/app/actions/vacancies";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
+import { panelClass } from "@/components/ui/panel";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function Submit({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function Submit({ label, loading }: { label: string; loading?: boolean }) {
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "…" : label}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" loading={loading}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -33,7 +34,9 @@ export function ClientVacancyActions({
   canHold: boolean;
   canClose: boolean;
 }) {
-  const [state, formAction] = useActionState<VacancyActionState, FormData>(
+  // Причина отмены набирается текстом и остаётся после отказа; кнопки «приостановить» и «возобновить» —
+  // формы без полей (action)
+  const { state, pending, formAction, formProps } = useFormAction<VacancyActionState>(
     clientTransitionAction,
     {},
   );
@@ -80,7 +83,7 @@ export function ClientVacancyActions({
       {/* Причина обязательна: без неё в аналитике останется дыра,
           а рекрутер не поймёт, что пошло не так */}
       {cancelling && (
-        <form action={formAction} className="space-y-2 rounded-md border p-3">
+        <form {...formProps} className={panelClass("plain", "space-y-2")}>
           <input type="hidden" name="vacancyId" value={vacancyId} />
           <input type="hidden" name="to" value="CLOSED_CANCELLED" />
           <Label htmlFor="closeReason">Почему отменяете?</Label>
@@ -91,7 +94,7 @@ export function ClientVacancyActions({
             placeholder="Закрыли внутренним переводом"
           />
           <div className="flex gap-2">
-            <Submit label="Отменить заявку" />
+            <Submit label="Отменить заявку" loading={pending} />
             <Button
               type="button"
               size="sm"
@@ -104,11 +107,7 @@ export function ClientVacancyActions({
         </form>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
     </div>
   );
 }

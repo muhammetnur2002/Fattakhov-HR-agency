@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authorize, requireClientActor } from "@/lib/auth/session";
@@ -9,6 +7,8 @@ import { fetchEmployerVacancy, StudentsServiceError } from "@/lib/students-servi
 import { updateVacancyAction } from "../actions";
 import { VacancyActions } from "../vacancy-actions";
 import { VacancyForm } from "../vacancy-form";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Вакансия" };
 
@@ -41,11 +41,10 @@ export default async function StudentsVacancyPage({ params }: Props) {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href="/students" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Все вакансии
-      </Link>
-      <h1 className="text-2xl font-semibold">{vacancy.title}</h1>
+      <div>
+        <BackLink href="/students">Все вакансии</BackLink>
+        <PageTitle>{vacancy.title}</PageTitle>
+      </div>
       <VacancyForm
         action={updateVacancyAction.bind(null, id)}
         initial={vacancy}

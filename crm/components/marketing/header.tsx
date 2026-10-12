@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { SITE_CONTAINER } from "./layout";
 import { MarketingMobileMenu } from "./mobile-menu";
 import { PHONE_DISPLAY, PHONE_HREF } from "@/lib/contacts";
 import { MARKETING_LINKS } from "@/lib/marketing/nav";
@@ -11,7 +12,7 @@ import { appUrl, studentsUrl } from "@/lib/urls";
 /**
  * Шапка лендинга.
  *
- * Держится в одну строку на десктопе и не выше h-16 (64 пикселя
+ * Держится в одну строку на десктопе и не выше --site-header-h (4rem: 64 пикселя
  * на телефоне, 80 на корне 125%): высокие «агентские» шапки съедают
  * первый экран, ради которого страница и существует. На узких экранах
  * ссылки-разделы уходят, остаются логотип, телефон, вход и одно действие.
@@ -31,12 +32,12 @@ export function MarketingHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-[2200px] items-center gap-6 px-5 md:px-8 xl:px-14">
+      <div className={`flex h-(--site-header-h) items-center gap-6 ${SITE_CONTAINER}`}>
         <Link href="/" aria-label="Fattakhov HR Agency" className="flex shrink-0 items-center">
           <Logo variant="lockup" className="h-7" priority />
         </Link>
 
-        <nav className="ml-4 hidden items-center gap-6 xl:flex">
+        <nav aria-label="Разделы сайта" className="ml-4 hidden items-center gap-6 xl:flex">
           {MARKETING_LINKS.map((l) => (
             <Link
               key={l.href}

@@ -34,7 +34,7 @@ export default async function ResetPasswordPage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Она истекла, уже использована или введена с ошибкой. Запросите
             новую, это займёт минуту.
@@ -55,7 +55,7 @@ export default async function ResetPasswordPage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Новый пароль</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Новый пароль</CardTitle>
         <CardDescription>
           {target.fullName}, задайте пароль для{" "}
           {withEmailOff(target.email, target.email)}. После смены на других

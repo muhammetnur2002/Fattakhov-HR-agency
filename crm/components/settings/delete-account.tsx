@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 
 import { cancelDeletionRequestAction, deleteAccountAction } from "@/app/(client)/settings/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Удаление своего аккаунта клиентом.
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
  */
 export function DeleteAccount({ contracted, requested }: { contracted: boolean; requested: boolean }) {
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
 
@@ -33,11 +35,7 @@ export function DeleteAccount({ contracted, requested }: { contracted: boolean; 
         <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => run(cancelDeletionRequestAction)}>
           Отозвать запрос
         </Button>
-        {message.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{message.error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={message.error} />
       </div>
     );
   }
@@ -56,30 +54,21 @@ export function DeleteAccount({ contracted, requested }: { contracted: boolean; 
             {contracted ? "Отправить запрос на удаление аккаунта?" : "Удалить аккаунт? Это нельзя отменить."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => run(deleteAccountAction)}>
+            <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => run(deleteAccountAction)}>
               {pending ? "Подождите…" : contracted ? "Да, отправить запрос" : "Да, удалить аккаунт"}
             </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+            <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
               Отмена
             </Button>
           </div>
         </div>
       ) : (
-        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>
+        <Button ref={triggerRef} type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>
           {contracted ? "Запросить удаление аккаунта" : "Удалить аккаунт"}
         </Button>
       )}
 
-      {message.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{message.error}</AlertDescription>
-        </Alert>
-      )}
-      {message.ok && (
-        <Alert>
-          <AlertDescription>{message.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={message.error} ok={message.ok} />
     </div>
   );
 }

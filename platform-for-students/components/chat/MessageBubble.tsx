@@ -22,6 +22,9 @@ export function MessageBubble({
   grouped,
   lastInBurst,
   pending,
+  failed,
+  onRetry,
+  onDiscard,
 }: {
   message: MessageDTO;
   /** Продолжение залпа: отступ сверху меньше */
@@ -30,6 +33,10 @@ export function MessageBubble({
   lastInBurst: boolean;
   /** Ещё летит на сервер */
   pending?: boolean;
+  /** Отправка не удалась: реплика остаётся в ленте, её можно повторить или убрать */
+  failed?: boolean;
+  onRetry?: () => void;
+  onDiscard?: () => void;
 }) {
   const mine = message.mine;
 
@@ -37,9 +44,9 @@ export function MessageBubble({
     <motion.div
       layout="position"
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: pending ? 0.55 : 1, y: 0, scale: 1 }}
+      animate={{ opacity: pending && !failed ? 0.55 : 1, y: 0, scale: 1 }}
       transition={springSoft}
-      className={cn('flex w-full', mine ? 'justify-end' : 'justify-start', grouped ? 'mt-1' : 'mt-3')}
+      className={cn('flex w-full flex-col', mine ? 'items-end' : 'items-start', grouped ? 'mt-1' : 'mt-3')}
     >
       <div
         className={cn(
@@ -52,6 +59,7 @@ export function MessageBubble({
           mine
             ? 'rounded-br-md border-accent-400/40 bg-accent-500/85'
             : 'rounded-bl-md border-[var(--hairline-strong)] bg-graphite-800',
+          failed && 'border-danger/70',
         )}
       >
         <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed text-paper">
@@ -76,6 +84,22 @@ export function MessageBubble({
           </div>
         )}
       </div>
+
+      {failed && (
+        <div role="status" className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[12px]">
+          <span className="text-danger">Не отправлено</span>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="font-medium text-paper underline underline-offset-2 hover:text-accent-200">
+              Повторить
+            </button>
+          )}
+          {onDiscard && (
+            <button type="button" onClick={onDiscard} className="text-paper-dim underline underline-offset-2 hover:text-paper">
+              Удалить
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

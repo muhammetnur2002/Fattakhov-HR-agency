@@ -1,10 +1,10 @@
-import Link from "next/link";
 
 import { QuickAddForm } from "@/components/candidates/quick-add-form";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Новый кандидат" };
 
@@ -35,12 +35,12 @@ export default async function NewCandidatePage({
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href={vacancy ? `/a/vacancies/${vacancy.id}` : "/a/candidates"}>
-            ← {vacancy ? `№${vacancy.number} ${vacancy.title}` : "Кандидаты"}
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-semibold">Новый кандидат</h1>
+        <BackLink
+          href={vacancy ? `/a/vacancies/${vacancy.id}` : "/a/candidates"}
+        >
+          {vacancy ? `№${vacancy.number} ${vacancy.title}` : "Кандидаты"}
+        </BackLink>
+        <PageTitle>Новый кандидат</PageTitle>
         {vacancy && (
           <p className="text-sm text-muted-foreground">
             Попадёт в воронку «{vacancy.title}» ({vacancy.client.name}) на

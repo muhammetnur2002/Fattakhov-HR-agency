@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { notify } from "@/lib/notifications/notify";
-import { studentsClientRecipients, studentsGrantRecipients } from "@/lib/notifications/recipients";
+import {
+  studentReplyRecipients,
+  studentsClientRecipients,
+  studentsGrantRecipients,
+} from "@/lib/notifications/recipients";
 import { safeEqual } from "@/lib/services/passwords";
 import type { EventCode } from "@/lib/notifications/events";
 import type { StaffGrant } from "@/lib/access";
@@ -69,8 +73,31 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { kind?: string; title?: string; body?: string; groupKey?: string; crmClientId?: string }
+    | { kind?: string; title?: string; body?: string; groupKey?: string; crmClientId?: string; studentId?: string }
     | null;
+  // Ответ студента в переписке с агентством: получатели — сотрудники, которые с ним работают
+  if (body?.kind === "agency-message") {
+    if (!body.studentId || !/^[\w-]{1,64}$/.test(body.studentId)) {
+      return NextResponse.json({ error: "Не указан студент" }, { status: 400 });
+    }
+    const organization = await prisma.organization.findFirst({ select: { id: true } });
+    if (!organization) {
+      return NextResponse.json({ error: "Организация не настроена" }, { status: 503 });
+    }
+    const target = await studentReplyRecipients(organization.id, body.studentId);
+    // Студента нет среди кандидатов: писать ему никто не мог, уведомлять некого
+    if (!target) return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
+    await notify({
+      organizationId: organization.id,
+      userIds: target.userIds,
+      event: "STUDENTS_AGENCY_REPLY",
+      title: `${target.fullName} ответил(а) в переписке`,
+      linkUrl: `/a/candidates/${target.candidateId}`,
+      groupKey: `agency-message:${target.candidateId}`,
+    });
+    return NextResponse.json({ ok: true }, { status: 201 });
+  }
+
   const clientMapping = body?.kind ? CLIENT_KIND_TO_EVENT[body.kind] : undefined;
   const mapping = body?.kind ? KIND_TO_EVENT[body.kind] : undefined;
   if ((!mapping && !clientMapping) || !body?.title) {

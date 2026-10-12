@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authConfig } from "@/auth.config";
+import { actionLoginResponse, isServerActionRequest, loginPathFor } from "@/lib/auth/login-redirect";
 import { AGENCY_HOME, CLIENT_HOME, homePathFor, TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
 import { appOrigin, siteHost, siteOrigin } from "@/lib/urls";
 
@@ -156,6 +157,11 @@ export default auth((req) => {
   if (pathname === LANDING_PATH && !user) return NextResponse.next();
 
   if (!user) {
+    // Форма, отправленная после окончания сессии: ответ не страницей, а так, как понимает
+    // серверное действие (иначе вместо входа — «Что-то пошло не так»)
+    if (isServerActionRequest(req)) {
+      return actionLoginResponse(loginPathFor(pathname, true));
+    }
     const loginUrl = new URL("/login", req.nextUrl);
     // Чтобы после входа вернуть человека туда, куда он шёл
     loginUrl.searchParams.set("callbackUrl", pathname);

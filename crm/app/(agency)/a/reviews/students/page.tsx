@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { ServiceUnavailable } from "../service-unavailable";
 import { ageLabel, GENDER_LABEL, StudentStatusBadges } from "./student-bits";
 import { StudentFilters } from "./student-filters";
+import { StudentSelectedMark, StudentSelectionBar } from "@/components/students/student-selection";
+import { candidateIdsByStudent } from "@/lib/services/student-candidates";
 import { PresenceLabel } from "@/components/presence/presence-label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { effectiveGrants } from "@/lib/access";
+import { canDo, effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
 import {
@@ -27,6 +28,10 @@ import {
   type StudentSearchParams,
 } from "@/lib/students-search-params";
 import { studyLine } from "@/lib/study-level";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackLink } from "@/components/ui/back-link";
+import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Студенты платформы" };
 
@@ -90,6 +95,10 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
   const outOfRange = result.items.length === 0 && result.total > 0;
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const backQuery = studentSearchQuery(params).toString();
+  const canPick = canDo(actor, "application.create");
+  const knownCandidates = canPick
+    ? await candidateIdsByStudent(actor, result.items.map((item) => item.id))
+    : {};
 
   return (
     <div className="space-y-6">
@@ -103,20 +112,13 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
       )}
 
       {result.items.length === 0 ? (
-        <Card>
-          <CardContent className="space-y-3 p-8 text-center text-sm text-muted-foreground">
-            <p>
-              {result.hint
-                ? "Результаты покажем, когда выборка станет уже."
-                : outOfRange
-                  ? `Страницы ${result.page} в этой выборке нет — всего найдено ${result.total}.`
-                  : filtered
-                    ? "Под эти условия никого не нашли — ослабьте фильтры или проверьте написание."
-                    : "На платформе пока нет студентов."}
-            </p>
-            {outOfRange && !result.hint ? (
+        <EmptyState
+          action={
+            outOfRange && !result.hint ? (
               <Button asChild variant="outline" size="sm">
-                <Link href={`/a/reviews/students${studentSearchQuery(params, { page: 1 }).size ? `?${studentSearchQuery(params, { page: 1 })}` : ""}`}>
+                <Link
+                  href={`/a/reviews/students${studentSearchQuery(params, { page: 1 }).size ? `?${studentSearchQuery(params, { page: 1 })}` : ""}`}
+                >
                   К первой странице
                 </Link>
               </Button>
@@ -126,9 +128,17 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
                   <Link href="/a/reviews/students">Сбросить фильтры</Link>
                 </Button>
               )
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        >
+          {result.hint
+            ? "Результаты покажем, когда выборка станет уже."
+            : outOfRange
+              ? `Страницы ${result.page} в этой выборке нет — всего найдено ${result.total}.`
+              : filtered
+                ? "Под эти условия никого не нашли — ослабьте фильтры или проверьте написание."
+                : "На платформе пока нет студентов."}
+        </EmptyState>
       ) : (
         <>
           <p className="text-sm text-muted-foreground" aria-live="polite">
@@ -138,13 +148,15 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
           <ul className="grid gap-3 xl:grid-cols-2">
             {result.items.map((student) => (
               <li key={student.id} className="min-w-0">
-                <StudentRow student={student} backQuery={backQuery} />
+                <StudentRow student={student} backQuery={backQuery} inCandidates={Boolean(knownCandidates[student.id])} canPick={canPick} />
               </li>
             ))}
           </ul>
           {pages > 1 && <Pagination params={params} page={result.page} pages={pages} />}
         </>
       )}
+
+      {canPick && <StudentSelectionBar />}
     </div>
   );
 }
@@ -152,13 +164,13 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
 function Header() {
   return (
     <>
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/a/reviews">← Студенческая платформа</Link>
-        </Button>
+      <div className="flex">
+        <BackLink href="/a/reviews" className="mb-0">
+          Студенческая платформа
+        </BackLink>
       </div>
       <div>
-        <h1 className="text-2xl font-semibold">Студенты</h1>
+        <PageTitle>Студенты</PageTitle>
         <p className="text-sm text-muted-foreground">
           Студенты платформы для подбора: вуз, специальность, курс, навыки, возраст и статус.
         </p>
@@ -172,7 +184,17 @@ function Header() {
 
 const DATE = new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow" });
 
-function StudentRow({ student, backQuery }: { student: PlatformStudentItem; backQuery: string }) {
+function StudentRow({
+  student,
+  backQuery,
+  inCandidates,
+  canPick,
+}: {
+  student: PlatformStudentItem;
+  backQuery: string;
+  inCandidates: boolean;
+  canPick: boolean;
+}) {
   const meta = [ageLabel(student.age), GENDER_LABEL[student.gender], student.city].filter(Boolean).join(" · ");
   const education = [
     student.university || "Вуз не указан",
@@ -186,7 +208,7 @@ function StudentRow({ student, backQuery }: { student: PlatformStudentItem; back
   return (
     <Link
       href={href}
-      className="block h-full rounded-xl border bg-card p-4 text-card-foreground transition-colors hover:border-primary/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="block h-full rounded-xl border bg-card p-4 text-card-foreground transition-colors hover:border-primary/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
     >
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-48">
@@ -194,6 +216,8 @@ function StudentRow({ student, backQuery }: { student: PlatformStudentItem; back
           <p className="truncate text-sm text-muted-foreground">{meta}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {inCandidates && <Badge variant="secondary">Уже в кандидатах</Badge>}
+          {canPick && !inCandidates && <StudentSelectedMark studentId={student.id} />}
           <StudentStatusBadges student={student} />
         </div>
       </div>
@@ -233,7 +257,8 @@ function Pagination({ params, page, pages }: { params: StudentSearchParams; page
       {page > 1 ? (
         <Button asChild variant="outline" size="sm">
           <Link href={href(page - 1)} rel="prev">
-            ← Назад
+            <ArrowLeftIcon aria-hidden />
+            Назад
           </Link>
         </Button>
       ) : (
@@ -245,7 +270,8 @@ function Pagination({ params, page, pages }: { params: StudentSearchParams; page
       {page < pages ? (
         <Button asChild variant="outline" size="sm">
           <Link href={href(page + 1)} rel="next">
-            Дальше →
+            Дальше
+            <ArrowRightIcon aria-hidden />
           </Link>
         </Button>
       ) : (

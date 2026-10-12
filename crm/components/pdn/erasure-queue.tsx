@@ -1,24 +1,22 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   queueErasureAction,
   type PdnState,
 } from "@/app/(agency)/a/settings/pdn/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ERASURE_REASON_LABELS } from "@/lib/labels";
 import type { ErasureQueueItem } from "@/lib/services/erasure";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function QueueButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "Ставим…" : "Поставить в очередь"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" pendingLabel="Ставим…">
+      Поставить в очередь
+    </SubmitButtonBase>
   );
 }
 
@@ -65,16 +63,7 @@ export function ErasureQueue({ items }: { items: ErasureQueueItem[] }) {
 
   return (
     <div className="space-y-4">
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
       {items.map((item) => {
         const deadline = deadlineLabel(item.daysLeft);

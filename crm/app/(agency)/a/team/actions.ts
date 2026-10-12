@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
+import type { FormState } from "@/lib/form-state";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { inviteResultMessage, InviteError } from "@/lib/services/invitations";
 import { resetStaffTwoFactor, TwoFactorError } from "@/lib/services/two-factor";
@@ -21,8 +22,9 @@ import {
   resetStaffPasswordSchema,
   updateStaffSchema,
 } from "@/lib/validation/staff";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type TeamFormState = { error?: string; ok?: string };
+export type TeamFormState = FormState;
 
 /** Поля формы. Доступы — несколько значений под одним именем. */
 function readForm(formData: FormData) {
@@ -66,12 +68,14 @@ export async function createStaffAction(
   const actor = await requireAgencyActor();
   const parsed = createStaffSchema.safeParse(readForm(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
     await createStaffAccount(actor, parsed.data);
   } catch (error) {
+    // Единственная беда сервиса здесь — «адрес уже занят»: показываем её у поля почты
+    if (error instanceof StaffError) return { fields: { email: error.message } };
     const known = explain(error);
     if (known) return known;
     throw error;
@@ -90,7 +94,7 @@ export async function resetStaffPasswordAction(
   const actor = await requireAgencyActor();
   const parsed = resetStaffPasswordSchema.safeParse(readForm(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
@@ -137,7 +141,7 @@ export async function updateStaffAction(
   const actor = await requireAgencyActor();
   const parsed = updateStaffSchema.safeParse(readForm(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
@@ -184,12 +188,16 @@ export async function inviteStaffAction(
   const actor = await requireAgencyActor();
   const parsed = inviteStaffSchema.safeParse(readForm(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
+    return invalidForm(parsed.error);
   }
 
   try {
     await inviteStaff(actor, parsed.data);
   } catch (error) {
+    // Адрес занят или уже приглашён — у поля почты, а не общей строкой
+    if (error instanceof InviteError || error instanceof StaffError) {
+      return { fields: { email: error.message } };
+    }
     const known = explain(error);
     if (known) return known;
     throw error;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { withEmailOff } from "@/components/shared/email-off";
 import { Section, SectionHead } from "@/components/marketing/sections";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import {
   OPERATOR_ADDRESS,
   OPERATOR_INN,
@@ -39,14 +40,15 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <>
-      <Section width="narrow" pad="tall">
+      <Section width="narrow">
         <SectionHead
+          as="h1"
           eyebrow="Документ"
           title="Политика в отношении обработки персональных данных"
           lead={`Оператор: ${OPERATOR_NAME}. ИНН ${OPERATOR_INN}${OPERATOR_OGRNIP ? `, ОГРНИП ${OPERATOR_OGRNIP}` : ""}. Адрес: ${OPERATOR_ADDRESS}.`}
         />
 
-        <div className="mt-12 space-y-10 leading-relaxed">
+        <div className="space-y-10 leading-relaxed">
           <Part n="1" title="Общие положения">
             <p>
               Настоящая Политика определяет порядок обработки и защиты
@@ -73,6 +75,7 @@ export default function PrivacyPage() {
 
           <Part n="3" title="Категории субъектов и цели">
             <Table
+              caption="Категории субъектов персональных данных, цели обработки и основные данные"
               head={["Категория", "Цели", "Основные данные"]}
               rows={[
                 [
@@ -319,10 +322,10 @@ function List({ items }: { items: string[] }) {
   return (
     <ul className="space-y-2">
       {items.map((i) => (
-        <li key={i} className="flex gap-2.5">
+        <li key={i} className="flex gap-3">
           <span
             aria-hidden
-            className="mt-2.5 size-1 shrink-0 rounded-full bg-foreground/35"
+            className="mt-3 size-1 shrink-0 rounded-full bg-foreground/35"
           />
           {i}
         </li>
@@ -331,30 +334,41 @@ function List({ items }: { items: string[] }) {
   );
 }
 
-function Table({ head, rows }: { head: string[]; rows: string[][] }) {
+function Table({ caption, head, rows }: { caption: string; head: string[]; rows: string[][] }) {
+  /*
+    На телефоне строка — блок: первая ячейка заголовком, остальные под ней с подписью
+    колонки (data-label → ::before). Три колонки длинного текста в 42rem давали прокрутку
+    вбок, где видна была половина таблицы. С md — обычная таблица.
+  */
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-2xl border-collapse text-left text-sm">
-        <thead>
+    <ScrollRegion label={caption} className="md:overflow-x-auto">
+      <table className="block w-full border-collapse text-left text-sm md:table md:min-w-2xl">
+        {/* Подпись только для читалок: заголовок раздела над таблицей общий для всех таблиц страницы */}
+        <caption className="sr-only">{caption}</caption>
+        <thead className="hidden md:table-header-group">
           <tr className="border-b">
             {head.map((h) => (
               <th
                 key={h}
-                className="py-2.5 pr-5 text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase"
+                scope="col"
+                className="py-3 pr-5 text-xs font-medium tracking-[0.1em] text-muted-foreground uppercase"
               >
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="block md:table-row-group">
           {rows.map((r) => (
-            <tr key={r[0]} className="border-b align-top last:border-0">
+            <tr key={r[0]} className="block border-b py-4 align-top last:border-0 md:table-row md:py-0">
               {r.map((c, i) => (
                 <td
                   key={c}
+                  data-label={head[i]}
                   className={
-                    i === 0 ? "py-3.5 pr-5 font-medium text-foreground" : "py-3.5 pr-5"
+                    i === 0
+                      ? "block pb-1 font-medium text-foreground md:table-cell md:py-3 md:pr-5"
+                      : "block py-1.5 before:mb-0.5 before:block before:text-xs before:font-medium before:tracking-[0.1em] before:text-muted-foreground before:uppercase before:content-[attr(data-label)] md:table-cell md:py-3 md:pr-5 md:before:hidden"
                   }
                 >
                   {c}
@@ -364,6 +378,6 @@ function Table({ head, rows }: { head: string[]; rows: string[][] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }

@@ -880,3 +880,64 @@ export async function fetchInstitutionNames(): Promise<string[]> {
     return [];
   }
 }
+
+// ============ Переписка агентства со студентом (сотрудники и владелец из карточки кандидата) ============
+
+export interface AgencyChatMessage {
+  id: string;
+  /** STUDENT — студент, AGENCY — сотрудник или владелец агентства */
+  author: "STUDENT" | "AGENCY";
+  /** Как студент видит автора из агентства («Мария К.»); у реплики студента null */
+  staffName: string | null;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface AgencyChatThread {
+  messages: AgencyChatMessage[];
+  /** Сколько сообщений студента до этого чтения были непрочитаны */
+  unread: number;
+}
+
+/**
+ * Беседа со студентом. Чтение отмечает сообщения студента прочитанными:
+ * вызывать только когда сотрудник реально открыл карточку. null — студента нет.
+ */
+export async function fetchAgencyChat(studentId: string, actorId: string): Promise<AgencyChatThread | null> {
+  const response = await staffCall(`/api/service/staff/students/${segment(studentId)}/messages`, actorId);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new StudentsServiceError(`Студенческая платформа ответила ${response.status}`);
+  const data = (await response.json()) as { thread: AgencyChatThread };
+  return data.thread;
+}
+
+/** Сообщение студенту. Первое сообщение открывает беседу. */
+export async function sendAgencyChatMessage(input: {
+  studentId: string;
+  actorId: string;
+  /** Подпись для студента: имя сотрудника */
+  staffName: string;
+  body: string;
+}): Promise<{ message?: AgencyChatMessage; error?: string }> {
+  let response: Response;
+  try {
+    response = await rawCall(`/api/service/staff/students/${segment(input.studentId)}/messages`, {
+      method: "POST",
+      headers: { "x-crm-actor": input.actorId },
+      body: JSON.stringify({ body: input.body, staffName: input.staffName }),
+      signal: AbortSignal.timeout(STAFF_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error instanceof StudentsServiceError) throw error;
+    throw new StudentsServiceError("Студенческая платформа не отвечает.");
+  }
+  if (response.status === 429) {
+    throw new StudentsRateLimitedError("Слишком много запросов к студенческой платформе — подождите минуту.");
+  }
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    return { error: typeof data?.error === "string" ? data.error : `Платформа ответила ${response.status}` };
+  }
+  return { message: ((await response.json()) as { message: AgencyChatMessage }).message };
+}

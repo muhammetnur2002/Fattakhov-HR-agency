@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
 import type { FormState } from "./actions";
@@ -13,6 +12,7 @@ import {
 } from "@/components/clients/client-form";
 import { createClientFromLinkRequestAction, linkExistingClientAction as linkAction } from "./link-requests/actions";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import {
   Select,
   SelectContent,
@@ -20,15 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Panel } from "@/components/ui/panel";
 
 type Mode = "closed" | "create" | "existing";
 
 function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Сохраняем…" : label}
-    </Button>
+    <SubmitButtonBase size="sm" pendingLabel="Сохраняем…">
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -73,7 +73,7 @@ export function CompanyActions({
 
   if (mode === "create") {
     return (
-      <div className="space-y-3 rounded-lg border p-4">
+      <Panel>
         <ClientForm
           action={createClientFromLinkRequestAction}
           employerId={employerId}
@@ -84,7 +84,7 @@ export function CompanyActions({
         <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
           Отмена
         </Button>
-      </div>
+      </Panel>
     );
   }
 

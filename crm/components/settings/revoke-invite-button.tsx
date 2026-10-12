@@ -1,18 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
-import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { FormMessage } from "@/components/ui/form-message";
 
 export type RevokeInviteState = { error?: string };
 
 function Submit() {
-  const status = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="ghost" disabled={status.pending}>
-      {status.pending ? "Отзываем…" : "Отозвать"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="ghost" pendingLabel="Отзываем…">
+      Отозвать
+    </SubmitButtonBase>
   );
 }
 
@@ -53,13 +52,11 @@ export function RevokeInviteButton({
   );
 
   return (
-    <form action={formAction} className="space-y-1">
+    <form action={formAction} className="space-y-2">
       <input type="hidden" name="id" value={id} />
       {clientId && <input type="hidden" name="clientId" value={clientId} />}
       <Submit />
-      {state.error && (
-        <p className="max-w-64 text-xs text-destructive">{state.error}</p>
-      )}
+      <FormMessage compact error={state.error} className="max-w-64" />
     </form>
   );
 }

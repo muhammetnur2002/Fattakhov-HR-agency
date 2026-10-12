@@ -2,10 +2,13 @@ import { FileText } from "lucide-react";
 import Link from "next/link";
 
 import { FunnelChart } from "@/components/analytics/funnel-chart";
+import { EmployeeTable } from "@/components/analytics/employee-table";
 import { RejectionChart } from "@/components/analytics/rejection-chart";
 import { StatCard } from "@/components/shell/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import {
   Card,
   CardContent,
@@ -14,11 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { listEmployeeStats } from "@/lib/services/analytics/employees";
 import {
   agencyAnalytics,
   defaultPeriod,
 } from "@/lib/services/analytics/queries";
 import { cn } from "@/lib/utils";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Аналитика" };
 
@@ -37,13 +42,15 @@ export default async function AgencyAnalyticsPage({
   const key: RangeKey =
     range === "month" || range === "year" ? range : "quarter";
 
-  const data = await agencyAnalytics(actor, defaultPeriod(RANGES[key]));
+  const period = defaultPeriod(RANGES[key]);
+  const data = await agencyAnalytics(actor, period);
+  const employees = await listEmployeeStats(actor, period);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Аналитика</h1>
+          <PageTitle>Аналитика</PageTitle>
           <p className="text-sm text-muted-foreground">
             Загрузка команды, скорость и качество подбора
           </p>
@@ -56,20 +63,13 @@ export default async function AgencyAnalyticsPage({
         </Button>
       </div>
 
-      <div className="flex gap-2">
+      <FilterChipGroup label="Период">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
-          <Button
-            key={r}
-            asChild
-            size="sm"
-            variant={key === r ? "default" : "outline"}
-          >
-            <Link href={`/a/analytics?range=${r}`}>
-              {r === "month" ? "Месяц" : r === "quarter" ? "Квартал" : "Год"}
-            </Link>
-          </Button>
+          <FilterChip key={r} href={`/a/analytics?range=${r}`} selected={key === r}>
+            {r === "month" ? "Месяц" : r === "quarter" ? "Квартал" : "Год"}
+          </FilterChip>
         ))}
-      </div>
+      </FilterChipGroup>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
@@ -163,7 +163,7 @@ export default async function AgencyAnalyticsPage({
                 ))}
               </div>
 
-              <div className="hidden space-y-2 overflow-x-auto sm:block">
+              <ScrollRegion label="Нагрузка рекрутёров" className="hidden space-y-2 overflow-x-auto sm:block">
                 {/* minmax вместо 1fr: на узком экране остальные четыре
                     колонки — все auto, то есть по своему полному размеру —
                     забирали всё место контейнера и не оставляли имени
@@ -206,7 +206,7 @@ export default async function AgencyAnalyticsPage({
                     </div>
                   </Link>
                 ))}
-              </div>
+              </ScrollRegion>
             </>
           )}
         </CardContent>
@@ -267,6 +267,19 @@ export default async function AgencyAnalyticsPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Сотрудники</CardTitle>
+          <CardDescription>
+            Нажмите на сотрудника, чтобы открыть его аналитику. «Финал» — сколько
+            его кандидатов сейчас на финальном этапе.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmployeeTable employees={employees} range={key} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

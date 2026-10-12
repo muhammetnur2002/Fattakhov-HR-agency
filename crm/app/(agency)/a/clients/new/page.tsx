@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { createClientAction } from "../actions";
 import { ClientForm } from "@/components/clients/client-form";
 import {
@@ -10,8 +8,9 @@ import {
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { getLead } from "@/lib/services/leads";
 import { listAccountManagers } from "@/lib/services/clients";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Новый клиент" };
 
@@ -31,10 +30,13 @@ export default async function NewClientPage({
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/a/clients">← Клиенты</Link>
-        </Button>
+      <div className="space-y-2">
+        <div className="flex">
+          <BackLink href="/a/clients" className="mb-0">
+            Клиенты
+          </BackLink>
+        </div>
+        <PageTitle>Новый клиент</PageTitle>
       </div>
 
       {/*
@@ -58,9 +60,6 @@ export default async function NewClientPage({
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Новый клиент</CardTitle>
-        </CardHeader>
         <CardContent>
           <ClientForm
             action={createClientAction}

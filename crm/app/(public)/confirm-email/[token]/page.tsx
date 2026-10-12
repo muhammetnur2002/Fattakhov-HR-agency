@@ -31,7 +31,7 @@ export default async function ConfirmEmailPage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Она устарела или повреждена. Запросите новую в настройках кабинета.
           </CardDescription>
@@ -48,7 +48,7 @@ export default async function ConfirmEmailPage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Подтверждение почты</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Подтверждение почты</CardTitle>
         <CardDescription>
           Подключить <span className="font-medium text-foreground">{claims.email}</span>{" "}
           как рабочую почту в кабинете Fattakhov HR? Сюда будут приходить

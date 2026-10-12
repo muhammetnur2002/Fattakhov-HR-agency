@@ -1,9 +1,9 @@
-import Link from "next/link";
-
 import { VacancyWizard } from "@/components/vacancies/vacancy-wizard";
-import { Button } from "@/components/ui/button";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const metadata = { title: "Новая заявка" };
 
@@ -61,10 +61,8 @@ export default async function AgencyNewVacancyPage({
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/a/vacancies">← Вакансии</Link>
-        </Button>
-        <h1 className="text-2xl font-semibold">Заявка на подбор</h1>
+        <BackLink href="/a/vacancies">Вакансии</BackLink>
+        <PageTitle>Заявка на подбор</PageTitle>
         <p className="text-sm text-muted-foreground">
           Заводится за клиента: пригодится, когда вакансию продиктовали
           голосом. Клиент увидит её в своём кабинете и сможет дополнить.
@@ -72,11 +70,11 @@ export default async function AgencyNewVacancyPage({
       </div>
 
       {clients.length === 0 ? (
-        <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+        <EmptyState>
           Нет ни одного клиента с действующим договором. Заявку не на кого
           завести: сначала подтвердите условия сотрудничества в карточке
           клиента.
-        </div>
+        </EmptyState>
       ) : (
         <VacancyWizard
           clients={clients}

@@ -2,15 +2,14 @@
 
 import { Check } from "lucide-react";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   submitAuditAction,
   type AuditLeadState,
 } from "@/app/(marketing)/audit/actions";
 import { ConsentFields } from "@/components/marketing/consent-fields";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,11 +17,10 @@ import { MAX_SCORE } from "@/lib/audit/stages";
 import type { Answers } from "@/lib/audit/score";
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="lg" disabled={pending} className="w-full">
-      {pending ? "Отправляем…" : "Получить разбор"}
-    </Button>
+    <SubmitButtonBase size="lg" className="w-full" pendingLabel="Отправляем…">
+      Получить разбор
+    </SubmitButtonBase>
   );
 }
 
@@ -150,11 +148,7 @@ export function AuditLeadForm({
 
       <ConsentFields idPrefix="audit" />
 
-      {state.error && (
-        <Alert variant="destructive" className="mt-5">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} className="mt-5" />
 
       <div className="mt-6">
         <SubmitButton />

@@ -8,16 +8,18 @@ import {
   uploadContractTemplateAction,
   type FormState,
 } from "@/app/(agency)/a/clients/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function Submit({ label, pending }: { label: string; pending: boolean }) {
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Загружаем…" : label}
-    </Button>
+    <SubmitButton size="sm" loading={pending} pendingLabel="Загружаем…">
+      {label}
+    </SubmitButton>
   );
 }
 
@@ -33,6 +35,7 @@ export function ContractTemplateManager({
   const [uploadState, upload, uploading] = useActionState<FormState, FormData>(uploadContractTemplateAction, {});
   const [deleteState, setDeleteState] = useState<FormState>({});
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [pending, startTransition] = useTransition();
 
   function remove() {
@@ -58,15 +61,15 @@ export function ContractTemplateManager({
             {confirming ? (
               <span className="flex flex-wrap items-center gap-2">
                 <span className="text-sm">Удалить шаблон?</span>
-                <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>
+                <Button type="button" size="sm" variant="destructive" loading={pending} onClick={remove}>
                   {pending ? "Удаляем…" : "Да, удалить"}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+                <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
                   Оставить
                 </Button>
               </span>
             ) : (
-              <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+              <Button ref={triggerRef} type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
                 <Trash2 className="mr-1 size-4" aria-hidden />
                 Удалить
               </Button>
@@ -77,16 +80,7 @@ export function ContractTemplateManager({
             Шаблона нет — клиенты видят подсказку написать менеджеру. Загрузите файл ниже.
           </p>
         )}
-        {deleteState.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{deleteState.error}</AlertDescription>
-          </Alert>
-        )}
-        {deleteState.ok && !current && (
-          <Alert>
-            <AlertDescription>{deleteState.ok}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={deleteState.error} ok={current ? null : deleteState.ok} />
       </div>
 
       <form
@@ -95,7 +89,7 @@ export function ContractTemplateManager({
           const data = new FormData(event.currentTarget);
           startUpload(() => upload(data));
         }}
-        className="space-y-3"
+        className="space-y-4"
       >
         <div className="space-y-2">
           <Label htmlFor="contractTemplate">{current ? "Заменить новым файлом" : "Загрузить шаблон"}</Label>
@@ -114,16 +108,7 @@ export function ContractTemplateManager({
           <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, RTF или ODT до 4 МБ.</p>
         </div>
         <Submit label={current ? "Заменить шаблон" : "Загрузить шаблон"} pending={uploading} />
-        {uploadState.error && (
-          <Alert variant="destructive">
-            <AlertDescription>{uploadState.error}</AlertDescription>
-          </Alert>
-        )}
-        {uploadState.ok && (
-          <Alert>
-            <AlertDescription>{uploadState.ok}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={uploadState.error} ok={uploadState.ok} />
       </form>
     </div>
   );

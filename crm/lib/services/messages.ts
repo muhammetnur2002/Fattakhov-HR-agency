@@ -4,6 +4,7 @@ import { link } from "@/lib/notifications/links";
 import { effectiveShowPresence, type Presence } from "@/lib/presence";
 import { truncateBody } from "@/lib/notifications/events";
 import { notify } from "@/lib/notifications/notify";
+import { createUnlessDuplicate } from "@/lib/services/duplicate-guard";
 
 export class MessageError extends Error {}
 
@@ -291,15 +292,34 @@ export async function sendDirectMessage(
     throw new MessageError("Этому человеку написать нельзя");
   }
 
-  const message = await prisma.directMessage.create({
-    data: {
-      organizationId: actor.organizationId,
-      senderId: actor.id,
-      recipientId,
-      body: text,
-    },
-    select: { id: true },
+  // Повтор того же текста тому же человеку в пределах нескольких секунд — это
+  // двойное нажатие, а не новое сообщение (lib/services/duplicate-guard.ts)
+  const { record: message, duplicate } = await createUnlessDuplicate({
+    lockKey: `dm:${actor.id}:${recipientId}:${text}`,
+    findRecent: (tx, since) =>
+      tx.directMessage.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          senderId: actor.id,
+          recipientId,
+          body: text,
+          createdAt: { gte: since },
+        },
+        select: { id: true },
+      }),
+    create: (tx) =>
+      tx.directMessage.create({
+        data: {
+          organizationId: actor.organizationId,
+          senderId: actor.id,
+          recipientId,
+          body: text,
+        },
+        select: { id: true },
+      }),
   });
+  // Получатель уже уведомлён о первом
+  if (duplicate) return message;
 
   const author = await prisma.user.findFirst({
     where: { id: actor.id },

@@ -32,6 +32,8 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { inviteTokenColumns, openInviteToken } from "../lib/auth/invite-token";
+
 import { createTransport } from "nodemailer";
 
 import { prismaRaw as db } from "../lib/db/prisma";
@@ -97,7 +99,7 @@ async function create() {
         organizationId: organization.id,
         email: OWNER_EMAIL,
         role: "OWNER",
-        token,
+        ...inviteTokenColumns(token),
         expiresAt,
       },
     });
@@ -123,7 +125,7 @@ async function send(dryRun: boolean): Promise<boolean> {
   const invite = await db.invitation.findFirst({
     where: { email: OWNER_EMAIL, role: "OWNER" },
     orderBy: { createdAt: "desc" },
-    select: { token: true, expiresAt: true, acceptedAt: true },
+    select: { token: true, tokenEnc: true, expiresAt: true, acceptedAt: true },
   });
   if (!invite) {
     throw new Refusal("Приглашения владельца в базе нет. Сначала `create`.");
@@ -140,7 +142,14 @@ async function send(dryRun: boolean): Promise<boolean> {
     );
   }
 
-  const link = `${appOrigin()}/invite/${invite.token}`;
+  const inviteToken = openInviteToken(invite);
+  if (!inviteToken) {
+    throw new Refusal(
+      "Ссылку приглашения прочитать нельзя: ключ шифрования не задан или сменился. " +
+        "Нужно завести новое приглашение.",
+    );
+  }
+  const link = `${appOrigin()}/invite/${inviteToken}`;
   const body = (shownLink: string) =>
     [
       "Здравствуйте!",

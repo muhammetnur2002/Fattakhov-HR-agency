@@ -14,6 +14,8 @@ import type { EmployerApplication, StudentsApplicationStatus } from "@/lib/stude
 import { studyLine } from "@/lib/study-level";
 import { cn } from "@/lib/utils";
 import { applicationAction } from "../actions";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 
 const STATUS_LABEL: Record<StudentsApplicationStatus, string> = {
   NEW: "Новый отклик",
@@ -72,30 +74,29 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
 
   if (applications.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          Откликов пока нет. Они появятся, когда студент смахнёт вашу вакансию вправо.
-        </CardContent>
-      </Card>
+      <EmptyState>
+        Откликов пока нет. Они появятся, когда студент смахнёт вашу вакансию
+        вправо.
+      </EmptyState>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="pill-scroller flex gap-2">
-        <Chip active={filter === "all"} onClick={() => setFilter("all")}>
+      <FilterChipGroup label="Какие отклики" className="pill-scroller flex-nowrap">
+        <FilterChip selected={filter === "all"} onClick={() => setFilter("all")}>
           Все
-        </Chip>
-        <Chip active={filter === "NEW"} onClick={() => setFilter("NEW")}>
+        </FilterChip>
+        <FilterChip selected={filter === "NEW"} onClick={() => setFilter("NEW")}>
           Новые{newCount > 0 ? ` · ${newCount}` : ""}
-        </Chip>
-        <Chip active={filter === "INVITED"} onClick={() => setFilter("INVITED")}>
+        </FilterChip>
+        <FilterChip selected={filter === "INVITED"} onClick={() => setFilter("INVITED")}>
           Приглашены
-        </Chip>
-        <Chip active={filter === "HIRED"} onClick={() => setFilter("HIRED")}>
+        </FilterChip>
+        <FilterChip selected={filter === "HIRED"} onClick={() => setFilter("HIRED")}>
           Вышли на работу
-        </Chip>
-      </div>
+        </FilterChip>
+      </FilterChipGroup>
 
       {error && (
         <Alert variant="destructive">
@@ -110,9 +111,9 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
           {visible.map((a) => {
             const open = openId === a.id;
             return (
-              <Card key={a.id} className={cn("relative overflow-hidden", a.status === "REJECTED" && "opacity-70")}>
+              <Card key={a.id} className={cn("relative overflow-hidden", a.status === "REJECTED" && "border border-dashed bg-muted/50")}>
                 {a.status === "NEW" && <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />}
-                <CardContent className="space-y-3 py-4">
+                <CardContent className="space-y-3">
                   <button
                     type="button"
                     onClick={() => toggle(a)}
@@ -204,24 +205,6 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
         </div>
       )}
     </div>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-background text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

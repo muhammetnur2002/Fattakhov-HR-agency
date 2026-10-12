@@ -2,16 +2,23 @@ import Link from "next/link";
 
 import { ApplicationList } from "@/components/candidates/application-list";
 import { CandidateFilters } from "@/components/candidates/candidate-filters";
+import { CandidateStatusBadge } from "@/components/candidates/candidate-status";
 import { LoadMore } from "@/components/shell/load-more";
+import { ListRegion } from "@/components/shell/list-pending";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { CANDIDATE_STATUS_LABELS, CANDIDATE_STATUS_ORDER } from "@/lib/labels";
 import { formatNumber } from "@/lib/pricing";
 import { listApplications } from "@/lib/services/applications";
 import { searchCandidates } from "@/lib/services/candidates";
+import { parseCandidateStatus } from "@/lib/services/candidate-status";
 import { isSourcingLead, sourcingDaysLeft } from "@/lib/sourcing";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Кандидаты" };
 
@@ -21,13 +28,23 @@ const PAGE_SIZE = 30;
 export default async function CandidatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sf?: string; st?: string; tab?: string; page?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    sf?: string;
+    st?: string;
+    tab?: string;
+    page?: string;
+    status?: string;
+    src?: string;
+  }>;
 }) {
   const actor = await requireAgencyActor();
   // Общая база — внутренний актив агентства, клиенту она недоступна
   authorize(actor, "application.viewInternal");
 
-  const { q, sf, st, tab, page: pageParam } = await searchParams;
+  const { q, sf, st, tab, page: pageParam, status, src } = await searchParams;
+  const studentsOnly = src === "students";
+  const statusFilter = parseCandidateStatus(status) ?? undefined;
   const awaitingTab = tab === "awaiting";
   const page = Math.max(1, Number(pageParam) || 1);
 
@@ -42,6 +59,8 @@ export default async function CandidatesPage({
       ...(q && { q }),
       ...(sf && { sf }),
       ...(st && { st }),
+      ...(studentsOnly && { src: "students" }),
+      ...(statusFilter && { status: statusFilter }),
       ...params,
     });
     const qs = merged.toString();
@@ -62,7 +81,7 @@ export default async function CandidatesPage({
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Кандидаты</h1>
+          <PageTitle>Кандидаты</PageTitle>
           <p className="text-sm text-muted-foreground">
             {allAwaiting.length === 0
               ? "Никто не ждёт решения клиента"
@@ -70,27 +89,29 @@ export default async function CandidatesPage({
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={withQuery({})}>Все</Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm">
-            <Link href={withQuery({ tab: "awaiting" })}>Ждут клиента</Link>
-          </Button>
-        </div>
+        <FilterChipGroup label="Какие кандидаты">
+          <FilterChip href={withQuery({})} selected={false}>
+            Все
+          </FilterChip>
+          <FilterChip href={withQuery({ tab: "awaiting" })} selected>
+            Ждут клиента
+          </FilterChip>
+        </FilterChipGroup>
 
         <CandidateFilters />
 
-        <ApplicationList
-          applications={applications}
-          hrefBase="/a/applications"
-          showClient
-          emptyText={
-            q || sf || st
-              ? "Ничего не нашлось по этим условиям."
-              : "Все представленные кандидаты дождались ответа."
-          }
-        />
+        <ListRegion>
+          <ApplicationList
+            applications={applications}
+            hrefBase="/a/applications"
+            showClient
+            emptyText={
+              q || sf || st
+                ? "Ничего не нашлось по этим условиям."
+                : "Все представленные кандидаты дождались ответа."
+            }
+          />
+        </ListRegion>
       </div>
     );
   }
@@ -99,14 +120,29 @@ export default async function CandidatesPage({
     query: q,
     salaryFrom: sf ? Number(sf) : undefined,
     salaryTo: st ? Number(st) : undefined,
+    studentsOnly,
+    status: statusFilter,
     take: page * PAGE_SIZE,
   });
+
+  // Ссылки на статус сохраняют поиск и вилку, но сбрасывают страницу
+  const withStatus = (value?: string) => {
+    const params = new URLSearchParams({
+      ...(q && { q }),
+      ...(sf && { sf }),
+      ...(st && { st }),
+      ...(studentsOnly && { src: "students" }),
+      ...(value && { status: value }),
+    });
+    const qs = params.toString();
+    return qs ? `/a/candidates?${qs}` : "/a/candidates";
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Кандидаты</h1>
+          <PageTitle>Кандидаты</PageTitle>
           <p className="text-sm text-muted-foreground">
             {candidates.length === 0
               ? "Общая база агентства. Один человек может быть в нескольких воронках."
@@ -122,59 +158,89 @@ export default async function CandidatesPage({
         )}
       </div>
 
-      <div className="flex gap-2">
-        <Button asChild variant="secondary" size="sm">
-          <Link href={withQuery({})}>Все</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href={withQuery({ tab: "awaiting" })}>Ждут клиента</Link>
-        </Button>
-      </div>
+      <FilterChipGroup label="Какие кандидаты">
+        <FilterChip href={withQuery({})} selected>
+          Все
+        </FilterChip>
+        <FilterChip href={withQuery({ tab: "awaiting" })} selected={false}>
+          Ждут клиента
+        </FilterChip>
+      </FilterChipGroup>
+
+      {/* Рабочий статус кандидата (ставится вручную в карточке) */}
+      <FilterChipGroup label="Статус кандидата">
+        <span className="text-sm text-muted-foreground">Статус</span>
+        <FilterChip href={withStatus()} selected={!statusFilter}>
+          Все
+        </FilterChip>
+        {CANDIDATE_STATUS_ORDER.map((s) => (
+          <FilterChip key={s} href={withStatus(s)} selected={statusFilter === s}>
+            {CANDIDATE_STATUS_LABELS[s]}
+          </FilterChip>
+        ))}
+      </FilterChipGroup>
+
+      <FilterChipGroup label="Источник кандидата">
+        <span className="text-xs text-muted-foreground">Источник:</span>
+        <FilterChip href={withQuery({ src: "" })} selected={!studentsOnly}>
+          Все
+        </FilterChip>
+        <FilterChip href={withQuery({ src: "students" })} selected={studentsOnly}>
+          Студплатформа
+        </FilterChip>
+      </FilterChipGroup>
 
       <CandidateFilters />
 
-      {candidates.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            {q || sf || st ? "Никого не нашли по этим условиям." : "База пока пуста."}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-2">
-          {candidates.map((c) => (
-            <Link key={c.id} href={`/a/candidates/${c.id}`}>
-              <Card className="transition-colors hover:border-primary/40">
-                <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 p-3">
-                  <div className="min-w-56 flex-1">
-                    <div className="font-medium">{c.fullName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[c.currentPosition, c.currentCompany, c.city]
-                        .filter(Boolean)
-                        .join(" · ") || "Профиль не заполнен"}
+      <ListRegion>
+        {candidates.length === 0 ? (
+          <EmptyState>
+            {q || sf || st
+              ? "Никого не нашли по этим условиям."
+              : "База пока пуста."}
+          </EmptyState>
+        ) : (
+          <div className="grid gap-2">
+            {candidates.map((c) => (
+              <Link key={c.id} href={`/a/candidates/${c.id}`}>
+                <Card className="transition-colors hover:border-primary/40">
+                  <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <div className="min-w-56 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 font-medium">
+                        {c.fullName}
+                        {c.source === "STUDENT_PLATFORM" && <Badge variant="secondary">🎓 Студплатформа</Badge>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {[c.currentPosition, c.currentCompany, c.city]
+                          .filter(Boolean)
+                          .join(" · ") || "Профиль не заполнен"}
+                      </div>
                     </div>
-                  </div>
 
-                  {c.salaryExpectation != null && (
+                    {c.salaryExpectation != null && (
+                      <div className="text-sm text-muted-foreground">
+                        {formatNumber(Number(c.salaryExpectation))} ₽
+                      </div>
+                    )}
+
                     <div className="text-sm text-muted-foreground">
-                      {formatNumber(Number(c.salaryExpectation))} ₽
+                      {c._count.applications > 0
+                        ? `${c._count.applications} воронок`
+                        : "не в работе"}
                     </div>
-                  )}
 
-                  <div className="text-sm text-muted-foreground">
-                    {c._count.applications > 0
-                      ? `${c._count.applications} воронок`
-                      : "не в работе"}
-                  </div>
+                    <CandidateStatusBadge status={c.status} />
 
-                  {c.consentStatus !== "GIVEN" && (
-                    <ConsentBadge sourcedAt={c.sourcedAt} consentStatus={c.consentStatus} />
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+                    {c.consentStatus !== "GIVEN" && (
+                      <ConsentBadge sourcedAt={c.sourcedAt} consentStatus={c.consentStatus} />
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </ListRegion>
 
       {hasMore && <LoadMore href={withQuery({ page: String(page + 1) })} />}
     </div>

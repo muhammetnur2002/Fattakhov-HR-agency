@@ -5,8 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { LIST_SEARCH_CLASS } from "./list-toolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+/**
+ * Ширина поиска в шапке: тянется на свободное место, но не шире `max-w-96`
+ * (480 на ноутбуке) — полтора раза от прежних `w-64` (320). Прежняя
+ * фиксированная ширина была узкой для подсказки: «Найти вакансию, кандидата…»
+ * обрезалась на слове «кандидат», а на планшете поле сжималось до 233 —
+ * рядом стояло имя пользователя (теперь оно видно только от xl, см. UserMenu).
+ * На телефоне скрыто — там значок-ссылка (MobileSearchLink).
+ */
+export const HEADER_SEARCH_CLASS = "hidden min-w-0 md:block md:flex-1 md:max-w-96";
 
 /**
  * Поиск по всему кабинету — в отличие от SearchField (который фильтрует
@@ -18,12 +30,16 @@ import { Input } from "@/components/ui/input";
 export function GlobalSearchField({
   hrefBase,
   defaultValue = "",
-  className = "hidden w-64 md:block",
+  placement = "header",
 }: {
   hrefBase: string;
   defaultValue?: string;
-  /** По умолчанию — как в шапке: скрыто на телефоне, узкое на десктопе. */
-  className?: string;
+  /**
+   * Где стоит поле: в шапке кабинета (по умолчанию) или на странице
+   * результатов. Ширину выбирает место, а не вызывающий: класса снаружи нет,
+   * чтобы поиск «в шапке» и «на странице» не расходился с остальными списками.
+   */
+  placement?: "header" | "page";
 }) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
@@ -36,12 +52,15 @@ export function GlobalSearchField({
   }
 
   return (
-    <form onSubmit={onSubmit} className={`relative ${className}`}>
+    <form
+      onSubmit={onSubmit}
+      className={cn("relative", placement === "header" ? HEADER_SEARCH_CLASS : LIST_SEARCH_CLASS)}
+    >
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Найти вакансию, кандидата…"
+        placeholder="Поиск по кабинету…"
         aria-label="Поиск по кабинету"
         className="h-8 pl-8 text-sm"
       />

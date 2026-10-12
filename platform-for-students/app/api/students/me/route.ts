@@ -4,7 +4,8 @@ import { studentName } from '@/lib/db/mappers';
 import { assertSameOrigin, audit, requireStudent } from '@/lib/security/guards';
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
 import { profileUpdateSchema } from '@/lib/validation';
-import { deleteStored } from '@/lib/storage';
+import { deleteStored, verifyVideoIfChanged } from '@/lib/storage';
+import { releaseReplacedFiles } from '@/lib/stored-files';
 import { track } from '@/lib/analytics';
 import { COMPLETE_PROFILE_PERCENT, profileCompleteness } from '@/lib/portfolio';
 import { releasePendingApplications } from '@/lib/services';
@@ -51,6 +52,10 @@ export async function PATCH(request: Request) {
       student.studyVerified &&
       ((institution?.id ?? null) !== student.institutionId || university !== student.university);
 
+    // Видео льётся прямо в S3 по подписанной ссылке, и сервер его не видел: прежде чем сохранить
+    // ссылку, смотрим размер и первые байты. Подделка удаляется, сохранение отклоняется
+    await verifyVideoIfChanged(input.videoUrl, student.videoUrl);
+
     const updated = await store.students.update(student.id, {
       fullName: input.fullName,
       phone: input.phone || null,
@@ -81,6 +86,10 @@ export async function PATCH(request: Request) {
       links: input.links,
       videoUrl: input.videoUrl,
     });
+
+    // Фото, резюме или видео заменили — прежний файл больше никому не нужен. После успешной записи,
+    // не до: пока в базе старое значение, файл ещё используется. Сбой удаления профиль не отменяет
+    await releaseReplacedFiles(store, student, updated);
 
     // Имя лежит в сессионном токене — шапка берёт его оттуда, а не из
     // базы. Без переподписи человек меняет имя и до конца срока куки

@@ -1,16 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import {
   recordOfferAction,
   type CandidateState,
 } from "@/app/(agency)/a/candidates/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 /**
  * Условия оффера.
@@ -19,13 +17,15 @@ import { Label } from "@/components/ui/label";
  * договору считается от неё (BR-31). Раньше поле существовало только
  * в базе — заполнить его было негде, и ни один живой найм не попадал
  * в список к выставлению счёта.
+ *
+ * Отправка — через `useFormAction`: «сумма должна быть больше нуля» не стирает
+ * должность и дату, а красный текст стоит у самой суммы.
  */
-function SaveButton() {
-  const { pending } = useFormStatus();
+function SaveButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Сохраняем…" : "Сохранить оффер"}
-    </Button>
+    <SubmitButtonBase size="sm" loading={loading} pendingLabel="Сохраняем…">
+      Сохранить оффер
+    </SubmitButtonBase>
   );
 }
 
@@ -41,47 +41,40 @@ export function OfferForm({
   /** YYYY-MM-DD или null */
   startDate: string | null;
 }) {
-  const [state, formAction] = useActionState<CandidateState, FormData>(
-    recordOfferAction,
-    {},
-  );
+  const { state, fields, pending, formProps } = useFormAction<CandidateState>(recordOfferAction, {});
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="applicationId" value={applicationId} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="offer-salary">Сумма оффера, ₽ в месяц</Label>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Сумма оффера, ₽ в месяц" error={fields.salary}>
           <Input
             id="offer-salary"
             name="salary"
             type="number"
             inputMode="numeric"
             min={1}
-            step={1000}
             defaultValue={salary ?? ""}
             required
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="offer-position">Должность в оффере</Label>
+        </Field>
+        <Field label="Должность в оффере" error={fields.position}>
           <Input
             id="offer-position"
             name="position"
             defaultValue={position ?? ""}
             placeholder="если отличается от вакансии"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="offer-start">Дата выхода</Label>
+        </Field>
+        <Field label="Дата выхода" error={fields.startDate}>
           <Input
             id="offer-start"
             name="startDate"
             type="date"
             defaultValue={startDate ?? ""}
           />
-        </div>
+        </Field>
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -89,18 +82,9 @@ export function OfferForm({
         гарантийный срок. Без даты гарантия начнётся в момент найма.
       </p>
 
-      <SaveButton />
+      <SaveButton loading={pending} />
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

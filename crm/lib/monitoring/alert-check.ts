@@ -1,4 +1,5 @@
 import { createTransport } from "nodemailer";
+import { secureSmtpUrl } from "@/lib/notifications/smtp-url";
 
 import { assertCanDo, type Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
@@ -152,7 +153,7 @@ async function checkEmail(who: string): Promise<ChannelResult> {
     };
   }
 
-  const transporter = createTransport(url);
+  const transporter = createTransport(secureSmtpUrl(url));
   try {
     // Вход под тем же логином: неверный пароль и порт всплывут здесь
     await withTimeout(transporter.verify(), 15_000, "почтовый сервер");

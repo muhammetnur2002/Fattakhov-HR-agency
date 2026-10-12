@@ -18,6 +18,7 @@ import { describePricing } from "@/lib/pricing";
 import { getAgreementFileUrl, toPricingParams } from "@/lib/services/agreements";
 import { getContractTemplate, listSubmittedContracts } from "@/lib/services/contract-documents";
 import { listInvoices } from "@/lib/services/invoices";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Документы" };
 
@@ -44,7 +45,7 @@ export default async function DocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Документы</h1>
+        <PageTitle>Документы</PageTitle>
         <p className="text-sm text-muted-foreground">
           Условия сотрудничества и счета
         </p>

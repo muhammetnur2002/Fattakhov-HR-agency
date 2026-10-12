@@ -42,8 +42,12 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {/* Имя видно только от sm: и шире (см. span ниже) — на телефоне
-            кнопка остаётся без всякого текста, aria-label обязателен */}
+        {/* Имя видно только от xl: и шире (см. span ниже) — на телефоне, планшете
+            и узком ноутбуке кнопка остаётся одним кружком с инициалами,
+            aria-label обязателен, полное имя — в открывшемся меню. Имя
+            занимает до ~200 точек шапки, и поиск рядом сжимался: 226 на
+            планшете, 475 на 1024 при длинном имени. С кружком вместо имени он
+            получает 420 и 480 при любой длине имени */}
         <Button
           variant="ghost"
           className="h-auto gap-2 px-2 py-2.5 md:py-1.5"
@@ -54,7 +58,7 @@ export function UserMenu({
               {initials(fullName)}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden text-sm sm:inline">{fullName}</span>
+          <span className="hidden text-sm xl:inline">{fullName}</span>
         </Button>
       </DropdownMenuTrigger>
 

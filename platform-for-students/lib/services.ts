@@ -3,6 +3,7 @@ import { getStore } from '@/lib/db';
 import { scoreMatch, studentName, toStudentDTO, toVacancyDTO } from '@/lib/db/mappers';
 import { visibleLastSeen } from '@/lib/presence';
 import { decryptSafe } from '@/lib/security/crypto';
+import { DELETED_ACTOR_LABEL } from '@/lib/audit-retention';
 import { HttpError } from '@/lib/security/http-error';
 import type { EmployerRecord, InstitutionRecord, StudentRecord, SwipeRecord, VacancyRecord } from '@/lib/db/types';
 import { isVacancyVisible, studentFacingVacancy, type CompanyAddress } from '@/lib/vacancy';
@@ -373,18 +374,56 @@ export function toSyncRunDTO(run: {
   };
 }
 
+/**
+ * Журнал для админки. В самой записи подпись актора — `РОЛЬ:accountId` без имени (см.
+ * lib/security/audit-log.ts), а здесь имя подтягивается из аккаунта, пока он существует:
+ * студент — ФИО, компания — название, сотрудник — почта. Удалённый профиль показывается
+ * без имени — в базе его уже нет.
+ */
 export async function listAuditEntries(limit = 30): Promise<AuditEntryDTO[]> {
   const store = await getStore();
   const rows = await store.audit.list(limit);
-  return rows.map((r) => ({
-    id: r.id,
-    action: r.action,
-    entity: r.entity,
-    entityId: r.entityId,
-    actorLabel: r.actorLabel,
-    ip: r.ip,
-    createdAt: r.createdAt.toISOString(),
-  }));
+
+  const resolved = new Map<string, Promise<string>>();
+  const display = (label: string): Promise<string> => {
+    const cached = resolved.get(label);
+    if (cached) return cached;
+    const next = (async () => {
+      if (label === DELETED_ACTOR_LABEL) return 'Удалённый профиль';
+      const match = /^(STUDENT|EMPLOYER|ADMIN):(.+)$/.exec(label);
+      if (!match) return label;
+      const [, role, accountId] = match;
+      try {
+        if (role === 'STUDENT') {
+          const student = await store.students.findByAccountId(accountId);
+          return student ? `${role}:${studentName(student)}` : label;
+        }
+        if (role === 'EMPLOYER') {
+          const employer = await store.employers.findByAccountId(accountId);
+          return employer ? `${role}:${employer.companyName}` : label;
+        }
+        const account = await store.accounts.findById(accountId);
+        const email = account ? decryptSafe(account.emailEnc, '') : '';
+        return email ? `${role}:${email}` : label;
+      } catch {
+        return label;
+      }
+    })();
+    resolved.set(label, next);
+    return next;
+  };
+
+  return Promise.all(
+    rows.map(async (r) => ({
+      id: r.id,
+      action: r.action,
+      entity: r.entity,
+      entityId: r.entityId,
+      actorLabel: await display(r.actorLabel),
+      ip: r.ip,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  );
 }
 
 export async function listSyncRuns(limit = 8): Promise<SyncRunDTO[]> {

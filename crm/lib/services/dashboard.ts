@@ -207,3 +207,38 @@ async function countOverdueStages(actor: Actor): Promise<number> {
     isOverdueBySla(a.stageEnteredAt, a.stage.slaHours),
   ).length;
 }
+
+export type NewCandidatesCounts = {
+  last3Days: number;
+  last7Days: number;
+  last10Days: number;
+};
+
+/**
+ * Сколько новых кандидатов добавлено в общую базу за 3, 7 и 10 суток.
+ *
+ * «Новый» — заведён в базу (дата создания карточки), а не «посажен на
+ * вакансию»: так число отвечает на вопрос «сколько людей пришло», и его
+ * не искажает то, что один человек может попасть в несколько воронок.
+ * Считаются живые карточки, удалённые и обезличенные не входят.
+ *
+ * База — внутренний актив агентства, как и страница «Кандидаты»: тем, у
+ * кого к ней нет доступа, возвращается null, и плитки не показываются
+ * (ссылка с них вела бы на экран, который им недоступен).
+ */
+export async function getNewCandidatesCounts(
+  actor: Actor,
+): Promise<NewCandidatesCounts | null> {
+  if (!canDo(actor, "application.viewInternal")) return null;
+
+  const base = { organizationId: actor.organizationId, deletedAt: null };
+  const [last3Days, last7Days, last10Days] = await Promise.all(
+    [3, 7, 10].map((days) =>
+      prisma.candidate.count({
+        where: { ...base, createdAt: { gte: inDays(-days) } },
+      }),
+    ),
+  );
+
+  return { last3Days, last7Days, last10Days };
+}

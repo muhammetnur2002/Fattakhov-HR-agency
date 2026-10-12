@@ -113,3 +113,35 @@ describe("пустой тред", () => {
     expect(screen.getByText("Пока пусто")).toBeInTheDocument();
   });
 });
+
+describe("ответ во внутренней ветке", () => {
+  it("уходит на сервер внутренним: выключенный чекбокс в форму не попадает, поэтому значение шлётся скрытым полем", () => {
+    // Сверка 08.10.2026: галочка «Внутренний» ставилась сама и блокировалась (disabled), а
+    // отключённое поле в FormData не входит — ответ шёл как видимый клиенту, сервис его
+    // отклонял, текст пропадал
+    const { container } = render(
+      <CommentThread
+        {...baseProps}
+        canWriteInternal
+        comments={[comment({ visibility: "INTERNAL" })]}
+        canDeleteAny={false}
+      />,
+    );
+    fireEvent.click(screen.getByText("Ответить"));
+
+    const form = container.querySelector("form") as HTMLFormElement;
+    const data = new FormData(form);
+    expect(data.get("internal")).toBe("on");
+  });
+
+  it("обычный комментарий: «Внутренний» остаётся выбором, скрытого поля нет", () => {
+    const { container } = render(
+      <CommentThread {...baseProps} canWriteInternal comments={[comment()]} canDeleteAny={false} />,
+    );
+    fireEvent.click(screen.getByText("Ответить"));
+
+    expect(container.querySelector('input[type="hidden"][name="internal"]')).toBeNull();
+    expect(container.querySelector('input[type="checkbox"][name="internal"]')).not.toBeNull();
+  });
+});
+

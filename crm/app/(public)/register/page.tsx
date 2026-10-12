@@ -39,7 +39,7 @@ export default async function RegisterPage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Регистрация компании</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Регистрация компании</CardTitle>
         <CardDescription>
           Заведите кабинет — в нём виден весь подбор: кандидаты, встречи,
           документы, — и вакансии на студенческой платформе. Дальше несколько

@@ -29,6 +29,7 @@ import {
   setStaffActiveAction,
   updateStaffAction,
 } from "./actions";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Сотрудники" };
 
@@ -64,7 +65,7 @@ export default async function TeamPage() {
       {/* «В сети» у сотрудников обновляется вместе со страницей */}
       <PresenceRefresh />
       <div>
-        <h1 className="text-2xl font-semibold">Сотрудники</h1>
+        <PageTitle>Сотрудники</PageTitle>
         <p className="text-sm text-muted-foreground">
           Роль задаёт работу в CRM, должность — как человека видят клиенты,
           доступы — чем ещё ему можно управлять.

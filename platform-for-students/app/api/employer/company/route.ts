@@ -5,6 +5,7 @@ import { isInnExistsError } from '@/lib/db';
 import type { EmployerRecord } from '@/lib/db/types';
 import { assertSameOrigin, audit, requireEmployer } from '@/lib/security/guards';
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
+import { verifyVideoIfChanged } from '@/lib/storage';
 import type { SessionUser } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,9 @@ export async function PATCH(request: Request) {
     // компания подменила бы реквизиты без проверки. У клиентов из CRM
     // реквизиты в CRM
     const inn = employer.moderationStatus === 'APPROVED' || employer.crmClientId ? undefined : input.inn;
+
+    // Видео льётся в S3 мимо сервера: перед сохранением новой ссылки смотрим размер и первые байты
+    await verifyVideoIfChanged(input.videoUrl, employer.videoUrl);
 
     let updated: EmployerRecord;
     try {

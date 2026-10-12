@@ -8,8 +8,10 @@ import {
   VacancyStatusActions,
 } from "@/components/vacancies/agency-vacancy-actions";
 import { AddExistingCandidate } from "@/components/candidates/add-existing-candidate";
-import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { VacancyBrief } from "@/components/vacancies/vacancy-brief";
+import { PickFromBase } from "@/components/vacancies/pick-from-base";
+import { VacancyBoard } from "@/components/vacancies/vacancy-board";
+import { PipelinePreview } from "@/components/vacancies/pipeline-preview";
 import { VacancyStatusBadge } from "@/components/vacancies/vacancy-list";
 import { formatDate } from "@/lib/format-date";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +31,9 @@ import { CommentThread } from "@/components/comments/comment-thread";
 import { listPipeline } from "@/lib/services/applications";
 import { listVacancyComments } from "@/lib/services/comments";
 import { getVacancy, listRecruitersWithLoad } from "@/lib/services/vacancies";
+import { lastBriefEdit } from "@/lib/services/vacancy-brief-edit";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export async function generateMetadata({
   params,
@@ -75,6 +80,15 @@ export default async function AgencyVacancyPage({
   const pipeline =
     vacancy.stages.length > 0 ? await listPipeline(actor, vacancy.id) : [];
   const vacancyComments = await listVacancyComments(actor, vacancy.id);
+  // Внутренние сообщения команды: тот же тред, что и «Внутренний» в обсуждении,
+  // только отдельным блоком внизу страницы
+  const teamComments = (vacancyComments ?? []).filter((c) => c.visibility === "INTERNAL");
+  const canPick = canDo(actor, "application.create");
+  const canEditBrief = canDo(actor, "vacancy.editBrief");
+  const briefEdit = await lastBriefEdit(vacancy.id);
+  const pickableStages = vacancy.stages
+    .filter((s) => !s.visibleToClient && !s.isTerminal)
+    .map((s) => ({ id: s.id, name: s.name }));
 
   // Часы спрашиваем один раз на страницу — см. KanbanBoard
   const now = new Date();
@@ -82,15 +96,13 @@ export default async function AgencyVacancyPage({
   return (
     <div className="space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/a/vacancies">← Вакансии</Link>
-        </Button>
+        <BackLink href="/a/vacancies">Вакансии</BackLink>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             <span className="text-muted-foreground">№{vacancy.number}</span>{" "}
             {vacancy.title}
-          </h1>
+          </PageTitle>
           <VacancyStatusBadge status={vacancy.status} />
         </div>
 
@@ -120,20 +132,27 @@ export default async function AgencyVacancyPage({
         defaultValue={
           tab === "discussion"
             ? "discussion"
-            : vacancy.stages.length > 0
+            : tab === "brief"
+              ? "brief"
+              : vacancy.stages.length > 0
               ? "pipeline"
               : "brief"
         }
       >
         <TabsList>
-          {vacancy.stages.length > 0 && (
-            <TabsTrigger value="pipeline">Воронка</TabsTrigger>
-          )}
+          {/* Воронка видна всегда: до запуска вакансии в ней серые пустые колонки */}
+          <TabsTrigger value="pipeline">Воронка</TabsTrigger>
           <TabsTrigger value="brief">Бриф</TabsTrigger>
           <TabsTrigger value="discussion">Обсуждение</TabsTrigger>
           <TabsTrigger value="team">Команда</TabsTrigger>
           <TabsTrigger value="internal">Внутреннее</TabsTrigger>
         </TabsList>
+
+        {vacancy.stages.length === 0 && (
+          <TabsContent value="pipeline" className="pt-4">
+            <PipelinePreview />
+          </TabsContent>
+        )}
 
         {vacancy.stages.length > 0 && (
           <TabsContent value="pipeline" className="space-y-4 pt-4">
@@ -143,6 +162,9 @@ export default async function AgencyVacancyPage({
                 через карточку кандидата: там проверяются резюме и саммари.
               </p>
               <div className="flex gap-2">
+                {canPick && pickableStages.length > 0 && (
+                  <PickFromBase vacancyId={vacancy.id} stages={pickableStages} />
+                )}
                 <AddExistingCandidate vacancyId={vacancy.id} />
                 <Button asChild size="sm">
                   <Link href={`/a/candidates/new?vacancyId=${vacancy.id}`}>
@@ -152,10 +174,11 @@ export default async function AgencyVacancyPage({
               </div>
             </div>
 
-            <KanbanBoard
+            <VacancyBoard
+              vacancyId={vacancy.id}
               stages={vacancy.stages}
               cards={pipeline}
-              hrefBase="/a/applications"
+              pickableStages={canPick ? pickableStages : []}
               draggable={canMove}
               bulkEnabled={canMove}
               now={now.getTime()}
@@ -163,9 +186,21 @@ export default async function AgencyVacancyPage({
           </TabsContent>
         )}
 
-        <TabsContent value="brief" className="pt-4">
+        <TabsContent value="brief" className="space-y-3 pt-4">
+          {canEditBrief && !vacancy.status.startsWith("CLOSED_") && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                {briefEdit
+                  ? `Изменено${briefEdit.by ? `: ${briefEdit.by}` : ""}, ${formatDate(briefEdit.at)}`
+                  : "Бриф ещё не правили со стороны агентства."}
+              </p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/a/vacancies/${vacancy.id}/edit`}>Редактировать бриф</Link>
+              </Button>
+            </div>
+          )}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <VacancyBrief
                 brief={vacancy}
                 hiringManagerName={hiringManager?.fullName}
@@ -282,6 +317,30 @@ export default async function AgencyVacancyPage({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Комментарии команды: только сотрудники агентства, клиент блока не видит */}
+      {canDo(actor, "comment.writeInternal") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Комментарии команды</CardTitle>
+            <CardDescription>
+              Видят только сотрудники агентства. Клиенту этот блок не показывается.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CommentThread
+              comments={teamComments}
+              vacancyId={vacancy.id}
+              canWrite
+              canWriteInternal
+              internalOnly
+              canDeleteAny={canDo(actor, "comment.deleteAny")}
+              currentUserId={actor.id}
+              emptyText="Пока ничего нет. Напишите коллегам по этой вакансии."
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

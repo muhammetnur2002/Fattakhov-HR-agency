@@ -10,6 +10,7 @@ import {
   type PushTestResult,
 } from "@/app/actions/push";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { plural } from "@/lib/notifications/events";
 import {
@@ -173,12 +174,12 @@ export function PushDevice({
       <p className="text-xs text-muted-foreground">{stateText(state)}</p>
 
       {state.kind === "off" && (
-        <Button type="button" size="sm" onClick={enable} disabled={pending}>
+        <Button type="button" size="sm" onClick={enable} loading={pending}>
           {pending ? "Включаем…" : "Включить"}
         </Button>
       )}
       {state.kind === "on" && (
-        <Button type="button" size="sm" variant="outline" onClick={disable} disabled={pending}>
+        <Button type="button" size="sm" variant="outline" onClick={disable} loading={pending}>
           {pending ? "Отключаем…" : "Отключить на этом устройстве"}
         </Button>
       )}
@@ -201,6 +202,7 @@ export function PushDevice({
           size="sm"
           variant="outline"
           onClick={sendTest}
+          loading={testing}
           disabled={pending}
         >
           {testing ? "Отправляем…" : "Отправить проверочное уведомление"}
@@ -227,27 +229,14 @@ export function PushDevice({
         </div>
       )}
 
-      {result?.ok && (
-        <Alert>
-          <AlertDescription className="text-sm">{result.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={result?.error} ok={result?.ok} />
       {result?.warning && (
-        <Alert>
+        <Alert variant="warning">
           <AlertDescription className="text-sm">{result.warning}</AlertDescription>
         </Alert>
       )}
-      {result?.error && (
-        <Alert variant="destructive">
-          <AlertDescription className="text-sm">{result.error}</AlertDescription>
-        </Alert>
-      )}
 
-      {test?.error && (
-        <Alert variant="destructive">
-          <AlertDescription className="text-sm">{test.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={test?.error} />
       {test?.devices && (
         <Alert data-push-test>
           <AlertDescription className="space-y-2 text-sm">

@@ -33,12 +33,30 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * Заголовок карточки — настоящий h2, а не div: программам чтения и поиску
+ * по странице нужны заголовки разделов (в настройках их не было вовсе).
+ * Вид задан классами, браузерные размеры h2 сброшены. Вес 600, а не 500:
+ * размер у заголовка карточки и у текста один (ступеней всего шесть),
+ * и без веса заголовок не отличался от абзаца под ним.
+ */
+function CardTitle({
+  as: Heading = "h2",
+  className,
+  ...props
+}: React.ComponentProps<"h2"> & {
+  /**
+   * Уровень заголовка. По умолчанию h2: карточка — раздел страницы. Единственная
+   * карточка на странице входа или по ссылке из письма — сама страница, и её
+   * заголовок h1 (иначе читалка экрана начинала страницу с h2).
+   */
+  as?: "h1" | "h2" | "h3"
+}) {
   return (
-    <div
+    <Heading
       data-slot="card-title"
       className={cn(
-        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "font-heading text-base leading-snug font-semibold group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}

@@ -120,9 +120,27 @@ export const onRequestError: Instrumentation.onRequestError = async (
   request,
   context,
 ) => {
-  Sentry.captureRequestError(error, request, context);
+  if (process.env.NEXT_RUNTIME !== "nodejs") {
+    Sentry.captureRequestError(error, request, context);
+    return;
+  }
 
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Устаревшая вкладка после выкатки: сообщение «Failed to find Server Action».
+  // Не сбой и не повод будить владельца — одна строка в журнал контейнера
+  // (метод, путь, браузер), чтобы всплеск при необходимости можно было увидеть
+  const { isStaleServerActionError } = await import("@/lib/monitoring/stale-action");
+  if (isStaleServerActionError(error)) {
+    const agent = request.headers?.["user-agent"];
+    console.warn(
+      "[stale-server-action]",
+      request.method,
+      request.path?.split("?")[0],
+      String(Array.isArray(agent) ? agent[0] : (agent ?? "")).slice(0, 80),
+    );
+    return;
+  }
+
+  Sentry.captureRequestError(error, request, context);
 
   const { reportFailure } = await import("@/lib/monitoring/alerts");
   await reportFailure({

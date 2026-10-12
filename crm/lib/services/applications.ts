@@ -1,4 +1,6 @@
 import {
+  canDo,
+  isAgency,
   stripInternal,
   visibleApplicationsFilter,
   visibleAttachmentsFilter,
@@ -153,6 +155,13 @@ export async function moveStage(
     },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+
+  // Воронку двигает агентство: право проверяется здесь, а не только в действии.
+  // Раньше сервис переносил любую заявку организации по id, и клиентская
+  // роль, вызвавшая его в обход действия, двигала чужого кандидата (BR-28)
+  if (!canDo(actor, "application.moveStage", application.vacancy)) {
+    throw new ApplicationError("Недостаточно прав");
+  }
 
   /*
     Заблокированные данные не двигаются по воронке. Блокировка по ст. 21
@@ -478,9 +487,19 @@ export async function rejectApplication(
 ) {
   const application = await prisma.application.findFirst({
     where: { id: applicationId, organizationId: actor.organizationId },
-    select: { id: true, stageId: true, stageEnteredAt: true, outcome: true },
+    select: {
+      id: true,
+      stageId: true,
+      stageEnteredAt: true,
+      outcome: true,
+      vacancy: { select: { clientId: true } },
+    },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+  // Отказ по воронке ведёт агентство; клиент отказывает через решение (setClientDecision)
+  if (!canDo(actor, "application.moveStage", application.vacancy)) {
+    throw new ApplicationError("Недостаточно прав");
+  }
   if (application.outcome === "REJECTED") {
     throw new ApplicationError("По кандидату уже зафиксирован отказ");
   }
@@ -547,9 +566,18 @@ export async function setClientDecision(
       stageId: true,
       stageEnteredAt: true,
       vacancyId: true,
+      vacancy: { select: { clientId: true, hiringManagerId: true } },
     },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+
+  // Право проверяется и здесь, а не только в действии: сервис, который
+  // принимает решение по любому id организации, оставляет межклиентскую
+  // границу на совести вызывающего (BR-28)
+  const decidePermission = options.onBehalf ? "application.decideOnBehalf" : "application.decide";
+  if (!canDo(actor, decidePermission, application.vacancy)) {
+    throw new ApplicationError("Недостаточно прав для решения по кандидату");
+  }
 
   // BR-12: решение возможно только по представленному кандидату
   if (!application.presentedAt) {
@@ -729,9 +757,16 @@ export async function undoClientRejection(actor: Actor, applicationId: string) {
       stageId: true,
       vacancyId: true,
       candidate: { select: { fullName: true } },
+      vacancy: { select: { clientId: true, hiringManagerId: true } },
     },
   });
   if (!application) throw new ApplicationError("Кандидат не найден");
+
+  // Тот же порог, что у самого решения: кто мог отказать, тот может передумать
+  const undoPermission = isAgency(actor) ? "application.decideOnBehalf" : "application.decide";
+  if (!canDo(actor, undoPermission, application.vacancy)) {
+    throw new ApplicationError("Недостаточно прав для решения по кандидату");
+  }
 
   if (application.outcome !== "REJECTED" && application.outcome !== "WITHDRAWN") {
     throw new ApplicationError("Отказа по этому кандидату нет");

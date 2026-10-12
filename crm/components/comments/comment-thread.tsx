@@ -2,7 +2,6 @@
 
 import { Lock, Reply } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   createCommentAction,
@@ -11,14 +10,16 @@ import {
   markReadAction,
   type CommentState,
 } from "@/app/actions/comments";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { ROLE_LABELS } from "@/lib/labels";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
 
 export type ThreadComment = {
   id: string;
@@ -38,11 +39,10 @@ export type ThreadComment = {
 };
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Отправляем…" : "Отправить"}
-    </Button>
+    <SubmitButtonBase size="sm" pendingLabel="Отправляем…">
+      Отправить
+    </SubmitButtonBase>
   );
 }
 
@@ -63,6 +63,7 @@ export function CommentThread({
   canDeleteAny,
   currentUserId,
   emptyText,
+  internalOnly = false,
 }: {
   comments: ThreadComment[];
   applicationId?: string;
@@ -79,24 +80,51 @@ export function CommentThread({
   canDeleteAny: boolean;
   currentUserId: string;
   emptyText: string;
+  /**
+   * Тред только для сотрудников агентства: каждое сообщение внутреннее,
+   * переключателя нет (блок «Комментарии команды» внизу вакансии).
+   */
+  internalOnly?: boolean;
 }) {
   const [state, setState] = useState<CommentState>({});
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const [internal, setInternal] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  // Текст в состоянии, а не в самом поле: React 19 после любой отправки формы
+  // через action очищает обычные поля, в том числе когда отправка не удалась,
+  // а у управляемого поля прежний текст возвращается
+  const [text, setText] = useState("");
+  // Идёт отправка: ссылка, а не состояние — повторное нажатие приходит
+  // раньше, чем React перерисует кнопку
+  const sending = useRef(false);
+  const guardStale = useStaleGuard();
 
   /**
    * Обычный обработчик вместо useActionState: после успешной отправки
    * надо очистить поле и выйти из режима ответа, а делать это эффектом
    * на изменение состояния — лишний каскад перерисовок.
+   *
+   * Пока предыдущая отправка не закончилась, новая не стартует: выключенная
+   * кнопка не останавливает отправку формы другим способом (requestSubmit,
+   * двойное нажатие в одном кадре). Сервер тоже не создаёт второй
+   * одинаковый комментарий подряд (createComment).
    */
   async function handleSubmit(formData: FormData) {
-    const result = await createCommentAction({}, formData);
-    setState(result);
-    if (result.ok) {
-      formRef.current?.reset();
-      setReplyTo(null);
-      setInternal(false);
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      const result = await createCommentAction({}, formData);
+      setState(result);
+      if (result.ok) {
+        setText("");
+        setReplyTo(null);
+        setInternal(false);
+      }
+    } catch (error) {
+      if (guardStale(error)) return;
+      // Нет связи: действие бросает, а не возвращает отказ. Текст в поле остаётся
+      setState({ error: "Не отправилось: нет связи с сервером. Попробуйте ещё раз" });
+    } finally {
+      sending.current = false;
     }
   }
 
@@ -111,7 +139,7 @@ export function CommentThread({
 
   // Ответ во внутренней ветке обязан остаться внутренним — сервис это
   // проверит, но переключатель лучше не давать трогать вовсе
-  const forcedInternal = replyTo?.visibility === "INTERNAL";
+  const forcedInternal = internalOnly || replyTo?.visibility === "INTERNAL";
   const isInternal = forcedInternal || internal;
 
   const roots = comments.filter((c) => !c.parentId);
@@ -179,7 +207,7 @@ export function CommentThread({
       )}
 
       {canWrite && (
-        <form ref={formRef} action={handleSubmit} className="space-y-3 border-t pt-4">
+        <form action={handleSubmit} className="space-y-4 border-t pt-4">
           {applicationId && (
             <input type="hidden" name="applicationId" value={applicationId} />
           )}
@@ -206,6 +234,8 @@ export function CommentThread({
 
           <Textarea
             name="body"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
             rows={3}
             required
             placeholder={
@@ -219,7 +249,17 @@ export function CommentThread({
           <div className="flex flex-wrap items-center gap-3">
             <SubmitButton />
 
-            {canWriteInternal && (
+            {/* Выключенный (disabled) чекбокс в форму не попадает, и ответ во внутренней
+                ветке уходил на сервер как видимый клиенту — и отклонялся. Само значение
+                шлём скрытым полем */}
+            {forcedInternal && <input type="hidden" name="internal" value="on" />}
+            {canWriteInternal && internalOnly && (
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Lock className="size-3.5" />
+                Видят только сотрудники агентства
+              </span>
+            )}
+            {canWriteInternal && !internalOnly && (
               <label
                 className={cn(
                   "flex items-center gap-2 text-sm",
@@ -240,11 +280,7 @@ export function CommentThread({
             )}
           </div>
 
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+          <FormMessage error={state.error} />
         </form>
       )}
     </div>
@@ -315,7 +351,7 @@ function CommentItem({
     >
       <div className="flex flex-wrap items-center gap-2">
         <Avatar className="size-6">
-          <AvatarFallback className="text-[10px]">
+          <AvatarFallback className="text-xs">
             {initials(comment.author?.fullName ?? "?")}
           </AvatarFallback>
         </Avatar>
@@ -396,7 +432,8 @@ function CommentItem({
             <Button
               type="button"
               size="sm"
-              disabled={pending || !draft.trim()}
+              loading={pending}
+              disabled={!draft.trim()}
               onClick={saveEdit}
             >
               {pending ? "Сохраняем…" : "Сохранить"}
@@ -428,7 +465,7 @@ function CommentItem({
               type="button"
               size="sm"
               variant="destructive"
-              disabled={pending}
+              loading={pending}
               onClick={confirmDelete}
             >
               {pending ? "Удаляем…" : "Да, удалить"}
@@ -447,9 +484,7 @@ function CommentItem({
         <p className="mt-2 whitespace-pre-line text-sm">{comment.body}</p>
       )}
 
-      {error && (
-        <p className="mt-2 text-xs text-destructive">{error}</p>
-      )}
+      <FormMessage compact error={error} className="mt-2" />
     </div>
   );
 }

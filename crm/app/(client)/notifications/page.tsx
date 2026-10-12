@@ -3,6 +3,7 @@ import { NotificationHistory } from "@/components/shell/notification-history";
 import { requireClientActor } from "@/lib/auth/session";
 import { categoriesInUse, type EventCategory } from "@/lib/notifications/events";
 import { listNotificationHistory } from "@/lib/notifications/notify";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Уведомления" };
 
@@ -32,9 +33,9 @@ export default async function ClientNotificationsPage({
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Уведомления</h1>
+        <PageTitle>Уведомления</PageTitle>
         <p className="text-sm text-muted-foreground">
           {items.length === 0
             ? "Пока ничего не было"

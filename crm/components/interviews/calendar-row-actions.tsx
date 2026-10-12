@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   submitFeedbackAction,
   transitionInterviewAction,
 } from "@/app/actions/interviews";
 import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { FormMessage } from "@/components/ui/form-message";
 
 /**
  * Действия по встрече прямо в календаре.
@@ -114,23 +115,21 @@ export function CalendarRowActions({
         </form>
       )}
 
-      {message && (
-        <span className="text-xs text-destructive">{message}</span>
-      )}
+      <FormMessage compact error={message} />
     </div>
   );
 }
 
 function RatingButton({ value }: { value: number }) {
-  const { pending } = useFormStatus();
   return (
-    <Button
-      type="submit"
+    <SubmitButtonBase
       name="rating"
       value={String(value)}
       size="sm"
       variant="outline"
-      disabled={pending}
+      // Пять оценок в одной форме: индикатор только у нажатой, цифра на это время скрыта
+      // (квадрат 28px не вмещает значок и цифру), для чтения с экрана остаётся
+      pendingLabel={<span className="sr-only">{value}</span>}
       // Пальцем — квадрат 40 (touch:size-10): пять оценок подряд, и промах
       // по соседней записал бы не ту оценку. Мышью — компактный размер.
       // Свой квадрат, а не общее правило 2.4em (globals.css): по пропорции
@@ -138,15 +137,14 @@ function RatingButton({ value }: { value: number }) {
       className="size-7 p-0 tabular-nums touch:size-10"
     >
       {value}
-    </Button>
+    </SubmitButtonBase>
   );
 }
 
 function PlainButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+    <SubmitButtonBase size="sm" variant="ghost">
       {label}
-    </Button>
+    </SubmitButtonBase>
   );
 }

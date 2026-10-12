@@ -1,13 +1,14 @@
 "use client";
 
 import { CalendarPlus, PauseCircle, ThumbsDown } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 
 import { decideAction, type DecisionState } from "@/app/actions/decisions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { panelClass } from "@/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -24,22 +25,27 @@ import type {
   ClientDecision,
   RejectionReason,
 } from "@/lib/generated/prisma/enums";
+import { useFormAction } from "@/lib/hooks/use-form-action";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function DecisionButton({
   label,
   icon,
   variant = "outline",
+  loading,
 }: {
   label: string;
   icon: React.ReactNode;
   variant?: "default" | "outline";
+  /** Форма причины отказа уходит через useFormAction, `useFormStatus` её не видит. */
+  loading?: boolean;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} disabled={pending} className="gap-2">
+    // Пока идёт отправка — индикатор вместо значка, подпись прежняя
+    <SubmitButton variant={variant} className="gap-2" loading={loading} pendingLabel={label}>
       {icon}
-      {pending ? "…" : label}
-    </Button>
+      {label}
+    </SubmitButton>
   );
 }
 
@@ -69,11 +75,12 @@ export function DecisionPanel({
   currentDecision: string | null;
   onDecided?: (decision: ClientDecision, rejectionReason?: RejectionReason) => void;
 }) {
-  const [state, formAction] = useActionState<DecisionState, FormData>(
-    decideAction,
-    {},
-  );
+  // Кнопки «интервью» и «пауза» — формы из одних скрытых полей (action, терять нечего); форма причины
+  // отказа идёт через onSubmit: комментарий не должен пропадать, если сервер отказал
+  const { state, fields, pending, formAction, formProps } = useFormAction<DecisionState>(decideAction, {});
   const [rejecting, setRejecting] = useState(false);
+  // «Отказать» заменяет кнопки формой причины: фокус — на первое поле, после «Отмены» — на «Отказать»
+  const { triggerRef, focusRef } = useConfirmFocus(rejecting);
   const [reason, setReason] = useState("");
   const lastDecision = useRef<ClientDecision | null>(null);
 
@@ -126,6 +133,7 @@ export function DecisionPanel({
           </form>
 
           <Button
+            ref={triggerRef}
             type="button"
             variant="outline"
             className="gap-2"
@@ -139,50 +147,56 @@ export function DecisionPanel({
 
       {rejecting && (
         <form
-          action={formAction}
-          onSubmit={() => (lastDecision.current = "REJECT")}
-          className="space-y-3 rounded-md border p-3"
+          {...formProps}
+          onSubmit={(event) => {
+            lastDecision.current = "REJECT";
+            formProps.onSubmit(event);
+          }}
+          className={panelClass("plain", "space-y-4")}
         >
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="decision" value="REJECT" />
           <input type="hidden" name="rejectedBy" value="CLIENT" />
 
-          <div className="space-y-2">
-            <Label htmlFor="rejectionReason">Почему не подходит</Label>
-            <Select name="rejectionReason" value={reason} onValueChange={setReason}>
-              <SelectTrigger id="rejectionReason" className="w-full">
-                <SelectValue placeholder="Выберите причину" />
-              </SelectTrigger>
-              <SelectContent>
-                {REJECTION_REASONS_BY_SIDE.CLIENT.map((code) => (
-                  <SelectItem key={code} value={code}>
-                    {REJECTION_REASON_LABELS[code]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Причина нужна не для отчётности: по ней рекрутер поймёт,
-              кого искать дальше.
-            </p>
-          </div>
+          <Field
+            label="Почему не подходит"
+            id="rejectionReason"
+            error={fields.rejectionReason}
+            hint="Причина нужна не для отчётности: по ней рекрутер поймёт, кого искать дальше."
+          >
+            {(control) => (
+              <Select name="rejectionReason" value={reason} onValueChange={setReason}>
+                <SelectTrigger ref={focusRef} {...control} className="w-full">
+                  <SelectValue placeholder="Выберите причину" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REJECTION_REASONS_BY_SIDE.CLIENT.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {REJECTION_REASON_LABELS[code]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="rejectionComment">
-              Комментарий{reason === "OTHER" ? "" : " (необязательно)"}
-            </Label>
+          <Field
+            label={`Комментарий${reason === "OTHER" ? "" : " (необязательно)"}`}
+            error={fields.rejectionComment}
+          >
             <Textarea
               id="rejectionComment"
               name="rejectionComment"
               rows={2}
               required={reason === "OTHER"}
             />
-          </div>
+          </Field>
 
           <div className="flex gap-2">
             <DecisionButton
               label="Отказать"
               icon={<ThumbsDown className="size-4" />}
+              loading={pending}
             />
             <Button
               type="button"
@@ -201,16 +215,7 @@ export function DecisionPanel({
         </p>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
     </div>
   );
 }

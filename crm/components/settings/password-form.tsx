@@ -1,20 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import { changePasswordAction, type PasswordState } from "@/app/actions/passwords";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Меняем…" : "Сменить пароль"}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel="Меняем…">
+      Сменить пароль
+    </SubmitButtonBase>
   );
 }
 
@@ -27,17 +24,20 @@ function SubmitButton() {
  * Поля с autoComplete по спецификации: без current-password и
  * new-password менеджеры паролей не понимают, что происходит,
  * и предлагают сохранить не то.
+ *
+ * Пароли не уходят из формы никуда, кроме запроса: после успеха поля очищаются, после отказа
+ * стирается только текущий пароль (неверный его всё равно набирать заново), новый остаётся.
  */
 export function PasswordForm() {
-  const [state, action] = useActionState<PasswordState, FormData>(
+  const { state, fields, pending, formProps } = useFormAction<PasswordState>(
     changePasswordAction,
     {},
+    { resetOnSuccess: true, clearOnError: ["currentPassword"] },
   );
 
   return (
-    <form action={action} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="currentPassword">Текущий пароль</Label>
+    <form {...formProps} className="space-y-4">
+      <Field label="Текущий пароль" error={fields.currentPassword}>
         <Input
           id="currentPassword"
           name="currentPassword"
@@ -45,11 +45,14 @@ export function PasswordForm() {
           autoComplete="current-password"
           required
         />
-      </div>
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="newPassword">Новый пароль</Label>
+        <Field
+          label="Новый пароль"
+          error={fields.newPassword}
+          hint="Не короче 10 символов. Длинная фраза надёжнее короткого набора символов и запоминается легче."
+        >
           <Input
             id="newPassword"
             name="newPassword"
@@ -57,14 +60,9 @@ export function PasswordForm() {
             autoComplete="new-password"
             required
           />
-          <p className="text-xs text-muted-foreground">
-            Не короче 10 символов. Длинная фраза надёжнее короткого набора
-            символов и запоминается легче.
-          </p>
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="newPasswordConfirm">Повторите новый</Label>
+        <Field label="Повторите новый" error={fields.newPasswordConfirm}>
           <Input
             id="newPasswordConfirm"
             name="newPasswordConfirm"
@@ -72,22 +70,12 @@ export function PasswordForm() {
             autoComplete="new-password"
             required
           />
-        </div>
+        </Field>
       </div>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} ok={state.ok} />
 
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
-
-      <SubmitButton />
+      <SubmitButton loading={pending} />
     </form>
   );
 }

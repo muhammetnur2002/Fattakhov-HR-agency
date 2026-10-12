@@ -1,40 +1,37 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import { acceptInvite, type AcceptState } from "./actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ loading }: { loading: boolean }) {
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Создаём доступ…" : "Принять приглашение"}
-    </Button>
+    <SubmitButtonBase className="w-full" loading={loading} pendingLabel="Создаём доступ…">
+      Принять приглашение
+    </SubmitButtonBase>
   );
 }
 
 export function InviteForm({ token }: { token: string }) {
-  const [state, formAction] = useActionState<AcceptState, FormData>(
-    acceptInvite,
-    {},
-  );
+  // Имя остаётся после отказа («пароли не совпадают»), ошибка стоит у своего поля
+  const { state, fields, pending, formProps } = useFormAction<AcceptState>(acceptInvite, {});
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Имя и фамилия</Label>
+      <Field label="Имя и фамилия" error={fields.fullName}>
         <Input id="fullName" name="fullName" required autoFocus />
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Пароль</Label>
+      <Field
+        label="Пароль"
+        error={fields.password}
+        hint="Не короче 10 символов. Длинная фраза надёжнее короткого набора символов и запоминается легче."
+      >
         <Input
           id="password"
           name="password"
@@ -43,14 +40,9 @@ export function InviteForm({ token }: { token: string }) {
           minLength={10}
           required
         />
-        <p className="text-xs text-muted-foreground">
-          Не короче 10 символов. Длинная фраза надёжнее короткого набора
-          символов и запоминается легче.
-        </p>
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <Label htmlFor="passwordConfirm">Повторите пароль</Label>
+      <Field label="Повторите пароль" error={fields.passwordConfirm}>
         <Input
           id="passwordConfirm"
           name="passwordConfirm"
@@ -58,15 +50,11 @@ export function InviteForm({ token }: { token: string }) {
           autoComplete="new-password"
           required
         />
-      </div>
+      </Field>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
-      <SubmitButton />
+      <SubmitButton loading={pending} />
     </form>
   );
 }

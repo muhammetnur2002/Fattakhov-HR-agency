@@ -6,7 +6,9 @@ import { usePathname } from "next/navigation";
 
 import { NAV_ICONS, type NavIconName } from "./icons";
 import { cn } from "@/lib/utils";
+import { navLinkLabel } from "@/lib/nav-links";
 import type { NavItem } from "@/lib/nav";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * Пункты приходят уже отфильтрованными по правам с сервера —
@@ -20,7 +22,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-1">
+    <nav aria-label="Разделы" className="flex flex-col gap-1">
       {items.map((item) => {
         const Icon = NAV_ICONS[item.icon as NavIconName];
         const active = item.exact
@@ -32,6 +34,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
+            aria-label={navLinkLabel(item)}
             className={cn(
               // Активный пункт отмечен вертикальной засечкой слева, а не
               // заливкой: на графите заливка съедает иконку, а засечка
@@ -59,9 +62,12 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
                 цвет, что и фон. Белым — тем же приёмом, что и у активного
                 пункта (засечка, светлая заливка при hover). */}
             {!!item.badge && (
-              <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-xs font-medium text-brand-graphite">
-                {item.badge > 9 ? "9+" : item.badge}
-              </span>
+              <CountBadge
+                aria-hidden
+                count={item.badge}
+                tone="inverse"
+                className="ml-auto"
+              />
             )}
           </Link>
         );

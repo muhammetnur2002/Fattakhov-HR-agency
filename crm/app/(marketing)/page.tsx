@@ -9,6 +9,7 @@ import { PlatformPreview } from "@/components/marketing/platform-preview";
 import { Pricing } from "@/components/marketing/pricing";
 import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { StructuredData } from "@/components/marketing/structured-data";
+import { SPLIT_EVEN, SPLIT_MAIN } from "@/components/marketing/layout";
 import { studentsUrl } from "@/lib/urls";
 import {
   Cases,
@@ -34,13 +35,15 @@ import {
  * рассказ о процессе от фактов и цифр, и глаз не устаёт от однородной
  * простыни.
  *
- * Ширина, отступы и наличие надзаголовка тоже меняются от раздела
+ * Тон фона, ширина колонки и наличие надзаголовка меняются от раздела
  * к разделу намеренно. Двенадцать блоков одной формы читаются сплошной
  * лентой независимо от того, насколько разный в них текст: глазу не
  * за что зацепиться, и он перестаёт различать границы. Здесь разделы
- * отличаются формой, а не только содержанием: кейсы шире остальных,
- * ответы на вопросы узкие, короткие разделы идут по центру и без
- * надзаголовка.
+ * отличаются формой, а не только содержанием: ответы на вопросы и
+ * зона ответственности идут узкой колонкой, короткие разделы — по
+ * центру и без надзаголовка. А вот вертикальный шаг у всех один
+ * (`Section`), интервал от заголовка до содержимого тоже
+ * (`SectionHead`), колонки делятся двумя пропорциями (`layout.ts`).
  */
 export default function LandingPage() {
   // Студенческая платформа — отдельное приложение агентства. На проде
@@ -62,19 +65,17 @@ export default function LandingPage() {
           title="Отдел найма в штате и команда по подписке."
           lead="Считаем открыто: оклады, взносы сверх окладов и доступы к базам резюме. Оклады у всех разные, поэтому цифры здесь ваши: подставьте свои и сразу увидите разницу с подпиской."
         />
-        <div className="mt-12">
-          {/* Единственный расчёт на странице, и считает он по цифрам
-              читателя. Готовых окладов агентства здесь нет: подтвердить
-              их нечем, а «это ваши оклады, а не мои» человек из другого
-              города скажет сразу */}
-          <CostCalculator />
-          <BeyondSalary />
-        </div>
+        {/* Единственный расчёт на странице, и считает он по цифрам
+            читателя. Готовых окладов агентства здесь нет: подтвердить
+            их нечем, а «это ваши оклады, а не мои» человек из другого
+            города скажет сразу */}
+        <CostCalculator />
+        <BeyondSalary />
       </Section>
 
       {/* Короткий раздел из трёх тезисов: по центру и без надзаголовка.
           После полутора экранов расчёта нужна пауза, а не ещё одна шапка */}
-      <Section id="model" pad="tight">
+      <Section id="model">
         <SectionHead
           align="center"
           title="Не ещё одно агентство. Ваша функция найма."
@@ -117,15 +118,13 @@ export default function LandingPage() {
         <PlatformPreview />
       </Section>
 
-      {/* Самый широкий раздел на странице: кейсы это витрина, и она
-          должна выходить за привычные поля, иначе не читается как витрина */}
-      <Section id="cases" width="wide" pad="tall">
+      <Section id="cases">
         <SectionHead
           title="Не обещания. Реальные рабочие ситуации."
           lead="Показываем только то, что уже было в практике агентства: сложные роли, повторное доверие клиентов и подбор под разные бизнес-задачи."
         />
         <Cases />
-        <p className="mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-6 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Без искусственных цифр. Сроки и количество закрытий появятся здесь
           тогда, когда за ними будут подтверждённые данные.
         </p>
@@ -142,11 +141,7 @@ export default function LandingPage() {
         <RoleMosaic />
       </Section>
 
-      {/* wide — пяти карточкам арки нужен запас по ширине, иначе цена
-          с ₽ на краевых и центральной плитке переносится на вторую
-          строку. У заголовка своя ширина (max-w в SectionHead), так
-          что на нём это расширение не сказывается */}
-      <Section id="pricing" width="wide">
+      <Section id="pricing">
         <SectionHead
           eyebrow="Активные слоты"
           title="Платите за мощность команды, а не за отдельные резюме."
@@ -156,7 +151,7 @@ export default function LandingPage() {
 
       {/* Приглушённый фон обязателен: до правки здесь шли две белые
           секции подряд, и граница между прайсом и сравнением пропадала */}
-      <Section tone="muted" pad="tight">
+      <Section tone="muted">
         <SectionHead
           align="center"
           title="Три способа организовать найм."
@@ -168,12 +163,12 @@ export default function LandingPage() {
           такой человек просто уходит: на странице есть только одна
           кнопка, и она требует оставить контакт */}
       <Section pad="tight">
-        <div className="grid items-center gap-8 rounded-2xl border bg-card p-8 md:p-10 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className={`${SPLIT_MAIN} items-center rounded-2xl border bg-card p-8`}>
           <div>
             <div className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
               Бесплатно и без контактов
             </div>
-            <h2 className="mt-3 text-2xl font-medium tracking-tight text-balance md:text-3xl">
+            <h2 className="mt-3 text-2xl font-medium tracking-tight text-balance">
               Не готовы обсуждать? Проверьте свой найм сами.
             </h2>
             <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
@@ -192,7 +187,7 @@ export default function LandingPage() {
       </Section>
 
       <Section id="diagnostic" tone="dark">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-start">
+        <div className={`${SPLIT_EVEN} lg:items-start`}>
           <div>
             <SectionHead
               tone="dark"
@@ -201,7 +196,7 @@ export default function LandingPage() {
               lead="За 20 минут разберём вакансии, сравним модели и покажем, какая команда нужна, со сроками и расчётом стоимости."
             />
 
-            <dl className="mt-10 space-y-6">
+            <dl className="space-y-6">
               {[
                 {
                   t: "Карта вакансий",
@@ -225,7 +220,7 @@ export default function LandingPage() {
               ))}
             </dl>
 
-            <p className="mt-10 border-t border-white/12 pt-5 text-sm text-white/60">
+            <p className="mt-6 border-t border-white/12 pt-5 text-sm text-white/60">
               Если подписка вам не подходит, скажем прямо.
             </p>
           </div>
@@ -239,7 +234,7 @@ export default function LandingPage() {
       </Section>
 
       {/* Последний раздел узкий: это уже не продажа, а дочитывание */}
-      <Section width="narrow" pad="tight">
+      <Section width="narrow">
         <SectionHead eyebrow="Коротко о важном" title="Частые вопросы." />
         <Faq />
       </Section>
@@ -250,12 +245,12 @@ export default function LandingPage() {
           карточка, что у аудита: второе действие, а не новая витрина */}
       {studentsHome && studentsRating && (
         <Section id="students" tone="muted" pad="tight">
-          <div className="grid items-center gap-8 rounded-2xl border bg-card p-8 md:p-10 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className={`${SPLIT_MAIN} items-center rounded-2xl border bg-card p-8`}>
             <div>
               <div className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
                 Студентам и учебным заведениям
               </div>
-              <h2 className="mt-3 text-2xl font-medium tracking-tight text-balance md:text-3xl">
+              <h2 className="mt-3 text-2xl font-medium tracking-tight text-balance">
                 Подработка под расписание учёбы.
               </h2>
               {/* «За несколько минут», а не «за три»: на публичных

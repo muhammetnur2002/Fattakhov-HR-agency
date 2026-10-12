@@ -70,7 +70,7 @@ export function CostCalculator() {
   const percent = savingsPercent(inhouse.total, tariff.price);
 
   return (
-    <div className="rounded-2xl border bg-card p-6 md:p-8">
+    <div className="rounded-2xl border bg-card p-6 md:p-6">
       <div className="max-w-2xl">
         <h3 className="text-2xl font-semibold tracking-tight">
           Посчитайте на своих числах
@@ -82,7 +82,7 @@ export function CostCalculator() {
         </p>
       </div>
 
-      <div className="mt-6 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {INHOUSE_ROLES.map((role, i) => (
           <div key={role.role} className="space-y-2">
             <Label htmlFor={`salary-${i}`}>{role.role}, ₽ в месяц</Label>
@@ -168,7 +168,7 @@ export function CostCalculator() {
 
       <div
         aria-live="polite"
-        className="mt-8 grid gap-6 border-t pt-6 sm:grid-cols-3"
+        className="mt-6 grid gap-6 border-t pt-6 sm:grid-cols-3"
       >
         <div>
           <div className="text-sm font-medium tracking-[0.14em] text-muted-foreground uppercase">

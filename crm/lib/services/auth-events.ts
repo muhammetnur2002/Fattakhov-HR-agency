@@ -77,6 +77,14 @@ export async function recordAuthEvent(input: AuthEventInput): Promise<void> {
           ?.organizationId ?? null;
     }
 
+    // Вход с устройства, которого у этого человека не было: проверяем ДО записи
+    // текущего события, иначе оно само сделало бы устройство «знакомым»
+    let newDevice = false;
+    if (input.kind === "LOGIN_OK" && input.userId) {
+      const { isNewDevice } = await import("@/lib/services/new-device");
+      newDevice = await isNewDevice(input.userId, userAgent).catch(() => false);
+    }
+
     await db.authEvent.create({
       data: {
         kind: input.kind,
@@ -85,9 +93,30 @@ export async function recordAuthEvent(input: AuthEventInput): Promise<void> {
         emailHash: input.email ? emailFingerprint(input.email) : null,
         ip,
         userAgent: userAgent ? userAgent.slice(0, USER_AGENT_MAX) : null,
-        details: input.details ?? undefined,
+        details: newDevice ? { ...(input.details ?? {}), newDevice: true } : (input.details ?? undefined),
       },
     });
+
+    if (newDevice && input.userId) {
+      const { notifyNewDevice } = await import("@/lib/services/new-device");
+      void notifyNewDevice({ userId: input.userId, userAgent, ip });
+    }
+
+    // Правила оповещений о взломе (перебор, вход после неудач, действия руководителей).
+    // В фоне и без ожидания: на вход и на запись журнала это влиять не должно
+    void import("@/lib/monitoring/security-alerts")
+      .then(({ evaluateSecurityAlerts }) =>
+        evaluateSecurityAlerts({
+          kind: input.kind,
+          userId: input.userId ?? null,
+          emailHash: input.email ? emailFingerprint(input.email) : null,
+          ip,
+          device: userAgent ? describeUserAgent(userAgent) : null,
+          details: input.details ?? null,
+          newDevice,
+        }),
+      )
+      .catch((error) => console.error("[журнал входов] оповещения не проверены", error));
   } catch (error) {
     console.error("[журнал входов] событие не записано", error);
   }
@@ -121,6 +150,7 @@ export const AUTH_EVENT_LABELS: Record<AuthEventKind, string> = {
   PASSWORD_RESET: "Сброс пароля",
   TWO_FACTOR_ENABLED: "Включена 2FA",
   TWO_FACTOR_RESET: "Сброшена 2FA",
+  SESSIONS_REVOKED: "Завершены все сессии",
 };
 
 /** События, о которых стоит задуматься: неудачи входа и неверные коды. */

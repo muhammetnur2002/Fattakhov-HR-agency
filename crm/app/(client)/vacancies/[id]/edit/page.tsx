@@ -1,15 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
   VacancyWizard,
   type WizardValues,
 } from "@/components/vacancies/vacancy-wizard";
-import { Button } from "@/components/ui/button";
 import { authorize, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getVacancy } from "@/lib/services/vacancies";
 import { clientCanEditBrief } from "@/lib/services/vacancy-status";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Изменение заявки" };
 
@@ -45,12 +45,10 @@ export default async function EditVacancyPage({
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href={`/vacancies/${vacancy.id}`}>← К вакансии</Link>
-        </Button>
-        <h1 className="text-2xl font-semibold">
+        <BackLink href={`/vacancies/${vacancy.id}`}>К вакансии</BackLink>
+        <PageTitle>
           Заявка №{vacancy.number}: {vacancy.title}
-        </h1>
+        </PageTitle>
       </div>
 
       <VacancyWizard

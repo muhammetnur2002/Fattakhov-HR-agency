@@ -6,7 +6,7 @@ import {
   addToVacancyAction,
   searchExistingCandidatesAction,
 } from "@/app/(agency)/a/candidates/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { panelClass } from "@/components/ui/panel";
+import { useReturnFocus } from "@/lib/hooks/use-return-focus";
 
 type Result = {
   id: string;
@@ -40,6 +42,8 @@ export function AddExistingCandidate({ vacancyId }: { vacancyId: string }) {
   const [searching, startSearch] = useTransition();
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Кнопка стоит рядом с окном, а не внутри DialogTrigger: фокус возвращаем сами
+  const returnFocus = useReturnFocus();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,10 +84,18 @@ export function AddExistingCandidate({ vacancyId }: { vacancyId: string }) {
         }
       }}
     >
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={(e) => {
+          returnFocus.remember(e.currentTarget);
+          setOpen(true);
+        }}
+      >
         Из базы
       </Button>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onCloseAutoFocus={returnFocus.onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Добавить кандидата из базы</DialogTitle>
         </DialogHeader>
@@ -95,11 +107,7 @@ export function AddExistingCandidate({ vacancyId }: { vacancyId: string }) {
           autoFocus
         />
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={error} />
 
         <div className="max-h-80 space-y-2 overflow-y-auto">
           {query.trim() && !searching && results.length === 0 && (
@@ -110,7 +118,7 @@ export function AddExistingCandidate({ vacancyId }: { vacancyId: string }) {
           {results.map((c) => (
             <div
               key={c.id}
-              className="flex items-center justify-between gap-3 rounded-md border p-2.5"
+              className={panelClass("plain", "flex items-center justify-between gap-3 space-y-0")}
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{c.fullName}</div>
@@ -127,10 +135,10 @@ export function AddExistingCandidate({ vacancyId }: { vacancyId: string }) {
               <Button
                 type="button"
                 size="sm"
-                disabled={addingId === c.id}
+                loading={addingId === c.id}
                 onClick={() => handleAdd(c.id)}
               >
-                {addingId === c.id ? "Добавляем…" : "Добавить"}
+                Добавить
               </Button>
             </div>
           ))}

@@ -1,6 +1,7 @@
-import type { Actor } from "@/lib/access";
+import { isAgency, type Actor } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
 import { plain } from "@/lib/db/serialize";
+import type { CandidateStatus } from "@/lib/generated/prisma/enums";
 import { buildStorageKey, validateUpload } from "@/lib/storage";
 import { getStorage } from "@/lib/storage/client";
 import {
@@ -97,6 +98,8 @@ export async function quickCreateCandidate(
       source: input.source,
       sourceDetails: input.sourceDetails,
       sourcedAt: new Date(),
+      // Новый кандидат получает статус «Новый»; прежние остаются без статуса
+      status: "NEW",
       createdById: actor.id,
     },
     select: { id: true, fullName: true },
@@ -131,6 +134,10 @@ export type CandidateSearchParams = {
   query?: string;
   salaryFrom?: number;
   salaryTo?: number;
+  /** Только кандидаты из студенческой платформы. */
+  studentsOnly?: boolean;
+  /** Рабочий статус в общей базе (ставится вручную). Без него — все. */
+  status?: CandidateStatus;
   /** Без него — без ограничения (нужно для типеахеда и служебных выборок). */
   take?: number;
 };
@@ -167,12 +174,16 @@ export async function searchCandidates(
     ];
   }
 
+  if (params.studentsOnly) where.source = "STUDENT_PLATFORM";
+
   if (params.salaryFrom || params.salaryTo) {
     where.salaryExpectation = {
       ...(params.salaryFrom && { gte: params.salaryFrom }),
       ...(params.salaryTo && { lte: params.salaryTo }),
     };
   }
+
+  if (params.status) where.status = params.status;
 
   const candidates = await prisma.candidate.findMany({
     where,
@@ -181,6 +192,7 @@ export async function searchCandidates(
     select: {
       id: true,
       fullName: true,
+      status: true,
       currentPosition: true,
       currentCompany: true,
       city: true,
@@ -188,6 +200,7 @@ export async function searchCandidates(
       email: true,
       salaryExpectation: true,
       consentStatus: true,
+      source: true,
       // Сорсинг-лид: в списке видно, сколько дней осталось до удаления
       sourcedAt: true,
       createdAt: true,
@@ -210,6 +223,9 @@ export async function searchCandidates(
  * где действует порог видимости (BR-3).
  */
 export async function getCandidate(actor: Actor, candidateId: string) {
+  // Карточка с контактами и всеми откликами кандидата: клиентской роли она не положена
+  if (!isAgency(actor)) return null;
+
   const candidate = await prisma.candidate.findFirst({
     where: { id: candidateId, organizationId: actor.organizationId },
     include: {

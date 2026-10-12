@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { deleteVacanciesAction } from "@/app/actions/vacancies";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Удаление закрытых вакансий с подтверждением. Используется в двух видах:
@@ -29,6 +30,7 @@ export function DeleteVacancies({
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const { triggerRef, focusRef } = useConfirmFocus(confirming);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -48,7 +50,7 @@ export function DeleteVacancies({
 
   if (!confirming) {
     return (
-      <Button type="button" size="sm" variant={variant} onClick={() => setConfirming(true)}>
+      <Button ref={triggerRef} type="button" size="sm" variant={variant} onClick={() => setConfirming(true)}>
         <Trash2 className="mr-1 size-4" aria-hidden />
         {label}
       </Button>
@@ -59,18 +61,14 @@ export function DeleteVacancies({
     <div className="space-y-2">
       <p className="text-sm">{question}</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={run}>
+        <Button type="button" size="sm" variant="destructive" loading={pending} onClick={run}>
           {pending ? "Удаляем…" : "Да, удалить"}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+        <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
           Отмена
         </Button>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={error} />
     </div>
   );
 }

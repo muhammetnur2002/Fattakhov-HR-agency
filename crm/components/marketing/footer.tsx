@@ -19,6 +19,7 @@ import {
   TELEGRAM_HREF,
 } from "@/lib/contacts";
 import { studentsUrl } from "@/lib/urls";
+import { SITE_CONTAINER } from "./layout";
 
 const CONTACTS = [
   { label: "Telegram", value: TELEGRAM_DISPLAY, href: TELEGRAM_HREF },
@@ -51,7 +52,7 @@ export function MarketingFooter() {
         className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
       />
 
-      <div className="relative mx-auto max-w-[2200px] px-5 md:px-8 xl:px-14 py-14">
+      <div className={`relative ${SITE_CONTAINER} py-10`}>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Logo variant="lockup" tone="light" className="h-8" />
@@ -64,7 +65,7 @@ export function MarketingFooter() {
             <div className="text-sm font-medium tracking-wide text-white/65 uppercase">
               Разделы
             </div>
-            <ul className="mt-4 space-y-2.5 text-base">
+            <ul className="mt-4 space-y-3 text-base">
               {SECTIONS.map((s) => (
                 <li key={s.href}>
                   <Link
@@ -93,7 +94,7 @@ export function MarketingFooter() {
             <div className="text-sm font-medium tracking-wide text-white/65 uppercase">
               Связаться напрямую
             </div>
-            <dl className="mt-4 space-y-2.5">
+            <dl className="mt-4 space-y-3">
               {CONTACTS.map((c) => (
                 <div key={c.label} className="flex gap-3 text-base">
                   <dt className="w-20 shrink-0 text-white/65">{c.label}</dt>
@@ -115,7 +116,7 @@ export function MarketingFooter() {
             человека, который решает, отдавать ли агентству сотни тысяч
             в месяц, ИНН и адрес в подвале — обычная проверка того,
             что за сайтом стоит настоящее лицо */}
-        <div className="mt-10 border-t border-white/12 pt-6 text-sm leading-relaxed text-white/65">
+        <div className="mt-6 border-t border-white/12 pt-6 text-sm leading-relaxed text-white/65">
           {OPERATOR_NAME} · ИНН {OPERATOR_INN}
           {OPERATOR_OGRNIP && <> · ОГРНИП {OPERATOR_OGRNIP}</>}
           <br />

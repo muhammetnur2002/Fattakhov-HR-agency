@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
+import { inviteTokenHash } from "@/lib/auth/invite-token";
 import { prismaRaw as db } from "@/lib/db/prisma";
 import {
   createInvitation,
@@ -120,7 +121,7 @@ describe("повторное приглашение", () => {
     });
 
     await db.invitation.updateMany({
-      where: { token },
+      where: { tokenHash: inviteTokenHash(token) },
       data: { expiresAt: new Date(Date.now() - 1000) },
     });
 

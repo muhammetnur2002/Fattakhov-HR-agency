@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useEffect, useState } from "react";
 
 import {
   checkDuplicatesAction,
@@ -10,9 +9,10 @@ import {
   type CandidateState,
 } from "@/app/(agency)/a/candidates/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,16 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 import type { DuplicateWarning } from "@/lib/services/candidates";
 import { CANDIDATE_SOURCE_LABELS } from "@/lib/labels";
 import { SOURCING_LEAD_TTL_DAYS } from "@/lib/sourcing";
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function SubmitButton({ label, loading }: { label: string; loading: boolean }) {
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Сохраняем…" : label}
-    </Button>
+    <SubmitButtonBase loading={loading} pendingLabel="Сохраняем…">
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -43,10 +43,9 @@ function SubmitButton({ label }: { label: string }) {
  * теперь отклоняет.
  */
 export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
-  const [state, formAction] = useActionState<CandidateState, FormData>(
-    createCandidateAction,
-    {},
-  );
+  // Telegram, «откуда» и ссылка на профиль не управляются состоянием, и action формы стирал их
+  // после любого отказа; useFormAction набранное оставляет, а ошибку ставит у поля
+  const { state, fields, pending, formProps } = useFormAction<CandidateState>(createCandidateAction, {});
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -77,12 +76,11 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
   }, [fullName, phone, email]);
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form {...formProps} className="space-y-4">
       {vacancyId && <input type="hidden" name="vacancyId" value={vacancyId} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="fullName">Имя и фамилия *</Label>
+        <Field label="Имя и фамилия" required className="sm:col-span-2" error={fields.fullName}>
           <Input
             id="fullName"
             name="fullName"
@@ -91,10 +89,9 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="phone">Телефон</Label>
+        <Field label="Телефон" error={fields.phone}>
           <Input
             id="phone"
             name="phone"
@@ -103,10 +100,9 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="email">Почта</Label>
+        <Field label="Почта" error={fields.email}>
           <Input
             id="email"
             name="email"
@@ -114,37 +110,39 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="telegram">Telegram</Label>
+        <Field label="Telegram" error={fields.telegram}>
           <Input id="telegram" name="telegram" placeholder="@username" />
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="source">Откуда</Label>
-          <Select name="source" defaultValue="DIRECT_SEARCH">
-            <SelectTrigger id="source" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(CANDIDATE_SOURCE_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Field label="Откуда" id="source" error={fields.source}>
+          {(control) => (
+            <Select name="source" defaultValue="DIRECT_SEARCH">
+              <SelectTrigger {...control} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {/* «Студплатформа» ставится только при добавлении студента из раздела «Студенты» */}
+                {Object.entries(CANDIDATE_SOURCE_LABELS)
+                  .filter(([value]) => value !== "STUDENT_PLATFORM")
+                  .map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
 
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="sourceDetails">Ссылка на профиль</Label>
+        <Field label="Ссылка на профиль" className="sm:col-span-2" error={fields.sourceDetails}>
           <Input
             id="sourceDetails"
             name="sourceDetails"
             placeholder="hh.ru, LinkedIn, Telegram-канал — где нашли"
           />
-        </div>
+        </Field>
       </div>
 
       <Alert>
@@ -159,7 +157,7 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
 
       {/* BR-7: показываем не «дубликат», а где человек сейчас в работе */}
       {duplicates.length > 0 && (
-        <Alert>
+        <Alert variant="warning">
           <AlertDescription className="space-y-1">
             <div className="font-medium">Похоже, он уже у нас в работе</div>
             {duplicates.map((d, i) => (
@@ -182,14 +180,11 @@ export function QuickAddForm({ vacancyId }: { vacancyId?: string }) {
         </Alert>
       )}
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
 
       <SubmitButton
         label={vacancyId ? "Добавить в воронку" : "Добавить в базу"}
+        loading={pending}
       />
     </form>
   );

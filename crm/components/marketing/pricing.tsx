@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
 import { formatNumber } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
+import { SITE_GUTTER, SITE_GUTTER_BLEED, SPLIT_EVEN } from "./layout";
 
 const INCLUDED = [
   "Выделенная команда",
@@ -28,19 +29,20 @@ const INCLUDED = [
  * страницы, убивает доверие быстрее, чем любая формулировка.
  *
  * Карточки — не строки одной таблицы, а пять раздельных плиток на
- * симметричной дуге размеров: крайние (Старт, Масштаб) — базового
- * размера, соседние с центром (Стандарт, Бизнес) — чуть крупнее,
- * средняя (Развитие, она же t.recommended) — крупнее всех. Дуга
- * задана и шириной колонки, и внутренним отступом карточки, и её
- * подъёмом вверх (все три растут вместе, иначе «крупнее» читалось бы
- * как «шире, но такой же приплюснутой»), поэтому глаз видит одну
- * растущую фигуру, а не рассинхронизированные полоски.
+ * симметричной дуге: крайние (Старт, Масштаб) стоят ниже всех, соседи центра
+ * (Стандарт, Бизнес) выше на 10px, средняя (Развитие, она же t.recommended) — на 20px.
+ * Дуга рисуется верхним краем коробки: плитка тянется вверх отрицательным
+ * отступом, а её внутренний верх на столько же толще, поэтому название, цена и все
+ * строки ниже стоят на общих линиях — разброс цен по высоте 0 (замер 11.10.2026:
+ * было 66px на 1920, потому что плитки выравнивались по низу и разной высоты, а
+ * плашка «Рекомендуем» стояла в потоке и сдвигала цену центральной на 51px).
+ * Плашка не в потоке вовсе: она лежит на верхней кромке плитки.
  */
 export function Pricing() {
   const базовый = pricePerSlot(TARIFFS[0]);
 
   return (
-    <div className="mt-12">
+    <div className="flow-root">
       {/*
         На телефоне и планшете пять карточек в столбик или в два ряда —
         это экран прокрутки целиком или неровная сетка ради того, чтобы
@@ -53,22 +55,34 @@ export function Pricing() {
 
         Граница 2xl (1536), а не стандартный lg: базовый размер продукта
         поднят до 125% (app/globals.css), и пять колонок с неразрывными
-        ценами вроде «250 000 ₽» перестают помещаться — замер 03.10.2026:
-        на 1280 пятая карточка уезжала за край на 164px и молча
-        обрезалась overflow'ом секции, на 1440 — ещё на 4px, на 1536
-        помещается. Меняешь базовый размер или отступы карточек —
-        перемеряй границу, сама она не подстроится.
+        ценами вроде «250 000 ₽» (224px) помещаются, только если карточка
+        от 264px: у px-4 и промежутка gap-3 на 1536 запас 16px. С px-5 и
+        gap-4 пятой карточке на 1536 не хватало 54px, и она выступала за
+        край окна на 12px (замер 11.10.2026). Меняешь базовый размер,
+        отступы карточек или промежуток — перемеряй границу, сама она
+        не подстроится (tests/e2e/site-grid.spec.ts).
 
-        -mx-5/px-5 компенсируют боковой отступ секции (Section даёт
-        px-5): без этого лента прокрутки не доезжала бы до края экрана,
-        и «рулетка» упиралась бы в невидимую стену раньше времени.
+        SITE_GUTTER_BLEED и SITE_GUTTER выводят ленту из боковых полей раздела
+        на их величину на каждой ширине (20 · 32 · 56): лента уходит под край
+        окна, а карточка не обрывается в пустоте. Раньше стояло -mx-5 px-5 —
+        поправка на мобильное поле, и на 1280 и 1440 лента кончалась за 45px
+        до края. pt-4 — место под плашку «Рекомендуем» (overflow-x у ленты
+        обрезает и по вертикали); -mt-4 забирает это место из зазора после
+        заголовка, чтобы видимый интервал до первой плитки остался общими
+        50px, а не 70 (замечание проверки к PR #118, 12.10.2026). Корень
+        flow-root не даёт отрицательному отступу схлопнуться с отступом
+        заголовка и сдвинуть сам корень: он по-прежнему ровно в 50px.
+        С 2xl лента — сетка без обрезки, там пара не нужна (2xl:mt-0 2xl:pt-0);
+        дуга поднимает центральную плитку на 20px выше края — это её цена.
       */}
       <div
         className={cn(
-          "-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2",
+          "flex snap-x snap-mandatory gap-4 overflow-x-auto -mt-4 pt-4 pb-2",
+          SITE_GUTTER_BLEED,
+          SITE_GUTTER,
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "2xl:mx-0 2xl:grid 2xl:snap-none 2xl:gap-4 2xl:overflow-visible 2xl:px-0 2xl:pb-0",
-          "2xl:grid-cols-[1fr_1.1fr_1.22fr_1.1fr_1fr] 2xl:items-end",
+          "2xl:mx-0 2xl:mt-0 2xl:grid 2xl:snap-none 2xl:gap-3 2xl:overflow-visible 2xl:px-0 2xl:pt-0 2xl:pb-0",
+          "2xl:grid-cols-[1fr_1.1fr_1.22fr_1.1fr_1fr]",
         )}
       >
         {TARIFFS.map((t, i) => {
@@ -82,27 +96,33 @@ export function Pricing() {
             <div
               key={t.slots}
               className={cn(
-                "flex flex-col rounded-2xl border p-6",
+                "relative flex flex-col rounded-2xl border p-5",
                 // Ширина меньше экрана — кромка соседней карточки видна
                 // у края, это и читается как «здесь можно листать
                 // дальше». От 2xl карточка снова обычная ячейка сетки
                 "w-[78%] max-w-[300px] shrink-0 snap-center",
-                "2xl:w-auto 2xl:max-w-none 2xl:shrink 2xl:snap-align-none",
+                "2xl:w-auto 2xl:max-w-none 2xl:shrink 2xl:snap-align-none 2xl:px-4",
                 // Тень есть у каждой карточки — плитка физически лежит
                 // на странице, а не нарисована на ней. У рекомендованной
                 // она ровно вдвое плотнее остальных: это тоже часть
                 // выделения центра, а не только тёмный фон
                 t.recommended
-                  ? "border-transparent bg-brand-graphite text-white shadow-xl shadow-black/15"
+                  ? "border-white/25 bg-brand-graphite text-white shadow-xl shadow-black/15"
                   : "border-border bg-card shadow-xl shadow-black/[0.075]",
-                // Соседи центра и сам центр приподняты и заметнее отступают
-                // внутри — эффект дуги, а не просто более широкая колонка
-                уровень === 1 && "2xl:-mt-2 2xl:p-7",
-                уровень === 2 && "2xl:-mt-4 2xl:p-8",
+                // Дуга: соседи центра и сам центр тянутся вверх отрицательным
+                // отступом на 10 и 20px, а внутренний верх толще на столько же
+                // (pt-7 = 25 + 10, pt-9 = 25 + 20): название и цена остаются
+                // на общей линии со всеми плитками, поднимается только коробка.
+                // Низ у всех общий — ячейки сетки растянуты по высоте ряда
+                уровень === 1 && "2xl:-mt-2 2xl:pt-7",
+                уровень === 2 && "2xl:-mt-4 2xl:pt-9",
               )}
             >
               {t.recommended && (
-                <div className="mb-3 inline-flex w-fit items-center rounded-full bg-white/15 px-2.5 py-1 text-sm font-medium tracking-[0.08em] text-white uppercase">
+                // Не в потоке: лежит на верхней кромке плитки и не сдвигает
+                // название и цену. Сплошной фон и контур, как у самой плитки,
+                // иначе половина плашки над кромкой — белый текст на светлой странице
+                <div className="absolute -top-3 left-5 inline-flex w-fit items-center rounded-full border border-white/25 bg-brand-graphite px-3 py-0.5 text-xs font-medium tracking-[0.08em] text-white uppercase 2xl:left-4">
                   Рекомендуем
                 </div>
               )}
@@ -116,12 +136,9 @@ export function Pricing() {
                 {t.name}
               </div>
 
-              <div
-                className={cn(
-                  "mt-4 font-semibold tracking-tight whitespace-nowrap tabular-nums",
-                  уровень === 2 ? "text-4xl" : "text-3xl",
-                )}
-              >
+              {/* Один размер у всех: у центральной цена была крупнее, и на телефоне (28 и 36px)
+                  это двигало нижние строки её плитки относительно соседних */}
+              <div className="mt-4 text-3xl font-semibold tracking-tight whitespace-nowrap tabular-nums">
                 {formatNumber(t.price)} ₽
               </div>
               <div
@@ -199,12 +216,12 @@ export function Pricing() {
         ))}
       </div>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+      <div className={`mt-6 ${SPLIT_EVEN} lg:items-start`}>
         <div>
           <h3 className="text-2xl font-medium">Что входит в любой тариф</h3>
-          <ul className="mt-4 space-y-2.5 text-lg">
+          <ul className="mt-4 space-y-3 text-lg">
             {INCLUDED.map((i) => (
-              <li key={i} className="flex gap-2.5">
+              <li key={i} className="flex gap-3">
                 <Check className="mt-1.5 size-4 shrink-0 text-primary" />
                 {i}
               </li>

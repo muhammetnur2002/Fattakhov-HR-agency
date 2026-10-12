@@ -16,6 +16,9 @@ const PRESIGN_KINDS: readonly UploadKind[] = ['companyVideo', 'studentVideo'];
  * выдаётся ссылка с подписью, а сам файл клиент льёт прямо в S3, минуя
  * наш сервер. Без S3 (разработка) отвечаем отказом — клиент в этом
  * случае переключается на обычную загрузку через /api/upload.
+ *
+ * Размер и тип входят в подпись ссылки (см. presignUpload): хранилище не примет файл
+ * другого размера. Содержимое проверяется позже, при сохранении ссылки в профиль.
  */
 export async function POST(request: Request) {
   return handle(async () => {
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
     if (!(limits.mime as readonly string[]).includes(mime)) {
       return fail(415, `Неподходящий формат. Нужен ${limits.label}`, 'BAD_MIME');
     }
-    if (!Number.isFinite(size) || size <= 0 || size > limits.maxBytes) {
+    if (!Number.isInteger(size) || size <= 0 || size > limits.maxBytes) {
       return fail(413, `Файл слишком большой. Нужен ${limits.label}`, 'TOO_LARGE');
     }
 
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const presigned = await presignUpload(kind as UploadKind, mime);
+    const presigned = await presignUpload(kind as UploadKind, mime, size);
     if (!presigned) {
       return fail(501, 'Прямая загрузка видео недоступна без S3', 'NO_S3');
     }

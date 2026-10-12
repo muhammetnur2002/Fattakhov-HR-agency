@@ -1,12 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import type { FormState } from "@/lib/form-state";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 /**
  * Общие куски форм создания и восстановления доступа — используются и
@@ -15,7 +14,7 @@ import { Label } from "@/components/ui/label";
  * случаях задаёт тот, кто заводит аккаунт, и сообщает его человеку лично.
  */
 
-export type AccountFormState = { error?: string; ok?: string };
+export type AccountFormState = FormState;
 export type AccountAction = (
   prev: AccountFormState,
   formData: FormData,
@@ -24,32 +23,17 @@ export type AccountAction = (
 export function SubmitButton({
   label,
   pending: pendingLabel,
+  loading,
 }: {
   label: string;
   pending: string;
+  /** Форма уходит через `useFormAction`, а не `action`: `useFormStatus` её не видит. */
+  loading?: boolean;
 }) {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? pendingLabel : label}
-    </Button>
-  );
-}
-
-export function FormMessages({ state }: { state: AccountFormState }) {
-  return (
-    <>
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && (
-        <Alert>
-          <AlertDescription>{state.ok}</AlertDescription>
-        </Alert>
-      )}
-    </>
+    <SubmitButtonBase loading={loading} pendingLabel={pendingLabel}>
+      {label}
+    </SubmitButtonBase>
   );
 }
 
@@ -66,28 +50,27 @@ export function ResetPasswordForm({
   /** Например clientId — чей это пользователь, для проверки прав в действии. */
   hiddenFields?: Record<string, string>;
 }) {
-  const [state, formAction] = useActionState<AccountFormState, FormData>(action, {});
+  // Успех очищает форму: новый пароль не должен висеть в странице, когда дело сделано
+  const { state, fields, pending, formProps } = useFormAction(action, {}, { resetOnSuccess: true });
   const prefix = `reset-${userId}`;
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form {...formProps} className="space-y-4">
       <input type="hidden" name="userId" value={userId} />
       {Object.entries(hiddenFields ?? {}).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`${prefix}-password`}>Новый пароль</Label>
+        <Field label="Новый пароль" error={fields.password}>
           <Input id={`${prefix}-password`} name="password" type="password" required minLength={10} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${prefix}-passwordConfirm`}>Ещё раз</Label>
+        </Field>
+        <Field label="Ещё раз" error={fields.passwordConfirm}>
           <Input id={`${prefix}-passwordConfirm`} name="passwordConfirm" type="password" required minLength={10} />
-        </div>
+        </Field>
       </div>
-      <SubmitButton label="Задать новый пароль" pending="Сохраняем…" />
+      <SubmitButton label="Задать новый пароль" pending="Сохраняем…" loading={pending} />
       <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
-      <FormMessages state={state} />
+      <FormMessage error={state.error} ok={state.ok} />
     </form>
   );
 }

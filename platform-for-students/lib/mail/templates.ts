@@ -240,6 +240,18 @@ export function passwordResetMail(input: { url: string; minutes: number }): Mail
   });
 }
 
+export function newDeviceMail(input: { device: string; when: string; ip: string | null; url: string }): MailContent {
+  return renderMail({
+    subject: 'Вход с нового устройства',
+    title: 'Вход с нового устройства',
+    paragraphs: [
+      `Вход в ваш аккаунт: ${input.when}, устройство «${input.device}»${input.ip ? `, адрес ${input.ip}` : ''}.`,
+      'Если это были вы, ничего делать не нужно. Если нет, войдите, откройте профиль и нажмите «Выйти на всех устройствах», затем смените пароль.',
+    ],
+    action: { label: 'Открыть платформу', url: input.url },
+  });
+}
+
 export function studyApprovedMail(input: { released: number; url: string }): MailContent {
   return renderMail({
     subject: 'Учёба подтверждена',
@@ -382,6 +394,17 @@ export function messagesDigestMail(input: { count: number; title: string; url: s
     subject: `Новое сообщение: ${input.title}`,
     title: 'Вам написали',
     paragraphs: [`Непрочитанных сообщений в переписке по вакансии «${input.title}»: ${input.count}.`],
+    action: { label: 'Открыть сообщения', url: input.url },
+    footnote: REMINDERS_NOTE,
+  });
+}
+
+/** Агентство написало студенту (первое сообщение в череде непрочитанных). */
+export function agencyMessageMail(input: { url: string }): MailContent {
+  return renderMail({
+    subject: 'Вам написало агентство',
+    title: 'Новое сообщение от агентства',
+    paragraphs: ['В разделе «Сообщения» вас ждёт сообщение от агентства. Прочитать и ответить можно там же.'],
     action: { label: 'Открыть сообщения', url: input.url },
     footnote: REMINDERS_NOTE,
   });

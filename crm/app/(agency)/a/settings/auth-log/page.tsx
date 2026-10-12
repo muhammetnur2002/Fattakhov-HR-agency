@@ -1,7 +1,5 @@
-import Link from "next/link";
-
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import {
   Card,
   CardContent,
@@ -17,6 +15,7 @@ import {
   listAuthEvents,
   type AuthEventRow,
 } from "@/lib/services/auth-events";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Журнал входов" };
 
@@ -91,7 +90,7 @@ export default async function AuthLogPage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Журнал входов</h1>
+        <PageTitle>Журнал входов</PageTitle>
         <p className="text-sm text-muted-foreground">
           Последние 200 событий. Время московское, записи хранятся 90 дней.
         </p>
@@ -109,14 +108,14 @@ export default async function AuthLogPage({
                 включение 2FA.
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button asChild size="sm" variant={onlyFailed ? "outline" : "default"}>
-                <Link href="/a/settings/auth-log">Все</Link>
-              </Button>
-              <Button asChild size="sm" variant={onlyFailed ? "default" : "outline"}>
-                <Link href="/a/settings/auth-log?failed=1">Только неудачные</Link>
-              </Button>
-            </div>
+            <FilterChipGroup label="Какие события">
+              <FilterChip href="/a/settings/auth-log" selected={!onlyFailed}>
+                Все
+              </FilterChip>
+              <FilterChip href="/a/settings/auth-log?failed=1" selected={onlyFailed}>
+                Только неудачные
+              </FilterChip>
+            </FilterChipGroup>
           </div>
         </CardHeader>
         <CardContent>

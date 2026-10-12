@@ -1,0 +1,9 @@
+{
+  "crm": {
+    "prisma": "Цепочка CLI Prisma (mysql2, deepmerge-ts). Исправление — понижение Prisma до 6.19.3 (мажорное). MySQL не используется, CLI в образ приложения не входит",
+    "@prisma/config": "Та же цепочка CLI Prisma: исправление только понижением Prisma до 6.19.3",
+    "deepmerge-ts": "Та же цепочка CLI Prisma: исправление только понижением Prisma до 6.19.3",
+    "mysql2": "Та же цепочка CLI Prisma. MySQL не используется, драйвер до сети не доходит"
+  },
+  "platform-for-students": {}
+}

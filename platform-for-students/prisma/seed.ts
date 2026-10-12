@@ -3,6 +3,7 @@ import { blindIndex, encrypt, hashToken } from '../lib/security/crypto';
 import { hashPassword } from '../lib/security/password';
 import {
   CONSENT_VERSION,
+  DEMO_STALE_CONSENT_VERSION,
   CRM_VACANCIES,
   DEMO_APPLICATION_FUNNEL,
   DEMO_CHAT,
@@ -231,6 +232,8 @@ async function main() {
       links: asJson([]),
       videoUrl: null,
       status: extra.status,
+      // Первый из остальных дал согласие под прежней редакцией — на нём видна плашка обновления
+      consentVersion: i === 0 ? DEMO_STALE_CONSENT_VERSION : CONSENT_VERSION,
     };
     const created = await prisma.student.upsert({
       where: { accountId: account.id },

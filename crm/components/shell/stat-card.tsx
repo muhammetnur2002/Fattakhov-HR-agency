@@ -49,9 +49,10 @@ export function StatCard({
     пояснение.
   */
   const className = cn(
-    // Отступы плотнее на телефоне: плитка там вдвое уже (две колонки),
-    // и 20px по бокам съедали почти половину её ширины
-    "relative grid grid-rows-[auto_auto_auto] content-start gap-0 px-4 py-3 sm:px-5 sm:py-4",
+    // Отступ по бокам — отступ карточки; в ряду плиток (StatRow) на 1px меньше — рамка ряда его добавляет: подпись стоит
+    // на одной вертикали с заголовком карточки, а не на 6–9px правее. На телефоне
+    // он плотнее (плитка вдвое уже), на ноутбуке 20px — как у карточки
+    "relative grid grid-rows-[auto_auto_auto] content-start gap-0 px-[var(--stat-pad,var(--card-spacing))] py-3 sm:py-4",
     "row-span-3 grid-rows-subgrid",
     // Засечка повторяет вертикальные рёбра знака
     hot && "before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:rounded-full before:bg-primary",
@@ -149,7 +150,7 @@ export function StatRow({ children }: { children: React.ReactNode }) {
           (subgrid) держат числа на одной линии, даже если подпись
           одной плитки в две строки, а другой в одну.
         */
-        "grid grid-cols-2 auto-rows-auto grid-rows-[auto_auto_auto] gap-px overflow-hidden rounded-xl border bg-border",
+        "grid grid-cols-2 auto-rows-auto grid-rows-[auto_auto_auto] gap-px overflow-hidden rounded-xl border bg-border [--stat-pad:calc(var(--card-spacing)-1px)]",
         lgCols,
       )}
     >

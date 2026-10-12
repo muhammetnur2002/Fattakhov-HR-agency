@@ -1,20 +1,19 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 
 import {
   requestRescheduleAction,
   type InterviewState,
 } from "@/app/actions/interviews";
-import { Button } from "@/components/ui/button";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { FormMessage } from "@/components/ui/form-message";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "Отправляем…" : "Запросить перенос"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" pendingLabel="Отправляем…">
+      Запросить перенос
+    </SubmitButtonBase>
   );
 }
 
@@ -26,16 +25,14 @@ export function RequestRescheduleButton({ interviewId }: { interviewId: string }
   );
 
   if (state.ok) {
-    return <span className="text-xs text-muted-foreground">{state.ok}</span>;
+    return <FormMessage compact ok={state.ok} />;
   }
 
   return (
     <form action={formAction} className="inline-flex items-center gap-2">
       <input type="hidden" name="interviewId" value={interviewId} />
       <Submit />
-      {state.error && (
-        <span className="text-xs text-destructive">{state.error}</span>
-      )}
+      <FormMessage compact error={state.error} />
     </form>
   );
 }

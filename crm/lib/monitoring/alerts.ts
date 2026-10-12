@@ -216,3 +216,75 @@ export async function reportFailure(params: {
 export function resetAlertSilence(): void {
   lastSent.clear();
 }
+
+/** Одинаковый признак взлома не спамит: одно сообщение на ключ за это время. */
+const SECURITY_SILENCE_MS = 30 * 60_000;
+
+/**
+ * Сообщить владельцу о подозрительном событии (перебор паролей, вход
+ * после серии неудач, действия с доступом владельца).
+ *
+ * Каналы те же, что у сбоев, но тексты другие. Письмо на ящик под сбои
+ * несёт разбор: что и сколько раз, с каких адресов — это наш ящик, и
+ * без цифр письмо бесполезно. ВК и пуш получают только заголовок:
+ * экран блокировки и сторонний мессенджер не место для адресов и имён.
+ *
+ * Не бросает никогда — по той же причине, что и reportFailure.
+ */
+export async function reportSecurity(params: {
+  /** Что именно и о ком: по ключу работает тишина. Без почт и телефонов. */
+  key: string;
+  title: string;
+  lines: string[];
+}): Promise<void> {
+  try {
+    const key = `security|${params.key}`;
+    const now = Date.now();
+    const previous = lastSent.get(key);
+    if (previous !== undefined && now - previous < SECURITY_SILENCE_MS) return;
+    lastSent.set(key, now);
+
+    const alertEmail = process.env.ALERT_EMAIL?.trim();
+    if (alertEmail) {
+      const body = [
+        params.title,
+        "",
+        ...params.lines,
+        "",
+        "События входов: кабинет → Настройки → журнал входов (/a/settings/auth-log).",
+        "Если это не вы и не ваши сотрудники: завершите все сессии и смените пароль",
+        "у затронутой учётной записи.",
+        "",
+        "Повтор по тому же признаку не придёт ещё 30 минут.",
+      ].join("\n");
+      await getEmailTransport().send({
+        to: alertEmail,
+        subject: `🚨 Безопасность: ${params.title.slice(0, 120)}`,
+        text: body,
+      });
+    }
+
+    const to = await recipients();
+    const whereToLook = alertEmail
+      ? "Подробности — в почте по сбоям."
+      : "Подробности — в журнале входов.";
+    if (to.vk.length > 0) {
+      const short = ["🚨 Безопасность", params.title, "", whereToLook].join("\n");
+      const vk = getVkTransport();
+      for (const userId of to.vk) {
+        await vk.send({ userId, text: short });
+      }
+    }
+    for (const userId of to.push) {
+      await sendPushToUser(userId, {
+        title: "🚨 Безопасность",
+        body: whereToLook,
+        url: "/a/settings/auth-log",
+        tag: "security-alert",
+        urgency: "high",
+      });
+    }
+  } catch (error) {
+    console.error("[безопасность] не удалось сообщить о событии", error);
+  }
+}

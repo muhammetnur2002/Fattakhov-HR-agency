@@ -62,11 +62,10 @@ export function FunnelChart({ steps }: { steps: FunnelStep[] }) {
 
             <div className="h-8 flex-1 rounded bg-muted">
               <div
-                className="flex h-full items-center rounded bg-primary/80 px-2 text-xs font-medium text-primary-foreground transition-all"
+                className="h-full rounded bg-primary/80 transition-all"
                 style={{ width: `${Math.max((step.reached / max) * 100, 4)}%` }}
-              >
-                {step.reached > 0 && step.reached}
-              </div>
+                aria-hidden
+              />
             </div>
 
             <div className="w-10 shrink-0 text-right text-sm tabular-nums">

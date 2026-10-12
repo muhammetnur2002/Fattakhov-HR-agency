@@ -20,6 +20,7 @@ import {
   listAccessLog,
   listForRetention,
 } from "@/lib/services/pdn-retention";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Персональные данные" };
 
@@ -43,7 +44,7 @@ export default async function PdnPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Персональные данные</h1>
+        <PageTitle>Персональные данные</PageTitle>
         <p className="text-sm text-muted-foreground">
           Очередь уничтожения, данные с истёкшим согласием и журнал доступа
         </p>

@@ -12,6 +12,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { clearStrangerMailCaps } from "./helpers/mail-caps";
 import {
   changePassword,
   getResetTarget,
@@ -30,6 +31,7 @@ const NEW = "sovsem-drugoy-parol-2026";
 let userId = "";
 
 async function cleanup() {
+  await clearStrangerMailCaps();
   const user = await db.user.findFirst({
     where: { email: EMAIL },
     select: { id: true },

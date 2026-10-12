@@ -13,7 +13,7 @@ import {
 import { hashPassword } from "@/lib/auth/password";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
-import { createInvitation } from "@/lib/services/invitations";
+import { createInvitation, inviteTokenForDisplay } from "@/lib/services/invitations";
 import { presenceFor } from "@/lib/services/messages";
 import type { Presence } from "@/lib/presence";
 import { recordAuthEvent } from "@/lib/services/auth-events";
@@ -292,12 +292,14 @@ export async function listStaffInvitations(actor: Actor): Promise<StaffInvitatio
       position: true,
       grants: true,
       token: true,
+      tokenEnc: true,
       expiresAt: true,
     },
   });
 
-  return invitations.map((invitation) => {
+  return Promise.all(invitations.map(async (invitation) => {
     const grants = knownGrants(invitation.grants);
+    const mayShow = canAssignStaff(actor, { role: invitation.role }, grants);
     return {
       id: invitation.id,
       email: invitation.email,
@@ -305,10 +307,11 @@ export async function listStaffInvitations(actor: Actor): Promise<StaffInvitatio
       position: invitation.position,
       grants,
       expiresAt: invitation.expiresAt,
-      token: canAssignStaff(actor, { role: invitation.role }, grants) ? invitation.token : null,
+      // Токен достаётся из шифра только тому, кому ссылку вообще можно показать
+      token: mayShow ? await inviteTokenForDisplay(invitation) : null,
       revocable: canManageStaffMember(actor, { role: invitation.role }),
     };
-  });
+  }));
 }
 
 /**

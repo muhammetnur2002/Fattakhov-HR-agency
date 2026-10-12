@@ -43,8 +43,10 @@ import {
   rejectSchema,
 } from "@/lib/validation/candidate";
 import { appOrigin } from "@/lib/urls";
+import type { FormState } from "@/lib/form-state";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type CandidateState = { error?: string; ok?: string };
+export type CandidateState = FormState;
 
 /**
  * Проверка дубликатов при вводе (BR-7).
@@ -78,9 +80,7 @@ export async function createCandidateAction(
   const actor = await requireAgencyActor();
 
   const parsed = quickCandidateSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   // Новый кандидат — сорсинг-лид: файлы только после согласия. Отказ
   // до создания карточки, иначе человек увидел бы ошибку, а кандидат
@@ -275,9 +275,7 @@ export async function presentAction(
   const applicationId = String(formData.get("applicationId") || "");
 
   const parsed = presentSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     authorizeOrThrow(actor, "application.present");
@@ -300,9 +298,7 @@ export async function rejectAction(
   const applicationId = String(formData.get("applicationId") || "");
 
   const parsed = rejectSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Укажите причину отказа" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error, "Укажите причину отказа");
 
   try {
     authorizeOrThrow(actor, "application.moveStage");
@@ -506,9 +502,7 @@ export async function recordOfferAction(
   const applicationId = String(formData.get("applicationId") ?? "");
 
   const parsed = offerSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     authorizeOrThrow(actor, "application.moveStage");
@@ -540,9 +534,7 @@ export async function recordGuaranteeCaseAction(
   const applicationId = String(formData.get("applicationId") ?? "");
 
   const parsed = guaranteeCaseSchema.safeParse(formToObject(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   let vacancyId: string;
   try {

@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Забыли пароль</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Забыли пароль</CardTitle>
         <CardDescription>
           Пришлём ссылку для смены пароля на рабочую почту. Она действует
           час и открывается один раз.

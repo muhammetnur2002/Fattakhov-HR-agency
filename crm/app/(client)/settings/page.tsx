@@ -10,6 +10,7 @@ import { withEmailOff } from "@/components/shared/email-off";
 import { NotificationSettings } from "@/components/settings/notification-settings";
 import { DeleteAccount } from "@/components/settings/delete-account";
 import { PasswordForm } from "@/components/settings/password-form";
+import { SessionsCard } from "@/components/settings/sessions-card";
 import { PresenceCard } from "@/components/settings/presence-card";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { RevokeInviteButton } from "@/components/settings/revoke-invite-button";
@@ -35,6 +36,7 @@ import { isClientContracted } from "@/lib/services/account-deletion";
 import { listClientTeam } from "@/lib/services/clients";
 import { getTwoFactorStatus } from "@/lib/services/two-factor";
 import { appOrigin } from "@/lib/urls";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Настройки" };
 
@@ -73,9 +75,9 @@ export default async function ClientSettingsPage() {
       : {};
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Настройки</h1>
+        <PageTitle>Настройки</PageTitle>
         <p className="text-sm text-muted-foreground">
           {user?.fullName} · {ROLE_LABELS[actor.role]}
         </p>
@@ -191,9 +193,15 @@ export default async function ClientSettingsPage() {
                     </div>
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
-                        <InviteLink
-                          url={`${appOrigin()}/invite/${inv.token}`}
-                        />
+                        {inv.token ? (
+                          <InviteLink url={`${appOrigin()}/invite/${inv.token}`} />
+                        ) : (
+                          // Не прятать молча: без строки выглядит так, будто ссылку потеряли
+                          <p className="py-1 text-xs text-muted-foreground">
+                            Ссылку показать нельзя — она ушла письмом. Не дошло
+                            письмо — отзовите приглашение и пригласите заново.
+                          </p>
+                        )}
                       </div>
                       <RevokeInviteButton
                         action={revokeTeammateInvitationAction}
@@ -234,6 +242,18 @@ export default async function ClientSettingsPage() {
         </CardHeader>
         <CardContent>
           <PasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Сессии</CardTitle>
+          <CardDescription>
+            Выйти на всех устройствах сразу, если есть подозрение на чужой доступ.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SessionsCard />
         </CardContent>
       </Card>
 

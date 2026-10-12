@@ -13,6 +13,7 @@ import type {
 } from "@/lib/generated/prisma/enums";
 import { INTERVIEW_STATUS_LABELS, INTERVIEW_TYPE_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type CalendarInterview = {
   id: string;
@@ -84,13 +85,7 @@ export function CalendarView({
   const pending = interviews.filter((i) => !i.scheduledAt);
 
   if (interviews.length === 0 && needFeedback.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          В этом периоде встреч нет.
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>В этом периоде встреч нет.</EmptyState>;
   }
 
   const byDay = new Map<string, CalendarInterview[]>();
@@ -206,7 +201,7 @@ function InterviewRow({
         и текстом длительности. Теперь строка и мета-данные — отдельные
         группы, каждая переносится сама по себе.
       */}
-      <CardContent className="space-y-2 p-3">
+      <CardContent className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
           <div className="flex gap-3">
             <div className="w-14 shrink-0 text-sm font-medium tabular-nums">

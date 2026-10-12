@@ -15,7 +15,7 @@ export function RateLimitCard({ retryAfter }: { retryAfter: number }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Слишком много попыток</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Слишком много попыток</CardTitle>
         <CardDescription>{rateLimitMessage(retryAfter)}</CardDescription>
       </CardHeader>
     </Card>

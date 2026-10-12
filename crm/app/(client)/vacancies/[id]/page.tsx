@@ -24,6 +24,8 @@ import { listPipeline } from "@/lib/services/applications";
 import { listVacancyComments } from "@/lib/services/comments";
 import { getVacancy } from "@/lib/services/vacancies";
 import { clientCanEditBrief } from "@/lib/services/vacancy-status";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export async function generateMetadata({
   params,
@@ -84,21 +86,19 @@ export default async function ClientVacancyPage({
         <div className="flex items-start justify-between gap-2">
           {/* min-w-0 + truncate: длинное название вакансии на телефоне
               обрезалось не само, а выталкивало кнопку печати за экран */}
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 min-w-0 print:hidden">
-            <Link href="/vacancies" className="min-w-0">
-              <span className="truncate">← Вакансии</span>
-            </Link>
-          </Button>
+          <BackLink href="/vacancies" className="print:hidden">
+            Вакансии
+          </BackLink>
           {/* Печать/PDF отдаёт только бриф — статус и обсуждение с
               рекрутером наружу не отдаём (см. print:hidden ниже) */}
           <PrintButton label="Скачать бриф" />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             <span className="text-muted-foreground">№{vacancy.number}</span>{" "}
             {vacancy.title}
-          </h1>
+          </PageTitle>
           <VacancyStatusBadge status={vacancy.status} />
         </div>
       </div>

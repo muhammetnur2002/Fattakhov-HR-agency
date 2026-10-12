@@ -3,9 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { blindIndex, encrypt, hashToken } from '@/lib/security/crypto';
 import { EMPTY_PORTFOLIO } from '@/lib/portfolio';
 import { hashPassword } from '@/lib/security/password';
+import { DELETED_ACTOR_LABEL } from '@/lib/audit-retention';
 import type { ApplicationStatus, StudentStatus, SwipeDirection } from '@/lib/types';
 import {
   CONSENT_VERSION,
+  DEMO_STALE_CONSENT_VERSION,
   CRM_VACANCIES,
   DEMO_APPLICATION_FUNNEL,
   DEMO_CHAT,
@@ -30,6 +32,7 @@ import type {
   EventRecord,
   InstitutionRecord,
   MessageRecord,
+  AgencyMessageRecord,
   PushSubscriptionRecord,
   StudentNotificationRecord,
   NewEmployerInput,
@@ -62,6 +65,7 @@ interface Tables {
   swipes: SwipeRecord[];
   applications: ApplicationRecord[];
   messages: MessageRecord[];
+  agencyMessages: AgencyMessageRecord[];
   accessCodes: AccessCodeRecord[];
   syncRuns: SyncRunRecord[];
   audit: AuditRecord[];
@@ -110,6 +114,7 @@ async function seed(): Promise<Tables> {
     swipes: [],
     applications: [],
     messages: [],
+    agencyMessages: [],
     accessCodes: [],
     syncRuns: [],
     audit: [],
@@ -332,6 +337,7 @@ async function seed(): Promise<Tables> {
       about: null,
       // Без этого все получили бы портфолио демо-студента через ...student
       ...structuredClone(EMPTY_PORTFOLIO),
+      consentVersion: i === 0 ? DEMO_STALE_CONSENT_VERSION : CONSENT_VERSION,
       createdAt: new Date(Date.now() - (3 + i * 4) * 86_400_000),
     });
   }
@@ -489,6 +495,10 @@ export async function createMemoryStore(): Promise<DataStore> {
         const acc = t.accounts.find((a) => a.id === id);
         if (acc && !acc.emailVerifiedAt) acc.emailVerifiedAt = now();
       },
+      async revokeSessions(id) {
+        const acc = t.accounts.find((a) => a.id === id);
+        if (acc) acc.passwordChangedAt = now();
+      },
       async setPassword(id, passwordHash) {
         const acc = t.accounts.find((a) => a.id === id);
         if (acc) {
@@ -638,7 +648,7 @@ export async function createMemoryStore(): Promise<DataStore> {
           if (filter.status === 'PLACED' && s.status !== 'PLACED') return false;
           if (filter.onlineSince) {
             const account = accountOf(s.accountId);
-            if (!account?.showPresence || !account.lastSeenAt || account.lastSeenAt < filter.onlineSince) return false;
+            if (!account?.lastSeenAt || account.lastSeenAt < filter.onlineSince) return false;
           }
           return true;
         });
@@ -705,6 +715,19 @@ export async function createMemoryStore(): Promise<DataStore> {
         const s = t.students.find((x) => x.id === id);
         if (!s) return;
         s.applicationsViewedAt = now();
+      },
+      async acceptConsent(id, input) {
+        const s = t.students.find((x) => x.id === id);
+        if (!s) return null;
+        s.consentVersion = input.version;
+        s.consentAt = now();
+        s.consentIp = input.ip;
+        s.updatedAt = now();
+        return clone(s);
+      },
+      async findByFileUrl(url) {
+        const s = t.students.find((x) => [x.photoUrl, x.resumeUrl, x.studyDocUrl, x.videoUrl].includes(url));
+        return clone(s ?? null);
       },
       async rejectStudy(id, note) {
         const s = t.students.find((x) => x.id === id);
@@ -776,13 +799,20 @@ export async function createMemoryStore(): Promise<DataStore> {
           t.applications = t.applications.filter((a) => a.studentId !== student.id);
           t.swipes = t.swipes.filter((s) => s.studentId !== student.id);
           t.studentNotifications = t.studentNotifications.filter((n) => n.studentId !== student.id);
+          t.agencyMessages = t.agencyMessages.filter((m) => m.studentId !== student.id);
           t.students = t.students.filter((s) => s.id !== student.id);
         }
         t.pushSubscriptions = t.pushSubscriptions.filter((p) => p.accountId !== accountId);
         t.accounts = t.accounts.filter((a) => a.id !== accountId);
-        // Журнал аудита переживает удаление, как и в базе: запись остаётся,
-        // ссылка на учётную запись обнуляется
-        for (const entry of t.audit) if (entry.accountId === accountId) entry.accountId = null;
+        // Журнал аудита переживает удаление, как и в базе: запись остаётся, ссылка на учётную
+        // запись обнуляется, а подпись, IP и user-agent стираются — человека в ней больше нет
+        for (const entry of t.audit) {
+          if (entry.accountId !== accountId) continue;
+          entry.accountId = null;
+          entry.actorLabel = DELETED_ACTOR_LABEL;
+          entry.ip = null;
+          entry.userAgent = null;
+        }
       },
     },
 
@@ -1300,6 +1330,41 @@ export async function createMemoryStore(): Promise<DataStore> {
       },
     },
 
+    agencyMessages: {
+      async listByStudent(studentId) {
+        return clone(
+          t.agencyMessages.filter((m) => m.studentId === studentId).sort((a, b) => +a.createdAt - +b.createdAt),
+        );
+      },
+      async create({ studentId, author, staffName, body }) {
+        const record: AgencyMessageRecord = {
+          id: randomUUID(),
+          studentId,
+          author,
+          staffName: author === 'AGENCY' ? (staffName ?? null) : null,
+          bodyEnc: encrypt(body),
+          readAt: null,
+          createdAt: now(),
+        };
+        t.agencyMessages.push(record);
+        return clone(record);
+      },
+      async markRead(studentId, reader) {
+        const stamp = now();
+        let count = 0;
+        for (const m of t.agencyMessages) {
+          if (m.studentId === studentId && m.author !== reader && !m.readAt) {
+            m.readAt = stamp;
+            count++;
+          }
+        }
+        return count;
+      },
+      async unreadFor(studentId, reader) {
+        return t.agencyMessages.filter((m) => m.studentId === studentId && m.author !== reader && !m.readAt).length;
+      },
+    },
+
     accessCodes: {
       async findByHash(codeHash) {
         return clone(t.accessCodes.find((c) => c.codeHash === codeHash) ?? null);
@@ -1486,18 +1551,27 @@ export async function createMemoryStore(): Promise<DataStore> {
 
     audit: {
       async log(entry) {
-        t.audit.push({ ...entry, id: randomUUID(), createdAt: now() });
+        t.audit.push({ ...entry, id: randomUUID(), createdAt: entry.createdAt ?? now() });
         // Журнал в памяти не должен съедать процесс на длинной сессии
         if (t.audit.length > 2000) t.audit.splice(0, t.audit.length - 2000);
       },
+      async recentExists(query) {
+        const since = 'since' in query ? query.since : new Date(+now() - query.withinMs);
+        return t.audit.some(
+          (e) =>
+            e.action === query.action &&
+            e.actorLabel === query.actorLabel &&
+            e.entityId === query.entityId &&
+            e.createdAt >= since,
+        );
+      },
+      async purgeOlderThan(cutoff) {
+        const before = t.audit.length;
+        t.audit = t.audit.filter((e) => e.createdAt >= cutoff);
+        return before - t.audit.length;
+      },
       async list(limit) {
         return clone([...t.audit].sort((a, b) => +b.createdAt - +a.createdAt).slice(0, limit));
-      },
-      async recentExists({ actorLabel, action, entityId, withinMs }) {
-        const since = +now() - withinMs;
-        return t.audit.some(
-          (e) => e.actorLabel === actorLabel && e.action === action && e.entityId === entityId && +e.createdAt >= since,
-        );
       },
     },
 

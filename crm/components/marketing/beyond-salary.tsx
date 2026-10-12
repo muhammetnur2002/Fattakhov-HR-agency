@@ -57,7 +57,7 @@ const ПУНКТЫ: { заголовок: string; текст: string; число
 
 export function BeyondSalary() {
   return (
-    <div className="mt-16">
+    <div className="mt-12">
       <h3 className="max-w-2xl text-3xl leading-tight font-medium tracking-tight text-balance md:text-4xl">
         И это ещё без того, что в смету не помещается.
       </h3>
@@ -68,7 +68,7 @@ export function BeyondSalary() {
 
       {/* Сетка из ячеек, разделённых линией в один пиксель: карточки
           с тенями превратили бы шесть доводов в шесть реклам */}
-      <div className="mt-8 grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2 lg:grid-cols-3">
         {ПУНКТЫ.map((п) => (
           <div key={п.заголовок} className="flex flex-col bg-card p-6">
             {п.число ? (
@@ -79,7 +79,7 @@ export function BeyondSalary() {
             <div className="text-lg font-medium text-balance">
               {п.заголовок}
             </div>
-            <p className="mt-2.5 text-base leading-relaxed text-muted-foreground">
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
               {п.текст}
             </p>
           </div>

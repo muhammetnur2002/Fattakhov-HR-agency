@@ -1,6 +1,7 @@
 import { track } from '@/lib/analytics';
 import { fail, handle, ok } from '@/lib/api';
 import { notifyCrm } from '@/lib/notify-crm';
+import { verifyVideoIfChanged } from '@/lib/storage';
 import {
   assertCompanyProfileComplete,
   assertEmailVerified,
@@ -56,6 +57,9 @@ export async function PATCH(request: Request, props: Params) {
       await assertEmailVerified(session.accountId);
       assertCompanyProfileComplete(employer);
     }
+
+    // Видео льётся в S3 мимо сервера: перед сохранением новой ссылки смотрим размер и первые байты
+    await verifyVideoIfChanged(input.videoUrl, vacancy.videoUrl);
 
     const status = statusAfterEdit(vacancy.status, submit, employer);
     const changed = status !== vacancy.status;

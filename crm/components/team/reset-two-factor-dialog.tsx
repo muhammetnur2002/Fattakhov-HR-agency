@@ -4,12 +4,12 @@ import { ShieldOff } from "lucide-react";
 import { useActionState, useState } from "react";
 
 import {
-  FormMessages,
   SubmitButton,
   type AccountAction,
   type AccountFormState,
 } from "@/components/shared/account-forms";
 import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +59,7 @@ export function ResetTwoFactorDialog({
                 защищён одним паролем.
               </DialogDescription>
             </DialogHeader>
-            <FormMessages state={state} />
+            <FormMessage error={state.error} ok={state.ok} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Отмена
@@ -69,7 +69,7 @@ export function ResetTwoFactorDialog({
           </form>
         </DialogContent>
       </Dialog>
-      {!open && state.ok && <p className="text-xs text-muted-foreground">{state.ok}</p>}
+      {!open && <FormMessage compact ok={state.ok} />}
     </div>
   );
 }

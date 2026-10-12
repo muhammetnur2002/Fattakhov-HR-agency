@@ -84,14 +84,14 @@ export function SwipeControls({
         transition={springSnappy}
         className={cn(
           'relative grid size-14 place-items-center rounded-full border border-yes/45',
-          'bg-yes-deep/80 text-yes-glow backdrop-blur-glass transition-colors',
-          'hover:border-yes-glow/70 disabled:opacity-40',
+          'bg-yes-deep/80 text-yes-bright backdrop-blur-glass transition-colors',
+          'hover:border-yes-bright/70 disabled:opacity-40',
         )}
       >
         <motion.span
           aria-hidden
           style={{ opacity: applyGlow }}
-          className="absolute inset-0 rounded-full shadow-glow-yes ring-2 ring-yes-glow/70"
+          className="absolute inset-0 rounded-full shadow-glow-yes ring-2 ring-yes-bright/70"
         />
         <Sparkles className="size-5" />
       </motion.button>

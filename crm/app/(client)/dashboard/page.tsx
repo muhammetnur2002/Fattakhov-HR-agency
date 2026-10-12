@@ -5,6 +5,7 @@ import { requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { listApplications } from "@/lib/services/applications";
 import { getClientDashboardStats } from "@/lib/services/dashboard";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Дашборд" };
 
@@ -41,7 +42,7 @@ export default async function ClientDashboard() {
     */
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Дашборд</h1>
+        <PageTitle>Дашборд</PageTitle>
         <p className="text-sm text-muted-foreground">
           Что происходит по вашим вакансиям
         </p>

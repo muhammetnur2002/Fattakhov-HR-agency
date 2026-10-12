@@ -1,5 +1,4 @@
 import { FileText } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -38,6 +37,9 @@ import { listDeletionRequests } from "@/lib/services/account-deletion";
 import { listUnattachedClientContracts } from "@/lib/services/contract-documents";
 import { DeletionRequest } from "@/components/clients/deletion-request";
 import { getClient, listAccountManagers } from "@/lib/services/clients";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 export async function generateMetadata({
   params,
@@ -93,12 +95,10 @@ export default async function ClientPage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/a/clients">← Клиенты</Link>
-        </Button>
+        <BackLink href="/a/clients">Клиенты</BackLink>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{client.name}</h1>
+          <PageTitle>{client.name}</PageTitle>
           <Badge variant={client.status === "ACTIVE" ? "default" : "secondary"}>
             {CLIENT_STATUS_LABELS[client.status]}
           </Badge>
@@ -303,12 +303,10 @@ export default async function ClientPage({
             </Card>
           )}
           {client.agreements.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                Условия сотрудничества клиент выбирает сам при первом входе
+            <EmptyState>
+Условия сотрудничества клиент выбирает сам при первом входе
                 в кабинет. Пригласите администратора, чтобы это стало возможно.
-              </CardContent>
-            </Card>
+</EmptyState>
           ) : (
             client.agreements.map((a) => (
               <Card key={a.id}>
@@ -379,7 +377,7 @@ export default async function ClientPage({
         {/* --- Реквизиты --- */}
         <TabsContent value="details" className="pt-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               {canManage ? (
                 <ClientForm
                   action={updateClientAction}

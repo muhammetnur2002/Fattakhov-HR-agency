@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CLIENT_STATUS_LABELS } from "@/lib/labels";
 import type { ClientStatus } from "@/lib/generated/prisma/enums";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type ClientListItem = {
   id: string;
@@ -23,13 +24,7 @@ export function ClientList({
   emptyText: string;
 }) {
   if (clients.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          {emptyText}
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>{emptyText}</EmptyState>;
   }
 
   return (
@@ -39,10 +34,7 @@ export function ClientList({
           <Card className="transition-colors hover:border-primary/40">
             {/* Сетка на широком экране — см. VacancyList */}
             <CardContent
-              className="
-                flex flex-wrap items-center gap-x-6 gap-y-2 p-4
-                xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]
-              "
+              className="flex flex-wrap items-center gap-x-6 gap-y-2 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
             >
               <div className="min-w-48 flex-1 xl:min-w-0">
                 <div className="font-medium">{client.name}</div>

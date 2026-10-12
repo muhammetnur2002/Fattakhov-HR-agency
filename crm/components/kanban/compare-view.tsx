@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ArrowLeftIcon, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -76,7 +76,8 @@ export function CompareView({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" className="-ml-2" onClick={onExit}>
-          ← Назад к доске
+          <ArrowLeftIcon aria-hidden />
+          Назад к доске
         </Button>
       </div>
 

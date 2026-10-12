@@ -18,6 +18,7 @@ vi.mock("@/lib/auth/password", async (importOriginal) => {
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { totp } from "@/lib/auth/totp";
 import { prismaRaw as db } from "@/lib/db/prisma";
+import { clearStrangerMailCaps } from "./helpers/mail-caps";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { setSmsTransportForTests, type SmsMessage } from "@/lib/notifications/sms";
 import { reserveSecondFactorAttempt } from "@/lib/security/login-throttle";
@@ -39,6 +40,7 @@ let sent: SmsMessage[] = [];
 const lastSmsCode = () => (sent.at(-1)?.text ?? "").match(/\d{6}/)?.[0] ?? "";
 
 async function cleanup() {
+  await clearStrangerMailCaps();
   await db.phoneCode.deleteMany({ where: { phone: PHONE } });
   await db.pendingClientRegistration.deleteMany({ where: { email: { startsWith: MARK } } });
   const users = await db.user.findMany({

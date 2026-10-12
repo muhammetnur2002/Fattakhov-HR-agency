@@ -23,7 +23,7 @@ export function GuideList({ items }: { items: GuideItem[] }) {
           {/* Отступы — у summary, а не у details: тогда нажимается вся
               полоса вопроса, а не только строка текста посередине
               (24px из 52 на телефоне) */}
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset">
             {item.question}
             <span
               aria-hidden

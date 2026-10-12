@@ -14,7 +14,7 @@ import { useCurtainNav } from '@/components/motion/RouteCurtain';
 import { DemoDeck } from './DemoDeck';
 import { CookieSettingsLink } from '@/components/analytics/CookieBanner';
 import { GOALS, reachGoal } from '@/components/analytics/YandexMetrika';
-import { durations, easeOutExpo, fadeUp } from '@/lib/motion';
+import { durations, easeOutExpo, fadeUp, rise } from '@/lib/motion';
 import type { VacancyDTO } from '@/lib/types';
 
 const STEPS = [
@@ -59,20 +59,11 @@ export function Landing({
   return (
     <div className="relative">
       <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-[2200px] items-center justify-between">
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: durations.base, ease: easeOutExpo }}
-        >
+        <div className="rise-in" style={rise(0, -12)}>
           <Logo href={null} />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: durations.base, ease: easeOutExpo, delay: 0.08 }}
-          className="flex items-center gap-2"
-        >
+        <div className="rise-in flex items-center gap-2" style={rise(0.08, -12)}>
           <Link href="/login">
             <Button variant="ghost" size="sm">
               Войти
@@ -81,20 +72,15 @@ export function Landing({
           <Button size="sm" onClick={() => navigate('/register')} iconRight={<ArrowRight />}>
             Начать
           </Button>
-        </motion.div>
+        </div>
       </header>
 
       {/* ---------- ПЕРВЫЙ ЭКРАН ---------- */}
       <section className="page-x mx-auto grid min-h-dvh max-w-[2200px] grid-cols-1 items-center gap-14 pb-20 pt-[calc(var(--header-h)+4.5rem)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pt-[var(--header-h)]">
         <div className="relative z-10">
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: durations.base, ease: easeOutExpo, delay: 0.1 }}
-            className="text-eyebrow uppercase text-accent-300"
-          >
+          <p className="rise-in text-eyebrow uppercase text-accent-300" style={rise(0.1, 10)}>
             Fattakhov HR Agency · для студентов
-          </motion.p>
+          </p>
 
           <SplitText
             text="Работа, которая помещается между парами"
@@ -103,22 +89,15 @@ export function Landing({
             delay={0.22}
           />
 
-          <motion.p
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: durations.slow, ease: easeOutExpo, delay: 0.55 }}
-            className="mt-7 max-w-[46ch] text-[16.5px] leading-relaxed text-paper-dim"
+          <p
+            className="rise-in mt-7 max-w-[46ch] text-[16.5px] leading-relaxed text-paper-dim"
+            style={rise(0.55, 14, durations.slow)}
           >
             Смахните вправо — отклик уходит работодателю в ту же секунду. Никаких сопроводительных
             писем и ожидания на неделю: только проверенные компании и график под вашу учёбу.
-          </motion.p>
+          </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: durations.slow, ease: easeOutExpo, delay: 0.68 }}
-            className="mt-9 flex flex-wrap items-center gap-3"
-          >
+          <div className="rise-in mt-9 flex flex-wrap items-center gap-3" style={rise(0.68, 16, durations.slow)}>
             {/* Раньше тут была одна кнопка «Создать профиль» — работодатель
                 на витрине попадал только в подвал и на закрытый /employer.
                 Два равных входа сразу под заголовком снимают вопрос «а где
@@ -140,42 +119,30 @@ export function Landing({
                 </Button>
               </a>
             )}
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: durations.slow, ease: easeOutExpo, delay: 0.78 }}
-            className="mt-4"
-          >
+          <div className="rise-in mt-4" style={rise(0.78, 10, durations.slow)}>
             <Link
               href="/login"
               className="text-[13.5px] text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
             >
               Уже есть аккаунт? Войти
             </Link>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: durations.slow, delay: 0.9 }}
-            className="mt-8 flex items-center gap-2 text-[12.5px] text-paper-faint"
+          <div
+            className="rise-in mt-8 flex items-center gap-2 text-[12.5px] text-paper-faint"
+            style={rise(0.9, 0, durations.slow)}
           >
             <ShieldCheck className="size-3.5 shrink-0 text-accent-400" aria-hidden />
             Персональные данные шифруются и передаются только тем компаниям, которым вы сами
             откликнулись
-          </motion.div>
+          </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 40 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 1, ease: easeOutExpo, delay: 0.35 }}
-          className="relative"
-        >
+        <div className="rise-in relative" style={rise(0.35, 40, 1, 0.92)}>
           <DemoDeck vacancies={vacancies} />
-        </motion.div>
+        </div>
       </section>
 
       {/* ---------- ЦИФРЫ ---------- */}

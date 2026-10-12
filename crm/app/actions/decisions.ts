@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { canDo, isAgency } from "@/lib/access";
 import { requireActor } from "@/lib/auth/session";
+import type { FormState } from "@/lib/form-state";
 import { prisma } from "@/lib/db/prisma";
 import { CLIENT_DECISION_MESSAGES } from "@/lib/labels";
 import {
@@ -13,8 +14,9 @@ import {
 } from "@/lib/services/applications";
 import type { ClientDecision } from "@/lib/generated/prisma/enums";
 import { rejectSchema } from "@/lib/validation/candidate";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type DecisionState = { error?: string; ok?: string };
+export type DecisionState = FormState;
 
 /**
  * Решение клиента по кандидату (BR-12, BR-13, BR-14).
@@ -56,11 +58,7 @@ export async function decideAction(
       rejectedBy: formData.get("rejectedBy") || "CLIENT",
       rejectionComment: formData.get("rejectionComment") || undefined,
     });
-    if (!parsed.success) {
-      return {
-        error: parsed.error.issues[0]?.message ?? "Укажите причину отказа",
-      };
-    }
+    if (!parsed.success) return invalidForm(parsed.error, "Укажите причину отказа");
     rejection = parsed.data;
   }
 

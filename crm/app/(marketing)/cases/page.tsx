@@ -5,6 +5,7 @@ import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { Cases, Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
 import { appUrl } from "@/lib/urls";
+import { PageHero, PageIntro } from "@/components/marketing/page-intro";
 
 export const metadata: Metadata = {
   title: { absolute: "Кейсы подбора персонала · Fattakhov HR Agency" },
@@ -35,26 +36,14 @@ export const metadata: Metadata = {
 export default function CasesPage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-brand-slate text-white">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
-        />
-        <div className="relative mx-auto max-w-4xl px-5 py-16 md:py-24">
-          <div className="text-xs font-medium tracking-[0.14em] text-white/65 uppercase">
-            Кейсы
-          </div>
-          <h1 className="mt-5 text-[2rem] leading-[1.08] font-semibold tracking-tight text-balance sm:text-4xl md:text-5xl">
-            Не обещания. Реальные рабочие ситуации.
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/75 md:text-lg">
-            Здесь только то, что уже было в практике агентства: сложные роли,
-            повторное доверие клиентов и подбор под разные бизнес-задачи.
-          </p>
-        </div>
-      </section>
+      <PageHero>
+        <PageIntro eyebrow="Кейсы" title="Не обещания. Реальные рабочие ситуации.">
+          Здесь только то, что уже было в практике агентства: сложные роли,
+          повторное доверие клиентов и подбор под разные бизнес-задачи.
+        </PageIntro>
+      </PageHero>
 
-      <Section id="cases" width="wide" pad="tall">
+      <Section id="cases">
         <Cases />
       </Section>
 
@@ -70,9 +59,9 @@ export default function CasesPage() {
       {/* Этот блок сильнее любых процентов: агентство, которое честно
           говорит «этих данных у нас пока нет», вызывает больше
           доверия, чем агентство с круглыми цифрами ниоткуда */}
-      <Section width="narrow" pad="tight">
+      <Section width="narrow">
         <SectionHead title="Почему здесь нет цифр" align="center" />
-        <p className="mx-auto mt-6 max-w-2xl text-center leading-relaxed text-muted-foreground">
+        <p className="mx-auto max-w-2xl text-center leading-relaxed text-muted-foreground">
           Сроки закрытия, количество закрытых вакансий и проценты конверсии
           появятся на этой странице тогда, когда за ними будут подтверждённые
           данные из платформы, а не пересказ по памяти. Пока таких данных нет,
@@ -90,7 +79,7 @@ export default function CasesPage() {
           title="Обсудим вашу задачу"
           lead="Расскажите, кого ищете. За 20 минут разберём позицию, оценим сложность и скажем, за какой срок реально закрыть."
         />
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button asChild size="lg" variant="secondary">
             {/* Как в шапке: «Обсудить найм» — регистрация в кабинете */}
             <a href={appUrl("/register")}>Обсудить найм</a>

@@ -8,9 +8,11 @@
 import { AGENCY_ROLES, type Action } from "@/lib/access";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 
-/** Корень своего кабинета для каждой стороны — используются оба разом. */
-export const AGENCY_HOME = "/a";
-export const CLIENT_HOME = "/dashboard";
+// Константы и имя ссылки — в nav-links.ts без единого импорта: их берут и клиентские
+// компоненты (панели разделов, error.tsx кабинетов), а этот файл тянет за собой
+// таблицу прав lib/access. Здесь они повторно экспортируются, прежние импорты не меняются.
+import { AGENCY_HOME, CLIENT_HOME } from "@/lib/nav-links";
+export { AGENCY_HOME, CLIENT_HOME, navLinkLabel } from "@/lib/nav-links";
 
 /**
  * Экран обязательной настройки двухфакторной для сотрудников агентства.
@@ -43,6 +45,8 @@ export function homePathFor(role: UserRole): string {
 export type NavItem = {
   href: string;
   label: string;
+  /** Короткая подпись для узкой панели иконок: «Студенческая» (12 букв) в неё не влезает. */
+  railLabel?: string;
   /** Иконка из lucide-react, имя экспорта. */
   icon: string;
   /** Право, без которого пункт не показывается. */
@@ -94,6 +98,7 @@ export const CLIENT_NAV: NavItem[] = [
   {
     href: "/students",
     label: "Студенческая платформа",
+    railLabel: "Студенты",
     icon: "GraduationCap",
     requires: "students.enterAsClient",
   },
@@ -147,6 +152,7 @@ export const AGENCY_NAV: NavItem[] = [
     // редиректом на этот адрес — старые ссылки не ломаются.
     href: "/a/reviews",
     label: "Студенческая платформа",
+    railLabel: "Студенты",
     icon: "ShieldCheck",
     requires: "students.enter",
   },

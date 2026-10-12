@@ -31,7 +31,7 @@ export default async function DisclosurePage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Возможно, подтверждение уже получено или срок ссылки истёк.
             Напишите рекрутеру — он пришлёт новую.
@@ -44,7 +44,7 @@ export default async function DisclosurePage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Передача данных работодателю</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Передача данных работодателю</CardTitle>
       </CardHeader>
       <CardContent>
         <DisclosureForm

@@ -8,6 +8,7 @@ import { ChevronDown, Download, GraduationCap, Mail, MessageSquare, Phone, Shiel
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Chip';
+import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { useToast } from '@/components/ui/Toast';
@@ -42,6 +43,9 @@ export function EmployerBoard({ board }: { board: BoardData }) {
   const [vacancyFilter, setVacancyFilter] = useState<string | 'ALL'>('ALL');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  // Отказ — решение с последствием: студент сразу видит статус и получает уведомление, которое
+  // не отозвать. Поэтому «Отказ» идёт через подтверждение, остальные этапы — одним нажатием
+  const [rejecting, setRejecting] = useState<EmployerApplicationDTO | null>(null);
 
   const visible = useMemo(
     () =>
@@ -80,6 +84,15 @@ export function EmployerBoard({ board }: { board: BoardData }) {
         current.map((a) => (a.id === application.id ? { ...a, status: application.status } : a)),
       );
     }
+  }
+
+  function requestStatus(application: EmployerApplicationDTO, status: ApplicationStatus) {
+    if (status === application.status) return;
+    if (status === 'REJECTED') {
+      setRejecting(application);
+      return;
+    }
+    void changeStatus(application, status);
   }
 
   async function changeStatus(application: EmployerApplicationDTO, status: ApplicationStatus) {
@@ -162,7 +175,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
               expanded={expanded === application.id}
               pending={pending === application.id}
               onToggle={() => toggle(application)}
-              onStatus={(status) => void changeStatus(application, status)}
+              onStatus={(status) => requestStatus(application, status)}
             />
           </Reveal>
         ))}
@@ -173,6 +186,34 @@ export function EmployerBoard({ board }: { board: BoardData }) {
           По этой вакансии откликов пока нет.
         </p>
       )}
+
+      <Dialog
+        open={rejecting !== null}
+        title="Отказать студенту?"
+        onClose={() => setRejecting(null)}
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={() => setRejecting(null)}>
+              Не сейчас
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const application = rejecting;
+                setRejecting(null);
+                if (application) void changeStatus(application, 'REJECTED');
+              }}
+            >
+              Отказать
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[14.5px] leading-relaxed text-paper-dim">
+          {rejecting?.student.fullName} сразу увидит статус «Отказ» в своих откликах и получит уведомление.
+          Уведомление отозвать нельзя; сам статус при необходимости можно будет поменять.
+        </p>
+      </Dialog>
     </>
   );
 }
@@ -438,11 +479,14 @@ function CandidateRow({
               <div className="mt-6">
                 <p className="text-eyebrow uppercase text-paper-faint">Этап отбора</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {APPLICATION_STATUSES.map((status) => (
+                  {APPLICATION_STATUSES.filter((status) => status !== 'NEW').map((status) => (
                     <button
                       key={status}
                       type="button"
-                      disabled={pending || status === application.status}
+                      disabled={pending}
+                      // Текущий этап — нажатая кнопка, а не выключенная: на выключенную нельзя встать
+                      // клавиатурой, и читалка не узнаёт, какой этап выбран
+                      aria-pressed={status === application.status}
                       onClick={() => onStatus(status)}
                       className={cn(
                         'rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-300',

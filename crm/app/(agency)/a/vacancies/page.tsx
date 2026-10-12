@@ -4,6 +4,8 @@ import { DeleteVacancies } from "@/components/vacancies/delete-vacancies";
 import { VacancyList } from "@/components/vacancies/vacancy-list";
 import { VacancyStatusFilter } from "@/components/vacancies/vacancy-status-filter";
 import { RecruiterFilter } from "@/components/vacancies/recruiter-filter";
+import { ListRegion } from "@/components/shell/list-pending";
+import { ListToolbar } from "@/components/shell/list-toolbar";
 import { SearchField } from "@/components/shell/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,7 @@ import { requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { listVacancies } from "@/lib/services/vacancies";
+import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Вакансии" };
 
@@ -38,11 +41,15 @@ export default async function AgencyVacanciesPage({
   });
 
   const filterBar = (
-    <div className="flex flex-wrap gap-3">
-      <SearchField placeholder="Название, подразделение, город…" />
-      <VacancyStatusFilter />
-      <RecruiterFilter recruiters={recruiters} />
-    </div>
+    <ListToolbar
+      search={<SearchField placeholder="Название, подразделение, город…" />}
+      filters={
+        <>
+          <VacancyStatusFilter />
+          <RecruiterFilter recruiters={recruiters} />
+        </>
+      }
+    />
   );
 
   // Пришли с фильтром — по статусу (например, с дашборда), поиском
@@ -59,7 +66,7 @@ export default async function AgencyVacanciesPage({
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Вакансии</h1>
+            <PageTitle>Вакансии</PageTitle>
             <p className="text-sm text-muted-foreground">{vacancies.length}</p>
           </div>
           <Button asChild variant="outline" size="sm">
@@ -68,12 +75,14 @@ export default async function AgencyVacanciesPage({
         </div>
         {filterBar}
         <ClearClosed vacancies={vacancies} allowed={canDelete} />
-        <VacancyList
-          vacancies={vacancies}
-          hrefBase="/a/vacancies"
-          showClient
-          emptyText="Ничего не нашлось."
-        />
+        <ListRegion>
+          <VacancyList
+            vacancies={vacancies}
+            hrefBase="/a/vacancies"
+            showClient
+            emptyText="Ничего не нашлось."
+          />
+        </ListRegion>
       </div>
     );
   }
@@ -100,7 +109,7 @@ export default async function AgencyVacanciesPage({
           на 31 точку. Теперь кнопка переносится под заголовок */}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div>
-          <h1 className="text-2xl font-semibold">Вакансии</h1>
+          <PageTitle>Вакансии</PageTitle>
           <p className="text-sm text-muted-foreground">
             Всего {vacancies.length}
           </p>
@@ -136,12 +145,14 @@ export default async function AgencyVacanciesPage({
               <Badge variant="outline">{incoming.length}</Badge>
             )}
           </div>
-          <VacancyList
-            vacancies={incoming}
-            hrefBase="/a/vacancies"
-            showClient
-            emptyText=""
-          />
+          <ListRegion>
+            <VacancyList
+              vacancies={incoming}
+              hrefBase="/a/vacancies"
+              showClient
+              emptyText=""
+            />
+          </ListRegion>
         </section>
       )}
 
@@ -150,12 +161,14 @@ export default async function AgencyVacanciesPage({
           {incoming.length > 0 ? "Остальные" : "Все вакансии"}
         </h2>
         <ClearClosed vacancies={rest} allowed={canDelete} />
-        <VacancyList
-          vacancies={rest}
-          hrefBase="/a/vacancies"
-          showClient
-          emptyText="Пока ни одной вакансии в работе."
-        />
+        <ListRegion>
+          <VacancyList
+            vacancies={rest}
+            hrefBase="/a/vacancies"
+            showClient
+            emptyText="Пока ни одной вакансии в работе."
+          />
+        </ListRegion>
       </section>
     </div>
   );

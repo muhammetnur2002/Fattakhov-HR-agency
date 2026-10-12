@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -68,11 +69,7 @@ export function Field({
           {counter}
         </p>
       )}
-      {error && (
-        <p id={`${htmlFor}-error`} className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
+      {error && <FieldError id={`${htmlFor}-error`}>{error}</FieldError>}
     </div>
   );
 }
@@ -108,6 +105,8 @@ export function TextField({
   placeholder,
   type = "text",
   className,
+  min,
+  max,
 }: {
   id: string;
   label: string;
@@ -119,6 +118,9 @@ export function TextField({
   placeholder?: string;
   type?: string;
   className?: string;
+  /** Для type="number": границы подсказывают клавиатуре и браузеру, а не заменяют проверку. */
+  min?: number;
+  max?: number;
 }) {
   return (
     <Field
@@ -132,6 +134,9 @@ export function TextField({
       <Input
         id={id}
         type={type}
+        inputMode={type === "number" ? "numeric" : undefined}
+        min={min}
+        max={max}
         value={value}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}

@@ -1,18 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
 
 import { undoRejectAction, type DecisionState } from "@/app/actions/decisions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
-      {pending ? "Отменяем…" : "Отменить отказ"}
-    </Button>
+    <SubmitButtonBase size="sm" variant="outline" pendingLabel="Отменяем…">
+      Отменить отказ
+    </SubmitButtonBase>
   );
 }
 
@@ -51,11 +49,7 @@ export function UndoRejectButton({
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="applicationId" value={applicationId} />
       <Submit />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={state.error} />
     </form>
   );
 }

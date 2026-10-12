@@ -35,6 +35,7 @@ export function Stagger({
   const Component = motion[as];
   return (
     <Component
+      data-reveal
       variants={stagger(each, delay)}
       initial="hidden"
       {...(inView
@@ -60,7 +61,7 @@ export function Reveal({
 }) {
   const Component = motion[as];
   return (
-    <Component variants={variants} className={className}>
+    <Component data-reveal variants={variants} className={className}>
       {children}
     </Component>
   );
@@ -80,6 +81,7 @@ export function FadeIn({
 }) {
   return (
     <motion.div
+      data-reveal
       initial={{ opacity: 0, y, filter: 'blur(6px)' }}
       whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       viewport={{ once: true, amount: 0.25 }}

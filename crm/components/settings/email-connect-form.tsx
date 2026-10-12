@@ -1,20 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-
 import { requestEmailAction, type FormState } from "@/app/(client)/settings/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
-function Submit({ again }: { again: boolean }) {
-  const { pending } = useFormStatus();
+function Submit({ again, loading }: { again: boolean; loading: boolean }) {
   return (
-    <Button type="submit" variant="outline" disabled={pending}>
-      {pending ? "Отправляем…" : again ? "Отправить ссылку ещё раз" : "Отправить ссылку"}
-    </Button>
+    <SubmitButtonBase variant="outline" loading={loading} pendingLabel="Отправляем…">
+      {again ? "Отправить ссылку ещё раз" : "Отправить ссылку"}
+    </SubmitButtonBase>
   );
 }
 
@@ -23,12 +20,11 @@ function Submit({ again }: { again: boolean }) {
  * Адрес подключается после перехода по ссылке из письма.
  */
 export function EmailConnectForm({ pendingEmail }: { pendingEmail: string | null }) {
-  const [state, formAction] = useActionState<FormState, FormData>(requestEmailAction, {});
+  const { state, fields, pending, formProps } = useFormAction<FormState>(requestEmailAction, {});
 
   return (
-    <form action={formAction} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor="work-email">Рабочая почта</Label>
+    <form {...formProps} className="space-y-4">
+      <Field label="Рабочая почта" error={fields.email}>
         <Input
           id="work-email"
           name="email"
@@ -37,14 +33,9 @@ export function EmailConnectForm({ pendingEmail }: { pendingEmail: string | null
           defaultValue={pendingEmail ?? ""}
           required
         />
-      </div>
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      {state.ok && <p className="text-sm text-muted-foreground">{state.ok}</p>}
-      <Submit again={pendingEmail !== null} />
+      </Field>
+      <FormMessage error={state.error} ok={state.ok} />
+      <Submit again={pendingEmail !== null} loading={pending} />
     </form>
   );
 }

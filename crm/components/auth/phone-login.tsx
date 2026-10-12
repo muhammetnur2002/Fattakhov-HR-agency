@@ -7,8 +7,9 @@ import {
   phoneSignInAction,
   requestPhoneCodeAction,
 } from "@/app/actions/quick-auth";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { normalizeRuPhone, PhoneFormatError } from "@/lib/auth/phone";
@@ -139,13 +140,13 @@ export function PhoneLogin({
           <motion.form
             key="phone"
             {...motionProps}
-            className="space-y-3"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               requestCode();
             }}
           >
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="quick-phone">Номер телефона</Label>
               <Input
                 id="quick-phone"
@@ -163,15 +164,20 @@ export function PhoneLogin({
               />
             </div>
             {beforeSubmit}
-            <Button
-              type="submit"
+            <SubmitButton
               variant={prominent ? "default" : "outline"}
-              // Блеклая до согласия — как «Зарегистрироваться» по почте
-              className={cn("w-full", requireConsent && !consent && "opacity-50")}
-              disabled={pending || !rawPhone.trim()}
+              // До согласия — серая плашка, как «Получить код на почту»; не disabled:
+              // нажатие подсвечивает галочку, а aria-disabled сообщает о состоянии
+              // Пока нет согласия — серая плашка и при пустом номере: у настоящего disabled
+              // своя прозрачность 50%, и подпись читалась на 2:1
+              className={cn("w-full", requireConsent && !consent && "disabled:opacity-100")}
+              aria-disabled={(requireConsent && !consent) || undefined}
+              loading={pending}
+              pendingLabel="Отправляем код…"
+              disabled={!rawPhone.trim()}
             >
-              {pending ? "Отправляем код…" : "Получить код по SMS"}
-            </Button>
+              Получить код по SMS
+            </SubmitButton>
           </motion.form>
         )}
 
@@ -179,13 +185,13 @@ export function PhoneLogin({
           <motion.form
             key="sms"
             {...motionProps}
-            className="space-y-3"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               signInWith();
             }}
           >
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="quick-sms">Код из SMS</Label>
               <Input
                 id="quick-sms"
@@ -212,9 +218,14 @@ export function PhoneLogin({
                 </button>
               </p>
             </div>
-            <Button type="submit" className="w-full" disabled={pending || smsCode.length !== 6}>
-              {pending ? "Проверяем…" : submitLabel}
-            </Button>
+            <SubmitButton
+              className="w-full"
+              loading={pending}
+              pendingLabel="Проверяем…"
+              disabled={smsCode.length !== 6}
+            >
+              {submitLabel}
+            </SubmitButton>
             <Button
               type="button"
               variant="ghost"
@@ -232,13 +243,13 @@ export function PhoneLogin({
           <motion.form
             key="totp"
             {...motionProps}
-            className="space-y-3"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               signInWith(totp.trim());
             }}
           >
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="quick-2fa">Код из приложения</Label>
               <Input
                 id="quick-2fa"
@@ -252,18 +263,14 @@ export function PhoneLogin({
                 У вас включена двухфакторная защита. Подойдёт и код восстановления.
               </p>
             </div>
-            <Button type="submit" className="w-full" disabled={pending || !totp.trim()}>
-              {pending ? "Проверяем…" : "Войти"}
-            </Button>
+            <SubmitButton className="w-full" loading={pending} pendingLabel="Проверяем…" disabled={!totp.trim()}>
+              Войти
+            </SubmitButton>
           </motion.form>
         )}
       </AnimatePresence>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <FormMessage error={error} />
     </div>
   );
 }

@@ -130,6 +130,8 @@ export type Action =
   | "comment.writeShared"
   | "comment.writeInternal"
   | "comment.deleteAny"
+  // задания в календаре
+  | "task.manage"
   // интервью
   | "interview.proposeSlots"
   | "interview.confirm"
@@ -139,6 +141,7 @@ export type Action =
   // аналитика
   | "analytics.client"
   | "analytics.agency"
+  | "analytics.employee"
   // администрирование
   | "org.settings"
   | "org.manageClientUsers"
@@ -345,6 +348,15 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
   */
   "comment.deleteAny": { OWNER: true },
 
+  // --- Задания в календаре ---
+  /*
+    Задания в календаре: ставить их себе может любой сотрудник агентства.
+    Кому ещё можно ставить, решает сервис заданий по роли постановщика
+    (lib/services/calendar-tasks.ts): право на сам раздел и право на
+    чужого исполнителя это разные вещи.
+  */
+  "task.manage": { OWNER: true, HEAD: true, ACCOUNT: true, RECRUITER: true },
+
   // --- Интервью ---
   "interview.proposeSlots": { OWNER: true, HEAD: true, RECRUITER: true },
   "interview.confirm": {
@@ -386,6 +398,12 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
     опаснее отсутствующей — она читается как работающее ограничение.
   */
   "analytics.agency": { OWNER: true, HEAD: true },
+  /*
+    Аналитика по сотруднику. Владелец и руководитель подбора открывают любого,
+    остальные сотрудники агентства — только себя (это проверяет сервис, а не
+    матрица: матрица отвечает на «можно ли вообще», «чью» — решает сервис).
+  */
+  "analytics.employee": { OWNER: true, HEAD: true, RECRUITER: true, ACCOUNT: true },
 
   // --- Администрирование ---
   "org.settings": { OWNER: true },

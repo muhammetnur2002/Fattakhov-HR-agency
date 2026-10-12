@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Building2 } from 'lucide-react';
 import { ChatEmpty, ChatScreen } from '@/components/chat/ChatScreen';
 import { Button } from '@/components/ui/Button';
+import { getStudentThread } from '@/lib/agency-chat';
 import { getThread, listThreads } from '@/lib/chat';
 import { requireStudentPage } from '@/lib/security/guards';
 
@@ -18,6 +19,14 @@ export default async function MessagesPage(
   const { student } = await requireStudentPage('/messages');
   const viewer = { role: 'STUDENT' as const, profileId: student.id };
   const threads = await listThreads(viewer);
+  // Переписка с агентством живёт отдельно от диалогов по откликам; ссылка на неё — над ними
+  const agency = await getStudentThread(student.id);
+  const lastAgencyMessage = agency.messages[agency.messages.length - 1];
+  const agencyLink = lastAgencyMessage ? <AgencyLink unread={agency.unread} last={lastAgencyMessage.body} /> : null;
+
+  if (threads.length === 0 && agencyLink) {
+    return <div className="mx-auto max-w-lg">{agencyLink}</div>;
+  }
 
   if (threads.length === 0) {
     return (
@@ -42,5 +51,34 @@ export default async function MessagesPage(
 
   // Заголовок и подсказка живут внутри ChatScreen (шапка списка диалогов) —
   // отдельный заголовок страницы поверх был бы вторым «Сообщения» подряд
-  return <ChatScreen initialThreads={threads} initialThread={thread} viewerRole="STUDENT" />;
+  return (
+    <div className="space-y-3">
+      {agencyLink}
+      <ChatScreen initialThreads={threads} initialThread={thread} viewerRole="STUDENT" />
+    </div>
+  );
+}
+
+/** Карточка-вход в переписку с агентством. */
+function AgencyLink({ unread, last }: { unread: number; last: string }) {
+  const preview = last.replace(/\s+/g, ' ').trim();
+  return (
+    <Link
+      href="/messages/agency"
+      className="surface flex items-center gap-3 rounded-2xl px-4 py-3 transition-colors hover:bg-paper/[0.04]"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-[var(--hairline)] bg-graphite-900/50">
+        <Building2 className="size-5 text-paper/60" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-medium text-paper">Агентство</span>
+        <span className="block truncate text-[13px] text-paper-dim">
+          {preview.length > 90 ? `${preview.slice(0, 89)}…` : preview}
+        </span>
+      </span>
+      {unread > 0 && (
+        <span className="rounded-full bg-paper px-2 py-0.5 text-[12px] font-semibold text-ink">{unread}</span>
+      )}
+    </Link>
+  );
 }

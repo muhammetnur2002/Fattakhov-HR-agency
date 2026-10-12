@@ -43,7 +43,7 @@ export default async function SchedulePage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Возможно, время уже выбрано или срок ссылки истёк. Напишите
             рекрутеру — он пришлёт новую.
@@ -58,7 +58,7 @@ export default async function SchedulePage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">
+        <CardTitle as="h1" className="text-2xl">
           {alreadyConfirmed ? "Встреча назначена" : "Выберите удобное время"}
         </CardTitle>
         <CardDescription>

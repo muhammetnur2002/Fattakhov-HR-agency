@@ -120,6 +120,11 @@ export function LoginForm({
             Пароль изменён — войдите с новым.
           </div>
         )}
+        {params.get('reason') === 'sessions-revoked' && (
+          <div className="mb-4 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4 text-[13px] leading-relaxed text-paper">
+            Все сессии завершены. Войдите заново; если подозреваете чужой доступ, смените пароль.
+          </div>
+        )}
         {params.get('reason') === 'stale' && (
           <div className="mb-4 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13px] leading-relaxed text-warn">
             Сессия устарела — данные аккаунта изменились на сервере. Войдите заново.

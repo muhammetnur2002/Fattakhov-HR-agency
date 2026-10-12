@@ -1,7 +1,8 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { useListNavigation } from "@/components/shell/list-pending";
 import {
   Select,
   SelectContent,
@@ -19,7 +20,7 @@ export function RecruiterFilter({
 }: {
   recruiters: { id: string; fullName: string }[];
 }) {
-  const router = useRouter();
+  const { navigate, pending } = useListNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const value = searchParams.get("recruiterId") ?? ALL;
@@ -28,12 +29,12 @@ export function RecruiterFilter({
     const params = new URLSearchParams(searchParams);
     if (next && next !== ALL) params.set("recruiterId", next);
     else params.delete("recruiterId");
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    navigate(`${pathname}?${params.toString()}`);
   }
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-full max-w-56" aria-label="Фильтр по рекрутёру">
+      <SelectTrigger pending={pending} className="w-full max-w-56" aria-label="Фильтр по рекрутёру">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { requireActor } from "@/lib/auth/session";
+import type { FormState } from "@/lib/form-state";
 import { prisma } from "@/lib/db/prisma";
 import { setShowPresence } from "@/lib/services/presence";
 import { profileSchema } from "@/lib/validation/auth";
+import { invalidForm } from "@/lib/validation/form-errors";
 
-export type ProfileState = { error?: string; ok?: string };
+export type ProfileState = FormState;
 
 /**
  * Свои данные — имя, телефон, должность.
@@ -27,9 +29,7 @@ export async function updateProfileAction(
     phone: formData.get("phone"),
     position: formData.get("position"),
   });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Проверьте поля формы" };
-  }
+  if (!parsed.success) return invalidForm(parsed.error);
 
   await prisma.user.update({
     where: { id: actor.id },

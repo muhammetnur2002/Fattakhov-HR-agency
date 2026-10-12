@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { easeOutExpo } from '@/lib/motion';
+import { easeOutExpo, rise } from '@/lib/motion';
 
 /**
  * Пословное раскрытие заголовка из-под маски.
@@ -27,29 +27,23 @@ export function SplitText({
   each?: number;
   as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
 }) {
-  const reduced = useReducedMotion();
   const words = text.split(' ');
 
-  if (reduced) return <Tag className={className}>{text}</Tag>;
-
+  /*
+    Слова выезжают CSS-анимацией, а не из JS: заголовок первого экрана — самый
+    крупный элемент страницы, и пока он ждал загрузки скриптов, экран был пуст
+    (на медленной сети — четыре секунды, без JS — вечно). Движение при
+    prefers-reduced-motion выключено правилом .word-rise в globals.css.
+  */
   return (
     <Tag className={className}>
       <span className="sr-only">{text}</span>
       <span aria-hidden>
         {words.map((word, index) => (
           <span key={`${word}-${index}`} className="mask-reveal pb-[0.12em] pr-[0.26em]">
-            <motion.span
-              className={cn('inline-block', wordClassName)}
-              initial={{ y: '108%' }}
-              animate={{ y: '0%' }}
-              transition={{
-                duration: 0.85,
-                ease: easeOutExpo,
-                delay: delay + index * each,
-              }}
-            >
+            <span className={cn('word-rise', wordClassName)} style={rise(delay + index * each)}>
               {word}
-            </motion.span>
+            </span>
           </span>
         ))}
       </span>
@@ -83,6 +77,7 @@ export function SplitTextInView({
       <span className="sr-only">{text}</span>
       <motion.span
         aria-hidden
+        data-reveal
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.5 }}
@@ -91,6 +86,7 @@ export function SplitTextInView({
         {words.map((word, index) => (
           <span key={`${word}-${index}`} className="mask-reveal pb-[0.12em] pr-[0.26em]">
             <motion.span
+              data-reveal
               className={cn('inline-block', wordClassName)}
               variants={{
                 hidden: { y: '108%' },

@@ -13,6 +13,8 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { inviteTokenColumns } from "../lib/auth/invite-token";
+
 import { prismaRaw as db } from "../lib/db/prisma";
 
 const ORG_NAME = "Fattakhov HR Agency";
@@ -83,7 +85,7 @@ async function main() {
       organizationId: organization.id,
       email: OWNER_EMAIL,
       role: "OWNER",
-      token,
+      ...inviteTokenColumns(token),
       expiresAt,
     },
   });

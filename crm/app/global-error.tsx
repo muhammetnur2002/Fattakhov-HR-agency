@@ -44,7 +44,8 @@ export default function GlobalError({
           font: '15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
         }}
       >
-        <div style={{ maxWidth: 380, textAlign: "center" }}>
+        {/* main: у страницы должен быть свой основной ориентир, оболочки здесь нет */}
+        <main style={{ maxWidth: 380, textAlign: "center" }}>
           <h1 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 8px" }}>
             Платформа не отвечает
           </h1>
@@ -81,7 +82,7 @@ export default function GlobalError({
           >
             Обновить
           </button>
-        </div>
+        </main>
       </body>
     </html>
   );

@@ -80,17 +80,22 @@ const config: Config = {
           200: withOpacity('--color-accent-200'),
           100: withOpacity('--color-accent-100'),
         },
+        // Статусные цвета читаются из переменных темы (app/globals.css): один hex на обе темы давал
+        // в светлой 1,3–2,6:1 (бейдж «Вышел на работу», «Приглашён», предупреждения на входе)
         yes: {
-          DEFAULT: '#4FA37F',
-          glow: '#71D9AC',
-          deep: '#1C3A2F',
+          DEFAULT: withOpacity('--color-yes'),
+          glow: withOpacity('--color-yes-glow'),
+          deep: withOpacity('--color-yes-deep'),
+          // Не зависит от темы: для элементов на тёмной подложке в обеих темах (свайп-карточка,
+          // кнопка «подходит»), где тёмный зелёный светлой темы сливался бы с заливкой
+          bright: '#71D9AC',
         },
         no: {
           DEFAULT: '#5A5F64',
           deep: '#17191B',
         },
-        warn: '#C9A227',
-        danger: '#B4534F',
+        warn: withOpacity('--color-warn'),
+        danger: withOpacity('--color-danger'),
       } as any,
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],

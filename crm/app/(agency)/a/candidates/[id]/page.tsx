@@ -2,28 +2,44 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CandidateProfile } from "@/components/applications/candidate-profile";
+import { CandidateCommentsCard, type FeedRow } from "@/components/candidates/candidate-comments";
+import { CandidateFilesCard, type CandidateFileRow } from "@/components/candidates/candidate-files";
+import { CandidateStatusSelect } from "@/components/candidates/candidate-status";
+import { SeatInVacancy } from "@/components/candidates/seat-in-vacancy";
 import { SourcingPanel } from "@/components/candidates/sourcing-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { EraseButton } from "@/components/pdn/erase-button";
+import { OfferWorkCard, StudentChatCard } from "@/components/students/student-candidate-panel";
 import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { APPLICATION_OUTCOME_LABELS, CANDIDATE_SOURCE_LABELS } from "@/lib/labels";
 import { getCandidate } from "@/lib/services/candidates";
+import { listCandidateFeed } from "@/lib/services/candidate-notes";
+import { buildSignedUrl } from "@/lib/storage/signing";
 import { LINK_TTL_DAYS } from "@/lib/services/consent";
 import {
+  canPickStudents,
+  listOfferableVacancies,
+  loadStudentChat,
+} from "@/lib/services/student-candidates";
+import {
   isSourcingLead,
+  SOURCING_FILES_MESSAGE,
   SOURCING_LEAD_TTL_DAYS,
   sourcingDaysLeft,
   sourcingDeadline,
 } from "@/lib/sourcing";
+import { BackLink } from "@/components/ui/back-link";
+import { PageTitle } from "@/components/ui/page-title";
 
 /**
  * Даты сорсинг-лида — без года: сроки здесь в пределах недель, а полная
@@ -58,8 +74,53 @@ export default async function CandidatePage({
   const candidate = await getCandidate(actor, id);
   if (!candidate) notFound();
 
+  // Кандидат из студенческой платформы: «Предложить работу» и переписка со студентом
+  const studentPanels =
+    candidate.studentPlatformId && canPickStudents(actor)
+      ? {
+          chat: await loadStudentChat(actor, candidate.id),
+          vacancies: await listOfferableVacancies(actor, candidate.id),
+        }
+      : null;
+
   // Удалять данные кандидата может только владелец (BR-35)
   const canErase = canDo(actor, "pdn.auditLog");
+
+  // Файлы, комментарии команды и статус: подписанные ссылки считаются здесь,
+  // клиентским компонентам отдаются готовые строки
+  const files: CandidateFileRow[] = candidate.attachments.map((a) => ({
+    id: a.id,
+    kind: a.kind,
+    fileName: a.fileName,
+    fileSize: a.fileSize,
+    visibility: a.visibility,
+    createdAt: new Date(a.createdAt).toISOString(),
+    url: buildSignedUrl(a.storageKey),
+  }));
+  const feed: FeedRow[] = (await listCandidateFeed(actor, candidate.id)).map((c) => ({
+    id: c.id,
+    body: c.body,
+    visibility: c.visibility,
+    createdAt: c.createdAt.toISOString(),
+    author: c.author?.fullName ?? null,
+    application: c.application
+      ? { id: c.application.id, vacancyLabel: c.application.vacancyLabel }
+      : null,
+    canDelete: c.author?.id === actor.id || canDo(actor, "comment.deleteAny"),
+  }));
+  const commentVacancies = candidate.applications.map((a) => ({
+    applicationId: a.id,
+    label: `№${a.vacancy.number} ${a.vacancy.title} · ${a.vacancy.client.name}`,
+  }));
+  const isLead = isSourcingLead(candidate);
+  // «Посадить в вакансию»: вакансии в работе, где человека ещё нет, и те, где он уже сидит
+  const canSeat = candidate.erasureState === "ACTIVE" && canDo(actor, "application.create");
+  const seatVacancies = canSeat ? await listOfferableVacancies(actor, candidate.id) : [];
+  const seatTaken = candidate.applications.map((a) => ({
+    id: a.vacancy.id,
+    label: `№${a.vacancy.number} ${a.vacancy.title} · ${a.vacancy.client.name}`,
+    stage: a.stage.name,
+  }));
 
   // Сорсинг-лид: согласия ещё не было, идёт срок (lib/services/sourcing.ts).
   // Блок — пока он применим: кандидат в работе или заблокирован именно
@@ -82,12 +143,11 @@ export default async function CandidatePage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link href="/a/candidates">← Кандидаты</Link>
-        </Button>
+        <BackLink href="/a/candidates">Кандидаты</BackLink>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{candidate.fullName}</h1>
+          <PageTitle>{candidate.fullName}</PageTitle>
+          {candidate.source === "STUDENT_PLATFORM" && <Badge variant="secondary">🎓 Студплатформа</Badge>}
           {candidate.consentStatus !== "GIVEN" && (
             <Badge variant={sourcing && sourcing.daysLeft <= 3 ? "destructive" : "outline"}>
               {sourcing
@@ -102,7 +162,38 @@ export default async function CandidatePage({
           {CANDIDATE_SOURCE_LABELS[candidate.source]}
           {candidate.sourceDetails ? ` · ${candidate.sourceDetails}` : ""}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <CandidateStatusSelect candidateId={candidate.id} status={candidate.status} />
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/a/candidates/${candidate.id}/edit`}>Редактировать профиль</Link>
+          </Button>
+        </div>
       </div>
+
+      {studentPanels && (
+        <>
+          <OfferWorkCard
+            candidateId={candidate.id}
+            studentName={candidate.fullName}
+            vacancies={studentPanels.vacancies.map((v) => ({
+              id: v.id,
+              label: v.label,
+              title: v.title,
+            }))}
+          />
+          <StudentChatCard
+            candidateId={candidate.id}
+            platformError={studentPanels.chat?.error}
+            messages={(studentPanels.chat?.thread?.messages ?? []).map((m) => ({
+              id: m.id,
+              author: m.author,
+              staffName: m.staffName,
+              body: m.body,
+              createdAt: m.createdAt,
+            }))}
+          />
+        </>
+      )}
 
       {sourcing && (
         <Card className="border-primary/40">
@@ -137,9 +228,10 @@ export default async function CandidatePage({
           <CardTitle className="text-base">Профиль</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Здесь только резюме: остальные файлы и загрузка живут в блоке «Файлы» ниже */}
           <CandidateProfile
             candidate={candidate}
-            attachments={candidate.attachments}
+            attachments={candidate.attachments.filter((a) => a.kind === "RESUME")}
             showContacts
           />
         </CardContent>
@@ -159,6 +251,16 @@ export default async function CandidatePage({
 
       <Card>
         <CardHeader>
+          {canSeat && (
+            <CardAction>
+              <SeatInVacancy
+                candidateId={candidate.id}
+                candidateName={candidate.fullName}
+                vacancies={seatVacancies}
+                taken={seatTaken}
+              />
+            </CardAction>
+          )}
           <CardTitle className="text-base">Участие в воронках</CardTitle>
           <CardDescription>
             Один человек может идти по нескольким вакансиям одновременно —
@@ -183,7 +285,7 @@ export default async function CandidatePage({
                 >
                   <Link
                     href={`/a/applications/${a.id}`}
-                    className="font-medium outline-none group-hover:underline after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-3 focus-visible:after:ring-ring/50"
+                    className="font-medium outline-none group-hover:underline after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-3 focus-visible:after:ring-ring"
                   >
                     №{a.vacancy.number} {a.vacancy.title}
                   </Link>
@@ -200,6 +302,45 @@ export default async function CandidatePage({
               ))}
             </ul>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Файлы</CardTitle>
+          <CardDescription>
+            Резюме, портфолио, тестовое задание. По умолчанию файл виден только
+            сотрудникам агентства.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CandidateFilesCard
+            candidateId={candidate.id}
+            files={files}
+            blockedReason={isLead ? SOURCING_FILES_MESSAGE : undefined}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Комментарии</CardTitle>
+          <CardDescription>
+            Пишут сотрудники агентства. Работодателю комментарий виден, только
+            если поставить галочку и выбрать вакансию.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CandidateCommentsCard
+            candidateId={candidate.id}
+            feed={feed}
+            vacancies={commentVacancies}
+            blockedReason={
+              isLead
+                ? "Пока кандидат не дал согласие, заметки о нём не сохраняются: можно хранить только имя, контакты и ссылку на профиль."
+                : undefined
+            }
+          />
         </CardContent>
       </Card>
 

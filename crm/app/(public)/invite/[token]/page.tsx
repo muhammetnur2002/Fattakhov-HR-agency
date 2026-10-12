@@ -36,7 +36,7 @@ export default async function InvitePage({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Ссылка недействительна</CardTitle>
+          <CardTitle as="h1" className="text-2xl">Ссылка недействительна</CardTitle>
           <CardDescription>
             Приглашение истекло, отозвано или уже использовано. Попросите
             отправить новое.
@@ -58,7 +58,7 @@ export default async function InvitePage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Приглашение {place}</CardTitle>
+        <CardTitle as="h1" className="text-2xl">Приглашение {place}</CardTitle>
         <CardDescription>
           {invite.invitedByName
             ? `${invite.invitedByName} приглашает вас как «${ROLE_LABELS[invite.role]}».`

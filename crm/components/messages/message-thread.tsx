@@ -2,18 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
-import { useFormStatus } from "react-dom";
 
 import {
   markConversationReadAction,
   sendMessageAction,
   type MessageState,
 } from "@/app/actions/messages";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
+import { enterSendsMessage } from "@/lib/chat-keys";
+import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
 
 export type ThreadMessage = {
   id: string;
@@ -23,17 +24,17 @@ export type ThreadMessage = {
 };
 
 function Submit() {
-  const { pending } = useFormStatus();
   return (
-    <Button
-      type="submit"
+    <SubmitButton
       size="icon"
       className="size-11 shrink-0 rounded-full"
-      disabled={pending}
-      aria-label={pending ? "Отправляем…" : "Отправить"}
+      // Имя кнопки не меняется: ход отправки объявляет живая область самого SubmitButton
+      aria-label="Отправить"
+      // Пока идёт отправка, на месте стрелки — индикатор
+      pendingLabel={<span className="sr-only">Отправляем…</span>}
     >
       <ArrowUp className="size-5" />
-    </Button>
+    </SubmitButton>
   );
 }
 
@@ -55,19 +56,43 @@ export function MessageThread({
   hasUnread: boolean;
 }) {
   const [state, setState] = useState<MessageState>({});
+  // Текст в состоянии, а не в самом поле: React 19 после любой отправки формы
+  // через action очищает обычные поля, в том числе когда отправка не удалась,
+  // а у управляемого поля прежний текст возвращается. Иначе сообщение, не
+  // дошедшее до сервера, пропадало бы вместе с отказом
+  const [text, setText] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  // Идёт отправка. Ссылка, а не состояние: Enter приходит быстрее, чем
+  // React успевает перерисовать кнопку, и по состоянию второй Enter ещё видел бы «не занято»
+  const sending = useRef(false);
+  const guardStale = useStaleGuard();
   useScrollToLatestOnKeyboard(scroller);
 
   /*
     Обычный обработчик вместо useActionState: после отправки надо
     очистить поле, а делать это эффектом на смену состояния — лишний
     каскад перерисовок. Тот же приём, что в обсуждениях.
+
+    Пока идёт предыдущая отправка, новая не стартует. Выключенной кнопки для
+    этого мало: Enter в поле вызывает requestSubmit() в обход кнопки, и
+    сообщение уходило дважды (проверка 11.10.2026). Сервер дополнительно
+    не создаёт второе одинаковое сообщение подряд (sendDirectMessage).
   */
   async function handleSubmit(formData: FormData) {
-    const result = await sendMessageAction({}, formData);
-    setState(result);
-    if (result.ok) formRef.current?.reset();
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      const result = await sendMessageAction({}, formData);
+      setState(result);
+      if (result.ok) setText("");
+    } catch (error) {
+      if (guardStale(error)) return;
+      // Сети нет: действие бросает, а не возвращает отказ. Текст в поле остаётся
+      setState({ error: "Не отправилось: нет связи с сервером. Попробуйте ещё раз" });
+    } finally {
+      sending.current = false;
+    }
   }
 
   // Открыли переписку — входящее прочитано. Ответа не ждём: это
@@ -125,7 +150,7 @@ export function MessageThread({
                       <div
                         className={cn(
                           "mt-1 text-right text-xs",
-                          m.fromMe ? "text-primary-foreground/70" : "text-muted-foreground",
+                          m.fromMe ? "text-primary-foreground" : "text-muted-foreground",
                         )}
                       >
                         {timeOnly(m.createdAt)}
@@ -145,27 +170,27 @@ export function MessageThread({
         <div className="flex items-end gap-2">
           <Textarea
             name="body"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
             rows={1}
             required
             maxLength={5000}
             placeholder="Сообщение"
             aria-label="Текст сообщения"
             className="min-h-11 flex-1 resize-none rounded-3xl px-4 py-2.5"
+            // Подсказка клавиатуре: на телефоне Enter переносит строку, а не отправляет
+            enterKeyHint="enter"
             onKeyDown={(e) => {
-              // Enter отправляет, Shift+Enter — перенос строки
-              if (e.key === "Enter" && !e.shiftKey) {
+              // На компьютере Enter отправляет, Shift+Enter — перенос; на телефоне — всегда перенос
+              if (enterSendsMessage(e)) {
                 e.preventDefault();
-                formRef.current?.requestSubmit();
+                if (!sending.current) formRef.current?.requestSubmit();
               }
             }}
           />
           <Submit />
         </div>
-        {state.error && (
-          <Alert variant="destructive" className="mt-2 py-2">
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
+        <FormMessage error={state.error} className="mt-2 py-2" />
       </form>
     </div>
   );

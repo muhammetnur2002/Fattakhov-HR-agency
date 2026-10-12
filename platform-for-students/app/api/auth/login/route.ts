@@ -1,8 +1,10 @@
 import { cookies } from 'next/headers';
+import { after } from 'next/server';
 import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
 import { audit, assertSameOrigin } from '@/lib/security/guards';
+import { noteLoginDevice } from '@/lib/security/login-device';
 import { blindIndex } from '@/lib/security/crypto';
 import { canSignInWithPassword, passwordHashForLogin } from '@/lib/security/login-policy';
 import { verifyPassword } from '@/lib/security/password';
@@ -72,6 +74,8 @@ export async function POST(request: Request) {
     const session: SessionUser = { accountId: account.id, role: account.role, profileId, name };
     (await cookies()).set(SESSION_COOKIE, await signSession(session), sessionCookieOptions);
     await store.accounts.touchLogin(account.id);
+    // Вход с нового устройства: письмо владельцу. После ответа, без ожидания почты
+    after(() => noteLoginDevice(account, { userAgent: request.headers.get('user-agent'), ip: clientIp(request.headers) }));
     await audit(session, { action: 'auth.login', entity: 'Account', entityId: account.id }, request.headers);
 
     return ok({ redirectTo: HOME_BY_ROLE[account.role], role: account.role });

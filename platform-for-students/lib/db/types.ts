@@ -276,6 +276,21 @@ export interface MessageRecord {
   createdAt: Date;
 }
 
+export type AgencyMessageAuthor = 'STUDENT' | 'AGENCY';
+
+/** Сообщение переписки студента с агентством. */
+export interface AgencyMessageRecord {
+  id: string;
+  studentId: string;
+  author: AgencyMessageAuthor;
+  /** Как студент видит автора из агентства; у реплики студента null */
+  staffName: string | null;
+  /** AES-256-GCM, как и у MessageRecord */
+  bodyEnc: string;
+  readAt: Date | null;
+  createdAt: Date;
+}
+
 export interface AccessCodeRecord {
   id: string;
   accountId: string;
@@ -560,6 +575,8 @@ export interface DataStore {
     markEmailVerified(id: string): Promise<void>;
     /** Новый пароль и метка смены: все ранее выданные сессии перестают действовать */
     setPassword(id: string, passwordHash: string): Promise<void>;
+    /** Погасить все выданные сессии учётной записи, не меняя пароль («выйти на всех устройствах»). */
+    revokeSessions(id: string): Promise<void>;
     /** Отключить или вернуть учётную запись. Отключённая теряет сессии сразу, любая роль */
     setActive(id: string, active: boolean): Promise<void>;
     setNotifyEmail(id: string, enabled: boolean): Promise<void>;
@@ -655,6 +672,14 @@ export interface DataStore {
     rejectStudy(id: string, note: string): Promise<StudentRecord | null>;
     /** Студент открыл вкладку «Отклики» — счётчик в навигации гасится. */
     markApplicationsViewed(id: string): Promise<void>;
+    /**
+     * Студент принял новую редакцию согласия: версия, время и IP перезаписываются.
+     * Прежний факт согласия остаётся в журнале аудита (student.consent.renewed, с прежней версией).
+     * null — студента нет.
+     */
+    acceptConsent(id: string, input: { version: string; ip: string | null }): Promise<StudentRecord | null>;
+    /** Профиль, в котором этот загруженный файл — фото, резюме, справка или видео. null — ни в одном. */
+    findByFileUrl(url: string): Promise<StudentRecord | null>;
     update(id: string, input: StudentProfileUpdate): Promise<StudentRecord>;
     /**
      * Удаление по требованию человека (152-ФЗ, право на отзыв согласия).
@@ -664,9 +689,10 @@ export interface DataStore {
      * оставить почту — то есть персональные данные, ради удаления
      * которых всё и затевалось.
      *
-     * Журнал аудита переживает удаление: ссылка на аккаунт обнуляется,
-     * а подпись актора в записи остаётся. Журнал, теряющий записи
-     * вместе с тем, о ком они, перестаёт быть журналом.
+     * Журнал аудита переживает удаление: ссылка на аккаунт обнуляется, а подпись актора,
+     * IP и user-agent в этих записях стираются — остаются действие, объект и время.
+     * Журнал, теряющий записи вместе с тем, о ком они, перестаёт быть журналом, но и
+     * хранить человека в нём после удаления профиля нельзя.
      */
     deleteByAccountId(accountId: string): Promise<void>;
   };
@@ -790,6 +816,19 @@ export interface DataStore {
     listUnreadBefore(before: Date): Promise<MessageRecord[]>;
   };
 
+  agencyMessages: {
+    listByStudent(studentId: string): Promise<AgencyMessageRecord[]>;
+    create(input: {
+      studentId: string;
+      author: AgencyMessageAuthor;
+      staffName?: string | null;
+      body: string;
+    }): Promise<AgencyMessageRecord>;
+    /** Помечает прочитанными сообщения ПРОТИВОПОЛОЖНОЙ стороны. Возвращает сколько. */
+    markRead(studentId: string, reader: AgencyMessageAuthor): Promise<number>;
+    unreadFor(studentId: string, reader: AgencyMessageAuthor): Promise<number>;
+  };
+
   accessCodes: {
     findByHash(codeHash: string): Promise<AccessCodeRecord | null>;
     markUsed(id: string): Promise<void>;
@@ -809,13 +848,17 @@ export interface DataStore {
   };
 
   audit: {
-    log(entry: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<void>;
-    list(limit: number): Promise<AuditRecord[]>;
+    /** createdAt — только для проверок и переноса: обычная запись берёт текущее время. */
+    log(entry: Omit<AuditRecord, 'id' | 'createdAt'> & { createdAt?: Date }): Promise<void>;
     /**
-     * Была ли такая запись (подпись актора, действие, объект) за последние `withinMs`.
-     * Нужна, чтобы повторный просмотр одной анкеты не засорял журнал.
+     * Есть ли запись этого действия этого актора по этому объекту за недавнее время: не раньше
+     * `since` или за последние `withinMs`. Нужна для «не чаще раза в N минут»: повторное чтение
+     * одной анкеты или файла не засоряет журнал.
      */
-    recentExists(query: { actorLabel: string; action: string; entityId: string; withinMs: number }): Promise<boolean>;
+    recentExists(query: { action: string; actorLabel: string; entityId: string } & ({ since: Date } | { withinMs: number })): Promise<boolean>;
+    /** Удалить записи старше момента (срок хранения журнала). Возвращает сколько. */
+    purgeOlderThan(cutoff: Date): Promise<number>;
+    list(limit: number): Promise<AuditRecord[]>;
   };
 
   events: {

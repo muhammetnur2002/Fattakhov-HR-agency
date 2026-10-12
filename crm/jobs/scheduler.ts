@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { recordWorkerTick } from "@/lib/monitoring/worker-heartbeat";
+import { startVkInboxPoller } from "@/lib/notifications/vk-poll";
 
 import { runScheduledTasks } from "./tasks";
 
@@ -54,3 +55,6 @@ console.info(
 
 void tick();
 setInterval(tick, INTERVAL_MS);
+
+// Бот ВКонтакте: сам проверяет сообщения сообщества, настройки в ВК не нужны
+startVkInboxPoller();

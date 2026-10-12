@@ -51,6 +51,9 @@ export function CandidateProfile({
   showContacts: boolean;
 }) {
   const resumes = attachments.filter((a) => a.kind === "RESUME");
+  // Прочие файлы (портфолио, тестовое, прочее). Клиенту сюда доходят только
+  // помеченные «показывать клиенту»: отбор делает слой доступа, а не этот компонент
+  const materials = attachments.filter((a) => a.kind !== "RESUME");
 
   return (
     <div className="space-y-4">
@@ -118,6 +121,24 @@ export function CandidateProfile({
           {resumes.map((file) => (
             <Button key={file.id} asChild variant="outline" size="sm">
               {/* Ссылка подписанная и живёт 15 минут (BR-37) */}
+              <a
+                href={buildSignedUrl(file.storageKey)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <FileText className="size-4" />
+                {file.fileName}
+              </a>
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {materials.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground">Материалы</div>
+          {materials.map((file) => (
+            <Button key={file.id} asChild variant="outline" size="sm">
               <a
                 href={buildSignedUrl(file.storageKey)}
                 target="_blank"

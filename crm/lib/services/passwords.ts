@@ -3,13 +3,21 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { getEmailTransport } from "@/lib/notifications/channels";
-import { reserveMail } from "@/lib/security/mail-limit";
+import { reserveMail, reserveStrangerMail } from "@/lib/security/mail-limit";
 import { recordAuthEvent } from "@/lib/services/auth-events";
 import { appUrl } from "@/lib/urls";
 import { brandedEmail } from "@/lib/notifications/email-brand";
 import { passwordProblem } from "@/lib/validation/password";
 
-export class PasswordError extends Error {}
+export class PasswordError extends Error {
+  /** Имя поля формы, к которому относится отказ: страница показывает его под этим полем. */
+  constructor(
+    message: string,
+    readonly field?: "currentPassword" | "newPassword",
+  ) {
+    super(message);
+  }
+}
 
 /** Сколько живёт ссылка восстановления. Час: этого хватает, чтобы дойти до почты. */
 const RESET_TTL_MINUTES = 60;
@@ -46,15 +54,15 @@ export async function changePassword(params: {
   }
 
   const ok = await verifyPassword(user.passwordHash, params.currentPassword);
-  if (!ok) throw new PasswordError("Текущий пароль неверен");
+  if (!ok) throw new PasswordError("Текущий пароль неверен", "currentPassword");
 
   if (params.currentPassword === params.newPassword) {
-    throw new PasswordError("Новый пароль совпадает с текущим");
+    throw new PasswordError("Новый пароль совпадает с текущим", "newPassword");
   }
 
   // Правило слабых паролей одно на все формы; почта — из базы
   const problem = passwordProblem(params.newPassword, { email: user.email });
-  if (problem) throw new PasswordError(problem);
+  if (problem) throw new PasswordError(problem, "newPassword");
 
   await prisma.user.update({
     where: { id: user.id },
@@ -90,7 +98,12 @@ export async function requestPasswordReset(params: {
     select: { id: true, email: true, fullName: true, isActive: true },
   });
   if (!user || !user.isActive) {
-    await sendNoResetMail(email, user ? "inactive" : "unknown");
+    // Письмо «восстановить нечего» уходит незнакомцу и бьёт по репутации
+    // домена, если им заваливать чужие ящики: потолок по IP и за сутки.
+    // Экран при этом отвечает так же, как всегда
+    if (await reserveStrangerMail("reset", params.ip)) {
+      await sendNoResetMail(email, user ? "inactive" : "unknown");
+    }
     return;
   }
 

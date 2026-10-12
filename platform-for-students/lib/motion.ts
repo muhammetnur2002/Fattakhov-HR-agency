@@ -127,3 +127,16 @@ export const SWIPE = {
   /** Максимальный наклон карточки в градусах */
   maxRotate: 16,
 } as const;
+
+/**
+ * Параметры CSS-анимации появления (`.rise-in`, `.word-rise` в globals.css).
+ * Секунды, как в остальном словаре движения; сдвиг — в пикселях.
+ */
+export function rise(delay = 0, y = 12, duration: number = durations.base, scale = 1): React.CSSProperties {
+  return {
+    '--rise-delay': `${Math.round(delay * 1000)}ms`,
+    '--rise-y': `${y}px`,
+    '--rise-dur': `${Math.round(duration * 1000)}ms`,
+    '--rise-scale': String(scale),
+  } as React.CSSProperties;
+}

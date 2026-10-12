@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
@@ -21,6 +21,7 @@ import { useCurtainNav } from '@/components/motion/RouteCurtain';
 import { durations, easeOutExpo, springSoft, stepVariants } from '@/lib/motion';
 import { PILOT_CITY } from '@/lib/pilot';
 import { passwordProblem } from '@/lib/password-policy';
+import { isMeaningfulDraft, parseDraft, REGISTRATION_DRAFT_KEY, serializeDraft } from '@/lib/registration-draft';
 import { registrationSteps } from '@/lib/validation';
 import {
   GENDERS,
@@ -112,6 +113,38 @@ export function RegistrationWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
+  // Черновик: восстановили из этой вкладки — сообщаем об этом, а не молчим
+  const [restored, setRestored] = useState(false);
+  const draftReady = useRef(false);
+
+  // Восстановление после обновления страницы, жеста «назад» или выгрузки вкладки (пока человек ушёл
+  // за кодом из почты). Делается после первой отрисовки: на сервере и при гидратации форма пустая
+  useEffect(() => {
+    try {
+      const draft = parseDraft(window.sessionStorage.getItem(REGISTRATION_DRAFT_KEY), INITIAL, STEP_META.length);
+      if (draft && isMeaningfulDraft(draft.step, draft.form, INITIAL)) {
+        // Восстановление из хранилища браузера — единственное, что нельзя сделать при первой
+        // отрисовке: на сервере хранилища нет, и начальное состояние обязано совпасть с ним
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setForm(draft.form);
+        setStep(draft.step);
+        setRestored(true);
+      }
+    } catch {
+      /* хранилище недоступно (приватный режим) — анкета работает как раньше */
+    }
+    draftReady.current = true;
+  }, []);
+
+  // Пишем черновик на каждое изменение, пока регистрация не завершена
+  useEffect(() => {
+    if (!draftReady.current || done || pending) return;
+    try {
+      window.sessionStorage.setItem(REGISTRATION_DRAFT_KEY, serializeDraft(step, form));
+    } catch {
+      /* см. выше */
+    }
+  }, [step, form, done, pending]);
 
   const meta = STEP_META[step];
   const isLast = step === STEP_META.length - 1;
@@ -228,6 +261,12 @@ export function RegistrationWizard() {
         return;
       }
 
+      // Учётная запись создана: черновик больше не нужен (и пароль в нём не хранился)
+      try {
+        window.sessionStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      } catch {
+        /* см. выше */
+      }
       setPending(data.pending ?? null);
     } catch {
       toast.error('Сеть недоступна', 'Проверьте соединение и попробуйте ещё раз');
@@ -280,13 +319,22 @@ export function RegistrationWizard() {
               onRestart={() => setPending(null)}
             />
           ) : (
-            <motion.section
+            // Шаг — настоящая форма: Enter переходит дальше, а на экранной клавиатуре телефона
+            // появляется рабочая кнопка «Далее» (раньше форм не было вовсе). Кнопка «Далее» стоит
+            // ниже, вне формы, и связана с ней атрибутом form
+            <motion.form
+              id="registration-step-form"
               key={meta.key}
               custom={direction}
               variants={stepVariants}
               initial="hidden"
               animate="show"
               exit="exit"
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!submitting) goNext();
+              }}
               className="min-h-[26rem]"
             >
               <motion.h1
@@ -296,9 +344,14 @@ export function RegistrationWizard() {
                 {meta.title}
               </motion.h1>
               <p className="mt-2.5 text-[14.5px] text-paper-dim">{meta.hint}</p>
+              {restored && (
+                <p role="status" className="mt-3 text-[13px] text-paper-faint">
+                  Мы сохранили ваши ответы и вернули вас на этот шаг. Пароль и согласия нужно ввести заново.
+                </p>
+              )}
 
               <div className="mt-9">{renderStep()}</div>
-            </motion.section>
+            </motion.form>
           )}
         </AnimatePresence>
 
@@ -317,7 +370,8 @@ export function RegistrationWizard() {
             <div className="flex items-center gap-2">
               <Button
                 size="lg"
-                onClick={goNext}
+                type="submit"
+                form="registration-step-form"
                 loading={submitting}
                 iconRight={isLast ? <Check /> : <ArrowRight />}
               >
@@ -338,6 +392,7 @@ export function RegistrationWizard() {
             <TextField
               label="Фамилия и имя"
               autoComplete="name"
+              enterKeyHint="next"
               autoFocus
               value={form.fullName}
               error={errors.fullName}
@@ -455,6 +510,7 @@ export function RegistrationWizard() {
               label="Почта"
               type="email"
               autoComplete="email"
+              enterKeyHint="next"
               autoFocus
               value={form.email}
               error={errors.email}
@@ -464,6 +520,7 @@ export function RegistrationWizard() {
               label="Пароль"
               type="password"
               autoComplete="new-password"
+              enterKeyHint="next"
               value={form.password}
               error={errors.password}
               hint="От 10 символов. Удобнее всего фраза из нескольких слов"
@@ -473,6 +530,7 @@ export function RegistrationWizard() {
               label="Телефон"
               type="tel"
               autoComplete="tel"
+              enterKeyHint="done"
               value={form.phone}
               error={errors.phone}
               hint="Необязательно. Виден только тем, кому вы откликнулись."
