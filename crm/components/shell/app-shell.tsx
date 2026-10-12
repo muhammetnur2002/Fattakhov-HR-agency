@@ -1,4 +1,3 @@
-import { BackToSite } from "./back-to-site";
 import { BottomTabs } from "./bottom-tabs";
 import { GlobalSearchField, MobileSearchLink } from "./global-search-field";
 import { IconRail } from "./icon-rail";
@@ -128,7 +127,10 @@ export async function AppShell({
           className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-25 mix-blend-overlay"
         />
         <div className="relative mb-7 px-1">
-          <Logo variant="lockup" tone="light" className="h-7" priority />
+          {/* Логотип ведёт на сайт агентства: отдельной кнопки «На сайт» нет */}
+          <a href={siteHref} aria-label="Fattakhov HR Agency — открыть сайт" className="inline-block">
+            <Logo variant="lockup" tone="light" className="h-7" priority />
+          </a>
           {/* Кабинет клиента открывает заказчик: ему важно, чьей компанией
               подписан экран, а не как называется его собственная */}
           <div className="mt-2.5 text-xs leading-tight text-white/65">
@@ -138,9 +140,6 @@ export async function AppShell({
           </div>
         </div>
         <div className="relative">
-          {/* Выход на сайт — над пунктами меню, отделён линией:
-              это уход из продукта, а не ещё один раздел */}
-          <BackToSite href={siteHref} className="mb-2 border-b border-white/10 pb-3" />
           <SidebarNav items={items} />
         </div>
       </aside>
@@ -155,7 +154,9 @@ export async function AppShell({
               без дела и убран; в шапке до xl — только знак: у панели
               иконок своего логотипа нет */}
           <div className="flex items-center gap-2 xl:hidden">
-            <Logo variant="mark" className="h-6" />
+            <a href={siteHref} aria-label="Fattakhov HR Agency — открыть сайт">
+              <Logo variant="mark" className="h-6" />
+            </a>
           </div>
 
           <GlobalSearchField hrefBase={searchHrefBase} />

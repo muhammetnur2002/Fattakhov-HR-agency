@@ -468,19 +468,13 @@ export function KanbanBoard({
               листать», особенно у новых пользователей. Видимость решает
               canScrollRight, а не ширина экрана (см. эффект выше) */}
           {/*
-            Доска — тёмная поверхность внутри светлого кабинета: воронка
-            читается как отдельный рабочий стол, а не как продолжение
-            страницы.
-
-            text-foreground здесь обязателен. Класс dark переопределяет
-            переменные темы, и утилиты вроде text-muted-foreground их
-            подхватывают сами. Но обычный текст цвета не объявляет вовсе —
-            он наследует его от body, то есть остаётся почти чёрным из
-            светлой темы. Без этой строки имя кандидата оказывалось
-            тёмным на тёмном, тогда как должность и зарплата рядом
-            читались нормально.
+            Доска следует теме кабинета: в светлой она светлая, в тёмной —
+            тёмная. Раньше здесь стоял принудительный класс dark, и в
+            светлой теме колонки оставались чёрными посреди светлой страницы.
+            Цвета берутся из переменных темы (bg-background, text-foreground),
+            поэтому имя кандидата читается в обеих.
           */}
-          <div className="dark relative hidden rounded-xl bg-background p-3 text-foreground md:block">
+          <div className="relative hidden rounded-xl border bg-background p-3 text-foreground md:block">
             {/*
               relative — чтобы прокрутка обрезала и то, что спозиционировано
               абсолютно: скрытые <input> чекбоксов Radix (до гидратации они
@@ -859,7 +853,7 @@ function MobileStageList({
   const list = cards.filter((c) => c.stageId === stage.id);
 
   return (
-    <div className="dark rounded-xl bg-background p-3 text-foreground md:hidden">
+    <div className="rounded-xl border bg-background p-3 text-foreground md:hidden">
       <div
         role="tablist"
         aria-label="Этапы воронки"

@@ -17,9 +17,6 @@ const ALLOWED = new Map<string, string>([
   ["app/(client)/messages/[userId]/page.tsx", "значок без подписи в шапке диалога на телефоне (md:hidden), aria-label «К списку диалогов»"],
   ["app/(agency)/a/messages/[userId]/page.tsx", "значок без подписи в шапке диалога на телефоне (md:hidden), aria-label «К списку диалогов»"],
   ["app/(agency)/a/reviews/students/page.tsx", "«Назад» в постраничном переключении — предыдущая страница списка, а не уровень выше"],
-  ["components/shell/icon-rail.tsx", "«На сайт» в тёмной панели разделов — выход из кабинета на витрину"],
-  ["components/shell/back-to-site.tsx", "«На сайт» в тёмной боковой панели — выход из кабинета на витрину"],
-  ["components/shell/bottom-tabs.tsx", "«На сайт» в шторке «Ещё» — выход из кабинета на витрину"],
 ]);
 
 const HAND_MADE_BACK = /ArrowLeft(?:Icon)?\b|>\s*Назад\s*</;

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Ellipsis, Lock, X } from "lucide-react";
+import { Ellipsis, Lock, X } from "lucide-react";
 import { motion, useReducedMotion, type Transition } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -312,7 +312,9 @@ export function BottomTabs({
             кабинета не реагирует
           */}
           <SheetHeader className="flex-row items-center gap-3 px-4 pt-2.5 pb-2.5">
-            <Logo variant="mark" tone="light" className="h-6 shrink-0" />
+            <a href={siteHref} aria-label="Fattakhov HR Agency — открыть сайт" className="shrink-0">
+              <Logo variant="mark" tone="light" className="h-6" />
+            </a>
             <div className="min-w-0 flex-1">
               <SheetTitle className="truncate text-sm leading-tight font-semibold text-white">
                 {title}
@@ -369,13 +371,6 @@ export function BottomTabs({
               })}
             </div>
 
-            <a
-              href={siteHref}
-              className="mt-2 flex min-h-11 items-center justify-center gap-2 rounded-2xl text-sm text-white/55 transition-colors active:bg-white/[0.08]"
-            >
-              <ArrowLeft className="size-4" />
-              На сайт
-            </a>
           </div>
         </SheetContent>
       </Sheet>

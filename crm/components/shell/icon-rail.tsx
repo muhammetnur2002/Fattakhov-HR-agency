@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NAV_ICONS, type NavIconName } from "./icons";
+import { Logo } from "@/components/brand/logo";
 import { navLinkLabel } from "@/lib/nav-links";
 import type { NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -48,11 +49,11 @@ export function IconRail({
     <aside data-slot="icon-rail" className="sticky top-0 hidden h-svh w-[5.25rem] shrink-0 flex-col self-start bg-brand-graphite px-1 py-3 md:flex xl:hidden print:hidden">
       <a
         href={siteHref}
-        title="На сайт"
-        className="mb-2 flex min-h-12 flex-col items-center justify-center gap-1 border-b border-white/10 pb-2 text-[12px] text-white/60 hover:text-white/85"
+        title="Открыть сайт агентства"
+        aria-label="Fattakhov HR Agency — открыть сайт"
+        className="mb-2 flex min-h-12 items-center justify-center border-b border-white/10 pb-2"
       >
-        <ArrowLeft className="size-4" />
-        На сайт
+        <Logo variant="mark" tone="light" className="h-6" />
       </a>
       <nav
         aria-label="Разделы"
