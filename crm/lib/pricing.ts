@@ -8,6 +8,7 @@
  * оффера (`Application.offerSalary`), а не от вилки в брифе. Функции здесь
  * принимают оклад параметром — передавать нужный источник обязан вызывающий.
  */
+import { formatMoney, formatNumber } from "@/lib/format-money";
 import type { PricingModel } from "@/lib/generated/prisma/enums";
 
 /** Параметры договора, влияющие на расчёт. Какие поля заполнены — зависит от модели. */
@@ -246,12 +247,8 @@ function pluralOklad(n: number): string {
   return "окладов";
 }
 
-export function formatMoney(value: number): string {
-  // Неразрывный пробел перед ₽ — иначе сумма может перенестись
-  // на новую строку между числом и знаком валюты
-  return `${formatNumber(value)} ₽`;
-}
-
-export function formatNumber(value: number): string {
-  return new Intl.NumberFormat("ru-RU").format(value);
-}
+/**
+ * Запись денег и чисел живёт в `lib/format-money.ts`; здесь только прежнее имя, чтобы чужие ветки
+ * с `import { formatMoney } from "@/lib/pricing"` не сломались. В новом коде — оттуда.
+ */
+export { formatMoney, formatNumber };

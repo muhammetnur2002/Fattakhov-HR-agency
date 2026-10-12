@@ -5,7 +5,15 @@
  */
 import { expect, test } from "@playwright/test";
 
-test.use({ storageState: "tests/e2e/.auth/owner.json" });
+/*
+  Смена пароля берёт попытку из той же корзины, что и вход (`guardRate("login")`: 10 в минуту на адрес, счётчик в памяти
+  сервера, до разбора формы). Тест с неверным текущим паролем тратил общую корзину, и на повторных локальных прогонах вместо
+  ошибки у поля приходило «Слишком много попыток». Адрес у прогона свой: заголовок X-Forwarded-For на локальном сервере
+  (без Caddy) принимается как есть, и корзина у каждого прогона новая.
+*/
+const OWN_IP = `10.77.${1 + Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`;
+
+test.use({ storageState: "tests/e2e/.auth/owner.json", extraHTTPHeaders: { "x-forwarded-for": OWN_IP } });
 
 test("создание пользователя клиента: пароли не совпадают — ошибка у второго поля, имя и почта остались", async ({ page }) => {
   await page.goto("/a/clients/cl_starfish");

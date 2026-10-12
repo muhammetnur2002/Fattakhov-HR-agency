@@ -14,6 +14,12 @@ const badgeVariants = cva(
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive dark:bg-destructive/20 [a]:hover:bg-destructive/20 dark:[a]:hover:bg-destructive/25",
+        // Тона статусов: прямо в разметке не используются — только через StatusBadge
+        // (components/ui/status-badge.tsx), его держит tests/status-badge-rule.test.ts.
+        // Тот же рисунок, что у destructive: плашка 10% (в тёмной 20%) и текст цветом тона
+        success: "bg-success/10 text-success dark:bg-success/20 focus-visible:ring-success",
+        progress: "bg-progress/10 text-progress dark:bg-progress/20 focus-visible:ring-progress",
+        warning: "bg-warning/10 text-warning dark:bg-warning/20 focus-visible:ring-warning",
         outline:
           "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
         ghost:

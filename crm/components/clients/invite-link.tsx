@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Copy, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useRef, useState } from "react";
 
+import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -23,19 +24,13 @@ import { Button } from "@/components/ui/button";
  * показывала ссылку целиком и считала, что писем нет вовсе.
  */
 export function InviteLink({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
   const [shown, setShown] = useState(false);
-
-  async function copy() {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  const codeRef = useRef<HTMLElement>(null);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {shown ? (
-        <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
+        <code ref={codeRef} className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
           {url}
         </code>
       ) : (
@@ -63,17 +58,8 @@ export function InviteLink({ url }: { url: string }) {
           </>
         )}
       </Button>
-      <Button type="button" size="sm" variant="outline" onClick={copy}>
-        {copied ? (
-          <>
-            <Check className="size-3.5" /> Скопировано
-          </>
-        ) : (
-          <>
-            <Copy className="size-3.5" /> Копировать
-          </>
-        )}
-      </Button>
+      {/* Без буфера обмена ссылка раскрывается и выделяется: скрытую копировать вручную нечем */}
+      <CopyButton text={url} targetRef={codeRef} onManual={() => setShown(true)} />
     </div>
   );
 }

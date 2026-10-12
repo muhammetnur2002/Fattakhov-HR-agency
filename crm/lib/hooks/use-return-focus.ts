@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 
 /**
  * Фокус возвращается туда, откуда его взяли: после закрытия окна и блока
@@ -23,6 +23,15 @@ import { useCallback, useEffect, useRef } from "react";
  * - `useConfirmFocus(open)` — для блока, который заменяет кнопку на месте:
  *   при открытии фокус уходит на `focusRef` (безопасное действие «Отмена» или
  *   поле, которое надо заполнить), при закрытии — на кнопку, открывавшую блок.
+ *   Вопрос блока («Удалить аккаунт? Это нельзя отменить.») связан с ним:
+ *   хук отдаёт `questionId` (на абзац с вопросом) и `groupProps` (на контейнер
+ *   блока: `role="group"` с названием из вопроса; у `<form>` вместо них —
+ *   `aria-labelledby={questionId}`). Кнопка, получающая фокус, описана тем же
+ *   вопросом (`aria-describedby={questionId}`): название группы при переводе
+ *   фокуса читают не всегда, описание кнопки — надёжнее. Иначе фокус молча
+ *   встаёт на «Отмена», и читалка говорит только «Отмена, кнопка» — человек не
+ *   узнаёт ни что появился запрос подтверждения, ни о чём он. Разметка и
+ *   размеры от этого не меняются.
  *
  * Элемент, которого уже нет в странице (список перерисовался, строку удалили),
  * пропускается: фокус не уходит в пустоту и не бросает ошибку.
@@ -43,6 +52,12 @@ export type ReturnFocus = {
   remember: (el?: Element | null) => void;
   /** Вернуть фокус сейчас (для окон, которые закрываются без Radix). */
   restore: () => void;
+  /**
+   * Забыть запомненное: окно закрывается переходом на другую страницу (плитка шторки
+   * «Ещё»), и вернуть фокус на кнопку в панели значит гонять Next, который сам ставит
+   * фокус на новой странице.
+   */
+  forget: () => void;
   /** Для `onCloseAutoFocus` у `DialogContent` / `SheetContent`. */
   onCloseAutoFocus: (event: Event) => void;
 };
@@ -62,6 +77,10 @@ export function useReturnFocus(): ReturnFocus {
     if (canFocus(target)) target.focus({ preventScroll: true });
   }, []);
 
+  const forget = useCallback(() => {
+    origin.current = null;
+  }, []);
+
   const onCloseAutoFocus = useCallback(
     (event: Event) => {
       // Radix сам вернул бы фокус на DialogTrigger; триггера нет — решаем мы
@@ -71,7 +90,7 @@ export function useReturnFocus(): ReturnFocus {
     [restore],
   );
 
-  return { remember, restore, onCloseAutoFocus };
+  return { remember, restore, forget, onCloseAutoFocus };
 }
 
 /**
@@ -83,6 +102,10 @@ export function useReturnFocus(): ReturnFocus {
  * открытии блока исчезает из страницы и возвращается при закрытии, поэтому
  * ссылка хранится на ней самой, а не на запомненном элементе: после закрытия
  * это уже новый элемент.
+ *
+ * `questionId` — на абзац или подпись с вопросом, `groupProps` — на контейнер блока:
+ * читалка экрана называет группу вопросом, когда фокус входит в неё. Хуков на одном
+ * экране может быть несколько (удаление и закрытие рядом) — идентификаторы у каждого свои.
  */
 export function useConfirmFocus<
   Trigger extends HTMLElement = HTMLButtonElement,
@@ -91,6 +114,11 @@ export function useConfirmFocus<
   const triggerRef = useRef<Trigger | null>(null);
   const focusRef = useRef<Focus | null>(null);
   const wasOpen = useRef(open);
+  const questionId = useId();
+  const groupProps = useMemo(
+    () => ({ role: "group" as const, "aria-labelledby": questionId }),
+    [questionId],
+  );
 
   useEffect(() => {
     if (open === wasOpen.current) return;
@@ -99,5 +127,5 @@ export function useConfirmFocus<
     if (canFocus(target)) target.focus({ preventScroll: true });
   }, [open]);
 
-  return { triggerRef, focusRef };
+  return { triggerRef, focusRef, questionId, groupProps };
 }

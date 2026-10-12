@@ -40,7 +40,8 @@ describe("нижняя панель разделов", () => {
       .map((a) => a.textContent?.trim());
     for (const tab of tabs) expect(rest).not.toContain(tab);
     expect(rest).toContain("Календарь");
-    expect(rest).toContain("На сайт");
+    // «На сайт» больше не отдельная плитка: на сайт ведёт логотип (коммит 6714122)
+    expect(rest).toContain("Fattakhov HR Agency");
   });
 
   it("не больше четырёх вкладок, даже если отмечено больше", () => {

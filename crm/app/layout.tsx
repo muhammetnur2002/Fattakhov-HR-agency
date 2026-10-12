@@ -3,6 +3,9 @@ import { Inter } from "next/font/google";
 
 import "./globals.css";
 import { ThemeProvider } from "@/components/shell/theme-provider";
+import { UnsupportedBrowserNotice } from "@/components/shell/unsupported-browser-notice";
+import { THEME_COLOR_SCRIPT, THEME_COLORS } from "@/lib/theme-color";
+import { LiveAnnouncer } from "@/components/ui/live-announcer";
 import { Toaster } from "@/components/ui/sonner";
 
 /**
@@ -21,6 +24,10 @@ const NO_FLASH_SCRIPT = `
     var root = document.documentElement;
     if (dark) root.classList.add("dark");
     root.style.colorScheme = dark ? "dark" : "light";
+    // Полоса браузера: при ручном выборе темы — цвет выбранной, а не системной
+    if (window.__applyThemeColor) {
+      window.__applyThemeColor(theme === "light" || theme === "dark" ? theme : "system");
+    }
   } catch (e) {}
 })();
 `;
@@ -63,8 +70,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eeeeea" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
   ],
   colorScheme: "light dark",
   width: "device-width",
@@ -83,10 +90,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col font-sans">
+        <script dangerouslySetInnerHTML={{ __html: THEME_COLOR_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
+        {/* Устаревший браузер: подсказка по возможностям, а не по User-Agent (lib/browser-support.ts) */}
+        <UnsupportedBrowserNotice />
         <ThemeProvider>
           {children}
           <Toaster />
+          {/* Постоянная пустая область для читалки: «Сохранено» объявляется через неё (FormMessage) */}
+          <LiveAnnouncer />
         </ThemeProvider>
       </body>
     </html>

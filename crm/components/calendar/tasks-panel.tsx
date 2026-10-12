@@ -17,9 +17,14 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
 import { panelClass } from "@/components/ui/panel";
 import { Textarea } from "@/components/ui/textarea";
+import { noScriptForm } from "@/lib/forms/no-script";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { utcToZonedInput, zonedToUtc } from "@/lib/calendar/timezone";
+import { formatDayMonth, formatInZone, formatTime, zonedDayKey } from "@/lib/format-date";
 import { useConfirmFocus, useReturnFocus } from "@/lib/hooks/use-return-focus";
 
 export type TaskDTO = {
@@ -48,25 +53,14 @@ type Draft = {
   candidate: { id: string; fullName: string } | null;
 };
 
-/** Значение для поля datetime-local: местное время браузера, без секунд. */
-function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-const timeFormat = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
-const dayFormat = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-
-function dayKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
 /**
  * Задания в календаре: список на выбранный период и форма «+ Задание».
  *
  * Невыполненные просроченные стоят отдельной группой сверху и не пропадают,
  * сколько бы ни листали календарь. Время показывается и вводится в часовом
- * поясе браузера, на сервер уходит момент в UTC.
+ * поясе из профиля (`useTimeZone`), на сервер уходит момент в UTC. Прежде это
+ * была зона браузера, а первый кадр на сервере считался в зоне процесса —
+ * группы по дням и сама разметка расходились при гидратации.
  */
 export function TasksPanel({
   tasks,
@@ -82,6 +76,7 @@ export function TasksPanel({
   /** Срок нового задания по умолчанию, ISO; в режиме «День» это выбранный день. */
   defaultDue: string;
 }) {
+  const timeZone = useTimeZone();
   const [draft, setDraft] = useState<Draft | null>(null);
   // Окно открыто состоянием, а не DialogTrigger: фокус возвращаем сами
   const returnFocus = useReturnFocus();
@@ -90,7 +85,7 @@ export function TasksPanel({
     returnFocus.remember(event.currentTarget);
     setDraft({
       title: "",
-      dueLocal: toLocalInput(new Date(defaultDue)),
+      dueLocal: utcToZonedInput(new Date(defaultDue), timeZone),
       assigneeId: currentUserId,
       vacancyId: "",
       candidate: null,
@@ -102,7 +97,7 @@ export function TasksPanel({
     setDraft({
       id: task.id,
       title: task.title,
-      dueLocal: toLocalInput(new Date(task.dueAt)),
+      dueLocal: utcToZonedInput(new Date(task.dueAt), timeZone),
       assigneeId: task.assignee.id,
       vacancyId: task.vacancy?.id ?? "",
       candidate: task.candidate,
@@ -114,7 +109,7 @@ export function TasksPanel({
   const groups = new Map<string, { date: Date; items: TaskDTO[] }>();
   for (const task of rest) {
     const date = new Date(task.dueAt);
-    const key = dayKey(date);
+    const key = zonedDayKey(date, timeZone);
     if (!groups.has(key)) groups.set(key, { date, items: [] });
     groups.get(key)!.items.push(task);
   }
@@ -149,10 +144,10 @@ export function TasksPanel({
         )}
 
         {[...groups.values()].map(({ date, items }) => (
-          <section key={dayKey(date)} className="space-y-2">
+          <section key={zonedDayKey(date, timeZone)} className="space-y-2">
             <h3 className="text-sm font-medium text-muted-foreground">
               {(() => {
-                const text = dayFormat.format(date);
+                const text = formatInZone(date, "weekdayDayMonth", timeZone);
                 return text.charAt(0).toUpperCase() + text.slice(1);
               })()}
             </h3>
@@ -191,10 +186,11 @@ function TaskItem({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [pending, start] = useTransition();
   const done = Boolean(task.completedAt);
   const due = new Date(task.dueAt);
+  const timeZone = useTimeZone();
 
   function toggle() {
     setError(null);
@@ -232,8 +228,8 @@ function TaskItem({
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className={task.overdue ? "font-medium text-destructive" : undefined}>
-              {showDay ? `${new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(due)}, ` : ""}
-              {timeFormat.format(due)}
+              {showDay ? `${formatDayMonth(due, timeZone)}, ` : ""}
+              {formatTime(due, timeZone)}
             </span>
             {task.assignee.id !== currentUserId && <span>исполнитель: {task.assignee.fullName}</span>}
             {task.createdBy.id !== currentUserId && task.assignee.id === currentUserId && (
@@ -255,12 +251,15 @@ function TaskItem({
 
         {task.canEdit &&
           (confirming ? (
-            <span className="flex items-center gap-2 text-xs">
-              Удалить?
+            <span {...groupProps} className="flex items-center gap-2 text-xs">
+              {/* Видно «Удалить?», читалке — какое именно задание: строк в списке много */}
+              <span id={questionId}>
+                Удалить<span className="sr-only"> задание «{task.title}»</span>?
+              </span>
               <Button type="button" size="sm" variant="destructive" loading={pending} onClick={remove}>
                 Да
               </Button>
-              <Button ref={focusRef} type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
+              <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
                 Нет
               </Button>
             </span>
@@ -307,6 +306,7 @@ function TaskDialog({
   onCloseAutoFocus: (event: Event) => void;
   onClose: () => void;
 }) {
+  const timeZone = useTimeZone();
   const [title, setTitle] = useState(draft.title);
   const [dueLocal, setDueLocal] = useState(draft.dueLocal);
   const [assigneeId, setAssigneeId] = useState(draft.assigneeId);
@@ -333,7 +333,8 @@ function TaskDialog({
 
   function save() {
     setError(null);
-    const due = new Date(dueLocal);
+    // «Настенное» время из поля — в зоне профиля, перевод только через timezone.ts
+    const due = zonedToUtc(dueLocal, timeZone);
     if (Number.isNaN(due.getTime())) {
       setError("Укажите дату и время");
       return;
@@ -360,6 +361,7 @@ function TaskDialog({
         </DialogHeader>
 
         <form
+          {...noScriptForm}
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
@@ -394,29 +396,29 @@ function TaskDialog({
             {assignees.length > 1 && (
               <div className="space-y-2">
                 <Label htmlFor="task-assignee">Кому</Label>
-                <select
+                <NativeSelect
                   id="task-assignee"
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-field bg-background px-2 text-sm"
+                  className="w-full"
                 >
                   {assignees.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.fullName}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="task-vacancy">Вакансия (по желанию)</Label>
-            <select
+            <NativeSelect
               id="task-vacancy"
               value={vacancyId}
               onChange={(e) => setVacancyId(e.target.value)}
-              className="h-9 w-full rounded-lg border border-field bg-background px-2 text-sm"
+              className="w-full"
             >
               <option value="">Без вакансии</option>
               {vacancies.map((v) => (
@@ -424,7 +426,7 @@ function TaskDialog({
                   {v.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="space-y-2">

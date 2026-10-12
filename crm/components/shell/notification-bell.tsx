@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CountBadge } from "@/components/ui/count-badge";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDayMonthTime } from "@/lib/format-date";
 
 /** Кольцо фокуса внутри панели: наружное срезалось бы краем прокручиваемого списка. */
 const FOCUS_INSET =
@@ -155,6 +157,7 @@ function Item({
   notification: BellNotification;
   onNavigate: () => void;
 }) {
+  const timeZone = useTimeZone();
   const content = (
     <div
       className={cn(
@@ -174,7 +177,7 @@ function Item({
             </div>
           )}
           <div className="mt-1 text-xs text-muted-foreground">
-            {formatWhen(notification.createdAt)}
+            {formatWhen(notification.createdAt, timeZone)}
           </div>
         </div>
       </div>
@@ -191,17 +194,12 @@ function Item({
 }
 
 /** Свежие показываем относительно: «12 минут назад» читается легче даты. */
-function formatWhen(date: Date): string {
+function formatWhen(date: Date, timeZone: string): string {
   const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60_000);
 
   if (minutes < 1) return "только что";
   if (minutes < 60) return `${minutes} мин назад`;
   if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} ч назад`;
 
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
+  return formatDayMonthTime(date, timeZone);
 }

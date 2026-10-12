@@ -8,6 +8,25 @@ const optionalText = (max: number) =>
     .optional()
     .transform((v) => (v === "" ? undefined : v));
 
+/**
+ * Почта похожа на почту: латиница по правилам `z.email()`, а адрес с кириллическим доменом (`имя@почта.рф`)
+ * проходит по мягкому шаблону — `z.email()` его отвергает, а такие адреса бывают.
+ */
+function looksLikeEmail(value: string): boolean {
+  if (z.email().safeParse(value).success) return true;
+  return /[^\x00-\x7F]/.test(value) && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)*\.[^\s@.]{2,}$/u.test(value);
+}
+
+/**
+ * Необязательная почта: пусто — нет значения, вписано — должно быть похоже на адрес.
+ *
+ * Формат проверяет сервер, а не `type="email"` браузера: форма кандидата идёт через `useFormAction`, который
+ * выключает проверку браузера (`noValidate`), и без этого правила «abc» сохранялся как почта кандидата и уходил
+ * в поиск дубликатов (BR-7) и в уведомления.
+ */
+const optionalEmail = (max: number) =>
+  optionalText(max).refine((v) => v === undefined || looksLikeEmail(v), { message: "Проверьте адрес почты" });
+
 const optionalNumber = z
   .union([z.string(), z.number()])
   .optional()
@@ -42,7 +61,7 @@ export const quickCandidateSchema = z
       .min(3, "Укажите имя и фамилию")
       .max(200, "Слишком длинное имя"),
     phone: optionalText(50),
-    email: optionalText(200),
+    email: optionalEmail(200),
     telegram: optionalText(100),
     // Поля профиля до согласия не сохраняются (сорсинг-лид), но разбираются:
     // форма, открытая до выкатки, может их прислать — сервис откажет
@@ -76,7 +95,7 @@ export type QuickCandidateInput = z.infer<typeof quickCandidateSchema>;
 export const candidateProfileSchema = z.object({
   fullName: z.string().trim().min(3, "Укажите имя и фамилию").max(200),
   phone: optionalText(50),
-  email: optionalText(200),
+  email: optionalEmail(200),
   telegram: optionalText(100),
   city: optionalText(120),
   currentPosition: optionalText(200),

@@ -6,9 +6,10 @@ import { CalendarView } from "@/components/interviews/calendar-view";
 import { Button } from "@/components/ui/button";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { canDo, visibleVacanciesFilter } from "@/lib/access";
-import { requireAgencyActor } from "@/lib/auth/session";
-import { parseDateParam, toDateParam } from "@/lib/calendar/day-range";
+import { getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDayTitle, parseDateParam, toDateParam } from "@/lib/calendar/day-range";
 import { calendarFeedUrl } from "@/lib/calendar/feed";
+import { zonedToUtc } from "@/lib/calendar/timezone";
 import { prisma } from "@/lib/db/prisma";
 import { listAssignableUsers, listTasks } from "@/lib/services/calendar-tasks";
 import {
@@ -41,6 +42,7 @@ export default async function AgencyCalendarPage({
 }) {
   const actor = await requireAgencyActor();
   const { range, date } = await searchParams;
+  const timeZone = await getUserTimeZone();
   const key: RangeKey =
     range === "month" || range === "quarter" || range === "day" ? range : "week";
 
@@ -89,10 +91,11 @@ export default async function AgencyCalendarPage({
         }),
       ])
     : [[], [], []];
-  // Новое задание по умолчанию: в режиме «День» 10:00 выбранного дня, иначе через час
+  // Новое задание по умолчанию: в режиме «День» 10:00 выбранного дня в зоне
+  // человека (не полночь сервера плюс десять часов), иначе через час
   const defaultDue =
     key === "day"
-      ? new Date(from.getTime() + 10 * 3_600_000)
+      ? zonedToUtc(`${toDateParam(from)}T10:00`, timeZone)
       : new Date(Math.ceil((now.getTime() + 3_600_000) / 900_000) * 900_000);
 
   return (
@@ -151,11 +154,7 @@ function DayNavigator({ from, isToday }: { from: Date; isToday: boolean }) {
   prev.setDate(prev.getDate() - 1);
   const next = new Date(from);
   next.setDate(next.getDate() + 1);
-  const title = new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(from);
+  const title = formatDayTitle(from);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

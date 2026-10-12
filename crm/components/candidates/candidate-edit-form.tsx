@@ -9,6 +9,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { noScriptForm } from "@/lib/forms/no-script";
 import { AreaField, TextField } from "@/components/vacancies/wizard-fields";
 
 export type ProfileValues = Record<string, string>;
@@ -64,6 +65,7 @@ export function CandidateEditForm({
 
   return (
     <form
+      {...noScriptForm}
       onSubmit={(e) => {
         e.preventDefault();
         save();

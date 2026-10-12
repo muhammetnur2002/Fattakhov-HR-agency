@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { REJECTION_REASON_LABELS } from "@/lib/labels";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 export function CandidateCard({
@@ -191,7 +191,7 @@ export function CandidateCard({
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {card.candidate.salaryExpectation !== null && (
-          <span>{formatNumber(card.candidate.salaryExpectation)} ₽</span>
+          <span>{formatMoney(card.candidate.salaryExpectation)}</span>
         )}
 
         <span

@@ -13,6 +13,7 @@ import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { panelClass } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function Submit() {
   return (
@@ -43,6 +44,8 @@ export function EraseButton({
     {},
   );
   const [open, setOpen] = useState(false);
+  // «Удалить данные» заменяется формой подтверждения: фокус — в поле для слова, после «Отмены» — обратно на кнопку
+  const { triggerRef, focusRef, questionId } = useConfirmFocus<HTMLButtonElement, HTMLInputElement>(open);
 
   if (state.ok) {
     return <FormMessage ok={state.ok} />;
@@ -51,6 +54,7 @@ export function EraseButton({
   if (!open) {
     return (
       <Button
+        ref={triggerRef}
         type="button"
         size="sm"
         variant="outline"
@@ -62,7 +66,11 @@ export function EraseButton({
   }
 
   return (
-    <form action={formAction} className={panelClass("plain", "space-y-4")}>
+    <form action={formAction} aria-labelledby={questionId} className={panelClass("plain", "space-y-4")}>
+      {/* Вопрос — абзац ниже, он длинный; форме для читалки нужно короткое название */}
+      <span id={questionId} className="sr-only">
+        Удалить данные кандидата {candidateName}
+      </span>
       <input type="hidden" name="candidateId" value={candidateId} />
 
       <p className="text-sm">
@@ -87,6 +95,7 @@ export function EraseButton({
           Впишите «удалить» для подтверждения
         </Label>
         <Input
+          ref={focusRef}
           id={`confirm-${candidateId}`}
           name="confirm"
           autoComplete="off"

@@ -28,5 +28,11 @@ export const NO_NUMBER_SPINNER =
  * перебило бы рамку фокуса и ошибки. А так порядок вариантов Tailwind сам
  * ставит `hover` ниже `focus-visible` и `aria-invalid`: рамка в фокусе
  * остаётся цветом кольца, красная — красной (проверка — `tests/e2e/selection-states.spec.ts`).
+ *
+ * Недоступное поле не отвечает на наведение: у `Input` это даёт `pointer-events-none`, у `Textarea`
+ * и `SelectTrigger` его нет (курсор «нельзя» нужен), поэтому рамке возвращается покой составным
+ * `disabled:hover:` — его специфичность выше обычного `hover:`, а не выше фокуса (отключённое поле
+ * фокуса не берёт). Поле с ошибкой остаётся красным и под курсором. Замечание проверки к PR #119.
  */
-export const FIELD_HOVER = "hover:border-foreground/60"
+export const FIELD_HOVER =
+  "hover:border-foreground/60 disabled:hover:border-field disabled:hover:aria-invalid:border-destructive dark:disabled:hover:aria-invalid:border-destructive/50"

@@ -7,7 +7,7 @@ import { Pricing } from "@/components/marketing/pricing";
 import { Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
 import { ENTRY_PRICE, TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { PageHero, PageIntro } from "@/components/marketing/page-intro";
 
 export const metadata: Metadata = {
@@ -48,7 +48,7 @@ export default function TariffsPage() {
     <>
       <PageHero>
         <PageIntro eyebrow="Тарифы" title="Сколько стоит внешняя команда найма">
-          От {formatNumber(ENTRY_PRICE)} ₽ в месяц за одну вакансию
+          От {formatMoney(ENTRY_PRICE)} в месяц за одну вакансию
           в активной работе. Цена растёт медленнее объёма: на пяти
           вакансиях слот обходится на {дешевле}% дешевле, чем на одной.
           Ниже открытый прайс и расчёт, с чем его сравнивать.

@@ -8,12 +8,14 @@ import type { KanbanCard, KanbanStage } from "./types";
 import { DecisionPanel } from "@/components/applications/decision-panel";
 import { UndoRejectButton } from "@/components/applications/undo-reject-button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   APPLICATION_OUTCOME_LABELS,
   REJECTION_REASON_LABELS,
 } from "@/lib/labels";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
+import { APPLICATION_OUTCOME_TONE } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
 import type { ClientDecision, RejectionReason } from "@/lib/generated/prisma/enums";
 
@@ -140,9 +142,9 @@ function CompareColumn({
           </Link>
           <div className="mt-1">
             {closed ? (
-              <Badge variant="secondary">
+              <StatusBadge tone={APPLICATION_OUTCOME_TONE[card.outcome]}>
                 {APPLICATION_OUTCOME_LABELS[card.outcome]}
-              </Badge>
+              </StatusBadge>
             ) : (
               <Badge variant="secondary">{stage?.name}</Badge>
             )}
@@ -172,7 +174,7 @@ function CompareColumn({
           <dt className="shrink-0 text-muted-foreground">Зарплата</dt>
           <dd className="min-w-0 truncate">
             {card.candidate.salaryExpectation !== null
-              ? `${formatNumber(card.candidate.salaryExpectation)} ₽`
+              ? formatMoney(card.candidate.salaryExpectation)
               : "—"}
           </dd>
         </div>

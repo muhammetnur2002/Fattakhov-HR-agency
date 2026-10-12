@@ -4,7 +4,7 @@ import {
   URGENCY_LABELS,
   WORK_FORMAT_LABELS,
 } from "@/lib/labels";
-import { formatNumber } from "@/lib/pricing";
+import { formatSalaryRange } from "@/lib/format-money";
 
 /** Поля брифа, показываемые обеим сторонам. Внутренних заметок здесь нет. */
 export type BriefData = {
@@ -33,9 +33,11 @@ export type BriefData = {
 export function VacancyBrief({
   brief,
   hiringManagerName,
+  timeZone,
 }: {
   brief: BriefData;
   hiringManagerName?: string | null;
+  timeZone: string;
 }) {
   return (
     <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
@@ -43,7 +45,7 @@ export function VacancyBrief({
       <Row label="Заказчик">{hiringManagerName ?? "—"}</Row>
       <Row label="Человек нужно">{brief.headcount}</Row>
       <Row label="Срочность">{URGENCY_LABELS[brief.urgency]}</Row>
-      <Row label="Вилка">{formatSalary(brief)}</Row>
+      <Row label="Вилка">{formatSalaryRange(brief.salaryFrom, brief.salaryTo, { gross: brief.salaryGross }) ?? "—"}</Row>
       <Row label="Город">{brief.city ?? "—"}</Row>
       <Row label="Формат работы">
         {brief.workFormat ? WORK_FORMAT_LABELS[brief.workFormat] : "—"}
@@ -56,7 +58,7 @@ export function VacancyBrief({
       {brief.workSchedule && <Row label="График">{brief.workSchedule}</Row>}
       {brief.desiredStartDate && (
         <Row label="Желаемая дата выхода">
-          {formatDate(brief.desiredStartDate)}
+          {formatDate(brief.desiredStartDate, timeZone)}
         </Row>
       )}
 
@@ -120,16 +122,4 @@ function Row({
       <dd className="whitespace-pre-line">{children}</dd>
     </div>
   );
-}
-
-function formatSalary(brief: BriefData): string {
-  const from = brief.salaryFrom == null ? null : Number(brief.salaryFrom);
-  const to = brief.salaryTo == null ? null : Number(brief.salaryTo);
-  if (from === null && to === null) return "—";
-
-  const suffix = brief.salaryGross ? "gross" : "на руки";
-  if (from !== null && to !== null) {
-    return `${formatNumber(from)} – ${formatNumber(to)} ₽ ${suffix}`;
-  }
-  return `${formatNumber((from ?? to) as number)} ₽ ${suffix}`;
 }

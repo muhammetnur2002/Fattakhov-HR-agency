@@ -3,9 +3,10 @@ import type * as React from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
 import { formatDate } from "@/lib/format-date";
 import {
   FUNNEL_STAGES,
@@ -36,6 +37,7 @@ const SOFT_LABELS: Partial<Record<FunnelStage, string>> = {
  */
 export default async function StudentsFunnelPage() {
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
   authorize(actor, "client.view");
 
   const [clients, rows] = await Promise.all([
@@ -122,7 +124,7 @@ export default async function StudentsFunnelPage() {
                   <h2 className="text-sm font-semibold [overflow-wrap:anywhere]">
                     {SOFT_LABELS[stage] ?? FUNNEL_STAGE_LABELS[stage]}
                   </h2>
-                  <Badge variant={stage === "READY" && items.length > 0 ? "default" : "secondary"}>{items.length}</Badge>
+                  <StatusBadge tone={stage === "READY" && items.length > 0 ? "warning" : "neutral"}>{items.length}</StatusBadge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{FUNNEL_STAGE_HINTS[stage]}</p>
               </div>
@@ -156,7 +158,7 @@ export default async function StudentsFunnelPage() {
                             <FunnelStat label="Принято">{activity.hired}</FunnelStat>
                           </dl>
                           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span>Движение: {formatDate(lastMove(activity))}</span>
+                            <span>Движение: {formatDate(lastMove(activity), timeZone)}</span>
                             {stage !== "CONTRACT" && isCold(activity) && <Badge variant="outline">остыл</Badge>}
                           </div>
                         </CardContent>

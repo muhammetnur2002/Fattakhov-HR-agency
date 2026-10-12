@@ -248,7 +248,7 @@ export function PushDevice({
                     aria-hidden
                     className={
                       device.state === "sent"
-                        ? "mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"
+                        ? "mt-1.5 size-2 shrink-0 rounded-full bg-success"
                         : "mt-1.5 size-2 shrink-0 rounded-full bg-destructive"
                     }
                   />

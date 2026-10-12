@@ -134,13 +134,13 @@ describe("оффер", () => {
     expect(salary).toHaveFocus();
   });
 
-  it("успех: «Оффер сохранён» — status с галочкой, значения остаются (это сохранённое)", async () => {
+  it("успех: «Оффер сохранён» — плашка с галочкой, значения остаются (это сохранённое)", async () => {
     mocks.recordOfferAction.mockResolvedValue({ ok: "Оффер сохранён" });
     const user = userEvent.setup();
     render(<OfferForm applicationId="a1" salary={200000} position="Менеджер" startDate={null} />);
     await user.click(screen.getByRole("button", { name: "Сохранить оффер" }));
     const status = await screen.findByText("Оффер сохранён");
-    expect(status.closest("[role=status]")?.querySelector("svg")).not.toBeNull();
+    expect(status.closest("[data-form-message=ok]")?.querySelector("svg")).not.toBeNull();
     expect(screen.getByLabelText("Должность в оффере")).toHaveValue("Менеджер");
   });
 });
@@ -153,10 +153,10 @@ describe("приглашение коллеги", () => {
     }));
     const user = userEvent.setup();
     render(<InviteForm clientId="c1" action={action} />);
-    await user.type(screen.getByLabelText("Email"), "kollega@starfish");
+    await user.type(screen.getByLabelText("Почта"), "kollega@starfish");
     await user.type(screen.getByLabelText("Должность"), "Руководитель отдела");
     await user.click(screen.getByRole("button", { name: "Пригласить" }));
-    const email = await screen.findByLabelText("Email");
+    const email = await screen.findByLabelText("Почта");
     await waitFor(() => expect(email).toHaveAttribute("aria-invalid", "true"));
     expect(email).toHaveAccessibleDescription("Проверьте адрес почты");
     expect(email).toHaveFocus();

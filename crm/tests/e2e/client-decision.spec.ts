@@ -35,8 +35,9 @@ test.describe("решение клиента по кандидату", () => {
 
       // Панель решения не пропадает для INTERVIEW (canDecide && !closed
       // остаётся true — в отличие от отказа), сообщение можно ловить прямо
+      // Плашка, а не текст страницы: тот же текст объявляется читалке через постоянную область #live-announcer
       await expect(
-        page.getByText("Рекрутер подберёт время и пришлёт слоты"),
+        page.locator("[data-form-message=ok]").getByText("Рекрутер подберёт время и пришлёт слоты"),
       ).toBeVisible();
 
       const updated = await getApplicationStage({ applicationId: ids.applicationId });

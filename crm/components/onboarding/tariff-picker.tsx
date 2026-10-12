@@ -10,9 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SelectionCheck } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatMoney } from "@/lib/format-money";
 import {
   feePerHire,
-  formatMoney,
   monthlyCost,
   prepaymentAmount,
   subscriptionBreakEven,

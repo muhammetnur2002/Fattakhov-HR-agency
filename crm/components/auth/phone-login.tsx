@@ -13,6 +13,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { normalizeRuPhone, PhoneFormatError } from "@/lib/auth/phone";
+import { noScriptForm } from "@/lib/forms/no-script";
 import { cn } from "@/lib/utils";
 
 /**
@@ -140,6 +141,7 @@ export function PhoneLogin({
           <motion.form
             key="phone"
             {...motionProps}
+            {...noScriptForm}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -185,6 +187,7 @@ export function PhoneLogin({
           <motion.form
             key="sms"
             {...motionProps}
+            {...noScriptForm}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -243,6 +246,7 @@ export function PhoneLogin({
           <motion.form
             key="totp"
             {...motionProps}
+            {...noScriptForm}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();

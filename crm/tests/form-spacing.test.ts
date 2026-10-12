@@ -84,7 +84,7 @@ describe("шаг между полями формы", () => {
 
 // ── Вложенные контейнеры ────────────────────────────────────────────────────────────────────
 
-const CONTROL_NAMES = /^(Input|Textarea|Select|SelectTrigger|textarea|select|FileInput|DatePicker)$/;
+const CONTROL_NAMES = /^(Input|Textarea|Select|SelectTrigger|NativeSelect|textarea|select|FileInput|DatePicker)$/;
 /** Поле ввода: текст, список, файл. Скрытые поля, галочки и кнопки полем не считаются. */
 const isControl = (n: JsxNode) =>
   CONTROL_NAMES.test(n.name) || (n.name === "input" && !/type=["{](hidden|checkbox|radio|submit)/.test(n.text));

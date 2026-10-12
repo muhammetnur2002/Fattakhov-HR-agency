@@ -3,6 +3,7 @@
 import { animate, useMotionValue, useReducedMotion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+import { formatNumber } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 /** Layout-эффект, безопасный на сервере: там измерять нечего. */
@@ -29,10 +30,9 @@ const useIsomorphicLayoutEffect =
  * превращалось в «250000». На мелких значениях это незаметно,
  * а на главном числе первого экрана нечитаемо ровно там, где читать
  * обязаны. Формат один и тот же для разметки и для кадров анимации,
- * иначе число дёргается по ширине на последнем кадре.
+ * иначе число дёргается по ширине на последнем кадре. Запись — `formatNumber`
+ * из `lib/format-money.ts`, одна на весь продукт.
  */
-const format = new Intl.NumberFormat("ru-RU");
-
 export function CountUp({
   value,
   className,
@@ -51,7 +51,7 @@ export function CountUp({
     if (!node) return;
 
     if (reduced || value === 0) {
-      node.textContent = format.format(value);
+      node.textContent = formatNumber(value);
       return;
     }
 
@@ -62,7 +62,7 @@ export function CountUp({
       count.set(0);
       node.textContent = "0";
       unsubscribe = count.on("change", (current) => {
-        node.textContent = format.format(Math.round(current));
+        node.textContent = formatNumber(Math.round(current));
       });
       // Замедление к концу: последние цифры должны успевать читаться
       controls = animate(count, value, { duration, ease: [0.16, 1, 0.3, 1] });
@@ -87,7 +87,7 @@ export function CountUp({
 
   return (
     <span ref={ref} className={cn("tabular-nums", className)}>
-      {format.format(value)}
+      {formatNumber(value)}
     </span>
   );
 }

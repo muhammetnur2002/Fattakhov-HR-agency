@@ -15,11 +15,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { ROLE_LABELS } from "@/lib/labels";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDateTime } from "@/lib/format-date";
 
 export type ThreadComment = {
   id: string;
@@ -232,7 +235,7 @@ export function CommentThread({
             </div>
           )}
 
-          <Textarea
+          <AutoGrowTextarea
             name="body"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -302,11 +305,26 @@ function CommentItem({
   onEdit: (commentId: string, body: string) => Promise<CommentState>;
   onDelete: (commentId: string) => Promise<CommentState>;
 }) {
+  const timeZone = useTimeZone();
   const internal = comment.visibility === "INTERNAL";
   const own = comment.authorId === currentUserId;
   const canDelete = own || canDeleteAny;
 
   const [mode, setMode] = useState<"view" | "editing" | "confirmDelete">("view");
+  // «Изменить» и «Удалить» пропадают, пока на их месте поле правки или вопрос: фокус — в поле или на
+  // «Отмену», а после закрытия — обратно на ту кнопку, с которой начали
+  const {
+    triggerRef: editTrigger,
+    focusRef: editFocus,
+    questionId: editQuestionId,
+    groupProps: editGroup,
+  } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(mode === "editing");
+  const {
+    triggerRef: deleteTrigger,
+    focusRef: deleteFocus,
+    questionId: deleteQuestionId,
+    groupProps: deleteGroup,
+  } = useConfirmFocus(mode === "confirmDelete");
   const [draft, setDraft] = useState(comment.body);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -364,7 +382,7 @@ function CommentItem({
           </span>
         )}
         <span className="text-xs text-muted-foreground">
-          {formatDateTime(comment.createdAt)}
+          {formatDateTime(comment.createdAt, timeZone)}
           {comment.editedAt ? " · изменено" : ""}
         </span>
 
@@ -391,6 +409,7 @@ function CommentItem({
               в lib/services/comments.ts) */}
           {own && mode === "view" && (
             <button
+              ref={editTrigger}
               type="button"
               onClick={() => {
                 setDraft(comment.body);
@@ -407,6 +426,7 @@ function CommentItem({
               в ней ошибся */}
           {canDelete && mode === "view" && (
             <button
+              ref={deleteTrigger}
               type="button"
               onClick={() => {
                 setError(null);
@@ -421,12 +441,16 @@ function CommentItem({
       </div>
 
       {mode === "editing" ? (
-        <div className="mt-2 space-y-2">
-          <Textarea
+        <div {...editGroup} className="mt-2 space-y-2">
+          {/* Вопроса на экране нет — поле само просит правку; для читалки блок назван */}
+          <span id={editQuestionId} className="sr-only">
+            Изменить комментарий
+          </span>
+          <AutoGrowTextarea
+            ref={editFocus}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
-            autoFocus
           />
           <div className="flex gap-2">
             <Button
@@ -453,10 +477,10 @@ function CommentItem({
           <p className="whitespace-pre-line text-sm text-muted-foreground line-through">
             {comment.body}
           </p>
-          <div className="flex items-center gap-2 text-sm">
+          <div {...deleteGroup} className="flex items-center gap-2 text-sm">
             {/* Удаление чужого — не рядовое действие, и спрашивать
                 о нём той же фразой значит дать промахнуться мимо */}
-            <span>
+            <span id={deleteQuestionId}>
               {own
                 ? "Удалить комментарий?"
                 : `Удалить комментарий — ${comment.author?.fullName ?? "другой автор"}?`}
@@ -471,6 +495,8 @@ function CommentItem({
               {pending ? "Удаляем…" : "Да, удалить"}
             </Button>
             <Button
+              ref={deleteFocus}
+              aria-describedby={deleteQuestionId}
               type="button"
               size="sm"
               variant="ghost"
@@ -495,13 +521,4 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
-}
-
-function formatDateTime(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(d));
 }

@@ -12,6 +12,7 @@ import {
 } from "@/app/(agency)/a/clients/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { oversizeMessage } from "@/lib/upload-limits";
 
@@ -81,22 +82,23 @@ export function TerminateAgreementButton({
 }
 
 /** Сам input: useFormStatus видит статус только формы-родителя. */
-function FileInput({ formRef }: { formRef: React.RefObject<HTMLFormElement | null> }) {
+function AutoUploadInput({ formRef }: { formRef: React.RefObject<HTMLFormElement | null> }) {
   const { pending } = useFormStatus();
   return (
-    <input
-      type="file"
+    <FileInput
+      size="sm"
       name="file"
+      aria-label="Файл скана договора"
       accept=".pdf,.doc,.docx,.rtf,.odt,image/jpeg,image/png"
       disabled={pending}
       onChange={(event) => {
         // Больше предела запрос не дойдёт до сервера — говорим сразу, а не страницей с ошибкой
         const message = oversizeMessage(event.target.files?.[0]);
         event.target.setCustomValidity(message);
+        event.target.ariaInvalid = message ? "true" : null;
         if (message) event.target.reportValidity();
         else formRef.current?.requestSubmit();
       }}
-      className="text-xs file:mr-2 file:rounded-md file:border file:border-field file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
     />
   );
 }
@@ -133,7 +135,7 @@ export function AgreementFileUpload({
         <span className="text-xs text-muted-foreground">
           {fileUrl ? "Заменить скан" : "Прикрепить скан подписанного договора"}
         </span>
-        <FileInput formRef={formRef} />
+        <AutoUploadInput formRef={formRef} />
         <FormMessage compact error={state.error} ok={state.ok} />
       </form>
     </div>

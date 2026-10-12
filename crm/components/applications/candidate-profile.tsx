@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 import { withEmailOff } from "@/components/shared/email-off";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { buildSignedUrl } from "@/lib/storage/signing";
 
 export type ProfileCandidate = {
@@ -71,7 +71,7 @@ export function CandidateProfile({
         </Row>
         <Row label="Зарплатное ожидание">
           {candidate.salaryExpectation != null
-            ? `${formatNumber(Number(candidate.salaryExpectation))} ₽`
+            ? formatMoney(Number(candidate.salaryExpectation))
             : "—"}
         </Row>
 

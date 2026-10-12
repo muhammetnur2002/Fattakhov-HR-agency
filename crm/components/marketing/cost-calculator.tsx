@@ -18,7 +18,7 @@ import {
   inhouseMonthlyCost,
   savingsPercent,
 } from "@/lib/marketing/inhouse-cost";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney, formatNumber } from "@/lib/format-money";
 import { cn, NO_NUMBER_SPINNER } from "@/lib/utils";
 
 /** Пустое или битое поле — ноль, а не NaN: иначе расчёт превращается в «NaN ₽». */
@@ -175,7 +175,7 @@ export function CostCalculator() {
             Своя команда
           </div>
           <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-            {filled ? `${formatNumber(inhouse.total)} ₽` : "—"}
+            {filled ? formatMoney(inhouse.total) : "—"}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
             {filled
@@ -193,7 +193,7 @@ export function CostCalculator() {
             Подписка, тариф «{tariff.name}»
           </div>
           <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-            {formatNumber(tariff.price)} ₽
+            {formatMoney(tariff.price)}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
             в месяц, {tariff.slots} в работе одновременно
@@ -212,7 +212,7 @@ export function CostCalculator() {
           */}
           <div className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
             {filled && monthlyDiff > 0
-              ? `${formatNumber(monthlyDiff * 12)} ₽`
+              ? formatMoney(monthlyDiff * 12)
               : "—"}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">

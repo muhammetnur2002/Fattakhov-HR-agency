@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
-import type { FormState as FormStateBase } from "@/lib/form-state";
+import { serviceFailure, type FormState as FormStateBase } from "@/lib/form-state";
 import {
   authorize,
   authorizeOrThrow,
@@ -98,10 +98,8 @@ export async function inviteTeammateAction(
     if (error instanceof AccessDeniedError) {
       return { error: "Недостаточно прав" };
     }
-    // Адрес занят или уже приглашён — у поля почты, а не общей строкой
-    if (error instanceof InviteError) {
-      return { fields: { email: error.message } };
-    }
+    // Адрес занят или уже приглашён сервис помечает сам (`field: "email"`) — это у поля почты, остальное общей строкой
+    if (error instanceof InviteError) return serviceFailure(error);
     throw error;
   }
 

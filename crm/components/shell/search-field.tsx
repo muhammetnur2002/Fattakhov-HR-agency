@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useListNavigation } from "./list-pending";
 import { ListSearchInput } from "./list-toolbar";
@@ -16,6 +16,12 @@ import { ListSearchInput } from "./list-toolbar";
  * Вид и ширина — у `ListSearchInput`, а ставят поле внутрь `ListToolbar`.
  * Пока сервер собирает новую выборку, на месте лупы крутится индикатор, а
  * список помечен `aria-busy` (`list-pending.tsx`).
+ *
+ * В адрес уходит только то, чего в нём ещё нет: при показе страницы поле равно
+ * `?q=`, и переход на тот же адрес показал бы ожидание и объявил «Список обновлён»
+ * без единого действия человека (замечание проверки к PR #119, 12.10.2026). Так же
+ * не уходит возврат к значению, которое уже отправлено, — и сохраняется `page`,
+ * пока поиск не менялся.
  */
 export function SearchField({
   paramName = "q",
@@ -28,9 +34,13 @@ export function SearchField({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(searchParams.get(paramName) ?? "");
+  // Что сейчас в адресе или уже ушло туда: с этим значением переходить некуда
+  const sent = useRef(value);
 
   useEffect(() => {
+    if (value === sent.current) return;
     const timer = setTimeout(() => {
+      sent.current = value;
       const params = new URLSearchParams(searchParams);
       if (value) params.set(paramName, value);
       else params.delete(paramName);

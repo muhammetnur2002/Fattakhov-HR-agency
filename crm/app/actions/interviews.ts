@@ -17,6 +17,7 @@ import {
   transitionInterview,
 } from "@/lib/services/interviews";
 import { appOrigin } from "@/lib/urls";
+import { formatDateTime } from "@/lib/format-date";
 
 export type InterviewState = {
   error?: string;
@@ -205,14 +206,4 @@ export async function submitFeedbackAction(
   revalidatePath("/a/calendar");
   revalidatePath("/calendar");
   return { ok: "Спасибо, записали" };
-}
-
-function formatDateTime(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(date);
 }

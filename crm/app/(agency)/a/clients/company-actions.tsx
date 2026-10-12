@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Panel } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 type Mode = "closed" | "create" | "existing";
 
@@ -50,6 +51,15 @@ export function CompanyActions({
   prefill: ClientFormValues;
 }) {
   const [mode, setMode] = useState<Mode>("closed");
+  // Кнопки режимов заменяются формой: после «Отмены» фокус возвращается на ту, что открывала. В форме
+  // «Создать клиента» фокус при открытии ставит поле «Название» (autoFocus), в «Привязать» — выбор клиента
+  const { triggerRef: createTrigger, questionId: createQuestionId, groupProps: createGroup } =
+    useConfirmFocus(mode === "create");
+  const {
+    triggerRef: existingTrigger,
+    focusRef: existingFocus,
+    questionId: existingQuestionId,
+  } = useConfirmFocus(mode === "existing");
   const [clientId, setClientId] = useState("");
   const [linkState, linkFormAction] = useActionState<FormState, FormData>(linkAction, {});
 
@@ -61,10 +71,10 @@ export function CompanyActions({
   if (mode === "closed") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => setMode("create")}>
+        <Button ref={createTrigger} size="sm" onClick={() => setMode("create")}>
           Создать клиента
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setMode("existing")}>
+        <Button ref={existingTrigger} size="sm" variant="outline" onClick={() => setMode("existing")}>
           Привязать к существующему
         </Button>
       </div>
@@ -73,7 +83,10 @@ export function CompanyActions({
 
   if (mode === "create") {
     return (
-      <Panel>
+      <Panel {...createGroup}>
+        <span id={createQuestionId} className="sr-only">
+          Новый клиент из заявки компании
+        </span>
         <ClientForm
           action={createClientFromLinkRequestAction}
           employerId={employerId}
@@ -89,11 +102,14 @@ export function CompanyActions({
   }
 
   return (
-    <form action={linkFormAction} className="flex flex-wrap items-center gap-2">
+    <form action={linkFormAction} aria-labelledby={existingQuestionId} className="flex flex-wrap items-center gap-2">
+      <span id={existingQuestionId} className="sr-only">
+        Привязать компанию к существующему клиенту
+      </span>
       <input type="hidden" name="employerId" value={employerId} />
       <input type="hidden" name="clientId" value={clientId} />
       <Select value={clientId} onValueChange={setClientId}>
-        <SelectTrigger className="w-56">
+        <SelectTrigger ref={existingFocus} className="w-56">
           <SelectValue placeholder="Выберите клиента" />
         </SelectTrigger>
         <SelectContent>

@@ -3,7 +3,7 @@ import { CalendarClock, MapPin, Video } from "lucide-react";
 
 import { CalendarRowActions } from "@/components/interviews/calendar-row-actions";
 import { RequestRescheduleButton } from "@/components/interviews/request-reschedule-button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type {
@@ -12,8 +12,10 @@ import type {
   InterviewType,
 } from "@/lib/generated/prisma/enums";
 import { INTERVIEW_STATUS_LABELS, INTERVIEW_TYPE_LABELS } from "@/lib/labels";
+import { INTERVIEW_STATUS_TONE } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatInZone } from "@/lib/format-date";
 
 export type CalendarInterview = {
   id: string;
@@ -90,7 +92,7 @@ export function CalendarView({
 
   const byDay = new Map<string, CalendarInterview[]>();
   for (const i of scheduled) {
-    const key = formatDay(i.scheduledAt!, i.timezone);
+    const key = formatInZone(i.scheduledAt!, "weekdayDayMonth", i.timezone);
     byDay.set(key, [...(byDay.get(key) ?? []), i]);
   }
 
@@ -206,7 +208,7 @@ function InterviewRow({
           <div className="flex gap-3">
             <div className="w-14 shrink-0 text-sm font-medium tabular-nums">
               {interview.scheduledAt
-                ? formatTime(interview.scheduledAt, interview.timezone)
+                ? formatInZone(interview.scheduledAt, "time", interview.timezone)
                 : "—"}
             </div>
 
@@ -224,9 +226,9 @@ function InterviewRow({
             </div>
           </div>
 
-          <Badge variant={needsSlots ? "destructive" : "secondary"} className="shrink-0">
+          <StatusBadge tone={INTERVIEW_STATUS_TONE[interview.status]} className="shrink-0">
             {INTERVIEW_STATUS_LABELS[interview.status]}
-          </Badge>
+          </StatusBadge>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -284,21 +286,4 @@ function InterviewRow({
       </CardContent>
     </Card>
   );
-}
-
-function formatDay(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone,
-  }).format(date);
-}
-
-function formatTime(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(date);
 }

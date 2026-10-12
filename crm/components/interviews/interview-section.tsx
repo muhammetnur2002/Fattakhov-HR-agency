@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarClock, Copy, Check, Video, MapPin } from "lucide-react";
-import { useState } from "react";
+import { CalendarClock, Video, MapPin } from "lucide-react";
+import { useRef, useState } from "react";
 
 import {
   proposeSlotsAction,
@@ -11,7 +11,7 @@ import {
 } from "@/app/actions/interviews";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,11 @@ import type {
   InterviewStatus,
 } from "@/lib/generated/prisma/enums";
 import { INTERVIEW_STATUS_LABELS, INTERVIEW_TYPE_LABELS } from "@/lib/labels";
+import { INTERVIEW_STATUS_TONE } from "@/lib/status-tones";
 import { Panel, panelClass } from "@/components/ui/panel";
+import { formatInZone } from "@/lib/format-date";
+import { CopyButton } from "@/components/shared/copy-button";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 export type InterviewView = {
   id: string;
@@ -116,9 +120,12 @@ function InterviewCard({
 }) {
   const [state, setState] = useState<InterviewState>({});
   const [proposing, setProposing] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const scheduleUrlRef = useRef<HTMLElement>(null);
   const [rating, setRating] = useState("");
   const [editingFeedback, setEditingFeedback] = useState(false);
+  // «Изменить оценку» пропадает, пока на её месте форма: фокус — на выбор оценки, после «Отмены» или
+  // сохранения — обратно на кнопку. Форме в этом режиме название даёт её вопрос «Как прошло?»
+  const { triggerRef, focusRef, questionId } = useConfirmFocus(editingFeedback);
 
   // Оценку спрашиваем только у встречи, которая уже прошла (так же, как в календаре):
   // у будущей такой вопрос выглядит как ошибка интерфейса. Закрытая встреча — всегда
@@ -153,14 +160,14 @@ function InterviewCard({
         <span className="text-sm font-medium">
           {INTERVIEW_TYPE_LABELS[interview.type]}
         </span>
-        <Badge variant={needsSlots ? "destructive" : "secondary"}>
+        <StatusBadge tone={INTERVIEW_STATUS_TONE[interview.status]}>
           {INTERVIEW_STATUS_LABELS[interview.status]}
-        </Badge>
+        </StatusBadge>
       </div>
 
       {interview.scheduledAt && (
         <div className="text-sm">
-          {formatFull(interview.scheduledAt, interview.timezone)}
+          {formatInZone(interview.scheduledAt, "weekdayShortDayMonthTime", interview.timezone)}
           <span className="text-muted-foreground">
             {" · "}
             {interview.durationMinutes} мин
@@ -206,6 +213,7 @@ function InterviewCard({
           {/* Нажали не ту оценку — исправить можно: она идёт в аналитику клиента */}
           {canGiveFeedback && !editingFeedback && (
             <Button
+              ref={triggerRef}
               type="button"
               variant="ghost"
               size="sm"
@@ -226,21 +234,18 @@ function InterviewCard({
         <Panel tone="muted">
           <div className="text-sm font-medium">Ссылка для кандидата</div>
           <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs">
+            <code
+              ref={scheduleUrlRef}
+              className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 text-xs"
+            >
               {state.scheduleUrl}
             </code>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={async () => {
-                await navigator.clipboard.writeText(state.scheduleUrl!);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </Button>
+            <CopyButton
+              text={state.scheduleUrl}
+              targetRef={scheduleUrlRef}
+              iconOnly
+              ariaLabel="Скопировать ссылку для кандидата"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Действует 7 дней. Кандидат откроет её с телефона и выберет время.
@@ -249,7 +254,9 @@ function InterviewCard({
       )}
 
       {state.conflicts && state.conflicts.length > 0 && (
-        <Alert>
+        // Предупреждение, а не обычная плашка: треугольник. Появляется после отправки формы встречи, поэтому
+        // role="alert" (вставленный с текстом status объявляется не везде)
+        <Alert variant="warning" role="alert">
           <AlertDescription>
             <div className="font-medium">Возможные накладки</div>
             {state.conflicts.map((c) => (
@@ -309,13 +316,19 @@ function InterviewCard({
 
       {/* Обратная связь: после встречи её ждут от того, кто на ней был */}
       {canGiveFeedback && (!interview.feedbackRating || editingFeedback) && (
-          <form action={handleFeedback} className="space-y-2 border-t pt-3">
+          <form
+            action={handleFeedback}
+            aria-labelledby={editingFeedback ? questionId : undefined}
+            className="space-y-2 border-t pt-3"
+          >
             <input type="hidden" name="interviewId" value={interview.id} />
             <input type="hidden" name="applicationId" value={applicationId} />
-            <Label htmlFor={`rating-${interview.id}`}>Как прошло?</Label>
+            <Label id={questionId} htmlFor={`rating-${interview.id}`}>
+              Как прошло?
+            </Label>
             <div className="flex flex-wrap items-center gap-2">
               <Select name="rating" value={rating} onValueChange={setRating}>
-                <SelectTrigger id={`rating-${interview.id}`}>
+                <SelectTrigger ref={focusRef} id={`rating-${interview.id}`}>
                   <SelectValue placeholder="Оценка" />
                 </SelectTrigger>
                 <SelectContent>
@@ -494,15 +507,4 @@ function SlotForm({
       <Submit label="Сохранить и получить ссылку" size="lg" />
     </form>
   );
-}
-
-function formatFull(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "short",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
 }

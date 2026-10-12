@@ -33,6 +33,7 @@ vi.mock("next/link", () => ({
 import { LoadMore } from "@/components/shell/load-more";
 import {
   LIST_UPDATED_MESSAGE,
+  PAGE_UPDATED_MESSAGE,
   ListPendingProvider,
   ListRegion,
   useListBusy,
@@ -101,14 +102,6 @@ describe("useListNavigation и поиск", () => {
     vi.useFakeTimers();
     newSlow();
     renderInShell(<SearchField placeholder="Название…" />);
-    // Дребезг первого монтирования (поле пустое) уходит сразу — отдельно от того, что набрали
-    await act(async () => {
-      vi.advanceTimersByTime(300);
-    });
-    slow!.resolve();
-    await act(async () => {});
-    nav.replace.mockClear();
-    newSlow();
 
     fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "Тов" } });
     expect(document.querySelector('[data-slot="list-search-pending"]')).toBeNull();
@@ -116,6 +109,7 @@ describe("useListNavigation и поиск", () => {
     await act(async () => {
       vi.advanceTimersByTime(300);
     });
+    expect(nav.replace).toHaveBeenCalledTimes(1);
     expect(nav.replace).toHaveBeenCalledWith("/a/vacancies?q=%D0%A2%D0%BE%D0%B2", { scroll: false });
     expect(document.querySelector('[data-slot="list-search-pending"]')).not.toBeNull();
     expect(region().getAttribute("aria-busy")).toBe("true");
@@ -125,6 +119,7 @@ describe("useListNavigation и поиск", () => {
     vi.useFakeTimers();
     newSlow();
     renderInShell(<SearchField placeholder="Название…" />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "Тов" } });
     await act(async () => {
       vi.advanceTimersByTime(300);
     });
@@ -164,6 +159,137 @@ describe("useListNavigation и поиск", () => {
     });
     expect(live().textContent).toBe("");
     expect(region().hasAttribute("aria-busy")).toBe(false);
+  });
+});
+
+/**
+ * Замечание независимой проверки к PR #119: таймер поиска срабатывал и при показе страницы и
+ * уходил на тот же адрес. С ожиданием в `startTransition` это стало видно: на каждом заходе в
+ * список через 300 мс лупа сменялась спиннером, список тускнел, а читалке говорили «Список
+ * обновлён» без единого действия человека.
+ */
+describe("поиск при показе страницы", () => {
+  const box = () => screen.getByRole("textbox", { name: "Название" });
+
+  async function settle(ms = 5000) {
+    await act(async () => {
+      vi.advanceTimersByTime(ms);
+    });
+  }
+
+  function expectQuiet() {
+    expect(nav.replace).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-slot="list-search-pending"]')).toBeNull();
+    expect(region().hasAttribute("aria-busy")).toBe(false);
+    expect(live().textContent).toBe("");
+  }
+
+  it("пустой адрес и пустое поле: переход не уходит, ожидания и объявления нет", async () => {
+    vi.useFakeTimers();
+    newSlow();
+    renderInShell(<SearchField placeholder="Название…" />);
+    await settle();
+    expectQuiet();
+  });
+
+  it("поле равно адресу (?q=Тов): переход не уходит", async () => {
+    vi.useFakeTimers();
+    nav.search = "q=%D0%A2%D0%BE%D0%B2";
+    newSlow();
+    renderInShell(<SearchField placeholder="Название…" />);
+    expect((box() as HTMLInputElement).value).toBe("Тов");
+    await settle();
+    expectQuiet();
+  });
+
+  it("страница ?page=3 при показе остаётся на месте: сбрасывать её нужно только новым поиском", async () => {
+    vi.useFakeTimers();
+    nav.search = "q=%D0%A2%D0%BE%D0%B2&page=3";
+    newSlow();
+    renderInShell(<SearchField placeholder="Название…" />);
+    await settle();
+    expectQuiet();
+  });
+
+  it("набрали и вернули прежнее значение до паузы: переходить не за чем", async () => {
+    vi.useFakeTimers();
+    newSlow();
+    renderInShell(<SearchField placeholder="Название…" />);
+    fireEvent.change(box(), { target: { value: "Т" } });
+    await settle(200);
+    fireEvent.change(box(), { target: { value: "" } });
+    await settle();
+    expectQuiet();
+  });
+
+  it("новое значение уходит один раз и с первой страницы; возврат к исходному после этого — тоже уходит", async () => {
+    vi.useFakeTimers();
+    nav.search = "q=%D0%A2%D0%BE%D0%B2&page=3";
+    newSlow();
+    renderInShell(<SearchField placeholder="Название…" />);
+
+    fireEvent.change(box(), { target: { value: "Склад" } });
+    await settle(300);
+    expect(nav.replace).toHaveBeenCalledTimes(1);
+    expect(nav.replace).toHaveBeenLastCalledWith("/a/vacancies?q=%D0%A1%D0%BA%D0%BB%D0%B0%D0%B4", { scroll: false });
+
+    // Адрес ещё не успел обновиться (ответ не пришёл), а человек уже вернул прежнее слово
+    fireEvent.change(box(), { target: { value: "Тов" } });
+    await settle(300);
+    expect(nav.replace).toHaveBeenCalledTimes(2);
+    expect(nav.replace).toHaveBeenLastCalledWith("/a/vacancies?q=%D0%A2%D0%BE%D0%B2", { scroll: false });
+  });
+});
+
+describe("что объявляет читалке экрана", () => {
+  function Reporter({ busy }: { busy: boolean }) {
+    useListBusy(busy);
+    return null;
+  }
+
+  it("есть список на странице — «Список обновлён»", async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <ListPendingProvider>
+        <Reporter busy />
+        <ListRegion>
+          <p>список</p>
+        </ListRegion>
+      </ListPendingProvider>,
+    );
+    rerender(
+      <ListPendingProvider>
+        <Reporter busy={false} />
+        <ListRegion>
+          <p>список</p>
+        </ListRegion>
+      </ListPendingProvider>,
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(live().textContent).toBe(LIST_UPDATED_MESSAGE);
+  });
+
+  it("списка нет (чип «Период» на аналитике): «Страница обновлена», а не про список", async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <ListPendingProvider>
+        <Reporter busy />
+        <p>график</p>
+      </ListPendingProvider>,
+    );
+    rerender(
+      <ListPendingProvider>
+        <Reporter busy={false} />
+        <p>график</p>
+      </ListPendingProvider>,
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(live().textContent).toBe(PAGE_UPDATED_MESSAGE);
+    expect(live().textContent).not.toBe(LIST_UPDATED_MESSAGE);
   });
 });
 

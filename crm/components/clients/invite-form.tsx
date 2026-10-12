@@ -112,7 +112,7 @@ export function InviteForm({
           вылезали бы из ряда */}
       <div className="grid gap-x-4 gap-y-4 lg:gap-y-2 lg:grid-cols-[1fr_1fr_auto_auto] lg:grid-rows-[20px_2rem] lg:items-start lg:touch:grid-rows-[20px_2.75rem]">
         <div className="space-y-2 lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:space-y-0">
-          <Label htmlFor="invite-email">Email</Label>
+          <Label htmlFor="invite-email">Почта</Label>
           <Input
             name="email"
             type="email"

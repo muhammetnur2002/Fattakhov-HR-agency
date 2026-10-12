@@ -36,7 +36,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
 
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Почта</Label>
         <Input
           id="email"
           name="email"

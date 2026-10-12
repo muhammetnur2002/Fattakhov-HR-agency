@@ -7,6 +7,7 @@ import { UndoRejectButton } from "@/components/applications/undo-reject-button";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Card,
   CardContent,
@@ -15,12 +16,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { canDo } from "@/lib/access";
-import { requireClientActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireClientActor } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/format-date";
 import { prisma } from "@/lib/db/prisma";
 import {
   APPLICATION_OUTCOME_LABELS,
   REJECTION_REASON_LABELS,
 } from "@/lib/labels";
+import { APPLICATION_OUTCOME_TONE } from "@/lib/status-tones";
 import { getApplication } from "@/lib/services/applications";
 import { listApplicationComments } from "@/lib/services/comments";
 import { BackLink } from "@/components/ui/back-link";
@@ -44,6 +47,7 @@ export default async function ClientApplicationPage({
 }) {
   const { id } = await params;
   const actor = await requireClientActor();
+  const timeZone = await getUserTimeZone();
 
   // getApplication фильтрует по BR-3: непредставленный кандидат
   // не найдётся и превратится в 404
@@ -92,11 +96,11 @@ export default async function ClientApplicationPage({
           <PageTitle>
             {application.candidate.fullName}
           </PageTitle>
-          <Badge>{application.stage.name}</Badge>
+          <Badge variant="secondary">{application.stage.name}</Badge>
           {closed && (
-            <Badge variant="secondary">
+            <StatusBadge tone={APPLICATION_OUTCOME_TONE[application.outcome]}>
               {APPLICATION_OUTCOME_LABELS[application.outcome]}
-            </Badge>
+            </StatusBadge>
           )}
         </div>
       </div>
@@ -137,7 +141,7 @@ export default async function ClientApplicationPage({
         <Alert>
           <AlertDescription>
             Решение по кандидату внёс {onBehalfBy.fullName} со стороны
-            агентства {formatDateTime(application.clientDecisionAt)} — со
+            агентства {formatDateTime(application.clientDecisionAt, timeZone)} — со
             слов вашей команды. Если это ошибка, напишите в обсуждении ниже.
           </AlertDescription>
         </Alert>
@@ -199,13 +203,4 @@ export default async function ClientApplicationPage({
       </Card>
     </div>
   );
-}
-
-function formatDateTime(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }

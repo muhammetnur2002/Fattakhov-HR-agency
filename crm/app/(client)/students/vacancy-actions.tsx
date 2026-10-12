@@ -18,8 +18,18 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
   const [error, setError] = useState<string | null>(null);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const { triggerRef: closeTrigger, focusRef: closeFocus } = useConfirmFocus(closing);
-  const { triggerRef: deleteTrigger, focusRef: deleteFocus } = useConfirmFocus(confirmingDelete);
+  const {
+    triggerRef: closeTrigger,
+    focusRef: closeFocus,
+    questionId: closeQuestionId,
+    groupProps: closeGroup,
+  } = useConfirmFocus(closing);
+  const {
+    triggerRef: deleteTrigger,
+    focusRef: deleteFocus,
+    questionId: deleteQuestionId,
+    groupProps: deleteGroup,
+  } = useConfirmFocus(confirmingDelete);
 
   function run(action: "close" | "delete", keep?: boolean) {
     setError(null);
@@ -46,13 +56,15 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
         <CardContent className="space-y-3">
           <FormMessage error={error} />
           {confirmingDelete ? (
-            <div className="space-y-2">
-              <p className="text-sm">Удалить вакансию из списка? Это нельзя отменить.</p>
+            <div {...deleteGroup} className="space-y-2">
+              <p id={deleteQuestionId} className="text-sm">
+                Удалить вакансию из списка? Это нельзя отменить.
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" loading={pending} onClick={() => run("delete")}>
                   {pending ? "Удаляем…" : "Да, удалить"}
                 </Button>
-                <Button ref={deleteFocus} variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(false)}>
+                <Button ref={deleteFocus} aria-describedby={deleteQuestionId} variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(false)}>
                   Отмена
                 </Button>
               </div>
@@ -75,8 +87,8 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
       <CardContent className="space-y-3">
         <FormMessage error={error} />
         {closing ? (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
+          <div {...closeGroup} className="space-y-2">
+            <p id={closeQuestionId} className="text-sm text-muted-foreground">
               Закрыть вакансию? Студенты её не увидят, отклики сохранятся. Сохранить её в истории?
             </p>
             <div className="flex flex-wrap gap-2">
@@ -86,7 +98,7 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
               <Button variant="destructive" disabled={pending} onClick={() => run("close", false)}>
                 Не сохранять
               </Button>
-              <Button ref={closeFocus} variant="ghost" disabled={pending} onClick={() => setClosing(false)}>
+              <Button ref={closeFocus} aria-describedby={closeQuestionId} variant="ghost" disabled={pending} onClick={() => setClosing(false)}>
                 Отмена
               </Button>
             </div>

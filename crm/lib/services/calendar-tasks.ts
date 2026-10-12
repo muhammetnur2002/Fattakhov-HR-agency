@@ -3,6 +3,7 @@ import { toDateParam } from "@/lib/calendar/day-range";
 import { prisma } from "@/lib/db/prisma";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { notify } from "@/lib/notifications/notify";
+import { DEFAULT_TIME_ZONE, formatInZone } from "@/lib/format-date";
 
 /**
  * Задания в календаре агентства.
@@ -80,14 +81,7 @@ export function taskPermissions(
 
 /** Срок для текста уведомления: по Москве, как остальные тексты кабинета. */
 function whenText(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Moscow",
-  }).format(date);
+  return formatInZone(date, "weekdayDayMonthTime", DEFAULT_TIME_ZONE);
 }
 
 function taskLink(dueAt: Date): string {

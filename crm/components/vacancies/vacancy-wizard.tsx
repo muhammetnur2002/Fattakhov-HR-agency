@@ -17,9 +17,12 @@ import {
   URGENCY_LABELS,
   WORK_FORMAT_LABELS,
 } from "@/lib/labels";
+import { formatSalaryRange } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { BRIEF_MIN_CHARS } from "@/lib/validation/brief-limits";
 import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatTime } from "@/lib/format-date";
 
 export type WizardValues = Record<string, string>;
 
@@ -192,6 +195,7 @@ export function VacancyWizard({
     return merged;
   });
   const [vacancyId, setVacancyId] = useState(initialVacancyId);
+  const timeZone = useTimeZone();
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -431,7 +435,7 @@ export function VacancyWizard({
         ) : (
           <span className="text-xs text-muted-foreground">
             {savedAt
-              ? `Черновик сохранён в ${new Date(savedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+              ? `Черновик сохранён в ${formatTime(savedAt, timeZone)}`
               : "Черновик сохранится автоматически"}
           </span>
         )}
@@ -782,9 +786,7 @@ function Preview({
 }) {
   const manager = managers.find((m) => m.id === values.hiringManagerId);
   const salary =
-    values.salaryFrom || values.salaryTo
-      ? `${values.salaryFrom || "…"} – ${values.salaryTo || "…"} ₽ ${values.salaryGross === "true" ? "gross" : "на руки"}`
-      : "Не указана";
+    formatSalaryRange(values.salaryFrom, values.salaryTo, { gross: values.salaryGross === "true" }) ?? "Не указана";
 
   return (
     <div className="space-y-4">

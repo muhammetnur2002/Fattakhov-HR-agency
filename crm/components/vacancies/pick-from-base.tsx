@@ -16,8 +16,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { panelClass } from "@/components/ui/panel";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import type { PickerCandidate } from "@/lib/services/vacancy-picker";
 import { useReturnFocus, type ReturnFocus } from "@/lib/hooks/use-return-focus";
 
@@ -231,7 +232,7 @@ export function PickFromBase({
                   {[
                     c.currentPosition,
                     c.city,
-                    c.salaryExpectation != null ? `${formatNumber(c.salaryExpectation)} ₽` : null,
+                    c.salaryExpectation != null ? formatMoney(c.salaryExpectation) : null,
                   ]
                     .filter(Boolean)
                     .join(" · ") || "Профиль не заполнен"}
@@ -251,18 +252,13 @@ export function PickFromBase({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Посадить на этап</span>
-            <select
-              value={stageId}
-              onChange={(e) => setStageId(e.target.value)}
-              className="h-8 rounded-lg border border-field bg-background px-2 text-sm"
-              aria-label="Этап"
-            >
+            <NativeSelect value={stageId} onChange={(e) => setStageId(e.target.value)} aria-label="Этап">
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <Button
             type="button"

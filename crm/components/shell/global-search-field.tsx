@@ -52,12 +52,17 @@ export function GlobalSearchField({
   }
 
   return (
+    // Запрос в адресе — задуманный результат (`router.push` выше кладёт его туда же), поэтому без скриптов это
+    // обычный GET на страницу поиска, а не форма, что перезагружала бы страницу с пустым `?`
     <form
+      action={`${hrefBase}/search`}
+      method="get"
       onSubmit={onSubmit}
       className={cn("relative", placement === "header" ? HEADER_SEARCH_CLASS : LIST_SEARCH_CLASS)}
     >
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
+        name="q"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Поиск по кабинету…"

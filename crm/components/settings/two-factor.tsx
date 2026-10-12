@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 
 import {
   confirmTwoFactorAction,
@@ -13,12 +13,14 @@ import {
   startTwoFactorAction,
   type TwoFactorState,
 } from "@/app/actions/two-factor";
+import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { noScriptForm } from "@/lib/forms/no-script";
 import type { TwoFactorStatus } from "@/lib/services/two-factor";
 import { Panel, panelClass } from "@/components/ui/panel";
 
@@ -52,7 +54,7 @@ function SubmitButton({
  * сохранить, а не просто выводит списком.
  */
 export function RecoveryCodes({ codes }: { codes: string[] }) {
-  const [copied, setCopied] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
 
   return (
     <Panel tone="accent">
@@ -65,27 +67,16 @@ export function RecoveryCodes({ codes }: { codes: string[] }) {
         </p>
       </div>
 
-      <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 font-mono text-sm tabular-nums">
+      <ul ref={listRef} className="grid grid-cols-2 gap-x-6 gap-y-1.5 font-mono text-sm tabular-nums">
         {codes.map((code) => (
           <li key={code}>{code}</li>
         ))}
       </ul>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(codes.join("\n"));
-            setCopied(true);
-          } catch {
-            // Без доступа к буферу обмена коды остаются на экране — их можно переписать
-          }
-        }}
-      >
-        {copied ? "Скопировано" : "Скопировать все"}
-      </Button>
+      {/* Без буфера обмена кнопка скажет об этом и выделит коды: дальше их можно скопировать вручную */}
+      <div className="flex flex-wrap items-center gap-2">
+        <CopyButton text={codes.join("\n")} targetRef={listRef} label="Скопировать все" />
+      </div>
     </Panel>
   );
 }
@@ -130,6 +121,7 @@ export function StartSetup({
 
   return (
     <form
+      {...noScriptForm}
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();

@@ -216,3 +216,108 @@ test.describe("фокус после окна", () => {
     await expect(opener).toBeFocused();
   });
 });
+
+/**
+ * Замечание независимой проверки к PR #119: таймер поиска и фильтров срабатывал при показе страницы и уходил на
+ * тот же адрес; с ожиданием в `startTransition` это стало видно на каждом заходе в список — спиннер вместо лупы,
+ * затемнение списка и «Список обновлён» без единого действия человека. Прежний сценарий «ожидание списка» этого
+ * не ловил: он ждал ответа с автоповтором, а «тишину в первые секунды» ничего не проверяло.
+ *
+ * Запросы страниц (RSC) замедлены на 1,5 с: пока переход жив, `aria-busy` видно больше секунды. Наблюдатель
+ * ставится до загрузки и запоминает всё, что мелькнуло, — а не смотрит в конце.
+ */
+test.describe("список при показе страницы: тишина", () => {
+  // Владелец: «Входящие» (client.manage) рекрутёру недоступны, а остальные списки открыты обоим
+  test.use({ storageState: "tests/e2e/.auth/owner.json", viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
+
+  for (const url of ["/a/vacancies", "/a/leads", "/a/clients", "/a/candidates"]) {
+    test(`${url}: за 3 секунды после загрузки ни ожидания, ни спиннера, ни объявления`, async ({ page }) => {
+      await page.addInitScript(() => {
+        const seen = { busy: 0, spinner: 0, live: "" };
+        (window as unknown as { __listSeen: typeof seen }).__listSeen = seen;
+        const look = () => {
+          if (document.querySelector('[data-slot="list-region"][aria-busy="true"]')) seen.busy++;
+          if (document.querySelector('[data-slot="list-search-pending"], [data-slot="select-pending"]')) seen.spinner++;
+          const said = document.querySelector('[data-slot="list-live"]')?.textContent;
+          if (said) seen.live = said;
+        };
+        new MutationObserver(look).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+        setInterval(look, 50);
+      });
+      await page.route(/_rsc=/, async (route) => {
+        await new Promise((r) => setTimeout(r, 1500));
+        await route.continue();
+      });
+
+      await page.goto(url);
+      await expect(page.locator('[data-slot="list-search"] input')).toBeVisible();
+      await page.waitForTimeout(3200);
+
+      const seen = await page.evaluate(() => (window as unknown as { __listSeen: { busy: number; spinner: number; live: string } }).__listSeen);
+      expect(seen, "при показе страницы список не должен ждать и объявлять").toEqual({ busy: 0, spinner: 0, live: "" });
+    });
+  }
+});
+
+for (const c of [
+  { name: "ноутбук", viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false },
+  { name: "телефон", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true },
+]) {
+  test.describe(`чип и кнопка одного роста: ${c.name}`, () => {
+    test.use({ viewport: c.viewport, hasTouch: c.hasTouch, isMobile: c.isMobile });
+
+    test("чип-фильтр той же высоты и кегля, что Button size=sm", async ({ page }) => {
+      await page.goto("/a/calendar");
+      const chip = page.locator('main [data-slot="filter-chip"]:not([data-tall])').first();
+      const sm = page.getByRole("button", { name: "+ Задание" });
+      await expect(chip).toBeVisible();
+      await expect(sm).toBeVisible();
+
+      const [chipBox, smBox] = [await chip.boundingBox(), await sm.boundingBox()];
+      expect(Math.abs(chipBox!.height - smBox!.height), `высота чипа ${chipBox!.height} и кнопки ${smBox!.height}`).toBeLessThan(0.6);
+      expect(await css(chip, "font-size")).toBe(await css(sm, "font-size"));
+    });
+  });
+}
+
+test.describe("недоступное поле", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
+
+  for (const [name, selector] of [
+    ["поле ввода текста (Textarea)", "main textarea"],
+    ["выпадающий список (SelectTrigger)", 'main [data-slot="select-trigger"]'],
+  ] as const) {
+    test(`${name}: доступное темнеет под курсором, недоступное — нет`, async ({ page }) => {
+      await page.goto("/a/candidates/cand_1");
+      const field = page.locator(selector).first();
+      await field.scrollIntoViewIfNeeded();
+
+      await page.mouse.move(2, 2);
+      await page.waitForTimeout(400);
+      const idle = await css(field, "border-top-color");
+      await field.hover();
+      await page.waitForTimeout(400);
+      expect(await css(field, "border-top-color"), "контроль: доступное поле отвечает на наведение").not.toBe(idle);
+
+      await page.mouse.move(2, 2);
+      await field.evaluate((el) => {
+        (el as HTMLTextAreaElement | HTMLButtonElement).disabled = true;
+      });
+      await page.waitForTimeout(400);
+      const disabledIdle = await css(field, "border-top-color");
+      await field.hover({ force: true });
+      await page.waitForTimeout(400);
+      expect(await css(field, "border-top-color"), "недоступное поле не отвечает на наведение").toBe(disabledIdle);
+
+      // Недоступное поле с ошибкой остаётся красным и под курсором: покой не перебивает красную рамку
+      await page.mouse.move(2, 2);
+      await field.evaluate((el) => el.setAttribute("aria-invalid", "true"));
+      await page.waitForTimeout(400);
+      const invalidIdle = await css(field, "border-top-color");
+      expect(invalidIdle, "с ошибкой рамка другого цвета, чем в покое").not.toBe(disabledIdle);
+      await field.hover({ force: true });
+      await page.waitForTimeout(400);
+      expect(await css(field, "border-top-color"), "красная рамка под курсором остаётся красной").toBe(invalidIdle);
+    });
+  }
+});

@@ -8,26 +8,22 @@ import {
 } from "@/app/(agency)/a/settings/session-actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { SESSION_CHOICES, type SessionLimits } from "@/lib/auth/session-policy";
 
-function Select({ name, label, value }: { name: string; label: string; value: number | null }) {
+function LimitSelect({ name, label, value }: { name: string; label: string; value: number | null }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <select
-        id={name}
-        name={name}
-        defaultValue={value === null ? "" : String(value)}
-        className="h-10 w-full rounded-md border border-field bg-background px-3 text-sm"
-      >
+      <NativeSelect id={name} name={name} defaultValue={value === null ? "" : String(value)} className="w-full">
         <option value="">По умолчанию</option>
         {SESSION_CHOICES.map((choice) => (
           <option key={choice.minutes} value={choice.minutes}>
             {choice.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     </div>
   );
 }
@@ -44,8 +40,8 @@ export function SessionLimitsCard({ limits }: { limits: SessionLimits }) {
   return (
     <form action={action} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select name="agency" label="Сотрудники агентства" value={limits.agency} />
-        <Select name="client" label="Клиенты" value={limits.client} />
+        <LimitSelect name="agency" label="Сотрудники агентства" value={limits.agency} />
+        <LimitSelect name="client" label="Клиенты" value={limits.client} />
       </div>
       <p className="text-xs text-muted-foreground">
         По умолчанию: сотрудники агентства 3 суток, клиенты 14 суток. Минимум 20 минут: после этого срока

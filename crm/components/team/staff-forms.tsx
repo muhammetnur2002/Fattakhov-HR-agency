@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Panel } from "@/components/ui/panel";
 import { useFormAction } from "@/lib/hooks/use-form-action";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 export type TeamFormState = AccountFormState;
 type TeamAction = AccountAction;
@@ -138,6 +139,12 @@ export function StaffAddPanel({
 }) {
   const [mode, setMode] = useState<"create" | "invite" | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // Кнопки заменяются бланком: в бланке фокус ставит первое поле (autoFocus), а после «Отмены» или
+  // успеха возвращается на ту кнопку, что открывала. Заголовок бланка — его название для читалки
+  const { triggerRef: createTrigger, questionId: createQuestionId, groupProps: createGroup } =
+    useConfirmFocus(mode === "create");
+  const { triggerRef: inviteTrigger, questionId: inviteQuestionId, groupProps: inviteGroup } =
+    useConfirmFocus(mode === "invite");
 
   // Успех закрывает бланк; сообщение остаётся над списком, чтобы было видно, что получилось
   const wrap =
@@ -159,10 +166,10 @@ export function StaffAddPanel({
   if (!mode) {
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={() => open("create")}>
+        <Button ref={createTrigger} type="button" onClick={() => open("create")}>
           Создать аккаунт сотрудника
         </Button>
-        <Button type="button" variant="outline" onClick={() => open("invite")}>
+        <Button ref={inviteTrigger} type="button" variant="outline" onClick={() => open("invite")}>
           Пригласить по почте
         </Button>
         <FormMessage compact ok={done} className="text-sm" />
@@ -172,10 +179,10 @@ export function StaffAddPanel({
 
   const invite = mode === "invite";
   return (
-    <Panel>
+    <Panel {...(invite ? inviteGroup : createGroup)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">
+          <h2 id={invite ? inviteQuestionId : createQuestionId} className="text-base font-semibold">
             {invite ? "Приглашение в команду" : "Новый сотрудник"}
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -223,6 +230,7 @@ export function StaffInviteForm({
           name="email"
           type="email"
           required
+          autoFocus
           placeholder="name@fattakhovhr.ru"
         />
       </Field>
@@ -266,6 +274,7 @@ export function StaffCreateForm({
             name="email"
             type="email"
             required
+            autoFocus
             placeholder="name@fattakhovhr.ru"
           />
         </Field>

@@ -30,7 +30,7 @@ export function DeleteVacancies({
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -58,13 +58,15 @@ export function DeleteVacancies({
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm">{question}</p>
+    <div {...groupProps} className="space-y-2">
+      <p id={questionId} className="text-sm">
+        {question}
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="destructive" loading={pending} onClick={run}>
           {pending ? "Удаляем…" : "Да, удалить"}
         </Button>
-        <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+        <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
           Отмена
         </Button>
       </div>

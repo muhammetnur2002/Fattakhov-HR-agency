@@ -15,7 +15,7 @@ import {
   effectiveGrants,
   STAFF_ROLES,
 } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
 import { ROLE_LABELS, STAFF_GRANT_LABELS } from "@/lib/labels";
 import { listStaff, listStaffInvitations } from "@/lib/services/staff";
 import { appOrigin } from "@/lib/urls";
@@ -44,6 +44,7 @@ export const metadata = { title: "Сотрудники" };
  */
 export default async function TeamPage() {
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
   authorize(actor, "staff.manage");
 
   const [{ members }, invitations] = await Promise.all([
@@ -92,7 +93,7 @@ export default async function TeamPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <StaffInvitations
+            <StaffInvitations timeZone={timeZone}
               invitations={invitations.map(({ token, ...invitation }) => ({
                 ...invitation,
                 url: token ? `${appOrigin()}/invite/${token}` : null,

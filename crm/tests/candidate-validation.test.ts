@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import { REJECTION_REASONS_BY_SIDE, REJECTION_SIDE_LABELS } from "@/lib/labels";
-import { rejectSchema } from "@/lib/validation/candidate";
+import { candidateProfileSchema, quickCandidateSchema, rejectSchema } from "@/lib/validation/candidate";
 
 /** Первое сообщение разбора — ровно то, что попадает человеку на экран. */
 function firstError(data: unknown): string | null {
@@ -102,5 +102,54 @@ describe("заполненный отказ", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+/*
+  Почта кандидата (замечание проверки PR #120, 12.10.2026). Формат проверял только `type="email"` браузера, а форма
+  на useFormAction выключает проверку браузера (`noValidate`): схема принимала «abc», и она сохранялась нижним регистром
+  как почта кандидата, попадала в поиск дубликатов (BR-7) и в уведомления.
+*/
+describe("почта кандидата: формат проверяет схема", () => {
+  const quick = (email: string | undefined) =>
+    quickCandidateSchema.safeParse({ fullName: "Иван Петров", phone: "+79991234567", email });
+  const profile = (email: string | undefined) => candidateProfileSchema.safeParse({ fullName: "Иван Петров", email });
+
+  describe.each([
+    ["быстрое добавление", quick],
+    ["профиль", profile],
+  ])("%s", (_name, parse) => {
+    it.each(["abc", "a@b", "a@b.", "@mail.ru", "a b@mail.ru", "иван@", "a@@mail.ru", "https://mail.ru"])(
+      "«%s» отклоняется с понятной фразой у поля почты",
+      (email) => {
+        const result = parse(email);
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        const issue = result.error.issues.find((i) => i.path[0] === "email");
+        expect(issue?.message).toBe("Проверьте адрес почты");
+      },
+    );
+
+    it.each(["ivan@mail.ru", "  ivan.petrov+hr@Mail.RU  ", "i@x.co", "иван@почта.рф"])("«%s» принимается", (email) => {
+      expect(parse(email).success).toBe(true);
+    });
+
+    it("пусто — не ошибка: почта необязательна", () => {
+      const result = parse("");
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.email).toBeUndefined();
+    });
+
+    it("пробелы по краям срезаются, письмо не теряется", () => {
+      const result = parse("  ivan@mail.ru ");
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.email).toBe("ivan@mail.ru");
+    });
+  });
+
+  it("быстрое добавление: неверная почта не маскируется контактом — ошибка на поле почты, а не «нужен контакт»", () => {
+    const result = quickCandidateSchema.safeParse({ fullName: "Иван Петров", email: "abc" });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.map((i) => i.path[0])).toContain("email");
   });
 });

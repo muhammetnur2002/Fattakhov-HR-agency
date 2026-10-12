@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { URGENCY_LABELS, VACANCY_STATUS_LABELS } from "@/lib/labels";
-import { formatNumber } from "@/lib/pricing";
+import { formatSalaryRange } from "@/lib/format-money";
+import { VACANCY_STATUS_TONE } from "@/lib/status-tones";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export type VacancyListItem = {
@@ -24,30 +25,18 @@ export type VacancyListItem = {
 };
 
 /**
- * Бейдж статуса: красным — только то, что ждёт реакции клиента
- * (агентство задало вопросы или прислало сроки на подтверждение).
+ * Бейдж статуса вакансии. Цвет — из общей карты `VACANCY_STATUS_TONE`: то, что ждёт реакции
+ * клиента (агентство задало вопросы или прислало сроки), жёлтое, а не красное — красный только
+ * для отказа, ошибки и просрочки. SUBMITTED — ход агентства, клиент ничего не должен.
  *
- * SUBMITTED раньше тоже был красным, хотя это ход агентства — клиент
- * ничего не должен делать, пока мы «изучаем» заявку. Красный бейдж
- * рядом со спокойным текстом статуса читался как сигнал тревоги там,
- * где его нет.
+ * `truncate`: в узкой колонке сетки (xl, minmax(0,1fr)) длинный статус вроде «Заявка отправлена»
+ * иначе срезался бы краем карточки — без многоточия и без полосы прокрутки.
  */
 export function VacancyStatusBadge({ status }: { status: VacancyStatus }) {
-  const variant =
-    status === "ACTIVE"
-      ? "default"
-      : status === "CLARIFYING" || status === "ESTIMATED"
-        ? "destructive"
-        : "secondary";
-
-  // max-w-full и truncate: в узкой колонке сетки (xl, minmax(0,1fr))
-  // длинный статус вроде «Заявка отправлена» иначе срезался бы краем
-  // карточки — без многоточия и без полосы прокрутки. Полный текст —
-  // в подсказке
   return (
-    <Badge variant={variant} className="max-w-full" title={VACANCY_STATUS_LABELS[status]}>
-      <span className="truncate">{VACANCY_STATUS_LABELS[status]}</span>
-    </Badge>
+    <StatusBadge tone={VACANCY_STATUS_TONE[status]} truncate>
+      {VACANCY_STATUS_LABELS[status]}
+    </StatusBadge>
   );
 }
 
@@ -106,7 +95,7 @@ export function VacancyList({
                     {location} · {URGENCY_LABELS[v.urgency]}
                   </div>
                   <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
-                    <span>{formatSalary(v.salaryFrom, v.salaryTo) ?? "—"}</span>
+                    <span>{formatSalaryRange(v.salaryFrom, v.salaryTo) ?? "—"}</span>
                     <span>{candidates}</span>
                   </div>
                   <div>
@@ -142,8 +131,8 @@ export function VacancyList({
                     </div>
                   </div>
 
-                  <div className="text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground">
-                    {formatSalary(v.salaryFrom, v.salaryTo) ?? "—"}
+                  <div className="text-right text-xs tabular-nums text-muted-foreground">
+                    {formatSalaryRange(v.salaryFrom, v.salaryTo) ?? "—"}
                   </div>
 
                   <div className="text-right text-sm whitespace-nowrap text-muted-foreground">
@@ -166,16 +155,4 @@ export function VacancyList({
       })}
     </div>
   );
-}
-
-function formatSalary(from: unknown, to: unknown): string | null {
-  const a = from === null || from === undefined ? null : Number(from);
-  const b = to === null || to === undefined ? null : Number(to);
-  if (a === null && b === null) return null;
-  // Фиксированный оклад пишут одинаковым числом в оба поля — «1 000 000–1 000 000»
-  // читается как ошибка ввода
-  if (a !== null && b !== null && a !== b) {
-    return `${formatNumber(a)}–${formatNumber(b)} ₽`;
-  }
-  return `${formatNumber((a ?? b) as number)} ₽`;
 }

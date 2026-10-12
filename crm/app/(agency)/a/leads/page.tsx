@@ -5,11 +5,13 @@ import { LeadStatusFilter } from "@/components/leads/lead-status-filter";
 import { ListRegion } from "@/components/shell/list-pending";
 import { ListToolbar } from "@/components/shell/list-toolbar";
 import { SearchField } from "@/components/shell/search-field";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/format-date";
 import { LEAD_STATUS_LABELS as STATUS_LABELS } from "@/lib/labels";
+import { LEAD_STATUS_TONE } from "@/lib/status-tones";
 import { listLeads } from "@/lib/services/leads";
 import type { LeadStatus } from "@/lib/generated/prisma/enums";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -32,6 +34,7 @@ export default async function LeadsPage({
 }) {
   const actor = await requireAgencyActor();
   authorize(actor, "client.manage", { clientId: null });
+  const timeZone = await getUserTimeZone();
 
   const { q, status } = await searchParams;
   const leads = await listLeads({ query: q, status });
@@ -93,9 +96,9 @@ export default async function LeadsPage({
                         {lead.company}
                       </span>
                     )}
-                    <Badge variant={lead.status === "NEW" ? "default" : "secondary"}>
+                    <StatusBadge tone={LEAD_STATUS_TONE[lead.status]}>
                       {STATUS_LABELS[lead.status]}
-                    </Badge>
+                    </StatusBadge>
                   </div>
 
                   <dl className="grid gap-x-8 gap-y-1.5 text-sm sm:grid-cols-2">
@@ -106,7 +109,7 @@ export default async function LeadsPage({
                     <LeadField label="Сайт" truncate>
                       {lead.website}
                     </LeadField>
-                    <LeadField label="Пришла">{formatWhen(lead.createdAt)}</LeadField>
+                    <LeadField label="Пришла">{formatDateTime(lead.createdAt, timeZone)}</LeadField>
                   </dl>
 
                   <Panel tone="muted" className="text-sm leading-relaxed">
@@ -158,13 +161,4 @@ function LeadField({
       </dd>
     </div>
   );
-}
-
-function formatWhen(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }

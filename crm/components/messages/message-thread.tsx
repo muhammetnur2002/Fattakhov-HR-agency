@@ -10,11 +10,13 @@ import {
 } from "@/app/actions/messages";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
 import { enterSendsMessage } from "@/lib/chat-keys";
 import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
+import { formatDayDivider, formatTime } from "@/lib/format-date";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
 
 export type ThreadMessage = {
   id: string;
@@ -55,7 +57,12 @@ export function MessageThread({
   /** Есть ли непрочитанное входящее — чтобы не дёргать сервер зря. */
   hasUnread: boolean;
 }) {
+  const timeZone = useTimeZone();
   const [state, setState] = useState<MessageState>({});
+  const now = new Date();
+  /** Сегодня / Вчера / короткая дата — разделитель дня в ленте сообщений. */
+  const dayLabel = (date: Date) => formatDayDivider(date, now, timeZone);
+  const timeOnly = (date: Date) => formatTime(date, timeZone);
   // Текст в состоянии, а не в самом поле: React 19 после любой отправки формы
   // через action очищает обычные поля, в том числе когда отправка не удалась,
   // а у управляемого поля прежний текст возвращается. Иначе сообщение, не
@@ -168,7 +175,7 @@ export function MessageThread({
       <form ref={formRef} action={handleSubmit} className="shrink-0 border-t p-3">
         <input type="hidden" name="recipientId" value={recipientId} />
         <div className="flex items-end gap-2">
-          <Textarea
+          <AutoGrowTextarea
             name="body"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -196,22 +203,8 @@ export function MessageThread({
   );
 }
 
-/** Сегодня / Вчера / короткая дата — разделитель дня в ленте сообщений. */
-function dayLabel(date: Date): string {
-  const now = new Date();
-  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((startOf(now) - startOf(date)) / 86_400_000);
-  if (days === 0) return "Сегодня";
-  if (days === 1) return "Вчера";
-  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
-}
-
 /** Один ли это «залп» сообщений: тот же автор и меньше пяти минут разрыва. */
 function isSameBurst(previous: ThreadMessage, current: ThreadMessage): boolean {
   if (previous.fromMe !== current.fromMe) return false;
   return current.createdAt.getTime() - previous.createdAt.getTime() < 5 * 60_000;
-}
-
-function timeOnly(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(date);
 }

@@ -6,17 +6,19 @@ import { CandidateStatusBadge } from "@/components/candidates/candidate-status";
 import { LoadMore } from "@/components/shell/load-more";
 import { ListRegion } from "@/components/shell/list-pending";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { canDo } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { CANDIDATE_STATUS_LABELS, CANDIDATE_STATUS_ORDER } from "@/lib/labels";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { listApplications } from "@/lib/services/applications";
 import { searchCandidates } from "@/lib/services/candidates";
 import { parseCandidateStatus } from "@/lib/services/candidate-status";
 import { isSourcingLead, sourcingDaysLeft } from "@/lib/sourcing";
+import { deadlineTone } from "@/lib/status-tones";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 
@@ -219,7 +221,7 @@ export default async function CandidatesPage({
 
                     {c.salaryExpectation != null && (
                       <div className="text-sm text-muted-foreground">
-                        {formatNumber(Number(c.salaryExpectation))} ₽
+                        {formatMoney(Number(c.salaryExpectation))}
                       </div>
                     )}
 
@@ -249,8 +251,9 @@ export default async function CandidatesPage({
 
 /**
  * Без согласия — а у сорсинг-лида ещё и сколько осталось до удаления
- * (lib/services/sourcing.ts): за три дня метка красная, чтобы список
- * сам показывал, кого пора довести до согласия.
+ * (lib/services/sourcing.ts): за три дня метка жёлтая, чтобы список
+ * сам показывал, кого пора довести до согласия; красной она становится,
+ * только когда срок вышел.
  */
 function ConsentBadge({
   sourcedAt,
@@ -260,12 +263,12 @@ function ConsentBadge({
   consentStatus: string;
 }) {
   if (!sourcedAt || !isSourcingLead({ sourcedAt, consentStatus })) {
-    return <Badge variant="outline">без согласия</Badge>;
+    return <StatusBadge tone="neutral">без согласия</StatusBadge>;
   }
   const daysLeft = sourcingDaysLeft(new Date(sourcedAt));
   return (
-    <Badge variant={daysLeft <= 3 ? "destructive" : "outline"}>
+    <StatusBadge tone={deadlineTone(daysLeft)}>
       {daysLeft > 0 ? `без согласия · ${daysLeft} дн.` : "без согласия · срок вышел"}
-    </Badge>
+    </StatusBadge>
   );
 }

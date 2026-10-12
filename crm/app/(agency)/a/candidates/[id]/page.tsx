@@ -20,8 +20,10 @@ import {
 import { EraseButton } from "@/components/pdn/erase-button";
 import { OfferWorkCard, StudentChatCard } from "@/components/students/student-candidate-panel";
 import { canDo } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDayMonth } from "@/lib/format-date";
 import { APPLICATION_OUTCOME_LABELS, CANDIDATE_SOURCE_LABELS } from "@/lib/labels";
+import { APPLICATION_OUTCOME_TONE, deadlineTone } from "@/lib/status-tones";
 import { getCandidate } from "@/lib/services/candidates";
 import { listCandidateFeed } from "@/lib/services/candidate-notes";
 import { buildSignedUrl } from "@/lib/storage/signing";
@@ -39,17 +41,8 @@ import {
   sourcingDeadline,
 } from "@/lib/sourcing";
 import { BackLink } from "@/components/ui/back-link";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { PageTitle } from "@/components/ui/page-title";
-
-/**
- * Даты сорсинг-лида — без года: сроки здесь в пределах недель, а полная
- * дата кончается на «г.», и точка после неё превращалась в «г..».
- */
-function shortDate(date: Date | string): string {
-  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(
-    new Date(date),
-  );
-}
 
 export async function generateMetadata({
   params,
@@ -70,6 +63,10 @@ export default async function CandidatePage({
   const { id } = await params;
   const actor = await requireAgencyActor();
   authorize(actor, "application.viewInternal");
+  const timeZone = await getUserTimeZone();
+  // Даты сорсинг-лида — без года: сроки здесь в пределах недель, а полная
+  // дата кончается на «г.», и точка после неё превращалась в «г..»
+  const shortDate = (date: Date | string) => formatDayMonth(date, timeZone);
 
   const candidate = await getCandidate(actor, id);
   if (!candidate) notFound();
@@ -149,13 +146,13 @@ export default async function CandidatePage({
           <PageTitle>{candidate.fullName}</PageTitle>
           {candidate.source === "STUDENT_PLATFORM" && <Badge variant="secondary">🎓 Студплатформа</Badge>}
           {candidate.consentStatus !== "GIVEN" && (
-            <Badge variant={sourcing && sourcing.daysLeft <= 3 ? "destructive" : "outline"}>
+            <StatusBadge tone={sourcing ? (sourcing.blocked ? "danger" : deadlineTone(sourcing.daysLeft)) : "neutral"}>
               {sourcing
                 ? sourcing.blocked || sourcing.daysLeft <= 0
                   ? "нет согласия · срок вышел"
                   : `нет согласия · удалится ${shortDate(sourcing.deadline)}`
                 : "нет согласия на обработку ПДн"}
-            </Badge>
+            </StatusBadge>
           )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -294,9 +291,9 @@ export default async function CandidatePage({
                   </span>
                   <Badge variant="secondary">{a.stage.name}</Badge>
                   {a.outcome !== "IN_PROGRESS" && (
-                    <Badge variant="outline">
+                    <StatusBadge tone={APPLICATION_OUTCOME_TONE[a.outcome]}>
                       {APPLICATION_OUTCOME_LABELS[a.outcome]}
-                    </Badge>
+                    </StatusBadge>
                   )}
                 </li>
               ))}

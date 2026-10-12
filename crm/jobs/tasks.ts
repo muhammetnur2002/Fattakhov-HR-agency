@@ -19,6 +19,7 @@ import {
   sourcingLeadsToRemind,
 } from "@/lib/services/sourcing";
 import { sendWeeklyDigest } from "./digest";
+import { DEFAULT_TIME_ZONE, formatDayMonth, formatInZone } from "@/lib/format-date";
 
 /**
  * Фоновые задачи.
@@ -57,7 +58,7 @@ export async function sendReminders24h(): Promise<number> {
       userIds: interview.participantUserIds,
       event: "INTERVIEW_REMINDER_24H",
       title: `Завтра интервью: ${interview.application.candidate.fullName}`,
-      body: formatWhen(interview.scheduledAt!, interview.timezone),
+      body: formatInZone(interview.scheduledAt!, "weekdayDayMonthTime", interview.timezone),
       linkUrl: link.application(interview.applicationId),
     });
 
@@ -234,10 +235,7 @@ export async function remindSourcingDeadlines(now: Date = new Date()): Promise<n
         ).map((u) => u.id);
 
     const daysLeft = sourcingDaysLeft(lead.sourcedAt, now);
-    const deadline = new Intl.DateTimeFormat("ru-RU", {
-      day: "numeric",
-      month: "long",
-    }).format(sourcingDeadline(lead.sourcedAt));
+    const deadline = formatDayMonth(sourcingDeadline(lead.sourcedAt), DEFAULT_TIME_ZONE);
 
     await notify({
       organizationId: lead.organizationId,
@@ -412,15 +410,4 @@ export async function runScheduledTasks(): Promise<Record<string, number>> {
     сводокОтправлено: await flushCollapsed(),
     еженедельныхДайджестов: await sendWeeklyDigest(),
   };
-}
-
-function formatWhen(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(date);
 }

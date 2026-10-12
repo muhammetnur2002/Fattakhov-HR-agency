@@ -11,7 +11,7 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
 import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
@@ -35,7 +35,7 @@ export function ContractTemplateManager({
   const [uploadState, upload, uploading] = useActionState<FormState, FormData>(uploadContractTemplateAction, {});
   const [deleteState, setDeleteState] = useState<FormState>({});
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [pending, startTransition] = useTransition();
 
   function remove() {
@@ -59,12 +59,14 @@ export function ContractTemplateManager({
             </Button>
             <span className="text-xs text-muted-foreground">загружен {current.uploadedAt}</span>
             {confirming ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-sm">Удалить шаблон?</span>
+              <span {...groupProps} className="flex flex-wrap items-center gap-2">
+                <span id={questionId} className="text-sm">
+                  Удалить шаблон?
+                </span>
                 <Button type="button" size="sm" variant="destructive" loading={pending} onClick={remove}>
                   {pending ? "Удаляем…" : "Да, удалить"}
                 </Button>
-                <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+                <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
                   Оставить
                 </Button>
               </span>
@@ -83,7 +85,10 @@ export function ContractTemplateManager({
         <FormMessage error={deleteState.error} ok={current ? null : deleteState.ok} />
       </div>
 
+      {/* `action` — ради отправки без скриптов (POST серверному действию, не GET); после загрузки
+          скриптов отправка идёт через onSubmit, чтобы выбранный файл не стирался при отказе */}
       <form
+        action={upload}
         onSubmit={(event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
@@ -93,15 +98,15 @@ export function ContractTemplateManager({
       >
         <div className="space-y-2">
           <Label htmlFor="contractTemplate">{current ? "Заменить новым файлом" : "Загрузить шаблон"}</Label>
-          <Input
+          <FileInput
             id="contractTemplate"
             name="file"
-            type="file"
             required
             accept=".pdf,.doc,.docx,.rtf,.odt"
             onChange={(event) => {
               const big = (event.target.files?.[0]?.size ?? 0) > 4 * 1024 * 1024;
               event.target.setCustomValidity(big ? "Файл больше 4 МБ — сожмите его" : "");
+              event.target.ariaInvalid = big ? "true" : null;
               event.target.reportValidity();
             }}
           />

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useListNavigation } from "@/components/shell/list-pending";
 import { ListSearchInput, ListToolbar } from "@/components/shell/list-toolbar";
@@ -30,6 +30,10 @@ export function CandidateFilters() {
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [salaryFrom, setSalaryFrom] = useState(searchParams.get("sf") ?? "");
   const [salaryTo, setSalaryTo] = useState(searchParams.get("st") ?? "");
+  // Что сейчас в адресе или уже ушло туда: с теми же значениями переходить некуда. Иначе при каждом
+  // показе страницы (поля равны адресу) уходил бы переход на тот же адрес — с ожиданием списка и
+  // объявлением «Список обновлён» без единого действия человека
+  const sent = useRef({ q: query, sf: salaryFrom, st: salaryTo });
 
   /*
     Только при заходе на «голый» урл — если параметры уже в адресе
@@ -70,10 +74,14 @@ export function CandidateFilters() {
       set("q", query);
       set("sf", salaryFrom);
       set("st", salaryTo);
-      // Новый фильтр — заново с первой страницы: иначе можно листать
-      // страницу 3 узкого списка и не увидеть, что в нём всего 5 карточек
-      params.delete("page");
-      navigate(`${pathname}?${params.toString()}`);
+      const was = sent.current;
+      if (query !== was.q || salaryFrom !== was.sf || salaryTo !== was.st) {
+        sent.current = { q: query, sf: salaryFrom, st: salaryTo };
+        // Новый фильтр — заново с первой страницы: иначе можно листать
+        // страницу 3 узкого списка и не увидеть, что в нём всего 5 карточек
+        params.delete("page");
+        navigate(`${pathname}?${params.toString()}`);
+      }
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({ q: query, sf: salaryFrom, st: salaryTo }),

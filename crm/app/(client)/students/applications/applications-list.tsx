@@ -8,8 +8,10 @@ import { useState, useTransition } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { STUDENTS_APPLICATION_STATUS_TONE } from "@/lib/status-tones";
 import type { EmployerApplication, StudentsApplicationStatus } from "@/lib/students-service";
 import { studyLine } from "@/lib/study-level";
 import { cn } from "@/lib/utils";
@@ -24,15 +26,6 @@ const STATUS_LABEL: Record<StudentsApplicationStatus, string> = {
   INTERVIEW: "Собеседование",
   HIRED: "Вышел на работу",
   REJECTED: "Отказ",
-};
-
-const STATUS_VARIANT: Record<StudentsApplicationStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  NEW: "default",
-  VIEWED: "secondary",
-  INVITED: "secondary",
-  INTERVIEW: "secondary",
-  HIRED: "default",
-  REJECTED: "outline",
 };
 
 const NEXT_STEPS: { status: StudentsApplicationStatus; label: string }[] = [
@@ -129,7 +122,7 @@ export function ApplicationsList({ applications }: { applications: EmployerAppli
                         </div>
                       </div>
                     </div>
-                    <Badge variant={STATUS_VARIANT[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                    <StatusBadge tone={STUDENTS_APPLICATION_STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</StatusBadge>
                   </button>
 
                   {open && (

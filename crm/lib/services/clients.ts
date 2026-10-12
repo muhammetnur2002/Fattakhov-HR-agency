@@ -15,7 +15,15 @@ import type { ClientInput } from "@/lib/validation/client";
 import { recordAuthEvent } from "@/lib/services/auth-events";
 import { passwordProblem } from "@/lib/validation/password";
 
-export class ClientUserError extends Error {}
+export class ClientUserError extends Error {
+  /** Имя поля формы, к которому относится отказ (`email` — адрес занят); без него отказ общий. */
+  constructor(
+    message: string,
+    readonly field?: "email",
+  ) {
+    super(message);
+  }
+}
 
 /** Сотрудник клиента для списков: поля строки плюс то, что нужно для «в сети». */
 const TEAM_USER_SELECT = {
@@ -354,6 +362,7 @@ export async function createClientUserAccount(params: {
       throw new ClientUserError(
         `${email} уже занят: ${taken.fullName}, ${where}. ` +
           `Один адрес — один пользователь. Укажите другой.`,
+        "email",
       );
     }
 

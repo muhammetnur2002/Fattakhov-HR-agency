@@ -8,6 +8,7 @@ import {
 } from "@/app/(agency)/a/settings/pdn/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { ERASURE_REASON_LABELS } from "@/lib/labels";
 import type { ErasureQueueItem } from "@/lib/services/erasure";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
@@ -76,12 +77,9 @@ export function ErasureQueue({ items }: { items: ErasureQueueItem[] }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{item.fullName}</span>
 
-              <Badge
-                variant={deadline.overdue ? "destructive" : "secondary"}
-                className="max-w-full"
-              >
-                <span className="truncate">{deadline.text}</span>
-              </Badge>
+              <StatusBadge tone={deadline.overdue ? "danger" : "neutral"} truncate>
+                {deadline.text}
+              </StatusBadge>
 
               {item.reason && (
                 <Badge variant="outline" className="max-w-full">

@@ -21,5 +21,14 @@ export type FormState = {
   fields?: FieldErrors;
 };
 
+/**
+ * Отказ сервиса: к полю он относится, только если сервис сам так пометил (`field`), иначе это общая ошибка формы.
+ * Разбирать класс ошибки или её текст ради привязки к полю нельзя: любой новый отказ того же класса оказался бы
+ * под полем почты (замечание проверки PR #120, 12.10.2026).
+ */
+export function serviceFailure(error: { message: string; field?: string }): FormState {
+  return error.field ? { fields: { [error.field]: error.message } } : { error: error.message };
+}
+
 /** Сводка над ошибками полей: что именно не так, сказано у каждого поля. */
 export const CHECK_FIELDS_MESSAGE = "Проверьте заполнение полей";

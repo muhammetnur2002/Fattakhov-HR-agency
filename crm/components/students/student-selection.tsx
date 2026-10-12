@@ -8,6 +8,7 @@ import {
 } from "@/app/(agency)/a/reviews/students/pick-actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { panelClass } from "@/components/ui/panel";
 import type { AddStudentsResult } from "@/lib/services/student-candidates";
@@ -17,6 +18,7 @@ import {
   readSelection,
   serverSelection,
   subscribeSelection,
+  summarizeFailures,
   unpickStudents,
 } from "@/lib/students-selection";
 
@@ -72,7 +74,7 @@ export function StudentPickToggle({
 export function StudentSelectedMark({ studentId }: { studentId: string }) {
   const selected = useSelection();
   if (!selected.some((s) => s.id === studentId)) return null;
-  return <Badge>Выбран</Badge>;
+  return <StatusBadge tone="progress">Выбран</StatusBadge>;
 }
 
 /**
@@ -166,9 +168,8 @@ export function StudentSelectionBar() {
               ))}
             </p>
           )}
-          {result.failed.map((f) => (
-            <FormMessage key={f.studentId} compact error={f.reason} className="text-sm" />
-          ))}
+          {/* Одна плашка на всех: десять отказов — десять срочных объявлений подряд, они заглушают друг друга */}
+          <FormMessage compact error={summarizeFailures(result.failed)} className="text-sm" />
           <Button type="button" variant="ghost" size="sm" onClick={() => setResult(null)}>
             Скрыть
           </Button>

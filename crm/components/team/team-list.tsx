@@ -9,9 +9,12 @@ import { ResetTwoFactorDialog } from "@/components/team/reset-two-factor-dialog"
 import { StaffMemberEditor, type TeamOption } from "@/components/team/staff-forms";
 import { PresenceLabel } from "@/components/presence/presence-label";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { ROLE_LABELS, STAFF_GRANT_LABELS } from "@/lib/labels";
 import type { StaffMember } from "@/lib/services/staff";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDateNumeric } from "@/lib/format-date";
 
 /** Список команды с поиском — на десяток человек не нужен, на полсотни уже да. */
 export function TeamList({
@@ -32,6 +35,7 @@ export function TeamList({
   /** Только у владельца: сбросить сотруднику 2FA. */
   resetTwoFactorAction?: AccountAction;
 }) {
+  const timeZone = useTimeZone();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const visible = q
@@ -74,16 +78,16 @@ export function TeamList({
                 </div>
               </div>
               <Badge variant="outline">{ROLE_LABELS[member.role]}</Badge>
-              {!member.isActive && <Badge variant="destructive">Доступ отключён</Badge>}
+              {!member.isActive && <StatusBadge tone="neutral">Доступ отключён</StatusBadge>}
               {member.isActive && !member.twoFactorEnabled && (
-                <Badge variant="outline">2FA не настроена</Badge>
+                <StatusBadge tone="warning">2FA не настроена</StatusBadge>
               )}
               <div className="flex flex-col items-end text-xs text-muted-foreground">
                 {member.presence && (
                   <PresenceLabel lastSeenAt={member.presence.lastSeenAt} />
                 )}
                 <span>
-                  {member.lastLoginAt ? `Заходил ${formatDate(member.lastLoginAt)}` : "Ни разу не заходил"}
+                  {member.lastLoginAt ? `Заходил ${formatDateNumeric(member.lastLoginAt, timeZone)}` : "Ни разу не заходил"}
                 </span>
               </div>
             </div>
@@ -121,12 +125,4 @@ export function TeamList({
       )}
     </div>
   );
-}
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
 }

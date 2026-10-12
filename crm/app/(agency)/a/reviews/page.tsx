@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { effectiveGrants } from "@/lib/access";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
@@ -80,7 +80,7 @@ export default async function ReviewsPage() {
               </p>
             </div>
             <Link href="/a/clients/link-requests" className="shrink-0">
-              <Badge className="text-sm">{linkRequests.length}</Badge>
+              <StatusBadge tone="warning">{linkRequests.length}</StatusBadge>
             </Link>
           </CardContent>
         </Card>
@@ -99,7 +99,7 @@ export default async function ReviewsPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base">{card.title}</CardTitle>
-                    {card.count !== null && card.count > 0 && <Badge>{card.count}</Badge>}
+                    {card.count !== null && card.count > 0 && <StatusBadge tone="warning">{card.count}</StatusBadge>}
                   </div>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">{card.description}</CardContent>

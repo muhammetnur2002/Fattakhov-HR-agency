@@ -6,6 +6,7 @@ import { ListRegion } from "@/components/shell/list-pending";
 import { ListToolbar } from "@/components/shell/list-toolbar";
 import { SearchField } from "@/components/shell/search-field";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
@@ -91,7 +92,7 @@ export default async function ClientsPage({
             <Button asChild variant="outline">
               <Link href="/a/clients/link-requests" className="flex items-center gap-2">
                 Заявки на привязку
-                {linkRequests.length > 0 && <Badge>{linkRequests.length}</Badge>}
+                {linkRequests.length > 0 && <StatusBadge tone="warning">{linkRequests.length}</StatusBadge>}
               </Link>
             </Button>
             <Button asChild>
@@ -137,7 +138,7 @@ export default async function ClientsPage({
               работаете с ними и по обычному подбору.
             </p>
           </div>
-          <div className="grid gap-3">
+          <ListRegion className="grid gap-3">
             {filteredCompanies.map((c) => (
               <Card key={c.employerId}>
                 <CardContent className="space-y-4">
@@ -190,7 +191,7 @@ export default async function ClientsPage({
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </ListRegion>
         </div>
       )}
     </div>

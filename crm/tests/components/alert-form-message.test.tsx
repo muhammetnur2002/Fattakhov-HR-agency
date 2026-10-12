@@ -98,11 +98,14 @@ describe("FormMessage", () => {
     expect(glyph(alert)).toBe("lucide-circle-alert");
   });
 
-  it("успех: role=status со значком-галочкой", () => {
+  it("успех: значок-галочка, у самой плашки роли нет — читалке она уходит через постоянную область", () => {
     render(<FormMessage ok="Сохранено" />);
-    const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Сохранено");
-    expect(glyph(status)).toBe("lucide-circle-check");
+    const plate = screen.getByText("Сохранено").closest("[data-form-message=ok]")!;
+    expect(glyph(plate)).toBe("lucide-circle-check");
+    // Живая область, вставленная в страницу уже с текстом, объявляется не везде, а с двумя озвучками
+    // читалка прочла бы «Сохранено» дважды: роли status и alert у плашки быть не должно
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("compact: строка без рамки, значок и роли те же", () => {
@@ -116,12 +119,15 @@ describe("FormMessage", () => {
     expect(alert.tagName).toBe("P");
     expect(alert).not.toHaveAttribute("data-slot", "alert");
     expect(glyph(alert)).toBe("lucide-circle-alert");
-    expect(glyph(screen.getByRole("status"))).toBe("lucide-circle-check");
+    const ok = screen.getByText("Отправлено").closest("[data-form-message=ok]")!;
+    expect(ok.tagName).toBe("P");
+    expect(glyph(ok)).toBe("lucide-circle-check");
+    expect(ok).not.toHaveAttribute("role");
   });
 
   it("ошибка и успех вместе: обе строки на месте, ошибка первой", () => {
     render(<FormMessage error="Не всё" ok="Часть сохранена" />);
-    const [first, second] = [screen.getByRole("alert"), screen.getByRole("status")];
+    const [first, second] = [screen.getByRole("alert"), screen.getByText("Часть сохранена")];
     expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

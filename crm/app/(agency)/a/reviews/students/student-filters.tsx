@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   countActiveFilters,
   STUDENT_GENDER_OPTIONS,
@@ -15,9 +16,6 @@ import {
   STUDENT_STUDY_OPTIONS,
   type StudentSearchParams,
 } from "@/lib/students-search-params";
-
-const SELECT_CLASS =
-  "h-8 w-full min-w-0 rounded-lg border border-field bg-transparent px-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring md:text-sm dark:bg-input/30 dark:[&>option]:bg-popover";
 
 function Field({
   label,
@@ -88,10 +86,12 @@ export function StudentFilters({
       </div>
 
       <div>
+        {/* md:hidden — как и подпись: с 768px панель видна всегда, а скрытый от подписи флажок оставался
+            безымянной остановкой Tab (axe: label) */}
         <input
           id="student-filters-toggle"
           type="checkbox"
-          className="peer sr-only"
+          className="peer sr-only md:hidden"
           defaultChecked={active > 0}
         />
         <label
@@ -128,14 +128,14 @@ export function StudentFilters({
             />
           </Field>
           <Field label="Курс" htmlFor="sf-year">
-            <select id="sf-year" name="studyYear" defaultValue={params.studyYear ?? ""} className={SELECT_CLASS}>
+            <NativeSelect id="sf-year" name="studyYear" defaultValue={params.studyYear ?? ""} className="w-full">
               <option value="">Любой</option>
               {[1, 2, 3, 4, 5, 6].map((y) => (
                 <option key={y} value={y}>
                   {y} курс
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="Город" htmlFor="sf-city">
             <Input id="sf-city" name="city" defaultValue={params.city ?? ""} placeholder="Любой" maxLength={80} />
@@ -165,9 +165,9 @@ export function StudentFilters({
             />
           </Field>
           <Field label="Пол" htmlFor="sf-gender">
-            <select id="sf-gender" name="gender" defaultValue={params.gender ?? ""} className={SELECT_CLASS}>
+            <NativeSelect id="sf-gender" name="gender" defaultValue={params.gender ?? ""} className="w-full">
               <Options options={STUDENT_GENDER_OPTIONS} />
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="Навыки (через запятую)" htmlFor="sf-skills" wide>
             <Input
@@ -179,33 +179,33 @@ export function StudentFilters({
             />
           </Field>
           <Field label="Учёба" htmlFor="sf-study">
-            <select id="sf-study" name="study" defaultValue={params.study ?? ""} className={SELECT_CLASS}>
+            <NativeSelect id="sf-study" name="study" defaultValue={params.study ?? ""} className="w-full">
               <Options options={STUDENT_STUDY_OPTIONS} />
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="Статус" htmlFor="sf-status">
-            <select id="sf-status" name="status" defaultValue={params.status ?? ""} className={SELECT_CLASS}>
+            <NativeSelect id="sf-status" name="status" defaultValue={params.status ?? ""} className="w-full">
               <Options options={STUDENT_STATUS_OPTIONS} />
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="В сети" htmlFor="sf-online">
-            <select
+            <NativeSelect
               id="sf-online"
               name="onlineWithin"
               defaultValue={params.onlineWithin ?? ""}
-              className={SELECT_CLASS}
+              className="w-full"
             >
               <Options options={STUDENT_ONLINE_OPTIONS} />
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="Сортировка" htmlFor="sf-sort">
-            <select id="sf-sort" name="sort" defaultValue={params.sort ?? "new"} className={SELECT_CLASS}>
+            <NativeSelect id="sf-sort" name="sort" defaultValue={params.sort ?? "new"} className="w-full">
               {STUDENT_SORTS.map((sort) => (
                 <option key={sort} value={sort}>
                   {STUDENT_SORT_LABELS[sort]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </Field>
           <div className="col-span-2 flex items-end gap-2 lg:col-span-4">
             <SubmitButton>Применить</SubmitButton>

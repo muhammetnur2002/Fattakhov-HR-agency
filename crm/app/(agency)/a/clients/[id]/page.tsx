@@ -19,6 +19,7 @@ import { RevokeInviteButton } from "@/components/settings/revoke-invite-button";
 import { ResetPasswordForm } from "@/components/shared/account-forms";
 import { withEmailOff } from "@/components/shared/email-off";
 import { Badge } from "@/components/ui/badge";
+import { AgreementStatusBadge, ClientStatusBadge } from "@/components/clients/status-badges";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,8 +30,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { canDo } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { CLIENT_STATUS_LABELS, ROLE_LABELS } from "@/lib/labels";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateNumeric } from "@/lib/format-date";
+import { ROLE_LABELS } from "@/lib/labels";
 import { describePricing } from "@/lib/pricing";
 import { getAgreementFileUrl, toPricingParams } from "@/lib/services/agreements";
 import { listDeletionRequests } from "@/lib/services/account-deletion";
@@ -60,6 +62,8 @@ export default async function ClientPage({
   const { id } = await params;
   const actor = await requireAgencyActor();
   authorize(actor, "client.view", { clientId: id });
+  const timeZone = await getUserTimeZone();
+  const formatDate = (d: Date) => formatDateNumeric(d, timeZone);
 
   const client = await getClient(actor, id);
   if (!client) notFound();
@@ -99,9 +103,7 @@ export default async function ClientPage({
 
         <div className="flex flex-wrap items-center gap-3">
           <PageTitle>{client.name}</PageTitle>
-          <Badge variant={client.status === "ACTIVE" ? "default" : "secondary"}>
-            {CLIENT_STATUS_LABELS[client.status]}
-          </Badge>
+          <ClientStatusBadge status={client.status} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {[client.city, client.industry].filter(Boolean).join(" · ") ||
@@ -313,7 +315,7 @@ export default async function ClientPage({
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-3">
                     <CardTitle className="text-base">{a.title}</CardTitle>
-                    <AgreementStatusBadge status={a.status} />
+                    <AgreementStatusBadge status={a.status} short />
                   </div>
                   <CardDescription>
                     {describePricing(toPricingParams(a))}
@@ -427,29 +429,10 @@ function Row({
   );
 }
 
-function AgreementStatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    PENDING: { label: "Ждёт подтверждения", variant: "destructive" },
-    ACTIVE: { label: "Действует", variant: "default" },
-    EXPIRED: { label: "Истёк", variant: "secondary" },
-    TERMINATED: { label: "Расторгнут", variant: "secondary" },
-  };
-  const s = map[status] ?? { label: status, variant: "outline" as const };
-  return <Badge variant={s.variant}>{s.label}</Badge>;
-}
-
 function pluralVacancies(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return "вакансия";
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "вакансии";
   return "вакансий";
-}
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
 }

@@ -16,6 +16,7 @@ import {
   isSlotPast,
   validateSlots,
 } from "@/lib/services/interview-status";
+import { formatInZone } from "@/lib/format-date";
 
 export { InterviewError };
 
@@ -293,7 +294,7 @@ export async function confirmSlot(token: string, slotId: string) {
       userIds: full.participantUserIds,
       event: "INTERVIEW_CONFIRMED",
       title: `Интервью назначено: ${full.application.candidate.fullName}`,
-      body: formatWhen(slot.startsAt, full.timezone),
+      body: formatInZone(slot.startsAt, "weekdayDayMonthTime", full.timezone),
       linkUrl: link.application(full.applicationId),
     });
   }
@@ -301,16 +302,6 @@ export async function confirmSlot(token: string, slotId: string) {
   return { interviewId: interview.id, scheduledAt: slot.startsAt };
 }
 
-function formatWhen(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(date);
-}
 
 /** Кандидату не подошёл ни один вариант — возвращаем задачу рекрутеру. */
 export async function requestOtherSlots(token: string, note: string) {

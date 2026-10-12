@@ -126,6 +126,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyToDocument(resolvedTheme);
   }, [resolvedTheme]);
 
+  // Полоса браузера (meta theme-color) следует за выбором, а не только за темой системы:
+  // «светлая» на тёмном телефоне должна дать светлую полосу. Отдельно от эффекта выше —
+  // выбор может смениться при той же резолвенной теме (с «как в системе» на «тёмную»)
+  useEffect(() => {
+    window.__applyThemeColor?.(theme);
+  }, [theme]);
+
   const setTheme = useCallback((next: Theme) => {
     try {
       localStorage.setItem(STORAGE_KEY, next);

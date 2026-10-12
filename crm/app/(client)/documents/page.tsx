@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { authorize, requireClientActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import type { AgreementStatus } from "@/lib/generated/prisma/enums";
@@ -24,6 +24,7 @@ export const metadata = { title: "Документы" };
 
 export default async function DocumentsPage() {
   const actor = await requireClientActor();
+  const timeZone = await getUserTimeZone();
   authorize(actor, "invoice.view", { clientId: actor.clientId });
 
   const [agreements, invoices, template, submitted] = await Promise.all([
@@ -93,7 +94,7 @@ export default async function DocumentsPage() {
                         {f.fileName}
                       </a>
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(f.createdAt)} · на проверке у агентства
+                        {formatDate(f.createdAt, timeZone)} · на проверке у агентства
                       </span>
                     </li>
                   ))}
@@ -119,7 +120,7 @@ export default async function DocumentsPage() {
           ) : (
             <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
               <Row label="Документ">{active.title}</Row>
-              <Row label="Действует с">{formatDate(active.startsAt)}</Row>
+              <Row label="Действует с">{formatDate(active.startsAt, timeZone)}</Row>
               <Row label="Гарантия замены">{active.guaranteeDays} дней</Row>
               <Row label="Предоплата">
                 {active.prepaymentPercent > 0
@@ -150,7 +151,7 @@ export default async function DocumentsPage() {
       {unpaid.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Ждут оплаты</h2>
-          <InvoiceList invoices={unpaid} emptyText="" />
+          <InvoiceList timeZone={timeZone} invoices={unpaid} emptyText="" />
         </div>
       )}
 
@@ -168,7 +169,7 @@ export default async function DocumentsPage() {
             </Button>
           )}
         </div>
-        <InvoiceList
+        <InvoiceList timeZone={timeZone}
           invoices={invoices.filter((i) => !unpaid.includes(i))}
           emptyText="Счетов пока не было."
         />

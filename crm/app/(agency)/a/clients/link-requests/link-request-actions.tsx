@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Panel } from "@/components/ui/panel";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 type Mode = "closed" | "create" | "existing" | "reject";
 
@@ -55,6 +56,20 @@ export function LinkRequestActions({
   prefill: ClientFormValues;
 }) {
   const [mode, setMode] = useState<Mode>("closed");
+  // Кнопки режимов заменяются формой: после «Отмены» фокус возвращается на ту, что открывала. В форме
+  // «Создать клиента» фокус при открытии ставит поле «Название» (autoFocus)
+  const { triggerRef: createTrigger, questionId: createQuestionId, groupProps: createGroup } =
+    useConfirmFocus(mode === "create");
+  const {
+    triggerRef: existingTrigger,
+    focusRef: existingFocus,
+    questionId: existingQuestionId,
+  } = useConfirmFocus(mode === "existing");
+  const {
+    triggerRef: rejectTrigger,
+    focusRef: rejectFocus,
+    questionId: rejectQuestionId,
+  } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(mode === "reject");
   const [clientId, setClientId] = useState("");
   const [linkState, linkFormAction] = useActionState<FormState, FormData>(linkAction, {});
   const [rejectState, rejectFormAction] = useActionState<FormState, FormData>(rejectAction, {});
@@ -73,13 +88,13 @@ export function LinkRequestActions({
   if (mode === "closed") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => setMode("create")}>
+        <Button ref={createTrigger} size="sm" onClick={() => setMode("create")}>
           Создать клиента
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setMode("existing")}>
+        <Button ref={existingTrigger} size="sm" variant="outline" onClick={() => setMode("existing")}>
           Привязать к существующему
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setMode("reject")}>
+        <Button ref={rejectTrigger} size="sm" variant="ghost" onClick={() => setMode("reject")}>
           Отклонить
         </Button>
       </div>
@@ -88,7 +103,10 @@ export function LinkRequestActions({
 
   if (mode === "create") {
     return (
-      <Panel>
+      <Panel {...createGroup}>
+        <span id={createQuestionId} className="sr-only">
+          Новый клиент из заявки компании
+        </span>
         <ClientForm
           action={createClientFromLinkRequestAction}
           employerId={employerId}
@@ -105,11 +123,14 @@ export function LinkRequestActions({
 
   if (mode === "existing") {
     return (
-      <form action={linkFormAction} className="flex flex-wrap items-center gap-2">
+      <form action={linkFormAction} aria-labelledby={existingQuestionId} className="flex flex-wrap items-center gap-2">
+        <span id={existingQuestionId} className="sr-only">
+          Привязать компанию к существующему клиенту
+        </span>
         <input type="hidden" name="employerId" value={employerId} />
         <input type="hidden" name="clientId" value={clientId} />
         <Select value={clientId} onValueChange={setClientId}>
-          <SelectTrigger className="w-56">
+          <SelectTrigger ref={existingFocus} className="w-56">
             <SelectValue placeholder="Выберите клиента" />
           </SelectTrigger>
           <SelectContent>
@@ -129,9 +150,13 @@ export function LinkRequestActions({
   }
 
   return (
-    <form action={rejectFormAction} className="space-y-2">
+    <form action={rejectFormAction} aria-labelledby={rejectQuestionId} className="space-y-2">
+      <span id={rejectQuestionId} className="sr-only">
+        Отклонить заявку с пояснением
+      </span>
       <input type="hidden" name="employerId" value={employerId} />
       <Textarea
+        ref={rejectFocus}
         name="note"
         required
         rows={2}

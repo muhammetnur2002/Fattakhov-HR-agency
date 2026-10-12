@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   confirmSlotAction,
@@ -22,6 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { isSlotPast } from "@/lib/services/interview-status";
 import { cn } from "@/lib/utils";
+import { browserTimeZone, DEFAULT_TIME_ZONE, formatInZone, resolveTimeZone } from "@/lib/format-date";
 
 export type PublicSlot = {
   id: string;
@@ -65,6 +66,7 @@ export function SlotPicker({
   slots,
   durationMinutes,
   now,
+  initialTimeZone,
 }: {
   token: string;
   slots: PublicSlot[];
@@ -77,12 +79,23 @@ export function SlotPicker({
    * и на доске кандидатов.
    */
   now: number;
+  /**
+   * Зона встречи: в ней рисуется первый кадр на сервере, пока браузер ещё
+   * не ответил. Своя зона процесса там была бы третьей, ни сервером, ни
+   * кандидатом не выбранной, и гидратация расходилась бы со вторым кадром.
+   */
+  initialTimeZone?: string;
 }) {
   // Часовой пояс браузера — почти всегда правильный ответ, но менять
   // его должно быть можно: кандидат может отвечать из поездки
-  const [timezone, setTimezone] = useState(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow",
+  const fallbackZone = resolveTimeZone(initialTimeZone ?? DEFAULT_TIME_ZONE);
+  const detectedZone = useSyncExternalStore(
+    subscribeNever,
+    () => browserTimeZone() ?? fallbackZone,
+    () => fallbackZone,
   );
+  const [chosenZone, setTimezone] = useState<string | null>(null);
+  const timezone = chosenZone ?? detectedZone;
   const [selected, setSelected] = useState<string | null>(null);
   const [askingOther, setAskingOther] = useState(false);
   const [state, setState] = useState<ScheduleState>({});
@@ -224,7 +237,10 @@ export function SlotPicker({
 
             <div className="space-y-2">
               <Label htmlFor="timezone">Ваш часовой пояс</Label>
-              <Select value={timezone} onValueChange={setTimezone}>
+              {/* Пустое значение — не выбор человека: скрытый select Radix сообщает его,
+                  когда зона браузера подставилась после гидратации, а нужного пункта
+                  в нём ещё нет. Принять его — значило бы молча вернуть Москву */}
+              <Select value={timezone} onValueChange={(next) => next && setTimezone(next)}>
                 {/* Высота крупнее обычной: экран открывают с телефона,
                     и здесь всё рассчитано на палец. Приоритет нужен —
                     свою высоту SelectTrigger задаёт через data-[size] */}
@@ -306,18 +322,14 @@ function groupByDay(
 }
 
 function formatDay(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone,
-  }).format(new Date(iso));
+  return formatInZone(iso, "weekdayDayMonth", timeZone);
 }
 
 function formatTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
+  return formatInZone(iso, "time", timeZone);
+}
+
+/** Зона браузера не меняется за время жизни страницы: подписываться не на что. */
+function subscribeNever(): () => void {
+  return () => {};
 }

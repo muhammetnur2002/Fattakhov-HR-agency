@@ -53,7 +53,7 @@ describe("PresenceLabel", () => {
     expect(screen.getByText("В сети")).toBeInTheDocument();
     const dot = container.querySelector("[aria-hidden]");
     expect(dot).not.toBeNull();
-    expect(dot?.className).toContain("bg-emerald-500");
+    expect(dot?.className).toContain("bg-success");
   });
 
   it("не в сети — без точки, текст на русском с «был(а)»", () => {
@@ -109,6 +109,7 @@ describe("список диалогов", () => {
         conversations={[conversation({ lastSeenAt: new Date(NOW.getTime() - 10_000) })]}
         hrefBase="/a"
         emptyText="пусто"
+        timeZone="Europe/Moscow"
       />,
     );
     expect(screen.getByText("В сети")).toBeInTheDocument();
@@ -116,7 +117,7 @@ describe("список диалогов", () => {
 
   it("скрыл статус — строки статуса нет вовсе, даже «давно»", () => {
     render(
-      <DirectConversationList conversations={[conversation(null)]} hrefBase="/a" emptyText="пусто" />,
+      <DirectConversationList conversations={[conversation(null)]} hrefBase="/a" emptyText="пусто" timeZone="Europe/Moscow" />,
     );
     expect(screen.queryByText(/был\(а\)/)).toBeNull();
     expect(screen.queryByText("В сети")).toBeNull();

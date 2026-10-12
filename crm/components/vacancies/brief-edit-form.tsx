@@ -9,6 +9,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { noScriptForm } from "@/lib/forms/no-script";
 import { EMPLOYMENT_TYPE_LABELS, URGENCY_LABELS, WORK_FORMAT_LABELS } from "@/lib/labels";
 
 export type BriefValues = Record<string, string>;
@@ -61,6 +62,7 @@ export function BriefEditForm({
 
   return (
     <form
+      {...noScriptForm}
       onSubmit={(e) => {
         e.preventDefault();
         save();

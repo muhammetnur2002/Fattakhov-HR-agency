@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { SITE_GUTTER, SITE_GUTTER_BLEED, SPLIT_EVEN } from "./layout";
 
@@ -139,7 +139,7 @@ export function Pricing() {
               {/* Один размер у всех: у центральной цена была крупнее, и на телефоне (28 и 36px)
                   это двигало нижние строки её плитки относительно соседних */}
               <div className="mt-4 text-3xl font-semibold tracking-tight whitespace-nowrap tabular-nums">
-                {formatNumber(t.price)} ₽
+                {formatMoney(t.price)}
               </div>
               <div
                 className={cn(
@@ -174,7 +174,7 @@ export function Pricing() {
                   t.recommended ? "text-white/70" : "text-muted-foreground",
                 )}
               >
-                <span className="tabular-nums">{formatNumber(заСлот)} ₽</span> за
+                <span className="tabular-nums">{formatMoney(заСлот)}</span> за
                 слот
                 {дешевле > 0 ? (
                   <span

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { setCandidateStatusAction } from "@/app/(agency)/a/candidates/extras-actions";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Select,
   SelectContent,
@@ -13,24 +13,15 @@ import {
 } from "@/components/ui/select";
 import type { CandidateStatus } from "@/lib/generated/prisma/enums";
 import { CANDIDATE_STATUS_LABELS, CANDIDATE_STATUS_ORDER } from "@/lib/labels";
+import { CANDIDATE_STATUS_TONE } from "@/lib/status-tones";
 import { FormMessage } from "@/components/ui/form-message";
 
 const NONE = "__none__";
 
-const VARIANTS: Record<CandidateStatus, "default" | "secondary" | "outline"> = {
-  NEW: "default",
-  IN_PROGRESS: "secondary",
-  WAITING_CLIENT: "default",
-  RESERVE: "outline",
-  ON_HOLD: "outline",
-  HIRED: "secondary",
-  NOT_RELEVANT: "outline",
-};
-
 /** Метка статуса для списков. Без статуса ничего не рисуется. */
 export function CandidateStatusBadge({ status }: { status: CandidateStatus | null }) {
   if (!status) return null;
-  return <Badge variant={VARIANTS[status]}>{CANDIDATE_STATUS_LABELS[status]}</Badge>;
+  return <StatusBadge tone={CANDIDATE_STATUS_TONE[status]}>{CANDIDATE_STATUS_LABELS[status]}</StatusBadge>;
 }
 
 /**

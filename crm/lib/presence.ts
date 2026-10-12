@@ -24,6 +24,8 @@
  * вообще ничего — даже «давно».
  */
 
+import { DEFAULT_TIME_ZONE, zonedClock, type ZonedClock } from "@/lib/format-date";
+
 /**
  * Показывается ли статус человека — с учётом роли.
  *
@@ -60,34 +62,13 @@ const MONTHS_SHORT = [
   "дек.",
 ] as const;
 
-const MOSCOW = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Europe/Moscow",
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-  hour: "numeric",
-  minute: "numeric",
-  hourCycle: "h23",
-});
-
-type MoscowClock = { year: number; month: number; day: number; hour: number; minute: number };
-
-function moscowClock(date: Date): MoscowClock {
-  const parts: Record<string, number> = {};
-  for (const part of MOSCOW.formatToParts(date)) {
-    if (part.type !== "literal") parts[part.type] = Number(part.value);
-  }
-  return {
-    year: parts.year,
-    month: parts.month,
-    day: parts.day,
-    hour: parts.hour,
-    minute: parts.minute,
-  };
+/** Зона «в сети» — всегда Москва, а не часы смотрящего: см. описание вверху файла. */
+function moscowClock(date: Date): ZonedClock {
+  return zonedClock(date, DEFAULT_TIME_ZONE);
 }
 
 /** Номер календарного дня — чтобы «вчера» считалось и через границу месяца и года. */
-function dayNumber(clock: MoscowClock): number {
+function dayNumber(clock: ZonedClock): number {
   return Math.floor(Date.UTC(clock.year, clock.month - 1, clock.day) / 86_400_000);
 }
 

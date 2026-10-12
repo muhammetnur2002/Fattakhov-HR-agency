@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { canDo } from "@/lib/access";
-import { getGatedActor } from "@/lib/auth/session";
+import { getGatedActor, getUserTimeZone } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { buildCsv, reportFileName, type Sheet } from "@/lib/services/analytics/export";
 import { listInvoices } from "@/lib/services/invoices";
@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
 export async function GET() {
   const actor = await getGatedActor();
   if (!actor) return new NextResponse("Требуется вход", { status: 401 });
+  const timeZone = await getUserTimeZone();
   // Та же проверка, что и у страницы «Документы»: счета видит администратор компании
   if (!actor.clientId || !canDo(actor, "invoice.view", { clientId: actor.clientId })) {
     return new NextResponse("Не найдено", { status: 404 });
@@ -49,9 +50,9 @@ export async function GET() {
         STATUS_LABELS[i.status] ?? i.status,
         i.amount,
         i.description ?? "",
-        i.issuedAt ? formatDate(i.issuedAt) : "",
-        i.dueAt ? formatDate(i.dueAt) : "",
-        i.paidAt ? formatDate(i.paidAt) : "",
+        i.issuedAt ? formatDate(i.issuedAt, timeZone) : "",
+        i.dueAt ? formatDate(i.dueAt, timeZone) : "",
+        i.paidAt ? formatDate(i.paidAt, timeZone) : "",
       ]),
     },
   ];
@@ -71,7 +72,7 @@ export async function GET() {
   return new NextResponse(buildCsv(sheets), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(reportFileName("Счета"))}`,
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(reportFileName("Счета", timeZone))}`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -12,8 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { canDo } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
-import { formatMoney } from "@/lib/pricing";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatMoney } from "@/lib/format-money";
 import {
   listBillableHires,
   listInvoices,
@@ -25,6 +25,7 @@ export const metadata = { title: "Финансы" };
 
 export default async function FinancePage() {
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
   authorize(actor, "invoice.view");
 
   const [hires, invoices, money] = await Promise.all([
@@ -109,7 +110,7 @@ export default async function FinancePage() {
 
       <div className="space-y-3">
         <h2 className="text-lg font-medium">Счета</h2>
-        <InvoiceList
+        <InvoiceList timeZone={timeZone}
           invoices={invoices}
           showClient
           emptyText="Счетов пока нет."

@@ -119,8 +119,11 @@ export function Section({
 
   const padding = pad === "tight" ? "py-8" : "py-8 md:py-10";
 
+  /* overflow-clip, а не hidden: hidden делает раздел своим контейнером прокрутки,
+     и прилипшая внутри полоса (полоса прогресса аудита) ломается — она «прилипает»
+     к разделу, а не к экрану. clip режет так же, но прокрутки не создаёт */
   return (
-    <section id={id} className={`relative overflow-hidden ${bg}`}>
+    <section id={id} className={`relative overflow-clip ${bg}`}>
       {tone === "dark" && (
         <div
           aria-hidden

@@ -14,7 +14,7 @@ import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
  */
 export function DeleteAccount({ contracted, requested }: { contracted: boolean; requested: boolean }) {
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
 
@@ -49,15 +49,15 @@ export function DeleteAccount({ contracted, requested }: { contracted: boolean; 
       </p>
 
       {confirming ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">
+        <div {...groupProps} className="space-y-2">
+          <p id={questionId} className="text-sm font-medium">
             {contracted ? "Отправить запрос на удаление аккаунта?" : "Удалить аккаунт? Это нельзя отменить."}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => run(deleteAccountAction)}>
               {pending ? "Подождите…" : contracted ? "Да, отправить запрос" : "Да, удалить аккаунт"}
             </Button>
-            <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+            <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
               Отмена
             </Button>
           </div>

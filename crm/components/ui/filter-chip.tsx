@@ -30,15 +30,22 @@ import { cn } from "@/lib/utils";
  * Размер — как у `Button size="sm"` (высота 28, на сенсорном экране от 2.4em,
  * `globals.css`): высоту чипа не меняем. Серверное ожидание (ссылка ведёт на
  * тот же список с другим фильтром) показывается там же, где потом встанет
- * галочка, — ширина при выборе не прыгает.
+ * галочка: при переходе «ожидание → выбор» ширина не меняется. Сам выбор ширину
+ * меняет (галочка 14 + зазор 4): нажатый чип растёт, прежний выбранный на столько же
+ * уже — в переносимом ряду строки могут перестроиться. Место под галочку заранее не
+ * резервируем: у каждого невыбранного чипа слева встала бы пустота.
  */
 
 const BASE =
   "inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-[min(var(--radius-md),12px)] border px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:translate-y-px touch:active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5";
 
-/** Не выбран: контурный, как `Button outline`. */
+/**
+ * Не выбран: контурный, как `Button outline`. В тёмной теме рамка — `--field` (3:1 к поверхности), а не
+ * `--input`: заливка выбранного к невыбранному там всего 3,01:1, и держать отличие на сотых нельзя —
+ * к заливке и галочке добавляется заметная рамка у невыбранных.
+ */
 const UNSELECTED =
-  "border-border bg-background text-foreground hover:bg-muted active:bg-muted-active dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:active:bg-muted-active";
+  "border-border bg-background text-foreground hover:bg-muted active:bg-muted-active dark:border-field dark:bg-input/30 dark:hover:bg-input/50 dark:active:bg-muted-active";
 
 /** Выбран: заливка основным цветом (галочку рисует сам компонент). */
 const SELECTED =

@@ -43,7 +43,7 @@ export function PresenceLabel({
       data-presence={online ? "online" : "offline"}
     >
       {online && (
-        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-success" />
       )}
       <span className="truncate" suppressHydrationWarning>
         {text}

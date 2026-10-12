@@ -87,3 +87,20 @@ export function unpickStudents(ids: string[]): void {
 export function clearSelection(): void {
   write([]);
 }
+
+/**
+ * Одна строка про всех, кого не удалось добавить в кандидаты: причины сгруппированы, у каждой — сколько студентов.
+ * Раньше на каждого студента выводилась своя плашка-ошибка (`role="alert"`): при десяти отказах читалка получала десять
+ * срочных объявлений подряд, и они заглушали друг друга. Теперь плашка одна.
+ */
+export function summarizeFailures(failed: ReadonlyArray<{ reason: string }>): string | null {
+  if (failed.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const { reason } of failed) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  if (failed.length === 1) return failed[0].reason;
+  const last = failed.length % 10;
+  const teen = failed.length % 100 >= 11 && failed.length % 100 <= 14;
+  const noun = !teen && last === 1 ? "студента" : "студентов";
+  const reasons = [...counts].map(([reason, n]) => (n > 1 ? `${reason} (${n})` : reason)).join("; ");
+  return `Не удалось добавить ${failed.length} ${noun}: ${reasons}`;
+}

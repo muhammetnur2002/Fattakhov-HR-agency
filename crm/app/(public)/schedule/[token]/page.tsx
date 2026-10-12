@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { guardRate } from "@/lib/security/guard";
 import { getInterviewByToken } from "@/lib/services/interviews";
+import { formatInZone } from "@/lib/format-date";
 
 export const metadata = { title: "Выбор времени интервью" };
 
@@ -99,7 +100,7 @@ export default async function SchedulePage({
             <p className="text-sm">
               Время подтверждено:{" "}
               <span className="font-medium">
-                {formatFull(interview.scheduledAt, interview.timezone)}
+                {formatInZone(interview.scheduledAt, "weekdayDayMonthTime", interview.timezone)}
               </span>
             </p>
             {/* Кандидат часто возвращается по ссылке из письма позже —
@@ -118,6 +119,7 @@ export default async function SchedulePage({
             token={token}
             durationMinutes={interview.durationMinutes}
             now={now.getTime()}
+            initialTimeZone={interview.timezone}
             slots={interview.slots.map((s) => ({
               id: s.id,
               startsAt: s.startsAt.toISOString(),
@@ -128,15 +130,4 @@ export default async function SchedulePage({
       </CardContent>
     </Card>
   );
-}
-
-function formatFull(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(date);
 }

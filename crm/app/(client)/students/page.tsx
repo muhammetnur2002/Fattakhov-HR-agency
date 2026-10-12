@@ -3,9 +3,11 @@ import { Plus } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { authorize, requireClientActor } from "@/lib/auth/session";
+import { STUDENTS_VACANCY_STATUS_TONE } from "@/lib/status-tones";
 import { ClearClosed } from "./clear-closed";
 import {
   fetchEmployerVacancies,
@@ -24,14 +26,6 @@ const STATUS_LABEL: Record<StudentsVacancyStatus, string> = {
   PUBLISHED: "Опубликована",
   REJECTED: "Отклонена",
   CLOSED: "Снята",
-};
-
-const STATUS_VARIANT: Record<StudentsVacancyStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  DRAFT: "outline",
-  PENDING: "secondary",
-  PUBLISHED: "default",
-  REJECTED: "destructive",
-  CLOSED: "outline",
 };
 
 /**
@@ -101,7 +95,7 @@ export default async function StudentsVacanciesPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{vacancy.title}</span>
                     {vacancy.fromCrm && <Badge variant="outline">Из CRM</Badge>}
-                    <Badge variant={STATUS_VARIANT[vacancy.status]}>{STATUS_LABEL[vacancy.status]}</Badge>
+                    <StatusBadge tone={STUDENTS_VACANCY_STATUS_TONE[vacancy.status]}>{STATUS_LABEL[vacancy.status]}</StatusBadge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {vacancy.city} · откликов: {vacancy.applications}

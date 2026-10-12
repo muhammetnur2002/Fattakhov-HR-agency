@@ -100,7 +100,12 @@ export async function resetPasswordAction(
   if (!rate.allowed) return { error: rateLimitMessage(rate.retryAfter) };
 
   const parsed = resetPasswordSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return invalidForm(parsed.error);
+  if (!parsed.success) {
+    const invalid = invalidForm(parsed.error);
+    // Токен — скрытое поле формы: ошибки под ним негде показать, поэтому она общая («Ссылка недействительна…»)
+    if (invalid.fields?.token) return { error: invalid.fields.token };
+    return invalid;
+  }
 
   try {
     await resetPassword({

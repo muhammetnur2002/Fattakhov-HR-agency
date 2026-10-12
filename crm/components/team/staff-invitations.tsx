@@ -33,9 +33,11 @@ export type PendingStaffInvitation = {
 export function StaffInvitations({
   invitations,
   revokeAction,
+  timeZone,
 }: {
   invitations: PendingStaffInvitation[];
   revokeAction: AccountAction;
+  timeZone: string;
 }) {
   return (
     <div className="space-y-4">
@@ -47,7 +49,7 @@ export function StaffInvitations({
                 {withEmailOff(inv.email, inv.email)}
               </div>
               <div className="text-xs text-muted-foreground">
-                {inv.position ? `${inv.position} · ` : ""}до {formatDate(inv.expiresAt)}
+                {inv.position ? `${inv.position} · ` : ""}до {formatDate(inv.expiresAt, timeZone)}
               </div>
             </div>
             <Badge variant="outline">{ROLE_LABELS[inv.role]}</Badge>

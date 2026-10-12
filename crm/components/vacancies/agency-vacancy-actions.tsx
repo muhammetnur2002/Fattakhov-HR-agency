@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type RefObject } from "react";
 
 import {
   activateVacancyAction,
@@ -86,8 +86,18 @@ function Submit({
   );
 }
 
-function Feedback({ state }: { state: AgencyVacancyState }) {
-  return <FormMessage error={state.error} ok={state.ok} />;
+/**
+ * Результат под формой. Плашка стоит вне формы, поэтому ссылка из `useFormAction` (`messageRef`) обязательна
+ * там, где форма идёт через хук: иначе после общего отказа фокус не дойдёт до плашки.
+ */
+function Feedback({
+  state,
+  messageRef,
+}: {
+  state: AgencyVacancyState;
+  messageRef?: RefObject<HTMLElement | null>;
+}) {
+  return <FormMessage ref={messageRef} error={state.error} ok={state.ok} />;
 }
 
 /**
@@ -257,8 +267,8 @@ export function VacancyIntake({
       )}
 
       <Feedback state={activateState} />
-      <Feedback state={estimateForm.state} />
-      <Feedback state={clarifyForm.state} />
+      <Feedback state={estimateForm.state} messageRef={estimateForm.messageRef} />
+      <Feedback state={clarifyForm.state} messageRef={clarifyForm.messageRef} />
     </div>
   );
 }
@@ -276,7 +286,7 @@ export function VacancyStatusActions({
 }) {
   // Кнопки «приостановить» и «вернуть в работу» — формы без полей (action); причина закрытия набирается
   // текстом и не должна пропадать, если сервер отказал
-  const { state, pending, formAction, formProps } = useFormAction<AgencyVacancyState>(
+  const { state, pending, formAction, formProps, messageRef } = useFormAction<AgencyVacancyState>(
     agencyTransitionAction,
     {},
   );
@@ -363,7 +373,7 @@ export function VacancyStatusActions({
         </form>
       )}
 
-      <Feedback state={state} />
+      <Feedback state={state} messageRef={messageRef} />
     </div>
   );
 }

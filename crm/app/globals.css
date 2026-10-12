@@ -287,25 +287,71 @@ main[tabindex="-1"]:focus {
   Поле ввода на сенсорном экране не мельче 16px — иначе iOS увеличивает
   страницу при фокусе, причём по типу устройства, а не по ширине.
 
-  У Input и Textarea (components/ui/input.tsx, textarea.tsx — заготовка
-  shadcn) есть `md:text-sm`: с 768px предполагается мышь, и текст поля
-  мельчает до --text-sm. На iPad пальцем это предположение неверно ровно
-  там, где ошибиться легче всего: --text-sm там стандартные 14px (шкала
-  выше), на страницах входа — 14px на любой ширине. Ниже 768px поле
-  и так text-base, 16px.
+  Правило одно на ВСЕ поля, а не по списку компонентов (13.10.2026).
+  Раньше его держали по частям: `md:text-sm` у Input и Textarea (заготовка
+  shadcn: «с 768px мышь») поправили здесь, сырой <input> и <select>
+  с собственным `text-sm` — классом `touch:text-base` в разметке, и каждое
+  новое поле требовало вспомнить про оба места. Поиск в шапке и список
+  причин в гарантийном случае так и остались по 14px — Safari увеличивал
+  страницу при фокусе. Теперь поле — любой input (кроме галочек, кнопок
+  и файла), select и textarea внутри кабинета и страниц входа.
 
   Пиксели, а не 1rem: размер поля — требование iOS в точках экрана,
-  а не ступень шкалы. Только кабинет и страницы входа — сайт со своими
-  полями живёт по своим правилам. Сырые <input> с собственным text-sm
-  (поиск в переписке) получают `touch:text-base` прямо в разметке.
+  а не ступень шкалы. Селектор с нулевой специфичностью, но правило вне
+  слоёв, поэтому оно сильнее любой утилиты Tailwind (они в @layer).
 
   До 1023px, не шире: от 1024 --text-sm в кабинете уже увеличенный и на
   корне 125% даёт 20px, а на страницах входа — 17.5px; прижимать поле
   к 16px там значило бы сделать его мельче подписи над ним.
 */
-@media (min-width: 768px) and (max-width: 1023px) and (pointer: coarse) {
+@media (max-width: 1023px) and (pointer: coarse) {
   :where(.cabinet-shell, .public-shell)
-    :where([data-slot="input"], [data-slot="textarea"]) {
+    :where(
+      input:not(
+        [type="checkbox"],
+        [type="radio"],
+        [type="hidden"],
+        [type="range"],
+        [type="file"],
+        [type="submit"],
+        [type="button"],
+        [type="reset"],
+        [type="image"],
+        [type="color"]
+      ),
+      select,
+      textarea
+    ) {
+    font-size: 16px;
+  }
+}
+
+/*
+  То же для сайта (13.10.2026): в .marketing-shell на телефоне --text-base
+  равен 15px (шкала сайта: 12 · 15 · 18 · 22 · 28 · 36), и все поля заявки,
+  подписки, калькулятора и аудита получали 15px — Safari на iPhone при
+  фокусе увеличивал страницу, и форму приходилось сводить пальцами обратно.
+  Меняется только размер текста в поле; остальная шкала сайта не тронута.
+  От 640px — поле 18px (--text-sm × корень 125%), там запас есть.
+*/
+@media (max-width: 639px) and (pointer: coarse) {
+  :where(.marketing-shell)
+    :where(
+      input:not(
+        [type="checkbox"],
+        [type="radio"],
+        [type="hidden"],
+        [type="range"],
+        [type="file"],
+        [type="submit"],
+        [type="button"],
+        [type="reset"],
+        [type="image"],
+        [type="color"]
+      ),
+      select,
+      textarea
+    ) {
     font-size: 16px;
   }
 }
@@ -321,6 +367,9 @@ main[tabindex="-1"]:focus {
   --color-primary-active: var(--primary-active);
   --color-muted-active: var(--muted-active);
   --color-destructive-active: var(--destructive-active);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-progress: var(--progress);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -436,6 +485,13 @@ main[tabindex="-1"]:focus {
   /* Красная кнопка при нажатии: плашка гуще (30%), а красный текст темнее — иначе на густой
      плашке он падает ниже 4,5:1 (при 28% уже 4,0:1). */
   --destructive-active: rgb(110 32 30);
+  /* Тона статусных бейджей (components/ui/status-badge.tsx, lib/status-tones.ts). Каждый — цвет
+     текста и одновременно плашки (/10 в светлой, /20 в тёмной): текст читается на плашке на любой
+     поверхности кабинета не ниже 4,5:1 (tests/contrast-tokens.test.ts). Красного здесь нет —
+     это --destructive, и он значит только «отказ, ошибка, просрочка». */
+  --success: rgb(22 101 62);
+  --warning: rgb(133 77 14);
+  --progress: rgb(52 78 106);
   /* Воронка: одна холодная лестница от светлого к графиту */
   --chart-1: oklch(0.8400 0.0180 245);
   --chart-2: oklch(0.7150 0.0250 245);
@@ -508,6 +564,9 @@ main[tabindex="-1"]:focus {
     --primary-active: rgb(47 70 94);
     --muted-active: rgb(65 67 70);
     --destructive-active: rgb(255 214 211);
+    --success: rgb(134 214 168);
+    --warning: rgb(240 196 112);
+    --progress: rgb(158 189 219);
     --chart-1: oklch(0.8400 0.0180 245);
     --chart-2: oklch(0.7150 0.0250 245);
     --chart-3: oklch(0.5900 0.0300 245);
@@ -773,6 +832,8 @@ main[tabindex="-1"]:focus {
       [data-slot="button"],
       [data-slot="filter-chip"]:not([data-tall]),
       [data-slot="input"],
+      [data-slot="native-select"],
+      [data-slot="file-input"],
       [data-slot="select-trigger"],
       [data-slot="tabs-list"]
     ) {
@@ -827,9 +888,10 @@ main[tabindex="-1"]:focus {
   Обёртка shadcn (components/ui/checkbox.tsx) в кабинете одна — на карточке
   кандидата. Все остальные галочки (согласие при регистрации и на странице
   согласия кандидата, настройки уведомлений, внутренний комментарий, участники
-  встречи, гарантийный случай — 32 штуки) и все переключатели (5: «Посадить
-  в вакансию», согласие на передачу, представление клиенту) — сырой <input>
-  без своей рамки и своей галочки.
+  встречи, гарантийный случай — 21 место в 17 файлах; на экране экземпляров
+  больше, строки списков повторяют разметку) и все переключатели (4 места в
+  3 файлах: «Посадить в вакансию», согласие на передачу, представление клиенту)
+  — сырой <input> без своей рамки и своей галочки.
 
   Сначала правило действовало только на сенсорном экране (23.09.2026): на iOS
   Safari системная галочка рисуется крупной плашкой почти овалом, не

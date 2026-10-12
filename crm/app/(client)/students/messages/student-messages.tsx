@@ -8,7 +8,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import type { StudentThreadMessage } from "@/lib/students-service";
 import { draftPreview, threadActivityAt, withDraft } from "@/lib/students-threads";
 import type { StudentThreadItem, StudentThreadView } from "@/lib/students-threads";
@@ -27,7 +27,10 @@ import { CountBadge } from "@/components/ui/count-badge";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { PageTitle } from "@/components/ui/page-title";
 import { enterSendsMessage } from "@/lib/chat-keys";
+import { noScriptForm } from "@/lib/forms/no-script";
 import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDayDivider, formatMessageStamp, formatTime } from "@/lib/format-date";
 
 /** Как часто сверяемся с платформой. SSE между приложениями — отдельная задача, опроса здесь достаточно. */
 const POLL_MS = 10_000;
@@ -161,7 +164,7 @@ export function StudentMessages({
             "-mx-4 -mb-4 h-[calc(100svh-3.5rem-1rem-4rem)] min-h-[28rem]",
       )}
     >
-      <aside className={cn("flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r", activeId && "hidden md:flex")}>
+      <aside aria-label="Диалоги со студентами" className={cn("flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r", activeId && "hidden md:flex")}>
         <div className="border-b p-4">
           <PageTitle compact>Сообщения студентам</PageTitle>
         </div>
@@ -234,6 +237,7 @@ export function StudentMessages({
 }
 
 function ThreadCard({ thread, active, onClick }: { thread: StudentThreadItem; active: boolean; onClick: () => void }) {
+  const timeZone = useTimeZone();
   // Время в списке — последняя активность: сообщение или правка черновика
   const activityAt = threadActivityAt(thread);
   const draft = thread.draft;
@@ -255,10 +259,9 @@ function ThreadCard({ thread, active, onClick }: { thread: StudentThreadItem; ac
         <div className="flex items-baseline justify-between gap-2">
           <div className="truncate text-sm font-medium">{thread.counterpartName}</div>
           {activityAt > 0 && (
-            // Время — по часовому поясу того, кто смотрит: у сервера он другой, и без
-            // метки React при сверке разметки выбрасывал дерево и собирал заново
-            <div suppressHydrationWarning className="shrink-0 text-xs text-muted-foreground">
-              {formatWhen(new Date(activityAt).toISOString())}
+            // Время — в зоне из профиля, одной на сервере и в браузере (lib/format-date.ts)
+            <div className="shrink-0 text-xs text-muted-foreground">
+              {formatMessageStamp(activityAt, new Date(), timeZone)}
             </div>
           )}
         </div>
@@ -293,6 +296,10 @@ function Conversation({
   onSent: () => Promise<void>;
   onDraftChange: (thread: StudentThreadView, body: string) => void;
 }) {
+  const timeZone = useTimeZone();
+  const now = new Date();
+  const dayLabel = (value: string) => formatDayDivider(value, now, timeZone);
+  const timeOnly = (value: string) => formatTime(value, timeZone);
   const scroller = useRef<HTMLDivElement>(null);
   useScrollToLatestOnKeyboard(scroller);
   const stick = useRef(true);
@@ -426,6 +433,7 @@ function Conversation({
       {thread.canWrite ? (
         <form
           ref={formRef}
+          {...noScriptForm}
           onSubmit={(e) => {
             e.preventDefault();
             void send();
@@ -433,7 +441,7 @@ function Conversation({
           className="shrink-0 border-t p-3"
         >
           <div className="flex items-end gap-2">
-            <Textarea
+            <AutoGrowTextarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={1}
@@ -475,27 +483,6 @@ function Conversation({
 function sameBurst(a: StudentThreadMessage, b: StudentThreadMessage): boolean {
   if (a.mine !== b.mine) return false;
   return Date.parse(b.createdAt) - Date.parse(a.createdAt) < 5 * 60_000;
-}
-
-function dayLabel(value: string): string {
-  const date = new Date(value);
-  const now = new Date();
-  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((startOf(now) - startOf(date)) / 86_400_000);
-  if (days === 0) return "Сегодня";
-  if (days === 1) return "Вчера";
-  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
-}
-
-function timeOnly(value: string): string {
-  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-
-function formatWhen(value: string): string {
-  const date = new Date(value);
-  const now = new Date();
-  const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
-  return sameDay ? timeOnly(value) : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date);
 }
 
 /** Фото студента в кружке: файл берётся по отклику своей компании, у кого фото нет — остаётся инициал. */

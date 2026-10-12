@@ -7,7 +7,7 @@ import { authorizeOrThrow, requireAgencyActor } from "@/lib/auth/session";
 import type { InvoiceStatus } from "@/lib/generated/prisma/enums";
 import { notify } from "@/lib/notifications/notify";
 import { prisma } from "@/lib/db/prisma";
-import { formatMoney } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import {
   attachInvoiceFile,
   createInvoice,

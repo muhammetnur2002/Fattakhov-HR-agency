@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { ConversationSummary } from "@/lib/services/comments";
 import { CountBadge } from "@/components/ui/count-badge";
+import { formatMessageStamp } from "@/lib/format-date";
 
 /**
  * Список обсуждений по кандидатам и вакансиям — компактные строки для
@@ -14,10 +15,13 @@ export function ConversationList({
   conversations,
   hrefFor,
   emptyText,
+  timeZone,
 }: {
   conversations: ConversationSummary[];
   hrefFor: (c: ConversationSummary) => string;
   emptyText: string;
+  /** Зона человека: «сегодня» и время в строке считаются в ней. */
+  timeZone: string;
 }) {
   if (conversations.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyText}</p>;
@@ -38,7 +42,7 @@ export function ConversationList({
             <div className="flex items-baseline justify-between gap-2">
               <div className="truncate text-sm font-medium">{c.title}</div>
               <div className="shrink-0 text-xs text-muted-foreground">
-                {formatWhen(c.lastMessage.createdAt)}
+                {formatMessageStamp(c.lastMessage.createdAt, new Date(), timeZone)}
               </div>
             </div>
             <div className="truncate text-xs text-muted-foreground">{c.subtitle}</div>
@@ -53,17 +57,4 @@ export function ConversationList({
       ))}
     </div>
   );
-}
-
-/** Сегодня — только время, раньше — короткая дата: как в любом мессенджере. */
-function formatWhen(value: Date): string {
-  const date = new Date(value);
-  const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  return sameDay
-    ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(date)
-    : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date);
 }

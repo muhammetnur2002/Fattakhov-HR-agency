@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { canDo } from "@/lib/access";
-import { requireAgencyActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { listPipeline } from "@/lib/services/applications";
@@ -56,6 +56,7 @@ export default async function AgencyVacancyPage({
   const { id } = await params;
   const { tab } = await searchParams;
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
 
   const vacancy = await getVacancy(actor, id);
   if (!vacancy) notFound();
@@ -122,6 +123,7 @@ export default async function AgencyVacancyPage({
       {/* Приёмка заявки — главное действие, пока вакансия не запущена */}
       {canAccept && (
         <IntakeCard
+          timeZone={timeZone}
           vacancy={vacancy}
           recruiters={recruiters}
           canAssign={canDo(actor, "vacancy.assignRecruiter")}
@@ -191,7 +193,7 @@ export default async function AgencyVacancyPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">
                 {briefEdit
-                  ? `Изменено${briefEdit.by ? `: ${briefEdit.by}` : ""}, ${formatDate(briefEdit.at)}`
+                  ? `Изменено${briefEdit.by ? `: ${briefEdit.by}` : ""}, ${formatDate(briefEdit.at, timeZone)}`
                   : "Бриф ещё не правили со стороны агентства."}
               </p>
               <Button asChild size="sm" variant="outline">
@@ -201,7 +203,7 @@ export default async function AgencyVacancyPage({
           )}
           <Card>
             <CardContent>
-              <VacancyBrief
+              <VacancyBrief timeZone={timeZone}
                 brief={vacancy}
                 hiringManagerName={hiringManager?.fullName}
               />
@@ -349,6 +351,7 @@ function IntakeCard({
   vacancy,
   recruiters,
   canAssign,
+  timeZone,
 }: {
   vacancy: {
     id: string;
@@ -358,6 +361,7 @@ function IntakeCard({
   };
   recruiters: Parameters<typeof VacancyIntake>[0]["recruiters"];
   canAssign: boolean;
+  timeZone: string;
 }) {
   if (!["SUBMITTED", "CLARIFYING", "ESTIMATED"].includes(vacancy.status)) {
     return null;
@@ -376,10 +380,10 @@ function IntakeCard({
         <CardDescription>
           {/* formatDate уже заканчивается на «г.» — своя точка тут даёт вторую */}
           {vacancy.submittedAt
-            ? `Отправлена ${formatDate(vacancy.submittedAt)} `
+            ? `Отправлена ${formatDate(vacancy.submittedAt, timeZone)} `
             : ""}
           {vacancy.estimatedFirstCandidatesAt
-            ? `Обещали кандидатов к ${formatDate(vacancy.estimatedFirstCandidatesAt)}.`
+            ? `Обещали кандидатов к ${formatDate(vacancy.estimatedFirstCandidatesAt, timeZone)}.`
             : vacancy.status === "CLARIFYING"
               ? "Задали вопросы — пока клиент не ответит, заявка ждёт."
               : "Возьмите в работу или назовите сроки."}

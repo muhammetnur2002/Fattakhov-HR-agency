@@ -11,7 +11,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { canDo, effectiveGrants } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateNumeric } from "@/lib/format-date";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
 import {
   fetchInstitutionNames,
@@ -49,6 +50,7 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
   const actor = await requireAgencyActor();
   authorize(actor, "students.enter");
   if (!effectiveGrants(actor).includes("students.search")) notFound();
+  const timeZone = await getUserTimeZone();
 
   const params = parseStudentSearchParams(await searchParams);
 
@@ -148,7 +150,7 @@ export default async function StudentsSearchPage({ searchParams }: { searchParam
           <ul className="grid gap-3 xl:grid-cols-2">
             {result.items.map((student) => (
               <li key={student.id} className="min-w-0">
-                <StudentRow student={student} backQuery={backQuery} inCandidates={Boolean(knownCandidates[student.id])} canPick={canPick} />
+                <StudentRow student={student} backQuery={backQuery} inCandidates={Boolean(knownCandidates[student.id])} canPick={canPick} timeZone={timeZone} />
               </li>
             ))}
           </ul>
@@ -182,18 +184,18 @@ function Header() {
   );
 }
 
-const DATE = new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow" });
-
 function StudentRow({
   student,
   backQuery,
   inCandidates,
   canPick,
+  timeZone,
 }: {
   student: PlatformStudentItem;
   backQuery: string;
   inCandidates: boolean;
   canPick: boolean;
+  timeZone: string;
 }) {
   const meta = [ageLabel(student.age), GENDER_LABEL[student.gender], student.city].filter(Boolean).join(" · ");
   const education = [
@@ -240,7 +242,7 @@ function StudentRow({
       {student.about && <p className="mt-2 line-clamp-2 text-sm break-words text-muted-foreground">{student.about}</p>}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span>Регистрация: {DATE.format(new Date(student.createdAt))}</span>
+        <span>Регистрация: {formatDateNumeric(student.createdAt, timeZone)}</span>
         <PresenceLabel lastSeenAt={student.lastSeenAt} />
       </div>
     </Link>

@@ -301,10 +301,9 @@ export function VacancyForm({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="salaryFrom">Оплата от</Label>
+            <Field label="Оплата от" error={errors.salaryFrom}>
               <Input id="salaryFrom" name="salaryFrom" type="number" min={0} defaultValue={initial?.salaryFrom ?? ""} />
-            </div>
+            </Field>
             <Field label="Оплата до" error={errors.salaryTo}>
               <Input id="salaryTo" name="salaryTo" type="number" min={0} defaultValue={initial?.salaryTo ?? ""} />
             </Field>
@@ -362,10 +361,11 @@ export function VacancyForm({
             <Field label="Город" className="sm:col-span-2" error={errors.city}>
               <Input id="city" name="city" defaultValue={initial?.city ?? "Казань"} required />
             </Field>
-            <div className="space-y-2">
-              <Label htmlFor="hoursPerWeek">Часов в неделю</Label>
+            {/* min/max подсказывают счётчику; проверка браузера выключена (useFormAction), диапазон 4–60 проверяет
+                студенческая платформа, и её отказ приходит в `fields.hoursPerWeek` — ему нужно место под полем */}
+            <Field label="Часов в неделю" error={errors.hoursPerWeek}>
               <Input id="hoursPerWeek" name="hoursPerWeek" type="number" min={4} max={60} defaultValue={initial?.hoursPerWeek ?? ""} />
-            </div>
+            </Field>
           </div>
 
           <FieldSet id="shiftDays-group" legend="Дни" error={errors.shiftDays} className="space-y-2">

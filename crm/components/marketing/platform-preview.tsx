@@ -2,6 +2,7 @@ import { Check, Clock, MessageSquare } from "lucide-react";
 
 import { Reveal } from "@/components/motion/primitives";
 import { SPLIT_MAIN } from "./layout";
+import { formatMoney } from "@/lib/format-money";
 
 /**
  * Личный кабинет на лендинге.
@@ -26,22 +27,22 @@ const STAGES = [
     name: "Представлен клиенту",
     count: 3,
     cards: [
-      { role: "Руководитель отдела продаж", salary: "210 000 ₽", days: "2 дн.", comments: 2 },
-      { role: "Коммерческий директор", salary: "245 000 ₽", days: "1 дн.", comments: null },
+      { role: "Руководитель отдела продаж", salary: formatMoney(210_000), days: "2 дн.", comments: 2 },
+      { role: "Коммерческий директор", salary: formatMoney(245_000), days: "1 дн.", comments: null },
     ],
   },
   {
     name: "Интервью с клиентом",
     count: 2,
     cards: [
-      { role: "Начальник отдела продаж", salary: "205 000 ₽", days: "4 дн.", comments: 1 },
+      { role: "Начальник отдела продаж", salary: formatMoney(205_000), days: "4 дн.", comments: 1 },
     ],
   },
   {
     name: "Оффер",
     count: 1,
     cards: [
-      { role: "Системный аналитик", salary: "230 000 ₽", days: "1 дн.", comments: null },
+      { role: "Системный аналитик", salary: formatMoney(230_000), days: "1 дн.", comments: null },
     ],
   },
 ];

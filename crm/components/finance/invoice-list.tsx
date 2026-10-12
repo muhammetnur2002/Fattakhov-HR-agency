@@ -1,11 +1,12 @@
 import { FileText } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/format-date";
 import type { InvoiceStatus } from "@/lib/generated/prisma/enums";
-import { formatMoney } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
+import { INVOICE_STATUS_TONE } from "@/lib/status-tones";
 import type { InvoiceView } from "@/lib/services/invoices";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -19,14 +20,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 };
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
-  const variant =
-    status === "PAID"
-      ? "default"
-      : status === "OVERDUE"
-        ? "destructive"
-        : "secondary";
-
-  return <Badge variant={variant}>{STATUS_LABELS[status]}</Badge>;
+  return <StatusBadge tone={INVOICE_STATUS_TONE[status]}>{STATUS_LABELS[status]}</StatusBadge>;
 }
 
 /**
@@ -40,11 +34,13 @@ export function InvoiceList({
   showClient = false,
   emptyText,
   renderActions,
+  timeZone,
 }: {
   invoices: InvoiceView[];
   showClient?: boolean;
   emptyText: string;
   renderActions?: (invoice: InvoiceView) => React.ReactNode;
+  timeZone: string;
 }) {
   if (invoices.length === 0) {
     return <EmptyState>{emptyText}</EmptyState>;
@@ -71,12 +67,12 @@ export function InvoiceList({
                 )}
                 <div className="mt-1 text-xs text-muted-foreground">
                   {invoice.issuedAt
-                    ? `Выставлен ${formatDate(invoice.issuedAt)}`
+                    ? `Выставлен ${formatDate(invoice.issuedAt, timeZone)}`
                     : "Не выставлен"}
                   {invoice.dueAt && invoice.status !== "PAID"
-                    ? ` · оплатить до ${formatDate(invoice.dueAt)}`
+                    ? ` · оплатить до ${formatDate(invoice.dueAt, timeZone)}`
                     : ""}
-                  {invoice.paidAt ? ` · оплачен ${formatDate(invoice.paidAt)}` : ""}
+                  {invoice.paidAt ? ` · оплачен ${formatDate(invoice.paidAt, timeZone)}` : ""}
                 </div>
               </div>
 

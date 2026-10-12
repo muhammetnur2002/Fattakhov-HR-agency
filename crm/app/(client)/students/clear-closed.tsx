@@ -17,7 +17,7 @@ import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 export function ClearClosed({ ids }: { ids: string[] }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -48,13 +48,15 @@ export function ClearClosed({ ids }: { ids: string[] }) {
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm">Удалить снятые и отклонённые вакансии ({ids.length}) из списка? Это нельзя отменить.</p>
+    <div {...groupProps} className="space-y-2">
+      <p id={questionId} className="text-sm">
+        Удалить снятые и отклонённые вакансии ({ids.length}) из списка? Это нельзя отменить.
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="destructive" loading={pending} onClick={run}>
           {pending ? "Удаляем…" : "Да, удалить"}
         </Button>
-        <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+        <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
           Отмена
         </Button>
       </div>

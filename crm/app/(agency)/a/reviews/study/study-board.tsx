@@ -97,7 +97,7 @@ function StudentCard({
 }) {
   const [rejecting, setRejecting] = useState(false);
   // «Вернуть с причиной» заменяет кнопки полем причины: фокус — в поле, после «Отмены» — на кнопку
-  const { triggerRef, focusRef } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
@@ -145,7 +145,11 @@ function StudentCard({
         </p>
 
         {rejecting ? (
-          <div className="space-y-2">
+          <div {...groupProps} className="space-y-2">
+            {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
+            <span id={questionId} className="sr-only">
+              Вернуть справку с причиной
+            </span>
             <Textarea
               ref={focusRef}
               value={note}

@@ -36,14 +36,22 @@ import { cn } from "@/lib/utils";
  *
  * Вне провайдера (тесты, страницы без каркаса) всё работает, но без общего
  * состояния и без объявления: хуки не падают.
+ *
+ * Что объявлять, решает наличие списка: чип-ссылка стоит и там, где списка нет (период
+ * на аналитике и в календаре, раздел сообщений), и «Список обновлён» там врал бы. Пока на
+ * странице есть хотя бы один `ListRegion`, говорится про список, иначе — про страницу.
  */
 
 /** Текст для читалки экрана, когда список обновился. */
 export const LIST_UPDATED_MESSAGE = "Список обновлён";
+/** То же там, где на странице нет списка: меняется только вид (период, раздел). */
+export const PAGE_UPDATED_MESSAGE = "Страница обновлена";
 
 type Ctx = {
   busy: boolean;
   report: (source: string, busy: boolean) => void;
+  /** Список заявил о себе; возвращает отмену. */
+  registerRegion: () => () => void;
 };
 
 const ListPendingContext = createContext<Ctx | null>(null);
@@ -52,6 +60,14 @@ export function ListPendingProvider({ children }: { children: React.ReactNode })
   const [sources, setSources] = useState<ReadonlySet<string>>(() => new Set());
   const [announcement, setAnnouncement] = useState("");
   const wasBusy = useRef(false);
+  const regions = useRef(0);
+
+  const registerRegion = useCallback(() => {
+    regions.current += 1;
+    return () => {
+      regions.current -= 1;
+    };
+  }, []);
 
   const report = useCallback((source: string, busy: boolean) => {
     setSources((prev) => {
@@ -70,7 +86,8 @@ export function ListPendingProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (wasBusy.current && !busy) {
       setAnnouncement("");
-      const say = setTimeout(() => setAnnouncement(LIST_UPDATED_MESSAGE), 60);
+      const text = regions.current > 0 ? LIST_UPDATED_MESSAGE : PAGE_UPDATED_MESSAGE;
+      const say = setTimeout(() => setAnnouncement(text), 60);
       const clear = setTimeout(() => setAnnouncement(""), 4000);
       wasBusy.current = busy;
       return () => {
@@ -81,7 +98,7 @@ export function ListPendingProvider({ children }: { children: React.ReactNode })
     wasBusy.current = busy;
   }, [busy]);
 
-  const value = useMemo(() => ({ busy, report }), [busy, report]);
+  const value = useMemo(() => ({ busy, report, registerRegion }), [busy, report, registerRegion]);
 
   return (
     <ListPendingContext.Provider value={value}>
@@ -145,7 +162,10 @@ export function ListRegion({
   children: React.ReactNode;
   className?: string;
 }) {
-  const busy = useContext(ListPendingContext)?.busy ?? false;
+  const ctx = useContext(ListPendingContext);
+  const busy = ctx?.busy ?? false;
+  const registerRegion = ctx?.registerRegion;
+  useEffect(() => registerRegion?.(), [registerRegion]);
   return (
     <div
       data-slot="list-region"

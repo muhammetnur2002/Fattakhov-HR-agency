@@ -164,7 +164,8 @@ export const changePasswordSchema = z
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1),
+    // Токен — скрытое поле: человек его не вводит, а у ошибки нет места под полем; действие показывает её общим сообщением
+    token: z.string().min(1, "Ссылка недействительна — запросите новую"),
     newPassword: newPasswordSchema,
     newPasswordConfirm: z.string(),
   })

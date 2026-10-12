@@ -13,10 +13,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import { panelClass } from "@/components/ui/panel";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { useFormAction } from "@/lib/hooks/use-form-action";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDayMonthTime } from "@/lib/format-date";
 
 export type FeedRow = {
   id: string;
@@ -30,15 +33,6 @@ export type FeedRow = {
 };
 
 export type VacancyOption = { applicationId: string; label: string };
-
-function when(iso: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
 
 /**
  * Комментарии команды под кандидатом.
@@ -93,7 +87,7 @@ export function CandidateCommentsCard({
       ) : (
         <form {...formProps} className="space-y-4 border-t pt-4">
           <input type="hidden" name="candidateId" value={candidateId} />
-          <Textarea
+          <AutoGrowTextarea
             name="body"
             rows={3}
             required
@@ -103,11 +97,10 @@ export function CandidateCommentsCard({
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2">
               <span className="text-muted-foreground">Вакансия</span>
-              <select
+              <NativeSelect
                 name="applicationId"
                 value={applicationId}
                 onChange={(e) => setApplicationId(e.target.value)}
-                className="h-8 rounded-lg border border-field bg-background px-2 text-sm"
               >
                 <option value="">Кандидат в целом</option>
                 {vacancies.map((v) => (
@@ -115,7 +108,7 @@ export function CandidateCommentsCard({
                     {v.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
             <label className={`flex items-center gap-2 ${applicationId ? "" : "opacity-60"}`}>
               <input
@@ -147,6 +140,7 @@ export function CandidateCommentsCard({
 }
 
 function FeedItem({ item, candidateId }: { item: FeedRow; candidateId: string }) {
+  const timeZone = useTimeZone();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -162,7 +156,7 @@ function FeedItem({ item, candidateId }: { item: FeedRow; candidateId: string })
     <li className={panelClass("plain", "space-y-1")}>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{item.author ?? "Сотрудник"}</span>
-        <span>{when(item.createdAt)}</span>
+        <span>{formatDayMonthTime(item.createdAt, timeZone)}</span>
         {item.application ? (
           <Link href={`/a/applications/${item.application.id}`} className="underline underline-offset-2">
             {item.application.vacancyLabel}

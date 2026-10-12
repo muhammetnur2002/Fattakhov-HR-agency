@@ -92,7 +92,7 @@ export async function createInvitation(params: {
     const mayDisclose = (clientId: string | null) =>
       !inviter?.clientId || clientId === inviter.clientId;
     const unavailable = () =>
-      new InviteError(`Не удалось пригласить ${email}: адрес недоступен. Укажите другой.`);
+      new InviteError(`Не удалось пригласить ${email}: адрес недоступен. Укажите другой.`, "email");
 
     const taken = await tx.user.findFirst({
       where: { email },
@@ -106,6 +106,7 @@ export async function createInvitation(params: {
       throw new InviteError(
         `${email} уже занят: ${taken.fullName}, ${where}. ` +
           `Один адрес — один пользователь. Укажите другой.`,
+        "email",
       );
     }
 
@@ -118,6 +119,7 @@ export async function createInvitation(params: {
       throw new InviteError(
         `На ${email} уже есть действующее приглашение — оно в списке «Ждут принятия». ` +
           `Нужно пригласить заново — отзовите там прежнее.`,
+        "email",
       );
     }
 
@@ -274,7 +276,15 @@ export async function getInvitation(
   };
 }
 
-export class InviteError extends Error {}
+export class InviteError extends Error {
+  /** Имя поля формы, к которому относится отказ (`email` — адрес занят); без него отказ общий. */
+  constructor(
+    message: string,
+    readonly field?: "email",
+  ) {
+    super(message);
+  }
+}
 
 /**
  * Приём приглашения: создаёт пользователя и гасит токен.

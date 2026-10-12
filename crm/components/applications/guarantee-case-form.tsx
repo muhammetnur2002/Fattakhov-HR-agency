@@ -7,6 +7,7 @@ import {
 import { Field } from "@/components/ui/field";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/lib/hooks/use-form-action";
 import { GUARANTEE_BREAK_REASON_LABELS } from "@/lib/labels";
@@ -15,7 +16,7 @@ import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button"
 /**
  * Гарантийный случай: нанятый ушёл в гарантийный срок.
  *
- * Обычный <select>, а не выпадающий список дизайн-системы: поле одно,
+ * `NativeSelect` (родной список браузера в оформлении кабинета), а не выпадающий список Radix: поле одно,
  * значений четыре, а родной элемент работает с клавиатуры и на телефоне
  * без единой строки кода.
  */
@@ -53,13 +54,7 @@ export function GuaranteeCaseForm({
         </Field>
         <Field label="Причина" id="gc-reason" error={fields.reason}>
           {(control) => (
-            <select
-              {...control}
-              name="reason"
-              required
-              defaultValue=""
-              className="h-8 w-full rounded-lg border border-field bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring aria-invalid:border-destructive aria-invalid:not-focus-visible:ring-3 aria-invalid:not-focus-visible:ring-destructive/20 touch:text-base dark:bg-input/30"
-            >
+            <NativeSelect {...control} name="reason" required defaultValue="" className="w-full">
               <option value="" disabled>
                 Выберите
               </option>
@@ -68,7 +63,7 @@ export function GuaranteeCaseForm({
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           )}
         </Field>
       </div>

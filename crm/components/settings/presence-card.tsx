@@ -12,13 +12,22 @@ import { effectiveShowPresence } from "@/lib/presence";
  * действует правило из effectiveShowPresence, и серверное действие отклонит
  * попытку сохранить.
  */
-export function PresenceCard({ role, showPresence }: { role: string; showPresence: boolean }) {
+export function PresenceCard({
+  role,
+  showPresence,
+  headingLevel = "h2",
+}: {
+  role: string;
+  showPresence: boolean;
+  /** `h3`, когда карточка стоит внутри раздела с собственным `h2` (настройки агентства). */
+  headingLevel?: "h2" | "h3";
+}) {
   const canHide = role === "OWNER";
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Статус «в сети»</CardTitle>
+        <CardTitle as={headingLevel} className="text-base">Статус «в сети»</CardTitle>
         <CardDescription>
           {canHide
             ? "Видно ли другим людям в «Сообщениях», что вы сейчас в кабинете и когда были в нём последний раз."

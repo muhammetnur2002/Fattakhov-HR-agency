@@ -11,6 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // Подписи по умолчанию английские («Notifications alt+T», «Close toast») — читалка экрана
+      // зачитывала их посреди русского интерфейса
+      containerAriaLabel="Уведомления"
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -37,6 +40,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       toastOptions={{
+        closeButtonAriaLabel: "Закрыть",
         classNames: {
           toast: "cn-toast",
         },

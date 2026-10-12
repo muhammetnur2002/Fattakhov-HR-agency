@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { AccessDeniedError } from "@/lib/access";
-import type { FormState } from "@/lib/form-state";
+import { serviceFailure, type FormState } from "@/lib/form-state";
 import { authorize, requireAgencyActor } from "@/lib/auth/session";
 import { inviteResultMessage, InviteError } from "@/lib/services/invitations";
 import { resetStaffTwoFactor, TwoFactorError } from "@/lib/services/two-factor";
@@ -74,8 +74,8 @@ export async function createStaffAction(
   try {
     await createStaffAccount(actor, parsed.data);
   } catch (error) {
-    // Единственная беда сервиса здесь — «адрес уже занят»: показываем её у поля почты
-    if (error instanceof StaffError) return { fields: { email: error.message } };
+    // «Адрес уже занят» сервис помечает сам (`field: "email"`) — это у поля почты, остальное общей строкой
+    if (error instanceof StaffError) return serviceFailure(error);
     const known = explain(error);
     if (known) return known;
     throw error;
@@ -194,10 +194,8 @@ export async function inviteStaffAction(
   try {
     await inviteStaff(actor, parsed.data);
   } catch (error) {
-    // Адрес занят или уже приглашён — у поля почты, а не общей строкой
-    if (error instanceof InviteError || error instanceof StaffError) {
-      return { fields: { email: error.message } };
-    }
+    // Адрес занят или уже приглашён сервис помечает сам (`field: "email"`) — это у поля почты, остальное общей строкой
+    if (error instanceof InviteError || error instanceof StaffError) return serviceFailure(error);
     const known = explain(error);
     if (known) return known;
     throw error;

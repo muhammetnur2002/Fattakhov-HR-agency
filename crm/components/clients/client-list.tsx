@@ -1,8 +1,7 @@
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { AgreementStatusBadge, ClientStatusBadge } from "@/components/clients/status-badges";
 import { Card, CardContent } from "@/components/ui/card";
-import { CLIENT_STATUS_LABELS } from "@/lib/labels";
 import type { ClientStatus } from "@/lib/generated/prisma/enums";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -52,13 +51,11 @@ export function ClientList({
               {/* Бейджи в своих ячейках: прямыми детьми сетки они
                   растянулись бы на всю её ширину */}
               <div className="xl:text-right">
-                <AgreementBadge status={client.agreementStatus} />
+                <AgreementStatusBadge status={client.agreementStatus} />
               </div>
 
               <div className="xl:text-right">
-                <Badge variant={client.status === "ACTIVE" ? "default" : "secondary"}>
-                  {CLIENT_STATUS_LABELS[client.status]}
-                </Badge>
+                <ClientStatusBadge status={client.status} />
               </div>
             </CardContent>
           </Card>
@@ -74,19 +71,4 @@ function pluralVacancies(n: number): string {
   if (mod10 === 1 && mod100 !== 11) return "вакансия";
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "вакансии";
   return "вакансий";
-}
-
-/** Отдельный бейдж под договор: «ждёт подтверждения» — это задача аккаунту, её видно сразу. */
-function AgreementBadge({ status }: { status: string | null }) {
-  if (status === "ACTIVE") {
-    return <Badge variant="outline">Договор действует</Badge>;
-  }
-  if (status === "PENDING") {
-    return <Badge variant="destructive">Ждёт подтверждения</Badge>;
-  }
-  return (
-    <Badge variant="outline" className="text-muted-foreground">
-      Без договора
-    </Badge>
-  );
 }

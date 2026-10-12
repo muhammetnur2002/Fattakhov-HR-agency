@@ -7,7 +7,7 @@ import { RecruiterFilter } from "@/components/vacancies/recruiter-filter";
 import { ListRegion } from "@/components/shell/list-pending";
 import { ListToolbar } from "@/components/shell/list-toolbar";
 import { SearchField } from "@/components/shell/search-field";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { canDo } from "@/lib/access";
 import { requireAgencyActor } from "@/lib/auth/session";
@@ -139,11 +139,7 @@ export default async function AgencyVacanciesPage({
             <h2 className="text-lg font-medium">
               {canAccept ? "Требуют реакции" : "Скоро в работу"}
             </h2>
-            {canAccept ? (
-              <Badge variant="destructive">{incoming.length}</Badge>
-            ) : (
-              <Badge variant="outline">{incoming.length}</Badge>
-            )}
+            <StatusBadge tone={canAccept ? "warning" : "neutral"}>{incoming.length}</StatusBadge>
           </div>
           <ListRegion>
             <VacancyList

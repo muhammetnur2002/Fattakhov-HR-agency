@@ -12,6 +12,7 @@ import {
   AvatarImage,
 } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatSalaryRange } from "@/lib/format-money";
+import { PROFILE_MODERATION_TONE } from "@/lib/status-tones";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type {
   ModerationCompany,
@@ -55,9 +58,7 @@ const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
 };
 
 function money(from: number | null, to: number | null): string {
-  if (!from && !to) return "Зарплата не указана";
-  if (from && to && from !== to) return `${from.toLocaleString("ru-RU")}–${to.toLocaleString("ru-RU")} ₽`;
-  return `${(from ?? to)!.toLocaleString("ru-RU")} ₽`;
+  return formatSalaryRange(from, to) ?? "Зарплата не указана";
 }
 
 export function ModerationBoard({
@@ -239,14 +240,14 @@ export function ModerationBoard({
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Badge>{WORK_FORMAT_LABEL[preview.vacancy.workFormat] ?? preview.vacancy.workFormat}</Badge>
+                  <Badge variant="secondary">{WORK_FORMAT_LABEL[preview.vacancy.workFormat] ?? preview.vacancy.workFormat}</Badge>
                   <Badge variant="secondary">
                     {EMPLOYMENT_TYPE_LABEL[preview.vacancy.employmentType] ?? preview.vacancy.employmentType}
                   </Badge>
                   {preview.vacancy.isHot && (
-                    <Badge variant="destructive">
+                    <StatusBadge tone="warning">
                       <Flame className="size-3" /> Срочно
-                    </Badge>
+                    </StatusBadge>
                   )}
                   {preview.vacancy.tags.map((tag) => (
                     <Badge key={tag} variant="outline">
@@ -379,8 +380,8 @@ function CompanyCard({
 
         {(company.freeEmail || !company.inn) && (
           <div className="flex flex-wrap gap-2">
-            {company.freeEmail && <Badge variant="destructive">Почта не на домене компании</Badge>}
-            {!company.inn && <Badge variant="destructive">Нет ИНН</Badge>}
+            {company.freeEmail && <StatusBadge tone="warning">Почта не на домене компании</StatusBadge>}
+            {!company.inn && <StatusBadge tone="warning">Нет ИНН</StatusBadge>}
           </div>
         )}
 
@@ -424,7 +425,9 @@ function VacancyCard({
               <Building2 className="size-3.5 shrink-0" />
               {vacancy.company}
               {!companyReady && (
-                <Badge variant="destructive">Компания: {COMPANY_STATUS_LABEL[item.companyStatus]}</Badge>
+                <StatusBadge tone={PROFILE_MODERATION_TONE[item.companyStatus]}>
+                  Компания: {COMPANY_STATUS_LABEL[item.companyStatus]}
+                </StatusBadge>
               )}
             </p>
           </div>
@@ -525,7 +528,7 @@ function DecisionBar({
 }) {
   const [rejecting, setRejecting] = useState(false);
   // «Отклонить» заменяет кнопки полем причины: фокус — в поле, а после «Отмены» — на «Отклонить»
-  const { triggerRef, focusRef } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
@@ -543,7 +546,11 @@ function DecisionBar({
 
   if (rejecting) {
     return (
-      <div className="space-y-2 border-t pt-3">
+      <div {...groupProps} className="space-y-2 border-t pt-3">
+        {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
+        <span id={questionId} className="sr-only">
+          Отклонить с причиной
+        </span>
         <Textarea
           ref={focusRef}
           value={note}

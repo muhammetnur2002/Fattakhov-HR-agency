@@ -12,7 +12,10 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDayMonthTime } from "@/lib/format-date";
 
 export type ChatRow = {
   id: string;
@@ -23,15 +26,6 @@ export type ChatRow = {
 };
 
 export type VacancyChoice = { id: string; label: string; title: string };
-
-function when(iso: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
 
 /** Текст предложения по умолчанию (тот же, что defaultOfferText на сервере). */
 function offerText(studentName: string, vacancyTitle: string): string {
@@ -95,11 +89,11 @@ export function OfferWorkCard({
           </p>
         ) : (
           <>
-            <select
+            <NativeSelect
               aria-label="Вакансия"
               value={vacancyId}
               onChange={(event) => pick(event.target.value)}
-              className="h-9 w-full rounded-lg border border-field bg-background px-3 text-sm"
+              className="w-full"
             >
               <option value="">Выберите вакансию…</option>
               {vacancies.map((v) => (
@@ -107,7 +101,7 @@ export function OfferWorkCard({
                   {v.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <Textarea
               aria-label="Сообщение студенту"
               placeholder="Сообщение студенту (можно оставить пустым)"
@@ -149,6 +143,7 @@ export function StudentChatCard({
   /** Платформа не ответила: переписку показать нельзя, писать тоже. */
   platformError?: string;
 }) {
+  const timeZone = useTimeZone();
   const [body, setBody] = useState("");
   const [state, setState] = useState<StudentActionState>({});
   const [pending, startTransition] = useTransition();
@@ -197,7 +192,7 @@ export function StudentChatCard({
                   >
                     <div className="mb-1 text-xs text-muted-foreground">
                       {m.author === "STUDENT" ? "Студент" : `${m.staffName ?? "Агентство"} (агентство)`} ·{" "}
-                      {when(m.createdAt)}
+                      {formatDayMonthTime(m.createdAt, timeZone)}
                     </div>
                     <div className="whitespace-pre-line break-words">{m.body}</div>
                   </li>

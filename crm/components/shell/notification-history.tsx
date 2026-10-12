@@ -7,6 +7,8 @@ import { ListRegion } from "@/components/shell/list-pending";
 import { LoadMore } from "@/components/shell/load-more";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatDayMonthTime } from "@/lib/format-date";
 
 export type HistoryNotification = {
   id: string;
@@ -67,6 +69,7 @@ export function NotificationHistory({
 }
 
 function Item({ notification }: { notification: HistoryNotification }) {
+  const timeZone = useTimeZone();
   const content = (
     <div
       className={cn(
@@ -85,7 +88,7 @@ function Item({ notification }: { notification: HistoryNotification }) {
           </div>
         )}
         <div className="mt-1 text-xs text-muted-foreground">
-          {formatWhen(notification.createdAt)}
+          {formatDayMonthTime(notification.createdAt, timeZone)}
         </div>
       </div>
     </div>
@@ -98,13 +101,4 @@ function Item({ notification }: { notification: HistoryNotification }) {
       {content}
     </Link>
   );
-}
-
-function formatWhen(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
 }

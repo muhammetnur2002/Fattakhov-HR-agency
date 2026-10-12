@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 
 import { decideAccountDeletionAction } from "@/app/(agency)/a/clients/actions";
 import { FormMessage } from "@/components/ui/form-message";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
@@ -24,7 +24,7 @@ export function DeletionRequest({
   canDecide: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
 
@@ -38,18 +38,20 @@ export function DeletionRequest({
   return (
     <Panel tone="danger">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="destructive">Просит удалить аккаунт</Badge>
+        <StatusBadge tone="warning">Просит удалить аккаунт</StatusBadge>
         {!canDecide && <span className="text-xs text-muted-foreground">Решает владелец агентства</span>}
       </div>
       {canDecide &&
         (confirming ? (
-          <div className="space-y-2">
-            <p className="text-sm">Удалить аккаунт? Имя, почта и пароль будут стёрты, вход закроется. Это нельзя отменить.</p>
+          <div {...groupProps} className="space-y-2">
+            <p id={questionId} className="text-sm">
+              Удалить аккаунт? Имя, почта и пароль будут стёрты, вход закроется. Это нельзя отменить.
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => decide("confirm")}>
                 {pending ? "Подождите…" : "Да, удалить"}
               </Button>
-              <Button ref={focusRef} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
+              <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
                 Назад
               </Button>
             </div>

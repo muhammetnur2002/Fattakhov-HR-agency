@@ -50,7 +50,9 @@ export function QuickLogin({
 
       <div className="space-y-4">
         {noAccount && (
-          <Alert>
+          // Появляется сразу после попытки входа и отвечает на неё: role="alert" объявляется при вставке в страницу,
+          // а вставленный с текстом status — не везде (до правки `Alert` без variant был alert всегда)
+          <Alert role="alert">
             <AlertDescription>
               Аккаунта с таким входом пока нет.{" "}
               <Link

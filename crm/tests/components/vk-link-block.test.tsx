@@ -119,7 +119,8 @@ describe("получение кода и ожидание сообщения", (
 
     expect(exec).toHaveBeenCalledWith("copy");
     expect(screen.queryByText("Скопировано")).toBeNull();
-    expect(screen.getByText(/Не удалось скопировать/)).toBeInTheDocument();
+    // Общая кнопка (CopyButton): то же слово, что везде в продукте
+    expect(screen.getByRole("status")).toHaveTextContent("Скопируйте вручную");
   });
 
   it("опрашивает сервер и, когда код дошёл, сам убирает его и обновляет страницу", async () => {

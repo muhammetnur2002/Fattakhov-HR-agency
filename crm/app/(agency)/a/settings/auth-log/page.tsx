@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import {
   Card,
@@ -7,7 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatInZone } from "@/lib/format-date";
 import {
   AUTH_EVENT_LABELS,
   describeUserAgent,
@@ -40,18 +41,6 @@ const METHODS: Record<string, string> = {
   totp: "приложение",
 };
 
-/** Время по Москве: агентство работает в одном часовом поясе, и журнал сверяют с рабочим днём. */
-function formatMoscow(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Europe/Moscow",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
-}
-
 /** Способ и причина из деталей — одной короткой строкой. */
 function describeDetails(details: unknown): string | null {
   if (typeof details !== "object" || details === null) return null;
@@ -83,6 +72,7 @@ export default async function AuthLogPage({
 }) {
   const actor = await requireAgencyActor();
   authorize(actor, "auth.log");
+  const timeZone = await getUserTimeZone();
 
   const onlyFailed = (await searchParams).failed === "1";
   const events = await listAuthEvents(actor, { onlyFailed, limit: 200 });
@@ -138,12 +128,12 @@ export default async function AuthLogPage({
                       dateTime={event.createdAt.toISOString()}
                       className="text-xs text-muted-foreground tabular-nums sm:pt-0.5"
                     >
-                      {formatMoscow(event.createdAt)}
+                      {formatInZone(event.createdAt, "dateTimeSeconds", timeZone)}
                     </time>
                     <div>
-                      <Badge variant={failed ? "destructive" : "secondary"}>
+                      <StatusBadge tone={failed ? "danger" : "neutral"}>
                         {AUTH_EVENT_LABELS[event.kind]}
-                      </Badge>
+                      </StatusBadge>
                     </div>
                     <div className="min-w-0 space-y-0.5">
                       <div className="font-medium break-words">{person.name}</div>

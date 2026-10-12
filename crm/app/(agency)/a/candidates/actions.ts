@@ -298,7 +298,9 @@ export async function rejectAction(
   const applicationId = String(formData.get("applicationId") || "");
 
   const parsed = rejectSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return invalidForm(parsed.error, "Укажите причину отказа");
+  // Общая сводка по умолчанию: текст у поля называет, что именно неверно (причина не выбрана или для «Другое»
+  // нет комментария). Фраза «Укажите причину отказа» над кнопкой противоречила бы ошибке у поля комментария
+  if (!parsed.success) return invalidForm(parsed.error);
 
   try {
     authorizeOrThrow(actor, "application.moveStage");

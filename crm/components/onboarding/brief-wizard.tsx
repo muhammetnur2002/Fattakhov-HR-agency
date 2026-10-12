@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { noScriptForm } from "@/lib/forms/no-script";
 import { cn } from "@/lib/utils";
 
 /**
@@ -388,6 +389,7 @@ export function BriefWizard({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: direction * -shift }}
               transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+              {...noScriptForm}
               onSubmit={next}
               noValidate
               className="space-y-6"

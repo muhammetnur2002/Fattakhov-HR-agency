@@ -69,18 +69,24 @@ test("разделы — в нижней панели, одним касание
 test("кнопки на сенсорном экране — высота пропорциональна тексту", async ({ page }) => {
   await page.goto("/a/calendar");
 
-  const ratios = await page.evaluate(() =>
-    [...document.querySelectorAll("main [data-slot=button]")]
+  const { ratios, chips } = await page.evaluate(() => {
+    // Чипы-фильтры («Все», «Ждут клиента», «Период») — не Button, а свой компонент с data-slot="filter-chip"; без них
+    // в замере выпала бы именно та пилюля, на пропорцию которой жаловались трижды. Этапы воронки (data-tall) — навигация
+    const measured = [...document.querySelectorAll("main [data-slot=button], main [data-slot=filter-chip]:not([data-tall])")]
       .filter((el) => !/\btouch:size-\d+\b/.test(el.className.toString()))
       .map((el) => {
         const r = el.getBoundingClientRect();
         const fontSize = parseFloat(getComputedStyle(el).fontSize);
-        return { r, ratio: r.height / fontSize };
+        return { el, r, ratio: r.height / fontSize };
       })
-      .filter((x) => x.r.width > 1 && x.r.height > 1)
-      .map((x) => Math.round(x.ratio * 100) / 100),
-  );
+      .filter((x) => x.r.width > 1 && x.r.height > 1);
+    return {
+      ratios: measured.map((x) => Math.round(x.ratio * 100) / 100),
+      chips: measured.filter((x) => x.el.getAttribute("data-slot") === "filter-chip").length,
+    };
+  });
   expect(ratios.length, "на странице должны быть кнопки — иначе тест ничего не проверяет").toBeGreaterThan(0);
+  expect(chips, "в замер должны попасть чипы-фильтры («Период»)").toBeGreaterThan(0);
   for (const ratio of ratios) {
     expect(ratio, "высота кнопки относительно кегля вышла за 2.2–2.7").toBeGreaterThanOrEqual(2.2);
     expect(ratio, "высота кнопки относительно кегля вышла за 2.2–2.7").toBeLessThanOrEqual(2.7);
@@ -225,6 +231,21 @@ test("шторка «Ещё» не повторяет вкладки и ведё
   await expect(page).toHaveURL(/\/a\/calendar$/);
   // шторка закрылась сама после перехода
   await expect(sheet).not.toBeVisible();
+
+  // Человек уже на другом разделе: фокус не возвращается на кнопку «Ещё» в панели (замечание проверки к PR #119) —
+  // иначе клавиатура и читалка остались бы в нижней панели, а Next ставит фокус на новой странице сам
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup"))).not.toBe("dialog");
+});
+
+test("шторка «Ещё» закрыта клавишей Escape — фокус возвращается на кнопку «Ещё»", async ({ page }) => {
+  await page.goto("/a");
+  const more = page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Ещё" });
+  await more.tap();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(more).toBeFocused();
 });
 
 /*
@@ -499,25 +520,36 @@ test.describe("планшет пальцем — та же стандартна�
     expect(fontSize).toBe(16);
   });
 
-  test("кнопки и поля пропорциональны тексту, как на телефоне", async ({ page }) => {
-    await page.goto("/a/vacancies");
-    const ratios = await page.evaluate(() =>
-      [...document.querySelectorAll("main [data-slot=button], main [data-slot=input], main [data-slot=select-trigger]")]
-        .filter((el) => !/\btouch:size-\d+\b/.test(el.className.toString()))
-        .map((el) => {
-          const r = el.getBoundingClientRect();
-          const fontSize = parseFloat(getComputedStyle(el).fontSize);
-          return { r, ratio: r.height / fontSize };
-        })
-        .filter((x) => x.r.width > 1 && x.r.height > 1)
-        .map((x) => Math.round(x.ratio * 100) / 100),
-    );
-    expect(ratios.length, "на странице должны быть кнопки и поля — иначе тест ничего не проверяет").toBeGreaterThan(0);
-    for (const ratio of ratios) {
-      expect(ratio, "высота относительно кегля вышла за 2.2–2.7").toBeGreaterThanOrEqual(2.2);
-      expect(ratio, "высота относительно кегля вышла за 2.2–2.7").toBeLessThanOrEqual(2.7);
-    }
-  });
+  // На /a/vacancies — кнопки и поля, на /a/clients — ещё и чипы-фильтры «Все · Лиды · Активные»
+  for (const path of ["/a/vacancies", "/a/clients"]) {
+    test(`кнопки, чипы и поля на ${path} пропорциональны тексту, как на телефоне`, async ({ page }) => {
+      await page.goto(path);
+      const { ratios, chips } = await page.evaluate(() => {
+        const measured = [
+          ...document.querySelectorAll(
+            "main [data-slot=button], main [data-slot=filter-chip]:not([data-tall]), main [data-slot=input], main [data-slot=select-trigger]",
+          ),
+        ]
+          .filter((el) => !/\btouch:size-\d+\b/.test(el.className.toString()))
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            const fontSize = parseFloat(getComputedStyle(el).fontSize);
+            return { el, r, ratio: r.height / fontSize };
+          })
+          .filter((x) => x.r.width > 1 && x.r.height > 1);
+        return {
+          ratios: measured.map((x) => Math.round(x.ratio * 100) / 100),
+          chips: measured.filter((x) => x.el.getAttribute("data-slot") === "filter-chip").length,
+        };
+      });
+      expect(ratios.length, "на странице должны быть кнопки и поля — иначе тест ничего не проверяет").toBeGreaterThan(0);
+      if (path === "/a/clients") expect(chips, "в замер должны попасть чипы-фильтры").toBeGreaterThan(0);
+      for (const ratio of ratios) {
+        expect(ratio, "высота относительно кегля вышла за 2.2–2.7").toBeGreaterThanOrEqual(2.2);
+        expect(ratio, "высота относительно кегля вышла за 2.2–2.7").toBeLessThanOrEqual(2.7);
+      }
+    });
+  }
 });
 
 /*

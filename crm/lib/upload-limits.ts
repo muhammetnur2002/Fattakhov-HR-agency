@@ -17,3 +17,11 @@ export const FILE_TOO_BIG_MESSAGE = "Файл больше 20 МБ — сожм�
 export function oversizeMessage(file: { size: number } | null | undefined): string {
   return file && file.size > MAX_FILE_SIZE ? FILE_TOO_BIG_MESSAGE : "";
 }
+
+/** Размер файла для подписи у поля: «340 КБ», «1,2 МБ». */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}\u00A0Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}\u00A0КБ`;
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(mb < 10 ? 1 : 0).replace(".", ",")}\u00A0МБ`;
+}

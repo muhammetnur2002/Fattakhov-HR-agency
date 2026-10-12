@@ -2,6 +2,7 @@ import { prismaRaw as db } from "@/lib/db/prisma";
 import { getEmailTransport } from "@/lib/notifications/channels";
 import { brandedEmail } from "@/lib/notifications/email-brand";
 import { appUrl } from "@/lib/urls";
+import { DEFAULT_TIME_ZONE, formatInZone } from "@/lib/format-date";
 
 /**
  * Уведомление «вход с нового устройства».
@@ -42,14 +43,6 @@ export async function isNewDevice(userId: string, userAgent: string | null): Pro
   return !prior.some((event) => deviceKey(describeUserAgent(event.userAgent)) === current);
 }
 
-const moscow = new Intl.DateTimeFormat("ru-RU", {
-  timeZone: "Europe/Moscow",
-  day: "2-digit",
-  month: "long",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
 /** Письмо о входе с нового устройства. Никогда не бросает: сбой почты не должен мешать входу. */
 export async function notifyNewDevice(params: {
   userId: string;
@@ -66,7 +59,7 @@ export async function notifyNewDevice(params: {
     if (!user?.isActive) return;
 
     const device = describeUserAgent(params.userAgent);
-    const when = `${moscow.format(params.at ?? new Date())} (МСК)`;
+    const when = `${formatInZone(params.at ?? new Date(), "dayMonthPaddedTime", DEFAULT_TIME_ZONE)} (МСК)`;
     const where = params.ip ? `, адрес ${params.ip}` : "";
     const line = `Вход в кабинет Fattakhov HR: ${when}, устройство «${device}»${where}.`;
     const advice =

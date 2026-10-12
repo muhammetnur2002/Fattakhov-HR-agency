@@ -18,7 +18,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { hasClass, jsxTags, jsxTree, read, sources, type JsxNode } from "./helpers/jsx-source";
+import { filesMatching, hasClass, jsxTags, jsxTree, read, sources, type JsxNode } from "./helpers/jsx-source";
 
 const FILES = [...sources("app"), ...sources("components")].filter((f) => !f.includes("components/ui/"));
 
@@ -66,6 +66,20 @@ describe("красная строка в форме — только FormMessage
     expect(offenders, "результат формы — <FormMessage error={…} ok={…} />").toEqual([]);
   });
 
+  it("FormMessage не выводится в цикле: N ошибок — N срочных объявлений подряд; причины собираются в одну плашку", () => {
+    // `role="alert"` на каждом элементе списка: читалка получает десяток assertive-объявлений, и они заглушают друг
+    // друга. Поэтому у ошибки поля (`field.tsx`) роли alert нет, а у списка отказов студентов — одна сводка
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      const text = read(file);
+      for (const tag of jsxTags(text, "FormMessage")) {
+        const before = text.slice(Math.max(0, tag.index - 160), tag.index);
+        if (/\.map\(\s*\(?[\w\s,]*\)?\s*=>\s*\(?\s*$/.test(before)) offenders.push(`${file}:${tag.line}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("успех не рисуется абзацем: `{ok && <p>…}` — это FormMessage", () => {
     const pattern = /\{\s*(?:[\w.?]*\.)?ok\s*&&\s*\(?\s*<(?:p|span|div)\b/;
     expect(FILES.filter((f) => pattern.test(read(f)))).toEqual([]);
@@ -77,6 +91,22 @@ describe("красная строка в форме — только FormMessage
     expect(read("components/pdn/erase-button.tsx")).toMatch(/<Alert variant="warning">/);
     expect(read("components/students/student-candidate-panel.tsx")).toMatch(/<Alert variant="warning">/);
     expect(read("components/candidates/quick-add-form.tsx")).toMatch(/<Alert variant="warning">/);
+    expect(read("components/interviews/interview-section.tsx")).toMatch(/<Alert variant="warning"/);
+  });
+
+  it("плашка без variant не говорит словами предупреждения: «накладки», «пересечение», «внимание» — это warning", () => {
+    // Перечень выше знает три-четыре файла. Здесь — любая обычная плашка, в тексте которой слова предупреждения
+    const WORDS = /накладк|пересечени|предупрежд|внимание|осторожн|не блокируем/i;
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      const text = read(file);
+      for (const tag of jsxTags(text, "Alert")) {
+        if (/\bvariant=/.test(tag.text)) continue;
+        const block = text.slice(tag.index, text.indexOf("</Alert>", tag.index));
+        if (WORDS.test(block)) offenders.push(`${file}:${tag.line}`);
+      }
+    }
+    expect(offenders, "предупреждение — <Alert variant=\"warning\"> (треугольник)").toEqual([]);
   });
 });
 
@@ -98,7 +128,7 @@ describe("канал результата: встроенное сообщени
 });
 
 describe("форма с полями не теряет набранное", () => {
-  const TEXT_CONTROL = /^(Input|Textarea|Select|SelectTrigger|textarea|select)$/;
+  const TEXT_CONTROL = /^(Input|Textarea|AutoGrowTextarea|Select|NativeSelect|SelectTrigger|textarea|select)$/;
   const isTextControl = (n: JsxNode) =>
     TEXT_CONTROL.test(n.name) || (n.name === "input" && !/type=["{](hidden|checkbox|radio|submit|file)/.test(n.text));
   const hasTextControl = (n: JsxNode): boolean => isTextControl(n) || n.children.some(hasTextControl);
@@ -118,7 +148,6 @@ describe("форма с полями не теряет набранное", () =
     "components/comments/comment-thread.tsx": { count: 1, why: "текст хранится в состоянии, а не в поле" },
     "components/messages/message-thread.tsx": { count: 1, why: "текст хранится в состоянии, а не в поле" },
     "components/onboarding/tariff-picker.tsx": { count: 1, why: "выбор карточки тарифа, вводить нечего" },
-    "components/settings/session-limits-card.tsx": { count: 1, why: "два списка, текста нет" },
     "components/pdn/erase-button.tsx": { count: 1, why: "слово-подтверждение «удалить»" },
     "components/vacancies/agency-vacancy-actions.tsx": { count: 1, why: "«Взять в работу»: ведущий в скрытом поле" },
     "app/(agency)/a/clients/company-actions.tsx": { count: 1, why: "список компаний + toast" },
@@ -132,14 +161,15 @@ describe("форма с полями не теряет набранное", () =
     for (const file of FILES) {
       const tree = jsxTree(read(file));
       const n = tree.filter(
-        (x) => /^(motion\.)?form$/.test(x.name) && /\baction=\{/.test(x.text) && hasTextControl(x),
+        // `action={`${base}/search`}` — адрес, а не функция: строку React не вызывает, поля она не стирает
+        (x) => /^(motion\.)?form$/.test(x.name) && /\baction=\{(?!\s*[`"'])/.test(x.text) && hasTextControl(x),
       ).length;
       if (n > 0) found[file] = n;
     }
-    for (const [file, n] of Object.entries(found)) {
-      const allowed = STILL_ACTION[file]?.count ?? 0;
-      expect(n, `${file}: форм с action={…} и полями ввода больше, чем в списке (${allowed}); возьми useFormAction`).toBeLessThanOrEqual(allowed);
-    }
+    // Строго, а не «не больше»: форму перевели на useFormAction — строку надо убрать, устаревшая запись иначе
+    // молча разрешила бы вернуть `action={…}` обратно
+    const expected = Object.fromEntries(Object.entries(STILL_ACTION).map(([file, { count }]) => [file, count]));
+    expect(found, "форм с action={…} и полями ввода больше или меньше, чем в списке: возьми useFormAction или поправь список").toEqual(expected);
   });
 
   it("форма, что уходит через formProps, держит кнопку отправки в состоянии загрузки", () => {
@@ -150,7 +180,7 @@ describe("форма с полями не теряет набранное", () =
       if (!text.includes("formProps")) continue;
       for (const form of jsxTree(text).filter((x) => /^(motion\.)?form$/.test(x.name) && /formProps/.test(x.text))) {
         const walk = (x: JsxNode) => {
-          if (SUBMITS.test(x.name) && !/\b(loading|pending)=/.test(x.text)) {
+          if (SUBMITS.test(x.name) && !/\bloading=/.test(x.text)) {
             offenders.push(`${file}:${x.line} <${x.name}>`);
           }
           x.children.forEach(walk);
@@ -161,7 +191,7 @@ describe("форма с полями не теряет набранное", () =
     expect(offenders, "useFormStatus не видит форму с onSubmit: передай loading={pending}").toEqual([]);
   });
 
-  it("ни одна форма с useFormAction не отключает проверку браузера вручную и не стирает пароль сама", () => {
+  it("ни одна форма с useFormAction не отключает проверку браузера вручную: noValidate ставит хук", () => {
     // noValidate ставит хук (проверяет сервер, текст по-русски у поля); свой атрибут рядом — путаница
     const offenders = FILES.filter((f) => {
       const text = read(f);
@@ -172,11 +202,33 @@ describe("форма с полями не теряет набранное", () =
 });
 
 describe("пароль и код не уезжают из формы", () => {
-  it("действия форм не возвращают введённые значения полей", () => {
+  it("тип ответа действия не знает значений полей", () => {
     // Ответ действия — FormState: error, ok, fields. Ни `values`, ни `password` там нет и быть не должно
     const state = read("lib/form-state.ts");
     expect(state).not.toMatch(/\bvalues\??:/);
     expect(state).not.toMatch(/\bpassword\w*\??:/);
+  });
+
+  it("ни одно действие не кладёт в error/ok/fields то, что человек ввёл: formData, пароль, код, токен", () => {
+    // Тип `Record<string, string>` пропускает любое значение, поэтому смотрим на сами ответы действий. Ответ с
+    // введённым значением вернул бы пароль в страницу (и в журнал ответов), откуда он «уходит» дальше
+    const files = filesMatching("app", /(^|\/)[\w-]*actions?\.ts$/);
+    const FORM_VALUE = /formData\.(get|getAll)\(|formToObject\(|\bpassword\b|\bnewPassword\b|\bcurrentPassword\b|\bpasswordConfirm\b|\btoken\b|\bcode\b/;
+    const offenders: string[] = [];
+    for (const file of files) {
+      const text = read(file);
+      // Объекты ответа: `return { error: …, fields: { … } }` и `return { ok: … }`
+      for (const m of text.matchAll(/return\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)) {
+        const body = m[1];
+        if (!/\b(error|ok|fields)\s*:/.test(body)) continue;
+        // Значения свойств error/ok/fields; ключи вроде `fields: { password: "…" }` — имя поля, не значение
+        for (const prop of body.matchAll(/\b(?:error|ok)\s*:\s*([^,]+)|\bfields\s*:\s*\{([^}]*)\}/g)) {
+          const value = prop[1] ?? (prop[2] ?? "").replace(/["']?\w+["']?\s*:/g, "");
+          if (FORM_VALUE.test(value)) offenders.push(`${file}: ${m[0].slice(0, 80).replace(/\s+/g, " ")}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   it("хук не пишет введённое в хранилище", () => {

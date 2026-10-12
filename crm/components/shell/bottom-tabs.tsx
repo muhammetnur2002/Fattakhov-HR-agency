@@ -340,7 +340,13 @@ export function BottomTabs({
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMore(false)}
+                    onClick={() => {
+                      // Плитка уводит на другой раздел: фокус на «Ещё» после закрытия шторки гонялся бы
+                      // с тем, что Next ставит сам на новой странице. Плитка текущего раздела никуда не
+                      // ведёт — тогда фокус возвращается, как при «Закрыть»
+                      if (item.href !== pathname) returnFocus.forget();
+                      setMore(false);
+                    }}
                     aria-current={active ? "page" : undefined}
                     aria-label={navLinkLabel(item)}
                     className={cn(

@@ -47,14 +47,19 @@ test.describe("профиль компании: ошибка у поля", () =>
 });
 
 test.describe("настройки: успех объявляется вежливо", () => {
-  test("«Сохранено»: role=status и значок-галочка, не alert", async ({ page }) => {
+  test("«Сохранено»: значок-галочка, не alert; читалке — через постоянную область", async ({ page }) => {
     await page.goto("/settings");
     const form = page.locator("form", { has: page.locator("input[name=fullName]") }).first();
+    // Область для читалки есть в странице ДО ответа и пуста: живая область, вставленная сразу с текстом, объявляется не везде
+    const announcer = page.locator("#live-announcer");
+    await expect(announcer).toHaveAttribute("role", "status");
+    await expect(announcer).toHaveText("");
     await form.getByRole("button", { name: "Сохранить" }).click();
-    const status = form.getByRole("status").filter({ hasText: "Сохранено" });
-    await expect(status).toBeVisible();
-    await expect(status.locator("svg")).toBeVisible();
+    const plate = form.locator("[data-form-message=ok]").filter({ hasText: "Сохранено" });
+    await expect(plate).toBeVisible();
+    await expect(plate.locator("svg")).toBeVisible();
     await expect(form.getByRole("alert")).toHaveCount(0);
+    await expect(announcer).toHaveText("Сохранено");
   });
 
   test("ошибка в профиле: у поля имени, не общей строкой, и введённое остаётся", async ({ page }) => {

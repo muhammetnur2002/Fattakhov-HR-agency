@@ -12,6 +12,7 @@ import {
   type Subject,
 } from "@/lib/access";
 import { prisma } from "@/lib/db/prisma";
+import { resolveTimeZone } from "@/lib/format-date";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
 import { isSessionTooOld, readSessionLimits } from "@/lib/auth/session-policy";
 import { twoFactorGate } from "@/lib/services/two-factor";
@@ -27,7 +28,7 @@ import { twoFactorGate } from "@/lib/services/two-factor";
  * выполняется один раз, сколько бы компонентов ни спросили актора.
  */
 const loadSession = cache(
-  async (): Promise<{ actor: Actor; twoFactor: "ok" | "setup" } | null> => {
+  async (): Promise<{ actor: Actor; twoFactor: "ok" | "setup"; timeZone: string } | null> => {
     const session = await auth();
     if (!session?.user?.id) return null;
 
@@ -39,6 +40,7 @@ const loadSession = cache(
         role: true,
         clientId: true,
         grants: true,
+        timezone: true,
         passwordChangedAt: true,
         totpEnabledAt: true,
         // Предел сессии задаёт владелец (lib/auth/session-policy.ts)
@@ -78,9 +80,20 @@ const loadSession = cache(
       // Состояние 2FA читается тем же запросом, что и роль: лишней
       // нагрузки ворота не добавляют (см. twoFactorGate)
       twoFactor: twoFactorGate(user),
+      // Часовой пояс человека читается тем же запросом: страницы показывают
+      // время в нём, а не в зоне процесса (lib/format-date.ts)
+      timeZone: resolveTimeZone(user.timezone),
     };
   },
 );
+
+/**
+ * Часовой пояс текущего пользователя для показа времени. Без входа (и у
+ * пустой или неизвестной зоны) — запасная, одинаковая на сервере и в браузере.
+ */
+export const getUserTimeZone = cache(async (): Promise<string> => {
+  return (await loadSession())?.timeZone ?? resolveTimeZone(null);
+});
 
 export const getActor = cache(async (): Promise<Actor | null> => {
   return (await loadSession())?.actor ?? null;

@@ -31,6 +31,7 @@ import type {
   OfferInput,
   RejectInput,
 } from "@/lib/validation/candidate";
+import { DEFAULT_TIME_ZONE, formatDateNumeric } from "@/lib/format-date";
 
 export class ApplicationError extends Error {}
 
@@ -910,7 +911,7 @@ export async function recordGuaranteeCase(
   };
   if (input.leftAt.getTime() > dayEnd(application.guaranteeUntil).getTime()) {
     throw new ApplicationError(
-      `Гарантия закончилась ${application.guaranteeUntil.toLocaleDateString("ru-RU")} — ` +
+      `Гарантия закончилась ${formatDateNumeric(application.guaranteeUntil, DEFAULT_TIME_ZONE)} — ` +
         "уход после неё не гарантийный случай, замена по договору не положена.",
     );
   }

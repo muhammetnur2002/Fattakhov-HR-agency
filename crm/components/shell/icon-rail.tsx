@@ -46,7 +46,7 @@ export function IconRail({
   const pathname = usePathname();
 
   return (
-    <aside data-slot="icon-rail" className="sticky top-0 hidden h-svh w-[5.25rem] shrink-0 flex-col self-start bg-brand-graphite px-1 py-3 md:flex xl:hidden print:hidden">
+    <aside data-slot="icon-rail" aria-label="Меню кабинета" className="sticky top-0 hidden h-svh w-[5.25rem] shrink-0 flex-col self-start bg-brand-graphite px-1 py-3 md:flex xl:hidden print:hidden">
       <a
         href={siteHref}
         title="Открыть сайт агентства"

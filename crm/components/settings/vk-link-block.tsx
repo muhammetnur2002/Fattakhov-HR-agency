@@ -1,8 +1,7 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   issueVkLinkCodeAction,
@@ -13,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { FormMessage } from "@/components/ui/form-message";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
+import { formatTime } from "@/lib/format-date";
+import { CopyButton } from "@/components/shared/copy-button";
 
 /** Как часто спрашиваем, дошёл ли код. Чаще незачем: человек ещё переключается в ВК. */
 const POLL_MS = 3000;
@@ -40,25 +42,19 @@ export function VkLinkBlock({
   messageUrl: string | null;
 }) {
   const router = useRouter();
+  const timeZone = useTimeZone();
   const [pending, startTransition] = useTransition();
   const [code, setCode] = useState<{ value: string; expiresAt: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingUnlink, setConfirmingUnlink] = useState(false);
-  const { triggerRef: unlinkTrigger, focusRef: unlinkFocus } = useConfirmFocus(confirmingUnlink);
-  const [copied, setCopied] = useState(false);
-
-  // «Скопировано» гаснет само, чтобы кнопка снова была готова к нажатию
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  async function copyCode(value: string) {
-    if (await copyText(value)) setCopied(true);
-    else setError("Не удалось скопировать — выделите цифры и скопируйте вручную.");
-  }
+  const {
+    triggerRef: unlinkTrigger,
+    focusRef: unlinkFocus,
+    questionId: unlinkQuestionId,
+    groupProps: unlinkGroup,
+  } = useConfirmFocus(confirmingUnlink);
+  const codeRef = useRef<HTMLParagraphElement>(null);
 
   // Пока код на экране — ждём сообщение. Не опрашиваем вкладку в фоне:
   // человек в ВК, а запросы впустую никому не нужны
@@ -147,24 +143,14 @@ export function VkLinkBlock({
         <Panel tone="muted">
           <div className="flex items-center gap-2">
             <p
+              ref={codeRef}
               aria-label={`Код привязки: ${code.value}`}
               className="font-mono text-2xl font-semibold tracking-widest tabular-nums"
             >
               {code.value}
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Скопировать код"
-              title="Скопировать код"
-              onClick={() => copyCode(code.value)}
-            >
-              {copied ? <Check /> : <Copy />}
-            </Button>
-            <span role="status" className="text-xs text-muted-foreground">
-              {copied ? "Скопировано" : ""}
-            </span>
+            {/* Без буфера обмена скажет «Скопируйте вручную» и выделит цифры */}
+            <CopyButton text={code.value} targetRef={codeRef} iconOnly size="default" ariaLabel="Скопировать код" />
           </div>
 
           <ol className="list-decimal space-y-1.5 pl-5 text-sm">
@@ -183,10 +169,7 @@ export function VkLinkBlock({
 
           <p className="text-xs text-muted-foreground">
             Код действует до{" "}
-            {new Date(code.expiresAt).toLocaleTimeString("ru-RU", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatTime(code.expiresAt, timeZone)}
             . Писать его надо именно в личные сообщения сообщества, не на стене
             и не в комментариях.
           </p>
@@ -205,8 +188,8 @@ export function VkLinkBlock({
           </div>
         </Panel>
       ) : confirmingUnlink ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm">
+        <div {...unlinkGroup} className="flex flex-wrap items-center gap-2">
+          <span id={unlinkQuestionId} className="text-sm">
             Отвязать страницу? Уведомления в ВКонтакте перестанут приходить.
           </span>
           <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={unlink}>
@@ -214,6 +197,7 @@ export function VkLinkBlock({
           </Button>
           <Button
             ref={unlinkFocus}
+            aria-describedby={unlinkQuestionId}
             type="button"
             variant="ghost"
             size="sm"
@@ -249,33 +233,4 @@ export function VkLinkBlock({
       <FormMessage error={error} />
     </div>
   );
-}
-
-/**
- * Скопировать в буфер. Сначала современный способ; запасной — для окон без
- * доступа к clipboard (http, встроенные браузеры, старые версии): скрытое
- * поле и execCommand. Возвращает, получилось ли, — молча «скопировав»
- * ничего, кнопка заставила бы человека вставлять пустоту.
- */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // пойдём запасным путём
-  }
-  try {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(area);
-    return ok;
-  } catch {
-    return false;
-  }
 }

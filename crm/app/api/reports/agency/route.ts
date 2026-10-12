@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { canDo } from "@/lib/access";
-import { getGatedActor } from "@/lib/auth/session";
+import { getGatedActor, getUserTimeZone } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { REJECTION_REASON_LABELS } from "@/lib/labels";
 import {
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(buildCsv(sheets), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(reportFileName("Аналитика_агентства"))}`,
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(reportFileName("Аналитика_агентства", await getUserTimeZone()))}`,
       "Cache-Control": "private, no-store",
     },
   });

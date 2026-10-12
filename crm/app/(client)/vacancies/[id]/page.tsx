@@ -17,7 +17,7 @@ import {
 import { CommentThread } from "@/components/comments/comment-thread";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { canDo, filterVisibleStages } from "@/lib/access";
-import { requireClientActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import { listPipeline } from "@/lib/services/applications";
@@ -45,6 +45,7 @@ export default async function ClientVacancyPage({
 }) {
   const { id } = await params;
   const actor = await requireClientActor();
+  const timeZone = await getUserTimeZone();
 
   // getVacancy уже фильтрует по видимости: чужая вакансия просто не найдётся
   // и превратится в 404, а не в 403 (BR-28)
@@ -110,7 +111,7 @@ export default async function ClientVacancyPage({
         <CardHeader>
           <CardTitle className="text-base">{statusHeadline(vacancy.status)}</CardTitle>
           <CardDescription>
-            {statusExplanation(vacancy, recruiter?.fullName ?? null)}
+            {statusExplanation(vacancy, recruiter?.fullName ?? null, timeZone)}
           </CardDescription>
         </CardHeader>
         {(canDo(actor, "vacancy.hold", subject) ||
@@ -177,7 +178,7 @@ export default async function ClientVacancyPage({
           )}
         </CardHeader>
         <CardContent>
-          <VacancyBrief
+          <VacancyBrief timeZone={timeZone}
             brief={vacancy}
             hiringManagerName={hiringManager?.fullName}
           />
@@ -240,6 +241,7 @@ function statusExplanation(
     closeReason: string | null;
   },
   recruiterName: string | null,
+  timeZone: string,
 ): string {
   const parts: string[] = [];
 
@@ -247,7 +249,7 @@ function statusExplanation(
     if (recruiterName) parts.push(`Рекрутер — ${recruiterName}.`);
     if (vacancy.estimatedFirstCandidatesAt) {
       parts.push(
-        `Первые кандидаты ожидаются к ${formatDate(vacancy.estimatedFirstCandidatesAt)}.`,
+        `Первые кандидаты ожидаются к ${formatDate(vacancy.estimatedFirstCandidatesAt, timeZone)}.`,
       );
     }
     if (parts.length === 0) parts.push("Подбираем кандидатов.");
@@ -255,7 +257,7 @@ function statusExplanation(
     parts.push("Обычно отвечаем в течение рабочего дня.");
   } else if (vacancy.status === "ESTIMATED" && vacancy.estimatedFirstCandidatesAt) {
     parts.push(
-      `Первые кандидаты — к ${formatDate(vacancy.estimatedFirstCandidatesAt)}.`,
+      `Первые кандидаты — к ${formatDate(vacancy.estimatedFirstCandidatesAt, timeZone)}.`,
     );
   } else if (vacancy.closeReason) {
     parts.push(vacancy.closeReason);

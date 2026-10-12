@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { findInlineToggles } from "./helpers/inline-toggles";
 import { jsxTags, read, ROOT, sources } from "./helpers/jsx-source";
 
 const css = readFileSync(join(ROOT, "app/globals.css"), "utf8");
@@ -255,11 +256,44 @@ describe("наведение на поле", () => {
     }
   });
 
-  it("FIELD_HOVER — токен foreground, без not-* (они подняли бы специфичность выше фокуса и ошибки)", () => {
+  it("FIELD_HOVER — токен foreground, без not-* и enabled: (они подняли бы специфичность выше фокуса и ошибки)", () => {
     const utils = read("lib/utils.ts");
-    const m = /export const FIELD_HOVER = "([^"]+)"/.exec(utils);
+    const m = /export const FIELD_HOVER =\s*"([^"]+)"/.exec(utils);
     expect(m, "FIELD_HOVER не найден").not.toBeNull();
-    expect(m![1]).toMatch(/^hover:border-foreground\/\d+$/);
+    const classes = m![1].split(/\s+/);
+    expect(classes[0]).toMatch(/^hover:border-foreground\/\d+$/);
+    expect(classes.filter((c) => /(^|:)(not-|enabled:)/.test(c))).toEqual([]);
+  });
+
+  it("недоступное поле не отвечает на наведение: рамке возвращается покой (disabled:hover:border-field), красная остаётся красной", () => {
+    // У Input это даёт disabled:pointer-events-none, у Textarea и SelectTrigger его нет (нужен курсор «нельзя»)
+    const m = /export const FIELD_HOVER =\s*"([^"]+)"/.exec(read("lib/utils.ts"));
+    const classes = m![1].split(/\s+/);
+    expect(classes).toContain("disabled:hover:border-field");
+    expect(classes).toContain("disabled:hover:aria-invalid:border-destructive");
+    expect(classes).toContain("dark:disabled:hover:aria-invalid:border-destructive/50");
+  });
+});
+
+describe("вкладки и чипы: мелочи после независимой проверки", () => {
+  it("у вкладки line цвет активной в тёмной теме не потерян: есть пара dark:", () => {
+    const tabs = read("components/ui/tabs.tsx");
+    expect(tabs).toContain("group-data-[variant=line]/tabs-list:data-active:text-foreground");
+    expect(tabs).toContain("dark:group-data-[variant=line]/tabs-list:data-active:text-foreground");
+  });
+
+  it("невыбранный чип в тёмной теме с рамкой --field: отличие выбранного не держится на сотых контраста заливки", () => {
+    const chip = read("components/ui/filter-chip.tsx");
+    const unselected = /const UNSELECTED =\s*"([^"]+)"/.exec(chip)?.[1] ?? "";
+    expect(unselected.split(/\s+/)).toContain("dark:border-field");
+    expect(unselected).not.toContain("dark:border-input");
+  });
+
+  it("замеры пропорций на сенсорном экране охватывают чипы-фильтры (data-slot=filter-chip), а не только Button", () => {
+    const spec = read("tests/e2e/mobile-shell.spec.ts");
+    const queries = spec.match(/"main \[data-slot=button\][^"]*"/g) ?? [];
+    expect(queries.length).toBeGreaterThanOrEqual(2);
+    for (const q of queries) expect(q, q).toContain("[data-slot=filter-chip]:not([data-tall])");
   });
 });
 
@@ -280,15 +314,197 @@ describe("фокус возвращается", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("блок подтверждения, заменяющий кнопку на месте, ведёт фокус: useConfirmFocus", () => {
-    // `const [confirming…, set…] = useState(false)` в клиентском файле — это блок «Удалить? Да / Отмена»
+});
+
+/**
+ * Блок на месте кнопки: кнопка открывает вопрос, поле причины или форму правки и сама пропадает, а на «Отмену»
+ * возвращается. Сторож ищет такие блоки по устройству (`tests/helpers/inline-toggles.ts`), а не по имени состояния:
+ * прежний искал `confirming|closing|rejecting` и пропустил `mode`, `cancelling`, `editingFeedback`, `open`.
+ */
+describe("блок на месте кнопки ведёт фокус и называет себя", () => {
+  /**
+   * Переключатели, у которых кнопка НЕ пропадает (или экран меняется целиком): фокус никуда не теряется.
+   * Ключ — «файл::состояние»; причина обязательна. Каждое исключение проверяется на живость.
+   */
+  const KEEPS_FOCUS: Record<string, string> = {
+    "components/interviews/interview-section.tsx::proposing":
+      "включается и выключается одной и той же кнопкой «Предложить время» — она остаётся на месте",
+    "components/vacancies/agency-vacancy-actions.tsx::closing":
+      "«Закрыть без найма» остаётся в ряду кнопок, форма причины встаёт под ним — фокус не теряется",
+    "components/schedule/slot-picker.tsx::askingOther":
+      "публичная страница кандидата меняет экран целиком («варианты» ↔ «своё время»), а не блок на месте кнопки",
+    "components/client/students-intro.tsx::open":
+      "карточка раскрывается сама при первом заходе: перевод фокуса на загрузке страницы вреден, а не нужен",
+    "app/(client)/students/candidates/candidates-list.tsx::year":
+      "кнопки курсов — фильтр: все остаются на месте, выбранная только меняет вид",
+  };
+
+  const files = all.filter((f) => !f.includes("components/ui/"));
+  const flagged = files.flatMap((file) =>
+    findInlineToggles(read(file)).map((toggle) => ({ file, key: `${file}::${toggle.state}`, ...toggle })),
+  );
+
+  /** Вызовы `useConfirmFocus(…)` в файле: аргумент и то, что слева (деструктуризация). */
+  function hookCalls(text: string) {
+    return [...text.matchAll(/(?:const \{([^}]*)\}\s*=\s*)?useConfirmFocus(?:<[^()]*?>)?\(([^)]*)\)/g)].map((m) => ({
+      left: m[1] ?? "",
+      arg: m[2],
+    }));
+  }
+
+  it("каждый такой блок вызывает useConfirmFocus от своего состояния (режимов больше одного — хук на каждый)", () => {
     const offenders: string[] = [];
-    for (const file of outsideUi) {
+    for (const t of flagged) {
+      if (KEEPS_FOCUS[t.key]) continue;
+      const calls = hookCalls(read(t.file)).filter((c) => new RegExp(`\\b${t.state}\\b`).test(c.arg));
+      const modes = new Set(t.opens.filter((a) => /^["']/.test(a))).size;
+      if (calls.length < Math.max(1, modes)) {
+        offenders.push(`${t.key} (строка ${t.line}): нужно хуков ${Math.max(1, modes)}, найдено ${calls.length}`);
+      }
+    }
+    expect(offenders, "блок заменяет кнопку — фокус при открытии и возврат ведёт useConfirmFocus(состояние)").toEqual([]);
+  });
+
+  it("исключения живые: каждое действительно находится сторожем и файл существует", () => {
+    const keys = new Set(flagged.map((t) => t.key));
+    const dead = Object.keys(KEEPS_FOCUS).filter((k) => !keys.has(k));
+    expect(dead, "исключение больше не нужно (код изменился) — уберите его").toEqual([]);
+    for (const reason of Object.values(KEEPS_FOCUS)) expect(reason.length).toBeGreaterThan(20);
+  });
+
+  it("кнопка «Да, …» всегда в файле с useConfirmFocus: блок подтверждения не обходит сторожа, меняя устройство состояния", () => {
+    // Витрина не в счёт: «Да, но для одной позиции…» там — ответ в частых вопросах, а не кнопка
+    const offenders = files
+      .filter((f) => !f.includes("components/marketing/"))
+      .filter((f) => {
+        const text = read(f);
+        return /(>\s*|["'`])Да, [а-яё]/.test(text) && !text.includes("useConfirmFocus");
+      });
+    expect(offenders).toEqual([]);
+  });
+
+  it("вопрос блока связан с ним: id на вопросе, role=group (или aria-labelledby формы) на контейнере, ссылки хука подключены", () => {
+    const offenders: string[] = [];
+    for (const file of files) {
       const text = read(file);
-      if (/const \[(confirming\w*|closing|rejecting), set\w+\] = useState\(false\)/.test(text) && !text.includes("useConfirmFocus")) {
-        offenders.push(file);
+      for (const call of hookCalls(text)) {
+        if (!call.left) {
+          offenders.push(`${file}: результат useConfirmFocus не деструктурирован (react-hooks/refs не пускает obj.ref в JSX)`);
+          continue;
+        }
+        const names = Object.fromEntries(
+          call.left
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean)
+            .map((p) => {
+              const [key, alias] = p.split(":").map((x) => x.trim());
+              return [key, alias ?? key];
+            }),
+        );
+        const q = names.questionId;
+        if (!q) {
+          offenders.push(`${file}: у хука с состоянием «${call.arg}» не взят questionId`);
+          continue;
+        }
+        if (!new RegExp(`\\bid=\\{[^}]*\\b${q}\\b[^}]*\\}`).test(text)) offenders.push(`${file}: нет id={${q}} на вопросе блока «${call.arg}»`);
+        const group = names.groupProps;
+        const named =
+          (group && new RegExp(`\\{\\.\\.\\.[^}]*\\b${group}\\b[^}]*\\}`).test(text)) ||
+          new RegExp(`aria-labelledby=\\{[^}]*\\b${q}\\b[^}]*\\}`).test(text);
+        if (!named) offenders.push(`${file}: контейнер блока «${call.arg}» не назван (нужен {...groupProps} или aria-labelledby={questionId})`);
+        if (names.triggerRef && !new RegExp(`ref=\\{${names.triggerRef}\\}`).test(text)) offenders.push(`${file}: triggerRef «${call.arg}» не повешен на кнопку`);
+        if (names.focusRef && !new RegExp(`ref=\\{${names.focusRef}\\}`).test(text)) offenders.push(`${file}: focusRef «${call.arg}» не повешен на «Отмену» или поле`);
+        // «Отмена» без слов вопроса не говорит ничего: там, где название группы при переводе фокуса читают не всегда
+        // (например, VoiceOver на iPhone), вопрос читается как описание самой кнопки
+        if (names.focusRef) {
+          const target = jsxTags(text, "Button|button").find((t) => new RegExp(`ref=\\{${names.focusRef}\\}`).test(t.text));
+          if (target && !new RegExp(`aria-describedby=\\{${q}\\}`).test(target.text)) {
+            offenders.push(`${file}: кнопка с focusRef «${call.arg}» не описана вопросом (aria-describedby={${q}})`);
+          }
+        }
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("плитка шторки «Ещё» уводит на другой раздел и забывает кнопку «Ещё» (иначе фокус гоняется с Next)", () => {
+    const text = read("components/shell/bottom-tabs.tsx");
+    expect(text).toMatch(/item\.href !== pathname\) returnFocus\.forget\(\)/);
+  });
+});
+
+describe("сторож блоков на месте кнопки сам проверен на выдуманном коде", () => {
+  const names = (code: string) => findInlineToggles(code).map((t) => t.state);
+
+  it("находит `cancelling`, `mode` со строками, `editingFeedback` и любое другое имя — по устройству", () => {
+    expect(
+      names(`
+        const [cancelling, setCancelling] = useState(false);
+        <Button onClick={() => setCancelling(true)}>Отменить</Button>
+        <Button onClick={() => setCancelling(false)}>Не отменять</Button>`),
+    ).toEqual(["cancelling"]);
+    expect(
+      names(`
+        const [mode, setMode] = useState<"view" | "editing">("view");
+        <button onClick={() => { setDraft(x); setMode("editing"); }}>Изменить</button>
+        <Button onClick={() => setMode("view")}>Отмена</Button>`),
+    ).toEqual(["mode"]);
+    expect(
+      names(`
+        const [zzz, setZzz] = useState(false);
+        <button onClick={() => setZzz(true)}>Открыть</button>
+        <button onClick={() => setZzz(false)}>Закрыть</button>`),
+    ).toEqual(["zzz"]);
+  });
+
+  it("видит кнопку, которая открывает блок через функцию файла, и кнопку «Отмена» через функцию", () => {
+    expect(
+      names(`
+        const [mode, setMode] = useState(null);
+        function open(next) { setDone(null); setMode(next); }
+        function cancel() { setMode(null); }
+        <Button onClick={() => open("create")}>Создать</Button>
+        <Button onClick={cancel}>Отмена</Button>`),
+    ).toEqual(["mode"]);
+  });
+
+  it("не принимает за блок окно, признак занятости, сообщение и фильтр без «закрыть»", () => {
+    // окно: у него свой возврат фокуса
+    expect(
+      names(`
+        const [more, setMore] = useState(false);
+        <button onClick={() => setMore(true)}>Ещё</button>
+        <Sheet open={more} onOpenChange={setMore}><button onClick={() => setMore(false)}>x</button></Sheet>`),
+    ).toEqual([]);
+    // занятость: «включить» и «выключить» в одном обработчике
+    expect(
+      names(`
+        const [busy, setBusy] = useState(false);
+        <button onClick={async () => { setBusy(true); await go(); setBusy(false); }}>Отправить</button>`),
+    ).toEqual([]);
+    // сообщение и данные
+    expect(
+      names(`
+        const [error, setError] = useState(null);
+        <button onClick={() => setError("Не получилось отправить код")}>a</button>
+        <button onClick={() => setError(null)}>b</button>
+        <button onClick={() => setError(result.error)}>c</button>`),
+    ).toEqual([]);
+    // выбор без «закрыть»
+    expect(
+      names(`
+        const [filter, setFilter] = useState("all");
+        <button onClick={() => setFilter("new")}>Новые</button>
+        <button onClick={() => setFilter("all")}>Все</button>`),
+    ).toEqual([]);
+  });
+
+  it("переключатель одной кнопкой `setX(!x)` тоже виден — он в исключениях с причиной", () => {
+    expect(
+      names(`
+        const [p, setP] = useState(false);
+        <button onClick={() => setP(!p)}>Показать</button>`),
+    ).toEqual(["p"]);
   });
 });

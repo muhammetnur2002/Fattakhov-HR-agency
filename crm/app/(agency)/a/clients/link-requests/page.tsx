@@ -1,8 +1,10 @@
 import { LinkRequestActions } from "./link-request-actions";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/format-date";
 import { listAccountManagers, listClients } from "@/lib/services/clients";
+import { PROFILE_MODERATION_TONE, type ProfileModerationStatus } from "@/lib/status-tones";
 import { fetchCrmLinkRequests } from "@/lib/students-service";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BackLink } from "@/components/ui/back-link";
@@ -10,10 +12,10 @@ import { PageTitle } from "@/components/ui/page-title";
 
 export const metadata = { title: "Заявки на привязку к CRM" };
 
-const MODERATION_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  APPROVED: { label: "Профиль одобрен на платформе", variant: "default" },
-  PENDING: { label: "Профиль ещё на проверке", variant: "secondary" },
-  REJECTED: { label: "Профиль отклонён на платформе", variant: "destructive" },
+const MODERATION_LABELS: Record<ProfileModerationStatus, string> = {
+  APPROVED: "Профиль одобрен на платформе",
+  PENDING: "Профиль ещё на проверке",
+  REJECTED: "Профиль отклонён на платформе",
 };
 
 /**
@@ -25,6 +27,7 @@ const MODERATION_LABELS: Record<string, { label: string; variant: "default" | "s
  */
 export default async function LinkRequestsPage() {
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
   authorize(actor, "client.manage");
 
   const [requests, managers, clients] = await Promise.all([
@@ -59,13 +62,13 @@ export default async function LinkRequestsPage() {
       ) : (
         <div className="grid gap-3">
           {requests.map((r) => {
-            const moderation = MODERATION_LABELS[r.moderationStatus] ?? MODERATION_LABELS.PENDING;
+            const moderation: ProfileModerationStatus = r.moderationStatus in MODERATION_LABELS ? r.moderationStatus : "PENDING";
             return (
               <Card key={r.employerId}>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{r.companyName}</span>
-                    <Badge variant={moderation.variant}>{moderation.label}</Badge>
+                    <StatusBadge tone={PROFILE_MODERATION_TONE[moderation]}>{MODERATION_LABELS[moderation]}</StatusBadge>
                   </div>
 
                   <dl className="grid gap-x-8 gap-y-1.5 text-sm sm:grid-cols-2">
@@ -97,7 +100,7 @@ export default async function LinkRequestsPage() {
                     )}
                     <div className="flex gap-2">
                       <dt className="text-muted-foreground">Заявка</dt>
-                      <dd>{formatWhen(new Date(r.requestedAt))}</dd>
+                      <dd>{formatDateTime(r.requestedAt, timeZone)}</dd>
                     </div>
                   </dl>
 
@@ -121,13 +124,4 @@ export default async function LinkRequestsPage() {
       )}
     </div>
   );
-}
-
-function formatWhen(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }

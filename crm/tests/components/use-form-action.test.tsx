@@ -6,7 +6,7 @@
  * Сверка 11.10.2026: `<form action={formAction}>` в React 19 очищает неуправляемые поля после ЛЮБОГО
  * ответа, в том числе после отказа — «ИНН уже занят» стирал анкету, «пароли не совпадают» — всё введённое.
  */
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useActionState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -181,7 +181,7 @@ describe("useFormAction", () => {
     expect(await screen.findByText("Укажите имя")).toBeInTheDocument();
   });
 
-  it("пока идёт отправка: кнопка в загрузке, статус для читалки; вторая отправка не стартует", async () => {
+  it("пока идёт отправка: кнопка в загрузке и отключена, статус для читалки; Enter в поле вторую отправку не стартует", async () => {
     let release!: (s: FormState) => void;
     const action = vi.fn<Action>(() => new Promise<FormState>((resolve) => (release = resolve)));
     const user = userEvent.setup();
@@ -191,12 +191,35 @@ describe("useFormAction", () => {
     const busy = await screen.findByRole("button", { name: "Сохраняем…" });
     expect(busy).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("status")).toHaveTextContent("Отправляем…");
-    // Ещё одна отправка (Enter в поле в обход кнопки) — игнорируется
+    // Enter в поле: user-event кликает по кнопке, а она отключена. Защиту самой формы (inFlight) проверяет
+    // следующий тест через submit в обход кнопки
     await user.type(screen.getByLabelText("Имя"), "{Enter}");
     expect(action).toHaveBeenCalledTimes(1);
     await act(async () => release({ ok: "Готово" }));
     expect(await screen.findByText("Готово")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Сохранить" })).toBeEnabled();
+  });
+
+  it("вторая отправка в обход кнопки не доходит до действия: защита inFlight, а не отключённая кнопка", async () => {
+    // user-event на Enter кликает по кнопке, а у кнопки в загрузке она отключена — так проверка inFlight
+    // не исполнялась бы вовсе. Здесь submit вызывается у самой формы, как это делает Enter в части браузеров
+    // и скрипты расширений: кнопка отключена, а событие приходит.
+    let release!: (s: FormState) => void;
+    const action = vi.fn<Action>(() => new Promise<FormState>((resolve) => (release = resolve)));
+    render(<Demo action={action} />);
+    const form = screen.getByRole("form", { name: "Форма" });
+    fireEvent.submit(form);
+    await screen.findByRole("button", { name: "Сохраняем…" });
+    expect(screen.getByRole("button", { name: "Сохраняем…" })).toBeDisabled();
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(action).toHaveBeenCalledTimes(1);
+    await act(async () => release({ ok: "Готово" }));
+    await screen.findByText("Готово");
+    // Ответ пришёл — следующая отправка снова свободна
+    fireEvent.submit(form);
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    await act(async () => release({ ok: "Готово ещё раз" }));
   });
 
   it("после быстрого отказа форму можно отправить снова (защита от второй отправки не залипает)", async () => {

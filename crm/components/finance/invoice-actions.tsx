@@ -10,16 +10,19 @@ import {
   type FinanceState,
 } from "@/app/(agency)/a/finance/actions";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/format-date";
-import { formatMoney } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import type { BillableHire } from "@/lib/services/invoices";
 import { Panel } from "@/components/ui/panel";
 import { useFormAction } from "@/lib/hooks/use-form-action";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { oversizeMessage } from "@/lib/upload-limits";
 import { FormMessage } from "@/components/ui/form-message";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
 
 function Submit({
   label,
@@ -57,10 +60,13 @@ export function BillableHireRow({
   /** Без права выставлять счёт строка остаётся справкой: кто закрыт и на сколько. */
   canManage?: boolean;
 }) {
+  const timeZone = useTimeZone();
   // Сумма и назначение подставлены заранее и правятся: после отказа сервера React 19 вернул бы
   // подставленное и стёр правку, useFormAction её оставляет
   const { state, pending, formProps } = useFormAction<FinanceState>(createInvoiceAction, {});
   const [open, setOpen] = useState(false);
+  // «Выставить счёт» заменяется формой: фокус — в поле суммы, после «Отмены» — обратно на кнопку
+  const { triggerRef, focusRef, questionId } = useConfirmFocus<HTMLButtonElement, HTMLInputElement>(open);
 
   return (
     <Panel>
@@ -71,7 +77,7 @@ export function BillableHireRow({
             №{hire.vacancyNumber} {hire.vacancyTitle} · {hire.clientName}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Вышел {formatDate(hire.hiredAt)} ·{" "}
+            Вышел {formatDate(hire.hiredAt, timeZone)} ·{" "}
             {hire.offerSalary !== null
               ? `оффер ${formatMoney(hire.offerSalary)}`
               : "оффер не зафиксирован"}
@@ -98,6 +104,7 @@ export function BillableHireRow({
         </p>
       ) : !open ? (
         <Button
+          ref={triggerRef}
           type="button"
           size="sm"
           onClick={() => setOpen(true)}
@@ -106,7 +113,10 @@ export function BillableHireRow({
           {hire.fee === null ? "Нет договора или оффера" : "Выставить счёт"}
         </Button>
       ) : (
-        <form {...formProps} className="space-y-4 border-t pt-3">
+        <form {...formProps} aria-labelledby={questionId} className="space-y-4 border-t pt-3">
+          <span id={questionId} className="sr-only">
+            Счёт за {hire.candidateName}, вакансия №{hire.vacancyNumber}
+          </span>
           <input type="hidden" name="clientId" value={hire.clientId} />
           <input type="hidden" name="vacancyIds" value={hire.vacancyId} />
 
@@ -114,6 +124,7 @@ export function BillableHireRow({
             <div className="space-y-2">
               <Label htmlFor={`amount-${hire.applicationId}`}>Сумма, ₽</Label>
               <Input
+                ref={focusRef}
                 id={`amount-${hire.applicationId}`}
                 name="amount"
                 type="number"
@@ -163,22 +174,29 @@ export function BillableHireRow({
  * здесь только лишний клик, реакция и так видна по подписи над полем.
  */
 /** Сам input: useFormStatus видит статус только формы-родителя, поэтому он в дочернем компоненте, а не в FileUploadField. */
-function FileInput({ formRef }: { formRef: React.RefObject<HTMLFormElement | null> }) {
+function AutoUploadInput({
+  formRef,
+  label,
+}: {
+  formRef: React.RefObject<HTMLFormElement | null>;
+  label: string;
+}) {
   const { pending } = useFormStatus();
   return (
-    <input
-      type="file"
+    <FileInput
+      size="sm"
       name="file"
+      aria-label={label}
       accept=".pdf,.doc,.docx,.rtf,.odt"
       disabled={pending}
       onChange={(event) => {
         // Больше предела запрос не дойдёт до сервера — говорим сразу, а не страницей с ошибкой
         const message = oversizeMessage(event.target.files?.[0]);
         event.target.setCustomValidity(message);
+        event.target.ariaInvalid = message ? "true" : null;
         if (message) event.target.reportValidity();
         else formRef.current?.requestSubmit();
       }}
-      className="text-xs file:mr-2 file:rounded-md file:border file:border-field file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium"
     />
   );
 }
@@ -216,7 +234,7 @@ function FileUploadField({
           )}
         </span>
       </label>
-      <FileInput formRef={formRef} />
+      <AutoUploadInput formRef={formRef} label={label} />
       <FormMessage compact error={state.error} ok={state.ok} />
     </form>
   );

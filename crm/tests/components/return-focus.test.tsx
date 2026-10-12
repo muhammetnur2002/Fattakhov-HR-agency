@@ -128,6 +128,51 @@ describe("useReturnFocus: окно без DialogTrigger", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Удалить и закрыть" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.queryByRole("button", { name: "Открыть" })).toBeNull();
+    // Пусть закрытие отработает целиком (onCloseAutoFocus идёт после ухода окна): фокус не прыгнул ни на что случайное
+    await new Promise((r) => setTimeout(r, 80));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("forget(): запомненное забыто — после закрытия фокус не возвращается на кнопку", async () => {
+    function Forgetful() {
+      const [open, setOpen] = useState(false);
+      const returnFocus = useReturnFocus();
+      return (
+        <>
+          <Button
+            type="button"
+            onClick={(e) => {
+              returnFocus.remember(e.currentTarget);
+              setOpen(true);
+            }}
+          >
+            Открыть
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent onCloseAutoFocus={returnFocus.onCloseAutoFocus}>
+              <DialogTitle>Окно</DialogTitle>
+              <Button
+                type="button"
+                onClick={() => {
+                  returnFocus.forget();
+                  setOpen(false);
+                }}
+              >
+                Перейти на другую страницу
+              </Button>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    render(<Forgetful />);
+    const opener = screen.getByRole("button", { name: "Открыть" });
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.click(await screen.findByRole("button", { name: "Перейти на другую страницу" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await new Promise((r) => setTimeout(r, 80));
+    expect(document.activeElement).not.toBe(opener);
   });
 });
 
@@ -220,5 +265,60 @@ describe("useConfirmFocus: блок «Удалить? Да / Отмена» на
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Причина" }));
     fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Вернуть с причиной" }));
+  });
+});
+
+describe("useConfirmFocus: вопрос блока и сам блок связаны", () => {
+  function Named() {
+    const [confirming, setConfirming] = useState(false);
+    const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
+    return confirming ? (
+      <div {...groupProps}>
+        <p id={questionId}>Удалить файл «план.pdf»?</p>
+        <button type="button">Да, удалить</button>
+        <button ref={focusRef} type="button" onClick={() => setConfirming(false)}>
+          Отмена
+        </button>
+      </div>
+    ) : (
+      <button ref={triggerRef} type="button" onClick={() => setConfirming(true)}>
+        Удалить
+      </button>
+    );
+  }
+
+  it("фокус встаёт на «Отмена» внутри группы, названной вопросом: читалка скажет вопрос, а не только «Отмена»", () => {
+    render(<Named />);
+    fireEvent.click(screen.getByRole("button", { name: "Удалить" }));
+    const group = screen.getByRole("group", { name: "Удалить файл «план.pdf»?" });
+    expect(group.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Отмена" }));
+  });
+
+  it("два блока на одной странице не делят идентификатор вопроса", () => {
+    function Two() {
+      const a = useConfirmFocus(false);
+      const b = useConfirmFocus(false);
+      return (
+        <>
+          <span data-testid="a">{a.questionId}</span>
+          <span data-testid="b">{b.questionId}</span>
+        </>
+      );
+    }
+    render(<Two />);
+    expect(screen.getByTestId("a").textContent).not.toBe(screen.getByTestId("b").textContent);
+    expect(screen.getByTestId("a").textContent).toBeTruthy();
+  });
+
+  it("groupProps — role=group и aria-labelledby на questionId (размеров и разметки не добавляет)", () => {
+    function Probe() {
+      const { questionId, groupProps } = useConfirmFocus(false);
+      return <div data-testid="p" data-q={questionId} {...groupProps} />;
+    }
+    render(<Probe />);
+    const el = screen.getByTestId("p");
+    expect(el.getAttribute("role")).toBe("group");
+    expect(el.getAttribute("aria-labelledby")).toBe(el.getAttribute("data-q"));
   });
 });

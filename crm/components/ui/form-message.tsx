@@ -1,6 +1,10 @@
+"use client";
+
+import { useEffect, type Ref } from "react";
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { announce } from "@/components/ui/live-announcer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,9 +15,11 @@ import { cn } from "@/lib/utils";
  * отличавшаяся только цветом. Теперь:
  *
  * - ошибка: значок «!» в круге, `role="alert"` — читалка объявляет сразу;
- * - успех: значок-галочка, `role="status"` — вежливо, не перебивая;
+ * - успех: значок-галочка. Читалке он уходит через постоянную область (`LiveAnnouncer`, вежливо, не
+ *   перебивая), а у самой плашки роли нет: живая область, вставленная в страницу уже с текстом,
+ *   объявляется не везде, а с двумя озвучками читалка прочла бы «Сохранено» дважды;
  * - `compact` — строка без рамки для кнопок в списках и строк таблиц, где плашка слишком
- *   тяжела; значок и роль те же.
+ *   тяжела; значок и озвучка те же.
  *
  * Канал один: в форме результат — здесь, встроенным сообщением (оно остаётся на экране, пока
  * человек его не прочтёт, и стоит рядом с кнопкой, которую он нажал). Toast — только для
@@ -21,6 +27,7 @@ import { cn } from "@/lib/utils";
  *
  * `data-form-message="error"` — за него хватается `useFormAction`: после неудачной отправки без
  * ошибок у полей фокус уходит на плашку (кнопка на время отправки отключалась, и фокус с неё слетал).
+ * Плашка вне формы (после неё, рядом) этим атрибутом не находится: ей нужен `ref={messageRef}` из хука.
  * Пустой результат не рисует ничего: пустой элемент среди детей `space-y-4` давал бы лишний отступ.
  */
 export function FormMessage({
@@ -28,18 +35,27 @@ export function FormMessage({
   ok,
   compact = false,
   className,
+  ref,
 }: {
   error?: string | null;
   ok?: string | null;
   compact?: boolean;
   className?: string;
+  /** Плашка ошибки — для `messageRef` из `useFormAction`, если сообщение стоит не внутри формы. */
+  ref?: Ref<HTMLElement>;
 }) {
+  // Успех читалке — через постоянную область: вставленная сразу с текстом `role="status"` объявляется не везде
+  useEffect(() => {
+    if (ok) announce(ok);
+  }, [ok]);
+
   if (!error && !ok) return null;
   return (
     <>
       {error ? (
         compact ? (
           <p
+            ref={ref as Ref<HTMLParagraphElement>}
             role="alert"
             tabIndex={-1}
             data-form-message="error"
@@ -49,7 +65,13 @@ export function FormMessage({
             <span>{error}</span>
           </p>
         ) : (
-          <Alert variant="destructive" tabIndex={-1} data-form-message="error" className={className}>
+          <Alert
+            ref={ref as Ref<HTMLDivElement>}
+            variant="destructive"
+            tabIndex={-1}
+            data-form-message="error"
+            className={className}
+          >
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )
@@ -57,7 +79,6 @@ export function FormMessage({
       {ok ? (
         compact ? (
           <p
-            role="status"
             data-form-message="ok"
             className={cn("flex items-start gap-1.5 text-xs text-card-foreground", className)}
           >
@@ -65,7 +86,7 @@ export function FormMessage({
             <span>{ok}</span>
           </p>
         ) : (
-          <Alert variant="success" data-form-message="ok" className={className}>
+          <Alert variant="success" role="none" data-form-message="ok" className={className}>
             <AlertDescription>{ok}</AlertDescription>
           </Alert>
         )

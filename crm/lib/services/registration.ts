@@ -4,6 +4,7 @@ import type { Actor } from "@/lib/access";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { maskPhone, normalizeRuPhone, PhoneFormatError } from "@/lib/auth/phone";
 import { prisma, prismaRaw } from "@/lib/db/prisma";
+import { formatSalaryRange } from "@/lib/format-money";
 import { REGISTRATION_CONSENT_VERSION } from "@/lib/legal/registration-consent";
 import {
   mailLimitMessage,
@@ -439,10 +440,8 @@ export async function completeRegistrationBrief(
   ]
     .filter(Boolean)
     .join(", ");
-  const salary =
-    input.salaryFrom || input.salaryTo
-      ? `, вилка ${input.salaryFrom ?? "…"}–${input.salaryTo ?? "…"} ₽`
-      : "";
+  const range = formatSalaryRange(input.salaryFrom, input.salaryTo);
+  const salary = range ? `, вилка ${range}` : "";
 
   await completeLeadFromBrief(actor.clientId, {
     name: input.position ? `${input.name}, ${input.position}` : input.name,

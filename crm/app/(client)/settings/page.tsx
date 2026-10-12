@@ -24,7 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { canDo } from "@/lib/access";
-import { requireClientActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireClientActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/format-date";
 import { ROLE_LABELS } from "@/lib/labels";
@@ -42,6 +42,7 @@ export const metadata = { title: "Настройки" };
 
 export default async function ClientSettingsPage() {
   const actor = await requireClientActor();
+  const timeZone = await getUserTimeZone();
   const canManageTeam =
     actor.clientId != null &&
     canDo(actor, "org.manageClientUsers", { clientId: actor.clientId });
@@ -162,7 +163,7 @@ export default async function ClientSettingsPage() {
                       {u.presence && <PresenceLabel lastSeenAt={u.presence.lastSeenAt} />}
                       <span>
                         {u.lastLoginAt
-                          ? `Заходил ${formatDate(u.lastLoginAt)}`
+                          ? `Заходил ${formatDate(u.lastLoginAt, timeZone)}`
                           : "Ни разу не заходил"}
                       </span>
                     </div>
@@ -188,7 +189,7 @@ export default async function ClientSettingsPage() {
                       <span>{withEmailOff(inv.email, inv.email)}</span>
                       <Badge variant="outline">{ROLE_LABELS[inv.role]}</Badge>
                       <span className="text-xs text-muted-foreground">
-                        до {formatDate(inv.expiresAt)}
+                        до {formatDate(inv.expiresAt, timeZone)}
                       </span>
                     </div>
                     <div className="flex items-start gap-2">

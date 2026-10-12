@@ -100,6 +100,10 @@ export function useFormAction<S extends FormState>(
 ) {
   const [state, formAction, pending] = useActionState<S, FormData>(action, initialState as Awaited<S>);
   const formRef = useRef<HTMLFormElement>(null);
+  // Плашка результата, если она стоит не внутри формы, а рядом (`<FormMessage ref={messageRef} />`)
+  const messageRef = useRef<HTMLElement>(null);
+  // Кнопка, что отправила форму: на неё возвращается фокус, если уходить ему больше некуда
+  const submitterRef = useRef<HTMLElement | null>(null);
   const handled = useRef(state);
   const inFlight = useRef(false);
   // Свежие параметры без перезапуска эффекта: массив `clearOnError` обычно пишут литералом, и он новый
@@ -119,6 +123,7 @@ export function useFormAction<S extends FormState>(
       if (inFlight.current) return;
       inFlight.current = true;
       const submitter = (event.nativeEvent as SubmitEvent).submitter;
+      submitterRef.current = submitter;
       const data = readForm(event.currentTarget, submitter);
       startTransition(() => formAction(data));
     },
@@ -133,26 +138,36 @@ export function useFormAction<S extends FormState>(
     inFlight.current = false;
     const { resetOnSuccess = false, clearOnError, onSuccess } = optionsRef.current;
     const form = formRef.current;
-    if (!form) {
-      if (state.ok && !state.error) onSuccess?.();
-      return;
-    }
+
+    // Кнопка на время запроса была отключена, и фокус с неё слетал на <body>: клавиатурный пользователь
+    // оказывался в начале страницы. Возвращаем его на кнопку, только если он больше нигде не стоит
+    const restoreFocus = () => {
+      const submitter = submitterRef.current;
+      const active = document.activeElement;
+      if (submitter?.isConnected && (!active || active === document.body)) submitter.focus();
+    };
 
     if (state.error || state.fields) {
-      // Стираем поле, к которому отказ относится (неверный текущий пароль), а при общем отказе без
-      // полей (слишком частые попытки) — все перечисленные; остальное человек набирал не зря
-      for (const name of clearOnError ?? []) {
-        if (state.fields && !(name in state.fields)) continue;
-        const control = form.elements.namedItem(name);
-        if (control instanceof HTMLInputElement) control.value = "";
+      if (form) {
+        // Стираем поле, к которому отказ относится (неверный текущий пароль), а при общем отказе без
+        // полей (слишком частые попытки) — все перечисленные; остальное человек набирал не зря
+        for (const name of clearOnError ?? []) {
+          if (state.fields && !(name in state.fields)) continue;
+          const control = form.elements.namedItem(name);
+          if (control instanceof HTMLInputElement) control.value = "";
+        }
       }
+      // Первое неверное поле, иначе плашка: внутри формы или рядом с ней (`messageRef`)
       const target =
-        form.querySelector<HTMLElement>(FIRST_INVALID) ??
-        form.querySelector<HTMLElement>('[data-form-message="error"]');
-      target?.focus();
+        form?.querySelector<HTMLElement>(FIRST_INVALID) ??
+        form?.querySelector<HTMLElement>('[data-form-message="error"]') ??
+        messageRef.current;
+      if (target) target.focus();
+      else restoreFocus();
     } else if (state.ok) {
-      if (resetOnSuccess) form.reset();
+      if (form && resetOnSuccess) form.reset();
       onSuccess?.();
+      restoreFocus();
     }
   }, [state]);
 
@@ -167,7 +182,21 @@ export function useFormAction<S extends FormState>(
      */
     formAction,
     formRef: formRef as RefObject<HTMLFormElement | null>,
-    /** `<form {...formProps}>` — ссылка, отправка и выключенная проверка браузера. */
-    formProps: { ref: formRef, onSubmit, noValidate: true },
+    /**
+     * Ссылка для `<FormMessage ref={messageRef} />`, когда плашка результата стоит ВНЕ формы (после неё,
+     * рядом): после общего отказа фокус идёт на неё, а не слетает на `<body>`. Внутри формы не нужна.
+     */
+    messageRef: messageRef as RefObject<HTMLElement | null>,
+    /**
+     * `<form {...formProps}>` — ссылка, отправка и выключенная проверка браузера.
+     *
+     * `action` обязателен: без него форма в разметке сервера — обычная GET-форма, и отправка до загрузки
+     * скриптов (медленный телефон, блокировщик, не пришёл чанк) уносила бы пароль, токен ссылки и данные
+     * кандидата в адресную строку, историю и журналы сервера. С `action={formAction}` серверное действие
+     * получает форму как обычный POST (React отдаёт `method="POST"` и скрытые поля), а действие-функция
+     * без серверной ссылки отправку до гидрации перехватывает и повторяет после неё. После загрузки
+     * `onSubmit` гасит стандартную отправку, и React `action` не вызывает.
+     */
+    formProps: { ref: formRef, action: formAction, onSubmit, noValidate: true },
   };
 }

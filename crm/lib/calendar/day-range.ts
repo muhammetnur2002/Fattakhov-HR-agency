@@ -1,3 +1,5 @@
+import { formatInZone } from "@/lib/format-date";
+
 /**
  * Режим «День» в календаре агентства: выбранная дата в адресе.
  *
@@ -26,4 +28,15 @@ export function parseDateParam(value: string | undefined): Date | null {
   return date.getFullYear() === y && date.getMonth() === mo - 1 && date.getDate() === d
     ? date
     : null;
+}
+
+/**
+ * Заголовок дня: «четверг, 6 августа». Берёт число, месяц и год у `d` по
+ * местным часам — так же, как `toDateParam`, — и пишет их как календарный
+ * день, а не как момент: иначе полночь сервера в одной зоне превратилась бы
+ * во вчерашний вечер в другой.
+ */
+export function formatDayTitle(d: Date): string {
+  const noon = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12));
+  return formatInZone(noon, "weekdayDayMonth", "UTC");
 }

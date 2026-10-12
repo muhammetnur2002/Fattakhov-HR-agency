@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Stagger, StaggerItem } from "@/components/motion/primitives";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ClientDecision } from "@/lib/generated/prisma/enums";
-import { formatNumber } from "@/lib/pricing";
+import { formatMoney } from "@/lib/format-money";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +127,7 @@ export function ApplicationList({
                     гуляла между карточками */}
                 <div className="w-28 shrink-0 text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground xl:w-auto xl:shrink">
                   {a.candidate.salaryExpectation !== null
-                    ? `${formatNumber(a.candidate.salaryExpectation)} ₽`
+                    ? formatMoney(a.candidate.salaryExpectation)
                     : "—"}
                 </div>
 
@@ -141,17 +142,13 @@ export function ApplicationList({
                     каждой карточки, а бейдж этапа правее должен стоять
                     на одном месте независимо от того, есть ли сосед слева */}
                 <div className="w-32 shrink-0 text-right xl:w-auto xl:shrink">
+                  {/* Ждёт решения клиента — жёлтое; три дня и больше (норматив BR-9) — просрочка, красное */}
                   {waiting !== null && (
-                    <Badge
-                      variant={waiting >= 3 ? "destructive" : "outline"}
-                      className="max-w-full"
-                    >
-                      <span className="truncate">
-                        {waiting === 0
-                          ? "Ждёт решения"
-                          : `Ждёт ${waiting} ${plural(waiting)}`}
-                      </span>
-                    </Badge>
+                    <StatusBadge tone={waiting >= 3 ? "danger" : "warning"} truncate>
+                      {waiting === 0
+                        ? "Ждёт решения"
+                        : `Ждёт ${waiting} ${plural(waiting)}`}
+                    </StatusBadge>
                   )}
                 </div>
 

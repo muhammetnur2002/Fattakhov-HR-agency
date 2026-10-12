@@ -109,3 +109,15 @@ export function createLeads(params: {
 export function cleanupLeads(params: { namePrefix: string }): Promise<{ removed: number }> {
   return call({ op: "cleanupLeads", ...params }) as Promise<{ removed: number }>;
 }
+
+/** Самостоятельно зарегистрированная компания с администратором (пароль demo1234); анкета не пройдена, пока `briefCompleted` ложь. */
+export function createSelfRegisteredClient(params: {
+  email: string;
+  briefCompleted: boolean;
+}): Promise<{ clientId: string; userId: string }> {
+  return call({ op: "createSelfRegisteredClient", ...params });
+}
+
+export function deleteSelfRegisteredClient(params: { email: string }): Promise<{ removed: number }> {
+  return call({ op: "deleteSelfRegisteredClient", ...params }) as Promise<{ removed: number }>;
+}

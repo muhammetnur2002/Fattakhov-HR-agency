@@ -5,6 +5,7 @@ import {
   type VkEventRow,
 } from "@/lib/notifications/vk-events";
 import { vkHumanError } from "@/lib/notifications/vk-api";
+import { formatInZone } from "@/lib/format-date";
 
 /**
  * Что сообщество ВКонтакте присылало на наш адрес и чем это кончилось.
@@ -18,18 +19,6 @@ const TONE_CLASS = {
   bad: "text-destructive",
 } as const;
 
-/** Время по Москве: агентство работает в одном часовом поясе. */
-function formatMoscow(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Europe/Moscow",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
-}
-
 function describe(row: VkEventRow) {
   const known = VK_EVENT_OUTCOME_LABELS[row.outcome as VkEventOutcome];
   const text = known?.text ?? row.outcome;
@@ -38,7 +27,7 @@ function describe(row: VkEventRow) {
   return { text: reason ? `${text}: ${reason}` : text, tone: known?.tone ?? "warn" };
 }
 
-export function VkEventsCard({ events }: { events: VkEventRow[] }) {
+export function VkEventsCard({ events, timeZone }: { events: VkEventRow[]; timeZone: string }) {
   if (events.length === 0) {
     return (
       <div className="space-y-2 text-sm">
@@ -61,7 +50,7 @@ export function VkEventsCard({ events }: { events: VkEventRow[] }) {
         const { text, tone } = describe(row);
         return (
           <li key={row.id} className="flex flex-wrap gap-x-3 gap-y-0.5 px-3 py-2">
-            <span className="tabular-nums text-muted-foreground">{formatMoscow(row.at)}</span>
+            <span className="tabular-nums text-muted-foreground">{formatInZone(row.at, "dateTimeSeconds", timeZone)}</span>
             <span className="font-medium">{VK_EVENT_TYPE_LABELS[row.type] ?? row.type}</span>
             <span className={TONE_CLASS[tone]}>{text}</span>
           </li>

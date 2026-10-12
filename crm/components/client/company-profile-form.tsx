@@ -13,9 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useFormAction } from "@/lib/hooks/use-form-action";
 import type { CompanyProfile } from "@/lib/services/company-profile";
 
-function Submit({ pending }: { pending: boolean }) {
+function Submit({ loading }: { loading: boolean }) {
   return (
-    <SubmitButton loading={pending} pendingLabel="Сохраняем…">
+    <SubmitButton loading={loading} pendingLabel="Сохраняем…">
       Сохранить
     </SubmitButton>
   );
@@ -163,7 +163,7 @@ export function CompanyProfileForm({ company, editable }: { company: CompanyProf
 
         <FormMessage error={state.error} ok={state.ok} />
         {editable ? (
-          <Submit pending={pending} />
+          <Submit loading={pending} />
         ) : (
           <p className="text-sm text-muted-foreground">Профиль компании правит администратор компании.</p>
         )}

@@ -77,10 +77,10 @@ export function DecisionPanel({
 }) {
   // Кнопки «интервью» и «пауза» — формы из одних скрытых полей (action, терять нечего); форма причины
   // отказа идёт через onSubmit: комментарий не должен пропадать, если сервер отказал
-  const { state, fields, pending, formAction, formProps } = useFormAction<DecisionState>(decideAction, {});
+  const { state, fields, pending, formAction, formProps, messageRef } = useFormAction<DecisionState>(decideAction, {});
   const [rejecting, setRejecting] = useState(false);
   // «Отказать» заменяет кнопки формой причины: фокус — на первое поле, после «Отмены» — на «Отказать»
-  const { triggerRef, focusRef } = useConfirmFocus(rejecting);
+  const { triggerRef, focusRef, questionId } = useConfirmFocus(rejecting);
   const [reason, setReason] = useState("");
   const lastDecision = useRef<ClientDecision | null>(null);
 
@@ -152,8 +152,13 @@ export function DecisionPanel({
             lastDecision.current = "REJECT";
             formProps.onSubmit(event);
           }}
+          aria-labelledby={questionId}
           className={panelClass("plain", "space-y-4")}
         >
+          {/* Вопроса на экране нет — форма сама просит причину; для читалки она названа, чтобы фокус в поле не был «ниоткуда» */}
+          <span id={questionId} className="sr-only">
+            Отказ кандидату: укажите причину
+          </span>
           <input type="hidden" name="applicationId" value={applicationId} />
           <input type="hidden" name="decision" value="REJECT" />
           <input type="hidden" name="rejectedBy" value="CLIENT" />
@@ -215,7 +220,8 @@ export function DecisionPanel({
         </p>
       )}
 
-      <FormMessage error={state.error} ok={state.ok} />
+      {/* Плашка стоит после формы, не в ней: ссылка нужна, чтобы фокус после отказа дошёл до неё */}
+      <FormMessage ref={messageRef} error={state.error} ok={state.ok} />
     </div>
   );
 }

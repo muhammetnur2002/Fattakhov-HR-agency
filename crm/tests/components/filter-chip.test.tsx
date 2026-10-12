@@ -148,19 +148,11 @@ describe("FilterChip: кнопка и вкладка", () => {
   });
 });
 
-describe("размер чипа не растёт", () => {
-  it("высота — как у Button size=sm: h-7 и text-xs, галочка не выше строки", () => {
-    render(
-      <FilterChip href="/x" selected>
-        Все
-      </FilterChip>,
-    );
-    const chip = screen.getByRole("link", { name: "Все" });
-    expect(chip.className).toContain("h-7");
-    expect(chip.className).toContain("text-xs");
-    expect(chip.className).toContain("size-3.5");
-  });
-});
+/*
+  Высоту чипа здесь не проверяем: в jsdom нет вёрстки, а подстроки `h-7` и `text-xs` в className ничего не
+  измеряют (замечание независимой проверки к PR #119). Размер — живой замер рядом с Button size="sm":
+  tests/e2e/selection-states.spec.ts, «чип той же высоты и кегля, что Button size=sm».
+*/
 
 describe("SelectionCheck", () => {
   it("круглая галочка выбора скрыта от читалки: состояние говорит aria-pressed на самой карточке", () => {

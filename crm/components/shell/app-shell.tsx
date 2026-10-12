@@ -121,7 +121,7 @@ export async function AppShell({
         со stretch по умолчанию, он растянул бы сайдбар на всю высоту
         содержимого, и прилипать было бы нечему.
       */}
-      <aside className="relative hidden w-60 shrink-0 flex-col bg-brand-graphite p-4 xl:sticky xl:top-0 xl:flex xl:h-svh xl:self-start xl:overflow-y-auto print:hidden">
+      <aside aria-label="Меню кабинета" className="relative hidden w-60 shrink-0 flex-col bg-brand-graphite p-4 xl:sticky xl:top-0 xl:flex xl:h-svh xl:self-start xl:overflow-y-auto print:hidden">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-25 mix-blend-overlay"

@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { PlatformStudentItem } from "@/lib/students-service";
 
 /** «19 лет», «21 год», «22 года» — возраст в подписи. */
@@ -22,16 +22,14 @@ export function StudentStatusBadges({ student }: { student: PlatformStudentItem 
   return (
     <>
       {student.studyVerified ? (
-        <Badge variant="secondary">Учёба подтверждена</Badge>
+        <StatusBadge tone="success">Учёба подтверждена</StatusBadge>
       ) : student.studyPending ? (
-        <Badge variant="outline">Справка на проверке</Badge>
+        <StatusBadge tone="warning">Справка на проверке</StatusBadge>
       ) : (
-        <Badge variant="outline" className="text-muted-foreground">
-          Учёба не подтверждена
-        </Badge>
+        <StatusBadge tone="neutral">Учёба не подтверждена</StatusBadge>
       )}
-      {student.paused && <Badge variant="outline">На паузе</Badge>}
-      {student.placed && <Badge>Трудоустроен(а)</Badge>}
+      {student.paused && <StatusBadge tone="neutral">На паузе</StatusBadge>}
+      {student.placed && <StatusBadge tone="success">Трудоустроен(а)</StatusBadge>}
     </>
   );
 }

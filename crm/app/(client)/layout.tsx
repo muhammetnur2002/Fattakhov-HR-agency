@@ -7,8 +7,9 @@ import { ContractGate } from "@/components/client/contract-gate";
 import { CooperationBanner } from "@/components/client/cooperation-banner";
 import { PushPromptGate } from "@/components/shell/push-prompt-gate";
 import { PushServiceWorker } from "@/components/shell/push-service-worker";
+import { TimeZoneProvider } from "@/components/shell/time-zone-provider";
 import { canDo } from "@/lib/access";
-import { requireClientActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireClientActor } from "@/lib/auth/session";
 import { CABINET_METADATA } from "@/lib/cabinet-metadata";
 import { TELEGRAM_HREF } from "@/lib/contacts";
 import { prisma } from "@/lib/db/prisma";
@@ -48,6 +49,8 @@ export default async function ClientLayout({
   children: React.ReactNode;
 }) {
   const actor = await requireClientActor();
+  // Время в клиентских компонентах — в зоне человека, как и на сервере (lib/format-date.ts)
+  const timeZone = await getUserTimeZone();
 
   const [client, agreementChosen, activeAgreement] = await Promise.all([
     actor.clientId
@@ -93,33 +96,35 @@ export default async function ClientLayout({
   };
 
   return (
-    <AppShell
-      actor={actor}
-      nav={CLIENT_NAV}
-      title={client?.name ?? "Кабинет"}
-      notificationsHref="/notifications"
-      searchHrefBase=""
-      contractLocked={contractState !== "active"}
-    >
-      {/* Пульс «в сети»: раз в минуту, пока вкладка на виду (/api/presence) */}
-      <PresenceHeartbeat />
-      {/* Воркер пушей — только в кабинетах и только при настроенном канале */}
-      {pushConfigured() && <PushServiceWorker />}
-      {pushConfigured() && <PushPromptGate userId={actor.id} />}
-      {contractState !== "active" && (
-        <CooperationBanner
+    <TimeZoneProvider timeZone={timeZone}>
+      <AppShell
+        actor={actor}
+        nav={CLIENT_NAV}
+        title={client?.name ?? "Кабинет"}
+        notificationsHref="/notifications"
+        searchHrefBase=""
+        contractLocked={contractState !== "active"}
+      >
+        {/* Пульс «в сети»: раз в минуту, пока вкладка на виду (/api/presence) */}
+        <PresenceHeartbeat />
+        {/* Воркер пушей — только в кабинетах и только при настроенном канале */}
+        {pushConfigured() && <PushServiceWorker />}
+        {pushConfigured() && <PushPromptGate userId={actor.id} />}
+        {contractState !== "active" && (
+          <CooperationBanner
+            state={contractState}
+            access={contractAccess}
+            telegramHref={TELEGRAM_HREF}
+          />
+        )}
+        <ContractGate
           state={contractState}
           access={contractAccess}
           telegramHref={TELEGRAM_HREF}
-        />
-      )}
-      <ContractGate
-        state={contractState}
-        access={contractAccess}
-        telegramHref={TELEGRAM_HREF}
-      >
-        {children}
-      </ContractGate>
-    </AppShell>
+        >
+          {children}
+        </ContractGate>
+      </AppShell>
+    </TimeZoneProvider>
   );
 }

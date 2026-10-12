@@ -58,7 +58,8 @@ export async function decideAction(
       rejectedBy: formData.get("rejectedBy") || "CLIENT",
       rejectionComment: formData.get("rejectionComment") || undefined,
     });
-    if (!parsed.success) return invalidForm(parsed.error, "Укажите причину отказа");
+    // Общая сводка по умолчанию: «Укажите причину отказа» противоречила бы ошибке у поля комментария («Другое»)
+    if (!parsed.success) return invalidForm(parsed.error);
     rejection = parsed.data;
   }
 

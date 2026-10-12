@@ -9,6 +9,8 @@
  * только эта функция.
  */
 
+import { DEFAULT_TIME_ZONE, formatDateForFileName } from "@/lib/format-date";
+
 /** Метка кодировки: без неё Excel читает кириллицу как мусор. */
 const BOM = "﻿";
 
@@ -89,14 +91,8 @@ export function buildCsv(sheets: Sheet[]): string {
 }
 
 /** Имя файла с датой — чтобы выгрузки не перезаписывали друг друга. */
-export function reportFileName(prefix: string): string {
-  const date = new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-    .format(new Date())
-    .replace(/\./g, "-");
+export function reportFileName(prefix: string, timeZone: string = DEFAULT_TIME_ZONE): string {
+  const date = formatDateForFileName(new Date(), timeZone);
 
   return `${prefix}_${date}.csv`;
 }

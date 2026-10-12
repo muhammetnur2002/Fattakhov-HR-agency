@@ -7,6 +7,7 @@ import { ConversationList } from "./conversation-list";
 import { DirectConversationList } from "./direct-conversation-list";
 import { NewMessageDialog } from "./new-message-dialog";
 import { PresenceRefresh } from "@/components/presence/presence-refresh";
+import { useTimeZone } from "@/components/shell/time-zone-provider";
 import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { useKeyboardViewport } from "@/lib/hooks/use-keyboard-viewport";
 import { SearchField } from "@/components/ui/search-field";
@@ -42,6 +43,7 @@ export function MessagesShell({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const timeZone = useTimeZone();
 
   const listBase = `${hrefBase}/messages`;
   const activeId = pathname.startsWith(`${listBase}/`)
@@ -99,6 +101,7 @@ export function MessagesShell({
       {/* «В сети» у собеседников не должно застывать на моменте загрузки */}
       <PresenceRefresh />
       <aside
+        aria-label="Список диалогов"
         className={cn(
           "flex min-h-0 w-full shrink-0 flex-col md:w-[21rem] md:border-r",
           threadOpen && "hidden md:flex",
@@ -148,12 +151,14 @@ export function MessagesShell({
               conversations={work}
               hrefFor={(c) => hrefForWork(c, hrefBase)}
               emptyText="Как только кто-то напишет в обсуждении кандидата или вакансии, переписка появится здесь."
+              timeZone={timeZone}
             />
           ) : (
             <DirectConversationList
               conversations={visibleDirect}
               hrefBase={hrefBase}
               activeId={activeId}
+              timeZone={timeZone}
               emptyText={
                 direct.length === 0
                   ? "Личных сообщений пока нет. Нажмите «Написать», чтобы начать."

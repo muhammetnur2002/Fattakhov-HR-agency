@@ -72,6 +72,52 @@ test("рекрутёр пишет, правит и удаляет свой ко�
   }
 });
 
+/**
+ * Блок на месте кнопки (замечание независимой проверки к PR #119, a11y-4): «Изменить» и «Удалить» пропадают,
+ * пока на их месте поле правки или вопрос «Удалить комментарий?». Раньше фокус терялся на <body>, а когда его
+ * вели, то на «Отмену» молча: вопрос лежал в соседнем абзаце, и читалка говорила только «Отмена, кнопка».
+ * Ничего не меняем и не удаляем — открываем и отменяем с клавиатуры.
+ */
+test("правка и удаление своего комментария: фокус ведётся, блок назван, «Отмена» возвращает на кнопку", async ({ page }) => {
+  const ids = await createApplicationFixture({
+    organizationId: ORG_ID,
+    vacancyId: VACANCY_ID,
+    stageCode: "LONGLIST",
+    createdById: RECRUITER_ID,
+    ownerId: RECRUITER_ID,
+    fullName: `E2E Кандидат Фокус Комментарий ${Date.now()}`,
+    consentStatus: "GIVEN",
+    consentExpiresAtIso: futureConsent(),
+  });
+  const body = `E2E фокус блока ${Date.now()}`;
+  await createComment({ organizationId: ORG_ID, applicationId: ids.applicationId, authorId: RECRUITER_ID, body });
+
+  try {
+    await page.goto(`/a/applications/${ids.applicationId}`);
+    const commentBox = page.locator("li").filter({ hasText: RECRUITER_NAME });
+    await expect(commentBox.getByText(body, { exact: true })).toBeVisible();
+
+    const edit = commentBox.getByRole("button", { name: "Изменить" });
+    await edit.focus();
+    await page.keyboard.press("Enter");
+    await expect(commentBox.getByRole("group", { name: "Изменить комментарий" })).toBeVisible();
+    await expect(commentBox.getByRole("textbox")).toBeFocused();
+    await commentBox.getByRole("button", { name: "Отмена" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(commentBox.getByRole("button", { name: "Изменить" })).toBeFocused();
+
+    const remove = commentBox.getByRole("button", { name: "Удалить" });
+    await remove.focus();
+    await page.keyboard.press("Enter");
+    await expect(commentBox.getByRole("group", { name: "Удалить комментарий?" })).toBeVisible();
+    await expect(commentBox.getByRole("button", { name: "Отмена" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(commentBox.getByRole("button", { name: "Удалить" })).toBeFocused();
+  } finally {
+    await cleanupCandidate({ candidateId: ids.candidateId });
+  }
+});
+
 test.describe("comment.deleteAny — только у владельца", () => {
   test.use({ storageState: "tests/e2e/.auth/owner.json" });
 

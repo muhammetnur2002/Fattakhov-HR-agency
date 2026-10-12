@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { panelClass } from "@/components/ui/panel";
 import { useFormAction } from "@/lib/hooks/use-form-action";
+import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function Submit({ label, loading }: { label: string; loading?: boolean }) {
   return (
@@ -36,11 +37,13 @@ export function ClientVacancyActions({
 }) {
   // Причина отмены набирается текстом и остаётся после отказа; кнопки «приостановить» и «возобновить» —
   // формы без полей (action)
-  const { state, pending, formAction, formProps } = useFormAction<VacancyActionState>(
+  const { state, pending, formAction, formProps, messageRef } = useFormAction<VacancyActionState>(
     clientTransitionAction,
     {},
   );
   const [cancelling, setCancelling] = useState(false);
+  // «Отменить заявку» заменяется формой причины: фокус — в поле, а после «Не отменять» — обратно на кнопку
+  const { triggerRef, focusRef, questionId } = useConfirmFocus<HTMLButtonElement, HTMLInputElement>(cancelling);
 
   const showHold = canHold && status === "ACTIVE";
   const showResume = canHold && status === "ON_HOLD";
@@ -70,6 +73,7 @@ export function ClientVacancyActions({
 
         {showCancel && !cancelling && (
           <Button
+            ref={triggerRef}
             type="button"
             size="sm"
             variant="outline"
@@ -83,11 +87,14 @@ export function ClientVacancyActions({
       {/* Причина обязательна: без неё в аналитике останется дыра,
           а рекрутер не поймёт, что пошло не так */}
       {cancelling && (
-        <form {...formProps} className={panelClass("plain", "space-y-2")}>
+        <form {...formProps} aria-labelledby={questionId} className={panelClass("plain", "space-y-2")}>
           <input type="hidden" name="vacancyId" value={vacancyId} />
           <input type="hidden" name="to" value="CLOSED_CANCELLED" />
-          <Label htmlFor="closeReason">Почему отменяете?</Label>
+          <Label id={questionId} htmlFor="closeReason">
+            Почему отменяете?
+          </Label>
           <Input
+            ref={focusRef}
             id="closeReason"
             name="closeReason"
             required
@@ -107,7 +114,7 @@ export function ClientVacancyActions({
         </form>
       )}
 
-      <FormMessage error={state.error} />
+      <FormMessage ref={messageRef} error={state.error} />
     </div>
   );
 }

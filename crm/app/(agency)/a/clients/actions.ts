@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 
 import { AccessDeniedError } from "@/lib/access";
-import type { FormState as FormStateBase } from "@/lib/form-state";
+import { serviceFailure, type FormState as FormStateBase } from "@/lib/form-state";
 import {
   authorize,
   authorizeOrThrow,
@@ -131,10 +131,8 @@ export async function createClientUserAction(
     if (error instanceof AccessDeniedError) {
       return { error: "Недостаточно прав" };
     }
-    // Единственная беда сервиса здесь — «адрес уже занят»: показываем её у поля почты
-    if (error instanceof ClientUserError) {
-      return { fields: { email: error.message } };
-    }
+    // «Адрес уже занят» сервис помечает сам (`field: "email"`) — это у поля почты, остальное общей строкой
+    if (error instanceof ClientUserError) return serviceFailure(error);
     throw error;
   }
 

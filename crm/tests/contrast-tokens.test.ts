@@ -100,6 +100,23 @@ describe.each(THEMES)("контраст токенов: $name тема", ({ name
     }
   });
 
+  it("тона статусных бейджей (success, warning, progress): текст читается на своей плашке на любой поверхности — не ниже 4,5:1", () => {
+    // Сверка 12.10.2026, consistency-7: бейджи статусов получили три цвета рядом с красным. Прозрачность плашки
+    // читается из badge.tsx (bg-<тон>/10 в светлой, dark:bg-<тон>/20 в тёмной), а не дублируется здесь
+    const badge = readFileSync(new URL("../components/ui/badge.tsx", import.meta.url), "utf8");
+    for (const tone of ["success", "warning", "progress"]) {
+      const light = Number(new RegExp(`(?<![:\\w-])bg-${tone}/(\\d+)`).exec(badge)?.[1]) / 100;
+      const dark = Number(new RegExp(`dark:bg-${tone}/(\\d+)`).exec(badge)?.[1]) / 100;
+      const alpha = name === "тёмная" ? dark : light;
+      expect(alpha, `прозрачность плашки ${tone} в badge.tsx`).toBeGreaterThan(0);
+      const color = token(body, tone);
+      for (const surface of ["background", "card", "muted", "accent", "secondary"]) {
+        const base = token(body, surface);
+        expect(ratio(color, over(color, base, alpha)), `${tone} на плашке поверх ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
   it("нажатие основной кнопки: заметно темнее покоя и наведения, белый текст на ней — не ниже 4,5:1", () => {
     // Сверка 11.10.2026: нажатая кнопка имела цвет наведения — 84 110 136 → 71 97 123, 1,2:1. На телефоне
     // наведения нет, и нажатие почти не было видно. Темнее, а не светлее: на светлом упал бы контраст текста.
@@ -154,6 +171,21 @@ describe.each(THEMES)("контраст токенов: $name тема", ({ name
     }
     expect(ratio(primary, token(body, "muted")), "активная вкладка к списку вкладок").toBeGreaterThanOrEqual(3);
     expect(ratio(token(body, "primary-foreground"), primary), "текст и галочка на заливке").toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("невыбранный чип обведён так, что граница не ниже 3:1 к поверхности — выбор держится не на сотых контраста заливки", () => {
+    // Заливка выбранного к невыбранному в тёмной теме — 3,01:1: запас в сотые. Поэтому у невыбранного чипа там
+    // рамка --field (как у полей ввода, 3:1), и к заливке и галочке добавляется заметная граница
+    // (замечание независимой проверки к PR #119). Токен проверяется здесь, класс — в исходнике чипа.
+    const chip = /const UNSELECTED =\s*"([^"]+)"/.exec(read("components/ui/filter-chip.tsx"))?.[1] ?? "";
+    if (name === "тёмная") {
+      expect(chip.split(/\s+/)).toContain("dark:border-field");
+      const field = token(body, "field");
+      for (const surface of ["background", "card"]) {
+        const base = token(body, surface);
+        expect(ratio(over(field, base), base), `рамка невыбранного чипа на ${surface}`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 
   it("значок успеха (--primary) и красный текст ошибки читаются на карточке и фоне (WCAG 1.4.11, 1.4.3)", () => {

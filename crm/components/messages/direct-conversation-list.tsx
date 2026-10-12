@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { DirectConversation } from "@/lib/services/messages";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { CountBadge } from "@/components/ui/count-badge";
+import { formatMessageStamp } from "@/lib/format-date";
 
 /**
  * Список личных переписок — компактные строки для боковой колонки
@@ -21,6 +22,7 @@ export function DirectConversationList({
   hrefBase,
   activeId,
   emptyText,
+  timeZone,
 }: {
   conversations: DirectConversation[];
   /** "" для клиента (/messages), "/a" для агентства. */
@@ -28,6 +30,8 @@ export function DirectConversationList({
   /** id открытого сейчас собеседника — подсвечивает строку. */
   activeId?: string | null;
   emptyText: string;
+  /** Зона человека: «сегодня» и время в строке считаются в ней. */
+  timeZone: string;
 }) {
   if (conversations.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyText}</p>;
@@ -56,7 +60,7 @@ export function DirectConversationList({
             <div className="flex items-baseline justify-between gap-2">
               <div className="truncate text-sm font-medium">{c.user.fullName}</div>
               <div className="shrink-0 text-xs text-muted-foreground">
-                {formatWhen(c.lastMessage.createdAt)}
+                {formatMessageStamp(c.lastMessage.createdAt, new Date(), timeZone)}
               </div>
             </div>
             <div className="truncate text-xs text-muted-foreground">
@@ -88,17 +92,4 @@ export function DirectConversationList({
 export function describeUser(role: UserRole, clientName: string | null): string {
   const roleLabel = ROLE_LABELS[role];
   return clientName ? `${roleLabel} · ${clientName}` : `${roleLabel} · агентство`;
-}
-
-/** Сегодня — только время, раньше — короткая дата: как в любом мессенджере. */
-function formatWhen(value: Date): string {
-  const date = new Date(value);
-  const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  return sameDay
-    ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(date)
-    : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(date);
 }

@@ -12,6 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { MAX_FILE_SIZE, oversizeMessage } from "@/lib/upload-limits";
@@ -97,26 +99,20 @@ export function CandidateFilesCard({
           <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
             <label className="space-y-2 text-sm">
               <span className="text-muted-foreground">Вид файла</span>
-              <select
-                name="kind"
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-                className="h-9 w-full rounded-lg border border-field bg-background px-2 text-sm"
-              >
+              <NativeSelect name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className="w-full">
                 <option value="RESUME">Резюме</option>
                 <option value="PORTFOLIO">Портфолио</option>
                 <option value="TEST_TASK">Тестовое задание</option>
                 <option value="OTHER">Прочее</option>
-              </select>
+              </NativeSelect>
             </label>
             <label className="space-y-2 text-sm">
               <span className="text-muted-foreground">Файл (до {MAX_FILE_SIZE / (1024 * 1024)} МБ)</span>
-              <input
-                type="file"
+              <FileInput
                 name="file"
                 required
                 onChange={(e) => setTooBig(oversizeMessage(e.target.files?.[0]))}
-                className="block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-field file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                aria-invalid={Boolean(tooBig)}
               />
             </label>
           </div>
@@ -147,7 +143,7 @@ export function CandidateFilesCard({
 
 function FileItem({ file }: { file: CandidateFileRow }) {
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef } = useConfirmFocus(confirming);
+  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -185,12 +181,14 @@ function FileItem({ file }: { file: CandidateFileRow }) {
           )}
         </div>
         {confirming ? (
-          <span className="flex items-center gap-2 text-xs">
-            Удалить файл?
+          <span {...groupProps} className="flex items-center gap-2 text-xs">
+            <span id={questionId}>
+              Удалить файл<span className="sr-only"> «{file.fileName}»</span>?
+            </span>
             <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>
               Да, удалить
             </Button>
-            <Button ref={focusRef} type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
+            <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
               Нет
             </Button>
           </span>

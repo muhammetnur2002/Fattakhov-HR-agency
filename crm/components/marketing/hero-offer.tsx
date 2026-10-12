@@ -5,7 +5,7 @@ import {
   TOP_TARIFF,
   pricePerSlot,
 } from "@/lib/marketing/inhouse-cost";
-import { formatNumber } from "@/lib/pricing";
+import { formatNumber } from "@/lib/format-money";
 
 /**
  * Ценник в первом экране.

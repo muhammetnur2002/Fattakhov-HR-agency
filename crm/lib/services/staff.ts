@@ -26,7 +26,15 @@ import { passwordProblem } from "@/lib/validation/password";
  * (canManageStaffMember, canAssignStaff). Здесь только данные.
  */
 
-export class StaffError extends Error {}
+export class StaffError extends Error {
+  /** Имя поля формы, к которому относится отказ (`email` — адрес занят); без него отказ общий. */
+  constructor(
+    message: string,
+    readonly field?: "email",
+  ) {
+    super(message);
+  }
+}
 
 export type StaffMember = {
   id: string;
@@ -133,6 +141,7 @@ export async function createStaffAccount(
       throw new StaffError(
         `${email} уже занят: ${taken.fullName}, ${where}. ` +
           `Один адрес — один пользователь. Укажите другой.`,
+        "email",
       );
     }
 

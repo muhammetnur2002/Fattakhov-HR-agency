@@ -19,8 +19,56 @@ export function sources(dir: string): string[] {
     .map((f) => join(dir, f));
 }
 
+/** Любые файлы внутри каталога, чьё имя подходит под шаблон (путь от корня проекта). */
+export function filesMatching(dir: string, pattern: RegExp): string[] {
+  return (readdirSync(join(ROOT, dir), { recursive: true }) as string[]).filter((f) => pattern.test(f)).map((f) => join(dir, f));
+}
+
 export function read(file: string): string {
   return readFileSync(join(ROOT, file), "utf8");
+}
+
+/**
+ * Текст без комментариев: каждый символ комментария заменён пробелом, переводы строк остаются — номера
+ * строк и смещения не меняются. Нужен, когда в комментарии упомянут тег (`<form>`, `<input>`) и тест не
+ * должен принять его за разметку. Строки в кавычках и шаблонах не трогаются (`"http://…"` — не комментарий).
+ */
+export function stripComments(text: string): string {
+  let out = "";
+  let quote: string | null = null;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (quote) {
+      out += c;
+      if (c === "\\") {
+        out += text[i + 1] ?? "";
+        i += 2;
+        continue;
+      }
+      if (c === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      const stop = end < 0 ? text.length : end + 2;
+      out += text.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "/" && text[i - 1] !== ":") {
+      const end = text.indexOf("\n", i);
+      const stop = end < 0 ? text.length : end;
+      out += " ".repeat(stop - i);
+      i = stop;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") quote = c;
+    out += c;
+    i++;
+  }
+  return out;
 }
 
 export type JsxTag = {

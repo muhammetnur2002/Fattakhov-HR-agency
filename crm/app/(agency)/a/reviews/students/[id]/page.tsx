@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canDo, effectiveGrants } from "@/lib/access";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateNumeric } from "@/lib/format-date";
 import { clientIp } from "@/lib/security/rate-limit";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
 import { PROFILE_VIEW_DEDUPE_MS, recordStudentProfileAccess } from "@/lib/services/student-profile-audit";
@@ -78,6 +79,7 @@ export default async function StudentProfilePage({
 }) {
   const actor = await requireAgencyActor();
   authorize(actor, "students.enter");
+  const timeZone = await getUserTimeZone();
   const grants = effectiveGrants(actor);
   if (!grants.includes("students.search")) notFound();
 
@@ -177,7 +179,7 @@ export default async function StudentProfilePage({
             <CardContent className="space-y-1 text-sm">
               <p className="break-words">{education.join(" · ")}</p>
               <p className="text-muted-foreground">
-                Регистрация: {new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow" }).format(new Date(student.createdAt))}
+                Регистрация: {formatDateNumeric(student.createdAt, timeZone)}
                 {" · "}
                 <PresenceLabel lastSeenAt={student.lastSeenAt} />
               </p>

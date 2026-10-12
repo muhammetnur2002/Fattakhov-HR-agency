@@ -4,7 +4,8 @@ import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 import { AppShell } from "@/components/shell/app-shell";
 import { PushPromptGate } from "@/components/shell/push-prompt-gate";
 import { PushServiceWorker } from "@/components/shell/push-service-worker";
-import { requireAgencyActor } from "@/lib/auth/session";
+import { TimeZoneProvider } from "@/components/shell/time-zone-provider";
+import { getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
 import { CABINET_METADATA } from "@/lib/cabinet-metadata";
 import { prisma } from "@/lib/db/prisma";
 import { AGENCY_NAV } from "@/lib/nav";
@@ -34,6 +35,8 @@ export default async function AgencyLayout({
   // принудительной настройки (/security/two-factor): остальной кабинет
   // до этого закрыт. Выход и статика — вне макета, их это не касается
   const actor = await requireAgencyActor();
+  // Время в клиентских компонентах — в зоне человека, как и на сервере (lib/format-date.ts)
+  const timeZone = await getUserTimeZone();
 
   const organization = await prisma.organization.findUnique({
     where: { id: actor.organizationId },
@@ -41,19 +44,21 @@ export default async function AgencyLayout({
   });
 
   return (
-    <AppShell
-      actor={actor}
-      nav={AGENCY_NAV}
-      title={organization?.name ?? "Агентство"}
-      notificationsHref="/a/notifications"
-      searchHrefBase="/a"
-    >
-      {/* Пульс «в сети»: раз в минуту, пока вкладка на виду (/api/presence) */}
-      <PresenceHeartbeat />
-      {/* Воркер пушей — только в кабинетах и только при настроенном канале */}
-      {pushConfigured() && <PushServiceWorker />}
-      {pushConfigured() && <PushPromptGate userId={actor.id} />}
-      {children}
-    </AppShell>
+    <TimeZoneProvider timeZone={timeZone}>
+      <AppShell
+        actor={actor}
+        nav={AGENCY_NAV}
+        title={organization?.name ?? "Агентство"}
+        notificationsHref="/a/notifications"
+        searchHrefBase="/a"
+      >
+        {/* Пульс «в сети»: раз в минуту, пока вкладка на виду (/api/presence) */}
+        <PresenceHeartbeat />
+        {/* Воркер пушей — только в кабинетах и только при настроенном канале */}
+        {pushConfigured() && <PushServiceWorker />}
+        {pushConfigured() && <PushPromptGate userId={actor.id} />}
+        {children}
+      </AppShell>
+    </TimeZoneProvider>
   );
 }

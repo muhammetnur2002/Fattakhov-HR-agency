@@ -24,6 +24,7 @@ import {
   VacancyTransitionError,
 } from "@/lib/services/vacancy-status";
 import type { VacancyBriefInput } from "@/lib/validation/vacancy";
+import { DEFAULT_TIME_ZONE, formatInZone } from "@/lib/format-date";
 
 /**
  * Следующий номер вакансии в организации (BR-25).
@@ -301,10 +302,7 @@ async function notifyAboutTransition(
 }
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "long",
-  }).format(date);
+  return formatInZone(date, "dayMonthPadded", DEFAULT_TIME_ZONE);
 }
 
 /** Этапы воронки из шаблона организации (ТЗ 5.3). */

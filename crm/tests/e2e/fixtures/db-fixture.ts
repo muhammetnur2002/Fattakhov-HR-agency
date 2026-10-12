@@ -77,7 +77,9 @@ type Input =
         status: "NEW" | "IN_PROGRESS" | "SPAM" | "CONVERTED" | "REJECTED";
       }[];
     }
-  | { op: "cleanupLeads"; namePrefix: string };
+  | { op: "cleanupLeads"; namePrefix: string }
+  | { op: "createSelfRegisteredClient"; email: string; briefCompleted: boolean }
+  | { op: "deleteSelfRegisteredClient"; email: string };
 
 async function run(input: Input) {
   switch (input.op) {
@@ -330,6 +332,46 @@ async function run(input: Input) {
     case "cleanupLeads": {
       const removed = await prismaRaw.lead.deleteMany({ where: { name: { startsWith: input.namePrefix } } });
       return { removed: removed.count };
+    }
+
+    case "createSelfRegisteredClient": {
+      // Сам зарегистрировавшаяся компания: анкета нужна, пока `briefCompletedAt` пуст (/onboarding). Пароль
+      // тот же, что у учёток seed (demo1234), — берётся готовый отпечаток у администратора первого клиента
+      const donor = await prismaRaw.user.findFirstOrThrow({
+        where: { email: "hrd@starfish.ru" },
+        select: { organizationId: true, passwordHash: true },
+      });
+      const now = new Date();
+      const client = await prismaRaw.client.create({
+        data: {
+          organizationId: donor.organizationId,
+          name: "e2e без скриптов",
+          selfRegisteredAt: now,
+          briefCompletedAt: input.briefCompleted ? now : null,
+        },
+        select: { id: true },
+      });
+      const user = await prismaRaw.user.create({
+        data: {
+          organizationId: donor.organizationId,
+          email: input.email,
+          fullName: "Проверка Без Скриптов",
+          passwordHash: donor.passwordHash,
+          role: "CLIENT_ADMIN",
+          clientId: client.id,
+        },
+        select: { id: true },
+      });
+      return { clientId: client.id, userId: user.id };
+    }
+
+    case "deleteSelfRegisteredClient": {
+      const user = await prismaRaw.user.findFirst({ where: { email: input.email }, select: { id: true, clientId: true } });
+      if (!user) return { removed: 0 };
+      await prismaRaw.authEvent.deleteMany({ where: { userId: user.id } });
+      await prismaRaw.user.delete({ where: { id: user.id } });
+      if (user.clientId) await prismaRaw.client.delete({ where: { id: user.clientId } });
+      return { removed: 1 };
     }
 
     case "cleanupCandidate": {

@@ -10,6 +10,7 @@ import {
 } from "@/components/applications/present-form";
 import { CommentThread } from "@/components/comments/comment-thread";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Card,
   CardContent,
@@ -18,15 +19,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { canDo } from "@/lib/access";
-import { requireAgencyActor } from "@/lib/auth/session";
+import { getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { formatDate } from "@/lib/format-date";
+import { formatDate as formatDateIn, formatDateTime as formatDateTimeIn } from "@/lib/format-date";
 import {
   APPLICATION_OUTCOME_LABELS,
   GUARANTEE_BREAK_REASON_LABELS,
   REJECTION_REASON_LABELS,
   REJECTION_SIDE_LABELS,
 } from "@/lib/labels";
+import { APPLICATION_OUTCOME_TONE } from "@/lib/status-tones";
 import { getApplication } from "@/lib/services/applications";
 import { consentIsValid } from "@/lib/services/consent";
 import { findValidDisclosure } from "@/lib/services/disclosure-consent";
@@ -54,6 +56,9 @@ export default async function AgencyApplicationPage({
 }) {
   const { id } = await params;
   const actor = await requireAgencyActor();
+  const timeZone = await getUserTimeZone();
+  const formatDate = (d: Date) => formatDateIn(d, timeZone);
+  const formatDateTime = (d: Date) => formatDateTimeIn(d, timeZone);
 
   const application = await getApplication(actor, id);
   if (!application) notFound();
@@ -117,11 +122,11 @@ export default async function AgencyApplicationPage({
           <PageTitle>
             {application.candidate.fullName}
           </PageTitle>
-          <Badge>{application.stage.name}</Badge>
+          <Badge variant="secondary">{application.stage.name}</Badge>
           {closed && (
-            <Badge variant="secondary">
+            <StatusBadge tone={APPLICATION_OUTCOME_TONE[application.outcome]}>
               {APPLICATION_OUTCOME_LABELS[application.outcome]}
-            </Badge>
+            </StatusBadge>
           )}
         </div>
 
@@ -426,13 +431,4 @@ export default async function AgencyApplicationPage({
       </Card>
     </div>
   );
-}
-
-function formatDateTime(d: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }

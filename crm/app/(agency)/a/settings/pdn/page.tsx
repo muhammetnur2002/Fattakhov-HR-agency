@@ -2,6 +2,7 @@ import { EraseButton } from "@/components/pdn/erase-button";
 import { ErasureQueue } from "@/components/pdn/erasure-queue";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Card,
   CardContent,
@@ -10,7 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authorize, requireAgencyActor } from "@/lib/auth/session";
+import { authorize, getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/format-date";
 import {
   countOverdueErasures,
   listErasureQueue,
@@ -33,6 +35,7 @@ export const metadata = { title: "Персональные данные" };
 export default async function PdnPage() {
   const actor = await requireAgencyActor();
   authorize(actor, "pdn.auditLog");
+  const timeZone = await getUserTimeZone();
 
   const [log, retention, queue, overdue] = await Promise.all([
     listAccessLog(actor, { limit: 100 }),
@@ -59,20 +62,17 @@ export default async function PdnPage() {
           <TabsTrigger value="queue">
             Уничтожение
             {queue.length > 0 && (
-              <Badge
-                variant={overdue > 0 ? "destructive" : "secondary"}
-                className="ml-2"
-              >
+              <StatusBadge tone={overdue > 0 ? "danger" : "neutral"} className="ml-2">
                 {queue.length}
-              </Badge>
+              </StatusBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="retention">
             Требуют решения
             {retention.length > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <StatusBadge tone="warning" className="ml-2">
                 {retention.length}
-              </Badge>
+              </StatusBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="log">Журнал доступа</TabsTrigger>
@@ -136,11 +136,11 @@ export default async function PdnPage() {
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{candidate.fullName}</span>
-                      <Badge variant="outline">
+                      <StatusBadge tone="warning">
                         {candidate.consentStatus === "EXPIRED"
                           ? "согласие истекло"
                           : "согласие отозвано"}
-                      </Badge>
+                      </StatusBadge>
                       {candidate.activeApplications > 0 && (
                         <Badge variant="secondary">
                           в работе: {candidate.activeApplications}
@@ -183,7 +183,7 @@ export default async function PdnPage() {
                       className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b pb-2 last:border-0 last:pb-0"
                     >
                       <span className="w-28 shrink-0 text-xs text-muted-foreground">
-                        {formatDateTime(entry.createdAt)}
+                        {formatDateTime(entry.createdAt, timeZone)}
                       </span>
                       <span className="min-w-40 flex-1">
                         {ACCESS_ACTION_LABELS[entry.action] ?? entry.action}
@@ -210,13 +210,4 @@ export default async function PdnPage() {
       </Tabs>
     </div>
   );
-}
-
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
