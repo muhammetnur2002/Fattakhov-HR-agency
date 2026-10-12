@@ -383,6 +383,9 @@ main[tabindex="-1"]:focus {
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-cal-sat: var(--cal-sat);
+  --color-cal-sun: var(--cal-sun);
+  --color-cal-interview: var(--cal-interview);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -442,6 +445,17 @@ main[tabindex="-1"]:focus {
      заменён на единое чёрное полотно — тот же приём, что и у графита
      выше: один фирменный акцент #546E88 вместо второго тёмного цвета */
   --brand-slate: rgb(0 0 0);
+
+  /*
+    Календарь (components/calendar): выходные обозначаются РАМКОЙ, а не фоном —
+    фон остаётся токенами темы. Суббота жёлтая, воскресенье красная; цвета
+    средние по яркости и читаются рамкой на светлом и на тёмном фоне, поэтому
+    в .dark не переопределяются. Интервью в сетке — отдельный зелёно-бирюзовый,
+    задачи берут акцент --primary. Заливки чипов — color-mix с прозрачностью.
+  */
+  --cal-sat: #ef9f27;
+  --cal-sun: #e24b4a;
+  --cal-interview: rgb(46 139 120);
 
   --background: rgb(238 237 234);
   --foreground: rgb(7 7 7);

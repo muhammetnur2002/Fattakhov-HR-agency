@@ -1,4 +1,6 @@
-import { toDateParam } from "@/lib/calendar/day-range";
+import { durationText } from "@/lib/calendar/countdown";
+import { dayKeyOf } from "@/lib/calendar/moscow";
+import { expandOccurrences } from "@/lib/calendar/recurrence";
 import { prisma } from "@/lib/db/prisma";
 import { notify, flushCollapsed } from "@/lib/notifications/notify";
 import { agencySideRecipients } from "@/lib/notifications/recipients";
@@ -318,49 +320,82 @@ export async function markOverdueInvoices(): Promise<number> {
   return overdue.length;
 }
 
+/** Самое раннее напоминание: не дальше недели вперёд (предел remindBeforeMinutes). */
+const MAX_REMIND_MINUTES = 7 * 24 * 60;
+
 /**
- * Напоминание за 15 минут до срока задания календаря.
+ * Напоминание за remindBeforeMinutes до начала задачи с дедлайном.
  *
- * Выбираются невыполненные задания, срок которых наступит в ближайшие
- * 15 минут. Флаг `reminderSentAt` делает проход идемпотентным; задания,
- * созданные уже внутри этого окна, помечены при создании и не напоминают.
+ * Окно напоминания вхождения открывается за remindBeforeMinutes до его начала.
+ * Напоминание считается отправленным, если `reminderSentAt` не раньше начала окна:
+ * одно поле держит и обычную задачу, и все вхождения повторяющейся (по одному за раз).
+ * Задачи, созданные уже внутри окна, помечены при создании и не напоминают.
+ * Выполненные и отменённые вхождения пропускаются.
  */
 export async function sendTaskReminders(): Promise<number> {
   const now = new Date();
+  const horizon = new Date(now.getTime() + MAX_REMIND_MINUTES * 60_000);
   const tasks = await prisma.calendarTask.findMany({
     where: {
-      completedAt: null,
-      reminderSentAt: null,
-      dueAt: { gt: now, lte: new Date(now.getTime() + 15 * 60_000) },
+      hasDeadline: true,
+      remindBeforeMinutes: { not: null },
+      OR: [
+        { recurrenceRule: null, completedAt: null, dueAt: { gt: now, lte: horizon } },
+        {
+          recurrenceRule: { not: null },
+          dueAt: { lte: horizon },
+          OR: [{ recurrenceUntil: null }, { recurrenceUntil: { gte: new Date(now.getTime() - 86_400_000) } }],
+        },
+      ],
     },
-    select: { id: true, organizationId: true, assigneeId: true, title: true, dueAt: true },
+    include: { exceptions: true },
   });
 
+  let sent = 0;
   for (const task of tasks) {
-    const minutes = Math.max(1, Math.round((task.dueAt.getTime() - now.getTime()) / 60_000));
+    const remindMs = (task.remindBeforeMinutes ?? 0) * 60_000;
+    const next = expandOccurrences(
+      { startsAt: task.dueAt, recurrenceRule: task.recurrenceRule, recurrenceUntil: task.recurrenceUntil, completedAt: task.completedAt },
+      new Date(now.getTime() + 1),
+      new Date(now.getTime() + remindMs + 1),
+      task.exceptions,
+    ).find((o) => !o.completedAt);
+    if (!next) continue;
+
+    const windowStart = next.startsAt.getTime() - remindMs;
+    if (task.reminderSentAt && task.reminderSentAt.getTime() >= windowStart) continue;
+
+    const left = Math.max(60_000, next.startsAt.getTime() - now.getTime());
     await notify({
       organizationId: task.organizationId,
       userIds: [task.assigneeId],
       event: "TASK_REMINDER",
-      title: `Через ${minutes} мин. срок задания: ${task.title}`,
-      linkUrl: `/a/calendar?range=day&date=${toDateParam(task.dueAt)}`,
+      title: `Через ${durationText(left)} начало задачи: ${task.title}`,
+      linkUrl: `/a/calendar?view=day&date=${dayKeyOf(next.startsAt)}`,
       groupKey: task.id,
     });
     await prisma.calendarTask.update({ where: { id: task.id }, data: { reminderSentAt: new Date() } });
+    sent++;
   }
 
-  return tasks.length;
+  return sent;
 }
 
 /**
- * Просроченные задания календаря.
+ * Просроченные задачи календаря (обычные, с дедлайном).
  *
  * Сообщаем исполнителю и тому, кто поставил (если это разные люди), один
- * раз на задание: повторно та же просрочка не рассылается.
+ * раз на задачу: повторно та же просрочка не рассылается.
  */
 export async function notifyOverdueTasks(): Promise<number> {
   const tasks = await prisma.calendarTask.findMany({
-    where: { completedAt: null, overdueNotifiedAt: null, dueAt: { lt: new Date() } },
+    where: {
+      hasDeadline: true,
+      recurrenceRule: null,
+      completedAt: null,
+      overdueNotifiedAt: null,
+      dueAt: { lt: new Date() },
+    },
     select: {
       id: true,
       organizationId: true,
@@ -376,8 +411,8 @@ export async function notifyOverdueTasks(): Promise<number> {
       organizationId: task.organizationId,
       userIds: [...new Set([task.assigneeId, task.createdById])],
       event: "TASK_OVERDUE",
-      title: `Задание просрочено: ${task.title}`,
-      linkUrl: `/a/calendar?range=day&date=${toDateParam(task.dueAt)}`,
+      title: `Задача просрочена: ${task.title}`,
+      linkUrl: `/a/calendar?view=day&date=${dayKeyOf(task.dueAt)}`,
       groupKey: task.id,
     });
     await prisma.calendarTask.update({ where: { id: task.id }, data: { overdueNotifiedAt: new Date() } });

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { visibleVacanciesFilter, type Actor } from "@/lib/access";
-import { buildCalendar, parseCalendarTokenVersioned } from "@/lib/calendar/ical";
+import { buildCalendar, parseCalendarTokenVersioned, type CalendarEvent } from "@/lib/calendar/ical";
+import { loadTaskFeedEvents } from "@/lib/calendar/task-feed";
 import { prisma } from "@/lib/db/prisma";
 import { link, resolveLink } from "@/lib/notifications/links";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
@@ -100,28 +101,33 @@ export async function GET(
   const cardPath = (applicationId: string) =>
     resolveLink(link.application(applicationId), actor.role);
 
+  const interviewEvents: CalendarEvent[] = interviews
+    .filter((i) => i.scheduledAt)
+    .map((i) => ({
+      uid: `interview-${i.id}@hr-platform`,
+      startsAt: i.scheduledAt!,
+      durationMinutes: i.durationMinutes,
+      summary: `Интервью: ${i.application.candidate.fullName} — ${i.vacancy.title}`,
+      description: [
+        `Кандидат: ${i.application.candidate.fullName}`,
+        `Вакансия: ${i.vacancy.title}`,
+        `Компания: ${i.vacancy.client.name}`,
+        `Карточка: ${baseUrl}${cardPath(i.application.id)}`,
+      ].join("\n"),
+      location:
+        i.format === "ONLINE"
+          ? (i.meetingUrl ?? "Онлайн")
+          : (i.address ?? "Офис"),
+      url: i.meetingUrl ?? undefined,
+      cancelled: i.status === "CANCELLED",
+    }));
+
+  // Задачи: только те, где человек исполнитель (свои и поставленные ему)
+  const taskEvents = await loadTaskFeedEvents(actor, from, to);
+
   const body = buildCalendar({
-    name: "Интервью",
-    events: interviews
-      .filter((i) => i.scheduledAt)
-      .map((i) => ({
-        uid: `interview-${i.id}@hr-platform`,
-        startsAt: i.scheduledAt!,
-        durationMinutes: i.durationMinutes,
-        summary: `Интервью: ${i.application.candidate.fullName} — ${i.vacancy.title}`,
-        description: [
-          `Кандидат: ${i.application.candidate.fullName}`,
-          `Вакансия: ${i.vacancy.title}`,
-          `Компания: ${i.vacancy.client.name}`,
-          `Карточка: ${baseUrl}${cardPath(i.application.id)}`,
-        ].join("\n"),
-        location:
-          i.format === "ONLINE"
-            ? (i.meetingUrl ?? "Онлайн")
-            : (i.address ?? "Офис"),
-        url: i.meetingUrl ?? undefined,
-        cancelled: i.status === "CANCELLED",
-      })),
+    name: taskEvents.length > 0 ? "Интервью и задачи" : "Интервью",
+    events: [...interviewEvents, ...taskEvents],
   });
 
   return new NextResponse(body, {

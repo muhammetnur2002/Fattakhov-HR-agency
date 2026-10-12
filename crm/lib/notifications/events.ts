@@ -204,37 +204,37 @@ export const EVENTS = {
   TASK_ASSIGNED: {
     channels: ["email", "vk"],
     priority: "high",
-    description: "Вам поставили задание",
+    description: "Вам поставили задачу",
     category: "tasks",
   },
   TASK_CHANGED: {
     channels: ["email"],
     priority: "normal",
-    description: "Задание изменили: срок или содержание",
+    description: "Задачу изменили: время или содержание",
     category: "tasks",
   },
   TASK_CANCELLED: {
     channels: ["email"],
     priority: "normal",
-    description: "Задание отменили или передали другому",
+    description: "Задачу отменили или передали другому",
     category: "tasks",
   },
   TASK_COMPLETED: {
     channels: ["email"],
     priority: "normal",
-    description: "Поставленное вами задание выполнено",
+    description: "Поставленная вами задача выполнена",
     category: "tasks",
   },
   TASK_REMINDER: {
     channels: ["email", "vk"],
     priority: "high",
-    description: "Напоминание за 15 минут до срока задания",
+    description: "Напоминание перед началом задачи",
     category: "tasks",
   },
   TASK_OVERDUE: {
     channels: ["email", "vk"],
     priority: "high",
-    description: "Задание просрочено",
+    description: "Задача просрочена",
     category: "tasks",
   },
 

@@ -739,22 +739,37 @@ model DirectMessage {
 
 // ============ ИНТЕРВЬЮ И КАЛЕНДАРЬ ============
 
-/// Задание сотрудника в календаре агентства: что сделать и к какому сроку.
+/// Задача сотрудника в календаре агентства: что сделать, когда и сколько времени.
 ///
-/// Ставит себе или (по правилам ролей, lib/services/calendar-tasks.ts) коллеге.
-/// Связи с пользователем, вакансией и кандидатом хранятся идентификаторами без
-/// внешних ключей, как у уведомлений: задание живёт само по себе, а исчезновение
-/// вакансии или кандидата не должно уносить его с собой.
+/// Ставит себе или (только OWNER и HEAD, lib/services/calendar-tasks.ts) коллеге.
+/// Задача, поставленная себе (assigneeId = createdById), видна только этому человеку,
+/// даже владельцу. Связи с пользователем, вакансией и кандидатом хранятся
+/// идентификаторами без внешних ключей, как у уведомлений: задача живёт сама
+/// по себе, а исчезновение вакансии или кандидата не должно уносить её с собой.
+///
+/// Время начала хранится в dueAt (так называлось поле, когда задача была только
+/// сроком; для задачи с дедлайном это и есть срок). Повторяющаяся задача хранится
+/// одной строкой, а её вхождения разворачиваются на сервере в запрошенном диапазоне
+/// (lib/calendar/recurrence.ts); отмена, перенос и отметка «сделано» одного вхождения
+/// живут в CalendarTaskException.
 model CalendarTask {
   id             String @id @default(cuid())
   organizationId String
 
-  title  String
-  dueAt  DateTime
+  title       String
+  description String?
+  /// Начало задачи (для повторяющейся: начало первого вхождения).
+  dueAt       DateTime
+  durationMinutes Int @default(60)
+  /// Начало — это срок: показываем «осталось», напоминаем, сообщаем о просрочке.
+  hasDeadline Boolean @default(true)
   /// Кто выполняет.
   assigneeId  String
   /// Кто поставил.
   createdById String
+  /// Задача поставлена себе (assigneeId = createdById). Хранится, чтобы видимость
+  /// считалась условием запроса, а не фильтром после выборки с лимитом.
+  isPersonal  Boolean @default(false)
 
   vacancyId   String?
   candidateId String?
@@ -762,10 +777,20 @@ model CalendarTask {
   completedAt   DateTime?
   completedById String?
 
-  /// Напоминание за 15 минут уже ушло: повторно не шлём.
-  reminderSentAt    DateTime?
-  /// О просрочке уже сообщили: повторно не шлём.
-  overdueNotifiedAt DateTime?
+  /// За сколько минут до начала напомнить; null: не напоминать.
+  remindBeforeMinutes Int? @default(60)
+  /// Когда ушло последнее напоминание. Для повторяющейся задачи сравнивается с
+  /// началом окна напоминания очередного вхождения: так одно поле держит все вхождения.
+  reminderSentAt      DateTime?
+  /// О просрочке уже сообщили: повторно не шлём (повторяющиеся не отслеживаются).
+  overdueNotifiedAt   DateTime?
+
+  /// DAILY | WEEKLY:MO,WE,FR | MONTHLY; null: задача не повторяется.
+  recurrenceRule  String?
+  /// Последний день повторов включительно (полночь по Москве); null: без конца.
+  recurrenceUntil DateTime?
+
+  exceptions CalendarTaskException[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -773,6 +798,26 @@ model CalendarTask {
   @@index([assigneeId, dueAt])
   @@index([organizationId, dueAt])
   @@index([createdById, dueAt])
+  @@index([hasDeadline, completedAt, dueAt])
+}
+
+/// Исключение из серии: одно вхождение повторяющейся задачи отменено,
+/// перенесено или выполнено, остальные не тронуты.
+model CalendarTaskException {
+  id             String @id @default(cuid())
+  taskId         String
+  task           CalendarTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// Какое вхождение: его начало по правилу серии (не перенесённое).
+  occurrenceDate DateTime
+  cancelled      Boolean @default(false)
+  movedToStartsAt DateTime?
+  /// Это вхождение выполнено.
+  completedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([taskId, occurrenceDate])
 }
 
 enum InterviewStatus {

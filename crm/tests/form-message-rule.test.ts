@@ -25,7 +25,7 @@ const FILES = [...sources("app"), ...sources("components")].filter((f) => !f.inc
 describe("красная строка в форме — только FormMessage или FieldError", () => {
   /** Красным окрашены данные, а не результат отправки формы. Число — сколько таких элементов в файле. */
   const DATA_COLOUR: Record<string, number> = {
-    "components/calendar/tasks-panel.tsx": 2, // «Просрочено» и дата просроченного задания
+    "components/calendar/calendar-day.tsx": 1, // «просрочено» в блоке задачи на сетке дня
     "components/kanban/candidate-card.tsx": 1, // срок ответа клиента вышел
     "components/analytics/funnel-chart.tsx": 1, // потери воронки
     "components/analytics/employee-table.tsx": 1, // просроченные задания сотрудника

@@ -1,84 +1,82 @@
-import Link from "next/link";
-
-import { CalendarSubscription } from "@/components/interviews/calendar-subscription";
-import { TasksPanel } from "@/components/calendar/tasks-panel";
-import { CalendarView } from "@/components/interviews/calendar-view";
-import { Button } from "@/components/ui/button";
-import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
-import { canDo, visibleVacanciesFilter } from "@/lib/access";
-import { getUserTimeZone, requireAgencyActor } from "@/lib/auth/session";
-import { formatDayTitle, parseDateParam, toDateParam } from "@/lib/calendar/day-range";
-import { calendarFeedUrl } from "@/lib/calendar/feed";
-import { zonedToUtc } from "@/lib/calendar/timezone";
-import { prisma } from "@/lib/db/prisma";
-import { listAssignableUsers, listTasks } from "@/lib/services/calendar-tasks";
+import { CalendarBoard, type CalendarView } from "@/components/calendar/calendar-board";
 import {
-  listInterviews,
-  listUnratedInterviews,
-} from "@/lib/services/interviews";
+  toTaskDTO,
+  type CalendarInterviewDTO,
+} from "@/components/calendar/calendar-model";
+import type { DayCounts } from "@/components/calendar/calendar-year";
+import { CalendarSubscription } from "@/components/interviews/calendar-subscription";
+import { CalendarView as InterviewList } from "@/components/interviews/calendar-view";
 import { PageTitle } from "@/components/ui/page-title";
+import { canDo, visibleVacanciesFilter } from "@/lib/access";
+import { requireAgencyActor } from "@/lib/auth/session";
+import { calendarFeedUrl } from "@/lib/calendar/feed";
+import {
+  addDays,
+  dayKeyOf,
+  isDayKey,
+  monthGrid,
+  startOfDay,
+  yearOf,
+  type DayKey,
+} from "@/lib/calendar/moscow";
+import { prisma } from "@/lib/db/prisma";
+import {
+  listAssignableUsers,
+  listOverdueTasks,
+  listTasks,
+  seesAllAssignedTasks,
+  upcomingDeadlines,
+} from "@/lib/services/calendar-tasks";
+import { listInterviews, listUnratedInterviews } from "@/lib/services/interviews";
 
 export const metadata = { title: "Календарь" };
 
 /**
- * Сколько дней показывать. Неделя по умолчанию — это рабочий горизонт.
- * «День» стоит последним: кнопки идут в порядке ключей, и он оказывается
- * справа от «Квартала».
+ * Календарь агентства: задачи и интервью в одной сетке (год, месяц, день).
+ *
+ * Дата и вид — в адресе (?view=month&date=2026-10-12). Все границы дней считаются по
+ * Москве (lib/calendar/moscow.ts), независимо от часового пояса сервера. Данные
+ * берутся ровно за видимый диапазон; повторяющиеся задачи разворачиваются в нём же.
  */
-const RANGES = { week: 7, month: 30, quarter: 90, day: 1 } as const;
-type RangeKey = keyof typeof RANGES;
-
-const RANGE_LABELS: Record<RangeKey, string> = {
-  week: "Неделя",
-  month: "Месяц",
-  quarter: "Квартал",
-  day: "День",
-};
-
 export default async function AgencyCalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; date?: string }>;
+  searchParams: Promise<{ view?: string; date?: string }>;
 }) {
   const actor = await requireAgencyActor();
-  const { range, date } = await searchParams;
-  const timeZone = await getUserTimeZone();
-  const key: RangeKey =
-    range === "month" || range === "quarter" || range === "day" ? range : "week";
+  const { view: viewParam, date } = await searchParams;
 
-  // Часы спрашиваем один раз на страницу и передаём вниз: строки списка
-  // должны сравниваться с одним моментом, а не каждая со своим
+  // Часы спрашиваем один раз на страницу и передаём вниз
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-  // Только режим «День» умеет листать на другие даты; остальные режимы
-  // по-прежнему начинаются с сегодняшней полуночи
-  const pickedDay = key === "day" ? parseDateParam(date) : null;
-  const from = pickedDay ?? todayStart;
-  const to = new Date(from);
-  to.setDate(to.getDate() + RANGES[key]);
+  const today = dayKeyOf(now);
+  const view: CalendarView = viewParam === "year" || viewParam === "day" ? viewParam : "month";
+  const anchor: DayKey = isDayKey(date) ? date : today;
 
-  // Неделя назад: встречи, которые прошли и не получили оценки. Календарь
-  // смотрит вперёд, и без этого блока такая задача не видна нигде
-  const feedbackSince = new Date(todayStart);
-  feedbackSince.setDate(feedbackSince.getDate() - 7);
+  const weeks = monthGrid(anchor);
+  const range =
+    view === "year"
+      ? { from: startOfDay(`${yearOf(anchor)}-01-01`), to: startOfDay(`${yearOf(anchor) + 1}-01-01`) }
+      : view === "month"
+        ? { from: startOfDay(weeks[0][0]), to: startOfDay(addDays(weeks[0][0], weeks.length * 7)) }
+        : { from: startOfDay(anchor), to: startOfDay(addDays(anchor, 1)) };
 
   const canManageInterviews = canDo(actor, "interview.proposeSlots");
+  const canTasks = canDo(actor, "task.manage");
 
-  const [interviews, needFeedback] = await Promise.all([
-    listInterviews(actor, { from, to }),
-    canManageInterviews
-      ? listUnratedInterviews(actor, feedbackSince)
-      : Promise.resolve([]),
+  // Неделя назад: встречи, которые прошли и не получили оценки
+  const feedbackSince = new Date(now.getTime() - 7 * 86_400_000);
+
+  const [interviews, needFeedback, feedUrl] = await Promise.all([
+    listInterviews(actor, range),
+    canManageInterviews ? listUnratedInterviews(actor, feedbackSince) : Promise.resolve([]),
+    calendarFeedUrl(actor.id),
   ]);
 
-  const feedUrl = await calendarFeedUrl(actor.id);
-
-  // Задания: список на период, кому можно поставить и к каким вакансиям привязать
-  const canTasks = canDo(actor, "task.manage");
-  const [tasks, assignees, taskVacancies] = canTasks
+  const [tasks, overdue, deadlines, assignees, vacancies] = canTasks
     ? await Promise.all([
-        listTasks(actor, { from, to }),
+        listTasks(actor, range),
+        listOverdueTasks(actor, { before: now }),
+        upcomingDeadlines(actor, now),
         listAssignableUsers(actor),
         prisma.vacancy.findMany({
           where: {
@@ -90,97 +88,72 @@ export default async function AgencyCalendarPage({
           select: { id: true, number: true, title: true },
         }),
       ])
-    : [[], [], []];
-  // Новое задание по умолчанию: в режиме «День» 10:00 выбранного дня в зоне
-  // человека (не полночь сервера плюс десять часов), иначе через час
-  const defaultDue =
-    key === "day"
-      ? zonedToUtc(`${toDateParam(from)}T10:00`, timeZone)
-      : new Date(Math.ceil((now.getTime() + 3_600_000) / 900_000) * 900_000);
+    : [[], [], [], [], []];
+
+  // Интервью без времени (ждут согласования) в сетке не показываются: они остаются списком ниже
+  const scheduled = interviews.filter((i) => i.scheduledAt && i.status !== "CANCELLED");
+  const pending = interviews.filter((i) => !i.scheduledAt);
+
+  const interviewDTOs: CalendarInterviewDTO[] = scheduled.map((i) => ({
+    id: i.id,
+    applicationId: i.applicationId,
+    startsAt: i.scheduledAt!.toISOString(),
+    durationMinutes: i.durationMinutes,
+    title: i.application.candidate.fullName,
+    subtitle: `№${i.vacancy.number} ${i.vacancy.title}`,
+    participantIds: i.participantUserIds,
+  }));
+
+  // Год: в браузер уходят только числа по дням, без самих задач
+  const dayCounts: DayCounts = {};
+  if (view === "year") {
+    for (const t of tasks) {
+      const key = dayKeyOf(t.startsAt);
+      (dayCounts[key] ??= { tasks: 0, interviews: 0 }).tasks++;
+    }
+    for (const i of scheduled) {
+      const key = dayKeyOf(i.scheduledAt!);
+      (dayCounts[key] ??= { tasks: 0, interviews: 0 }).interviews++;
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <PageTitle>Календарь</PageTitle>
-          <p className="text-sm text-muted-foreground">
-            Интервью и встречи, ждущие согласования времени
-          </p>
+          <p className="text-sm text-muted-foreground">Задачи и интервью. Время московское.</p>
         </div>
         <CalendarSubscription url={feedUrl} />
       </div>
 
-      <FilterChipGroup label="Период">
-        {(Object.keys(RANGES) as RangeKey[]).map((r) => (
-          <FilterChip key={r} href={`/a/calendar?range=${r}`} selected={key === r}>
-            {RANGE_LABELS[r]}
-          </FilterChip>
-        ))}
-      </FilterChipGroup>
-
-      {key === "day" && (
-        <DayNavigator from={from} isToday={from.getTime() === todayStart.getTime()} />
-      )}
-
-      {canTasks && (
-        <TasksPanel
-          tasks={tasks.map((t) => ({
-            ...t,
-            dueAt: t.dueAt.toISOString(),
-            completedAt: t.completedAt?.toISOString() ?? null,
-          }))}
-          assignees={assignees.map((a) => ({ id: a.id, fullName: a.fullName }))}
-          vacancies={taskVacancies.map((v) => ({ id: v.id, label: `№${v.number} ${v.title}` }))}
-          currentUserId={actor.id}
-          defaultDue={defaultDue.toISOString()}
-        />
-      )}
-
-      <CalendarView
-        interviews={interviews}
+      <CalendarBoard
+        view={view}
+        anchor={anchor}
+        today={today}
+        nowIso={now.toISOString()}
+        tasks={view === "year" ? [] : tasks.map(toTaskDTO)}
+        interviews={view === "year" ? [] : interviewDTOs}
+        dayCounts={dayCounts}
+        overdue={overdue.map(toTaskDTO)}
+        upcomingDeadlines={deadlines.map(toTaskDTO)}
+        assignees={assignees.map((a) => ({ id: a.id, fullName: a.fullName }))}
+        vacancies={vacancies.map((v) => ({ id: v.id, label: `№${v.number} ${v.title}` }))}
+        currentUserId={actor.id}
+        canFilter={canTasks && seesAllAssignedTasks(actor)}
         hrefBase="/a/applications"
-        showClient
-        canManageInterviews={canManageInterviews}
-        needFeedback={needFeedback}
-        now={now.getTime()}
       />
-    </div>
-  );
-}
 
-/** Листание дней в режиме «День»: вчера, выбранная дата, завтра. */
-function DayNavigator({ from, isToday }: { from: Date; isToday: boolean }) {
-  const prev = new Date(from);
-  prev.setDate(prev.getDate() - 1);
-  const next = new Date(from);
-  next.setDate(next.getDate() + 1);
-  const title = formatDayTitle(from);
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button asChild size="sm" variant="outline">
-        <Link
-          href={`/a/calendar?range=day&date=${toDateParam(prev)}`}
-          aria-label="Предыдущий день"
-        >
-          ‹
-        </Link>
-      </Button>
-      <span className="min-w-40 text-center text-sm font-medium">
-        {isToday ? `Сегодня, ${title}` : title.charAt(0).toUpperCase() + title.slice(1)}
-      </span>
-      <Button asChild size="sm" variant="outline">
-        <Link
-          href={`/a/calendar?range=day&date=${toDateParam(next)}`}
-          aria-label="Следующий день"
-        >
-          ›
-        </Link>
-      </Button>
-      {!isToday && (
-        <Button asChild size="sm" variant="ghost">
-          <Link href="/a/calendar?range=day">Сегодня</Link>
-        </Button>
+      {/* Встречи, которым нужно действие: согласовать время или записать результат */}
+      {(pending.length > 0 || needFeedback.length > 0) && (
+        <InterviewList
+          interviews={pending}
+          hrefBase="/a/applications"
+          showClient
+          canManageInterviews={canManageInterviews}
+          needFeedback={needFeedback}
+          now={now.getTime()}
+        />
       )}
     </div>
   );

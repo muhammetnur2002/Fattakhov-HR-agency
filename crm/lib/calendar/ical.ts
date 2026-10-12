@@ -19,6 +19,17 @@ export type CalendarEvent = {
   url?: string;
   /** Отменённые события уходят из календаря подписчика. */
   cancelled?: boolean;
+  /**
+   * Повторение в виде RRULE без префикса (FREQ=WEEKLY;BYDAY=MO). Событие с повторением
+   * пишется в московском времени (TZID), иначе день недели в BYDAY считался бы по UTC.
+   */
+  rrule?: string;
+  /** Отменённые вхождения серии (EXDATE). */
+  exdates?: Date[];
+  /** Это перенесённое вхождение серии с тем же UID: исходное начало (RECURRENCE-ID). */
+  recurrenceId?: Date;
+  /** Напоминание за столько минут до начала (VALARM); не задано: без напоминания. */
+  alarmMinutes?: number;
 };
 
 /**
@@ -37,6 +48,24 @@ function escapeText(value: string): string {
 function formatDate(date: Date): string {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
+
+/** Московское время без пояса: 20261012T100000 (в Москве нет перехода на летнее время). */
+function formatMoscow(date: Date): string {
+  return new Date(date.getTime() + 3 * 3_600_000).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
+}
+
+/** Описание пояса Europe/Moscow для событий с TZID: с 2014 года +03:00 без перехода. */
+const MOSCOW_VTIMEZONE = [
+  "BEGIN:VTIMEZONE",
+  "TZID:Europe/Moscow",
+  "BEGIN:STANDARD",
+  "DTSTART:19700101T000000",
+  "TZOFFSETFROM:+0300",
+  "TZOFFSETTO:+0300",
+  "TZNAME:MSK",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+];
 
 /**
  * Сворачивание длинных строк.
@@ -87,19 +116,36 @@ export function buildCalendar(params: {
 
   const now = formatDate(new Date());
 
+  // Пояс описываем только если есть события с повторением: у интервью формат прежний
+  if (params.events.some((e) => e.rrule)) {
+    lines.push(...MOSCOW_VTIMEZONE);
+  }
+
   for (const event of params.events) {
     const end = new Date(
       event.startsAt.getTime() + event.durationMinutes * 60_000,
     );
 
+    const zoned = Boolean(event.rrule || event.recurrenceId);
     lines.push(
       "BEGIN:VEVENT",
       `UID:${event.uid}`,
       `DTSTAMP:${now}`,
-      `DTSTART:${formatDate(event.startsAt)}`,
-      `DTEND:${formatDate(end)}`,
+      ...(event.recurrenceId
+        ? [`RECURRENCE-ID;TZID=Europe/Moscow:${formatMoscow(event.recurrenceId)}`]
+        : []),
+      zoned
+        ? `DTSTART;TZID=Europe/Moscow:${formatMoscow(event.startsAt)}`
+        : `DTSTART:${formatDate(event.startsAt)}`,
+      zoned
+        ? `DTEND;TZID=Europe/Moscow:${formatMoscow(end)}`
+        : `DTEND:${formatDate(end)}`,
       `SUMMARY:${escapeText(event.summary)}`,
     );
+    if (event.rrule) lines.push(`RRULE:${event.rrule}`);
+    for (const ex of event.exdates ?? []) {
+      lines.push(`EXDATE;TZID=Europe/Moscow:${formatMoscow(ex)}`);
+    }
 
     if (event.description) {
       lines.push(`DESCRIPTION:${escapeText(event.description)}`);
@@ -111,6 +157,15 @@ export function buildCalendar(params: {
       lines.push(`URL:${escapeText(event.url)}`);
     }
     lines.push(`STATUS:${event.cancelled ? "CANCELLED" : "CONFIRMED"}`);
+    if (event.alarmMinutes !== undefined) {
+      lines.push(
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        `DESCRIPTION:${escapeText(event.summary)}`,
+        `TRIGGER:${event.alarmMinutes === 0 ? "PT0S" : `-PT${event.alarmMinutes}M`}`,
+        "END:VALARM",
+      );
+    }
     lines.push("END:VEVENT");
   }
 
