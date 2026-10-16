@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import { HeroOffer } from "./hero-offer";
 import { HeroVideo } from "./hero-video";
 import { Button } from "@/components/ui/button";
@@ -22,10 +24,24 @@ export function Hero() {
           тот же кроп, то же место. Без ролика (телефон, reduced-motion) остаётся кадр;
           до загрузки и запуска ролика на компьютере вместо чёрного фона тоже он.
           Условия показа ролика — комментарий в HeroVideo. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-speckle.jpg')] bg-cover bg-center"
-      />
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        {/* Кадр — настоящая картинка, а не `background-image`: фон браузер находит только после
+            разбора CSS и качает с низким приоритетом вровень со скриптами, на медленной сети
+            самая большая картинка страницы приходила последней (замер 13.10.2026: LCP телефона
+            4,2 с при тексте в 1,2 с, картинка 192 КБ). `fetchPriority="high"` и `loading="eager"`
+            ставят её в голову очереди: React сам кладёт ссылку на такую картинку в <head>, отдельный
+            `preload` (в Next 16 он заменил `priority`) не нужен. `sizes="100vw"` и оптимизатор
+            отдают телефону WebP на 750 пикселей (18 КБ), ноутбуку — на 1920 (55 КБ). */}
+        <Image
+          src="/brand/slate-speckle.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+          className="object-cover object-center"
+        />
+      </div>
       <HeroVideo />
       {/* Плотнее, чем было у статичной картинки: собственные куб и надпись
           в ролике иначе читаются вторым логотипом рядом с ценником и

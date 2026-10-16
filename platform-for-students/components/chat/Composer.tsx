@@ -51,10 +51,10 @@ export function Composer({
     <div className="border-t border-[var(--hairline)] bg-ink/70 p-3 backdrop-blur-glass sm:p-4">
       <div
         className={cn(
-          'flex items-end gap-2 rounded-2xl border bg-graphite-900/60 p-2 pl-3.5 transition-colors duration-300',
+          'field-focus flex items-end gap-2 rounded-2xl border bg-graphite-900/60 p-2 pl-3.5 transition-colors duration-300',
           tooLong
             ? 'border-danger/60'
-            : 'border-[var(--hairline)] focus-within:border-accent-400/70 focus-within:bg-graphite-850/70',
+            : 'border-[var(--hairline)] focus-within:border-accent-300 focus-within:bg-graphite-850/70',
         )}
       >
         <textarea
@@ -71,7 +71,7 @@ export function Composer({
               send();
             }
           }}
-          className="max-h-[132px] flex-1 resize-none bg-transparent py-2 text-[14.5px] leading-relaxed text-paper outline-none placeholder:text-paper/30 disabled:opacity-50"
+          className="max-h-[132px] flex-1 resize-none bg-transparent py-2 text-body leading-relaxed text-paper outline-0 placeholder:text-paper-faint disabled:opacity-50"
         />
 
         <motion.button
@@ -96,12 +96,12 @@ export function Composer({
       <div className="mt-1.5 flex items-center justify-between px-1">
         {/* Подсказка про клавиши нужна с клавиатурой компьютера; на телефоне она
             только отнимает место над клавиатурой */}
-        <span className="hidden text-[11.5px] text-paper-faint lg:inline">
+        <span className="hidden text-caption text-paper-faint lg:inline">
           Enter — отправить, Shift + Enter — перенос строки
         </span>
         {/* Счётчик появляется на подходе к пределу, а не висит всегда */}
         {trimmed.length > MESSAGE_MAX_LENGTH - 200 && (
-          <span className={cn('text-[11.5px] tabular-nums', tooLong ? 'text-danger' : 'text-paper-faint')}>
+          <span className={cn('text-caption tabular-nums', tooLong ? 'text-danger' : 'text-paper-faint')}>
             {trimmed.length} / {MESSAGE_MAX_LENGTH}
           </span>
         )}
@@ -116,7 +116,7 @@ export function ComposerLocked({ reason }: { reason: string }) {
     <div className="border-t border-[var(--hairline)] bg-ink/70 p-4 backdrop-blur-glass">
       <div className="flex items-center gap-3 rounded-2xl border border-[var(--hairline)] bg-graphite-900/40 px-4 py-3.5">
         <Lock className="size-4 shrink-0 text-paper-faint" aria-hidden />
-        <p className="text-[13.5px] leading-snug text-paper-dim">{reason}</p>
+        <p className="text-small leading-snug text-paper-dim">{reason}</p>
       </div>
     </div>
   );

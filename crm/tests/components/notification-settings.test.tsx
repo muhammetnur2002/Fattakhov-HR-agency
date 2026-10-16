@@ -19,6 +19,8 @@ vi.mock("@/app/actions/notifications", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+  // ConfirmBlock берёт useStaleGuard: без этой подмены «страница устарела» в catch не отличить от обычной ошибки
+  unstable_isUnrecognizedActionError: () => false,
 }));
 vi.mock("@/app/actions/push", () => ({
   subscribePushAction: vi.fn(),

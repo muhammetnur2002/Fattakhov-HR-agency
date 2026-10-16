@@ -144,8 +144,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
       <div className="glass mx-auto flex max-w-[26rem] flex-col items-center gap-4 rounded-4xl p-10 text-center">
         <Users className="size-10 text-paper-faint" aria-hidden />
         <div>
-          <h1 className="text-display-sm text-paper">Пока нет вакансий</h1>
-          <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
+          <h1 className="text-title text-paper">Пока нет вакансий</h1>
+          <p className="mt-2 text-small leading-relaxed text-paper-dim">
             Кандидатов подбираем под конкретную вакансию — создайте её в разделе «Вакансии», и здесь
             появится список студентов.
           </p>
@@ -157,8 +157,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col pb-16">
       <header className="w-full">
-        <h1 className="text-display-md text-paper">Кандидаты</h1>
-        <p className="mt-1.5 text-[14px] text-paper-dim">
+        <h1 className="text-headline text-paper">Кандидаты</h1>
+        <p className="mt-1.5 text-small text-paper-dim">
           Студенты, подтверждённые агентством и подходящие на выбранную вакансию.
         </p>
       </header>
@@ -191,7 +191,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         >
           <Filter className="size-[18px]" aria-hidden />
           {activeFilters > 0 && (
-            <span className="absolute -right-1 -top-1 grid size-[18px] place-items-center rounded-full bg-accent-500 text-[10.5px] font-semibold text-ink">
+            <span className="absolute -right-1 -top-1 grid size-[18px] place-items-center rounded-full bg-accent-300 text-caption font-semibold text-ink">
               {activeFilters}
             </span>
           )}
@@ -209,7 +209,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
           >
             <div className="glass mt-3 space-y-4 rounded-3xl p-4">
               <div>
-                <p className="mb-2 text-[12px] uppercase tracking-[0.1em] text-paper-faint">День работы</p>
+                <p className="mb-2 text-caption uppercase tracking-[0.1em] text-paper-faint">День работы</p>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAYS.map((day) => (
                     <Chip
@@ -226,7 +226,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-[12px] uppercase tracking-[0.1em] text-paper-faint">Пол</p>
+                <p className="mb-2 text-caption uppercase tracking-[0.1em] text-paper-faint">Пол</p>
                 <div className="flex flex-wrap gap-1.5">
                   {GENDERS.map((gender) => (
                     <Chip
@@ -251,7 +251,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
                     setDays([]);
                     setGenders([]);
                   }}
-                  className="text-[12.5px] text-paper-faint underline-offset-4 hover:text-paper hover:underline"
+                  className="text-caption text-paper-faint underline-offset-4 hover:text-paper hover:underline"
                 >
                   Сбросить фильтр
                 </button>
@@ -262,7 +262,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
       </AnimatePresence>
 
       {invited > 0 && (
-        <p className="mt-5 text-[12.5px] tabular-nums text-paper-faint">Приглашено сейчас: {invited}</p>
+        <p className="mt-5 text-caption tabular-nums text-paper-faint">Приглашено сейчас: {invited}</p>
       )}
 
       <div className="mt-5 w-full space-y-2.5">
@@ -322,8 +322,8 @@ function CandidateRow({
       <div className="flex min-w-0 flex-1 items-start gap-3.5">
         <Avatar name={student.fullName} src={student.photoUrl} size={52} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[16px] font-semibold text-paper">{student.fullName}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-paper-dim">
+          <p className="truncate text-body font-semibold text-paper">{student.fullName}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-paper-dim">
             {student.university && (
               <span className="flex items-center gap-1.5">
                 <GraduationCap className="size-3.5 shrink-0" aria-hidden />
@@ -347,7 +347,7 @@ function CandidateRow({
           </div>
 
           {student.about && (
-            <p className="mt-2 line-clamp-2 text-[13.5px] leading-relaxed text-paper-dim">{student.about}</p>
+            <p className="mt-2 line-clamp-2 text-small leading-relaxed text-paper-dim">{student.about}</p>
           )}
 
           {student.skills.length > 0 && (
@@ -378,10 +378,10 @@ function EmptyList({ invited, hasFilters }: { invited: number; hasFilters: boole
     <div className="glass flex flex-col items-center gap-5 rounded-4xl p-10 text-center">
       <CubeMark className="h-16 w-16 text-paper/25" />
       <div className="space-y-2">
-        <h3 className="text-display-sm text-paper">
+        <h3 className="text-title text-paper">
           {hasFilters ? 'По фильтру никого нет' : 'Кандидаты закончились'}
         </h3>
-        <p className="mx-auto max-w-[22rem] text-[14px] leading-relaxed text-paper-dim">
+        <p className="mx-auto max-w-[22rem] text-small leading-relaxed text-paper-dim">
           {hasFilters
             ? 'Смягчите фильтр или поиск — подходящие студенты появятся снова.'
             : invited > 0

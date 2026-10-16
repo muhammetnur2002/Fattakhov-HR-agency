@@ -33,7 +33,7 @@ const STUDENT_TONE: Record<StudentStatus, string> = {
 };
 
 const base =
-  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium leading-none whitespace-nowrap';
+  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-medium leading-none whitespace-nowrap';
 
 export function ApplicationStatusPill({
   status,

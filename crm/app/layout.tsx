@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 
 import "./globals.css";
 import { ThemeProvider } from "@/components/shell/theme-provider";
 import { UnsupportedBrowserNotice } from "@/components/shell/unsupported-browser-notice";
 import { THEME_COLOR_SCRIPT, THEME_COLORS } from "@/lib/theme-color";
 import { LiveAnnouncer } from "@/components/ui/live-announcer";
-import { Toaster } from "@/components/ui/sonner";
 
 /**
  * Анти-мерцающий скрипт — прямо в серверной разметке, а не рождённый
@@ -37,8 +37,31 @@ const NO_FLASH_SCRIPT = `
  * русский интерфейс уезжал бы в системный запасной шрифт.
  */
 const inter = Inter({
-  variable: "--font-sans",
+  variable: "--font-inter",
   subsets: ["latin", "cyrillic"],
+});
+
+/**
+ * Знак рубля отдельным крошечным файлом.
+ *
+ * Inter от Google режется на подмножества по диапазонам знаков, и «₽» (U+20BD) попадает в
+ * `latin-ext` — файл 85 КБ ради одного знака. Он грузился на каждой странице с ценой (главная,
+ * тарифы, кабинеты) с высоким приоритетом, поздно, и при его приходе цена перерисовывалась
+ * (замер 13.10.2026). Здесь тот же знак из того же файла Inter, вырезанный в 2,3 КБ: переменный
+ * по насыщенности, один знак. Рисунок побитно совпадает с исходным на насыщенности 400, 600 и 700
+ * (hb-view); как вырезан — в `app/fonts/README.md`.
+ *
+ * Стоит в списке шрифтов первым (`--font-sans` в globals.css) и предзагружается: к первой отрисовке
+ * он уже на месте, поэтому «₽» не уходит запасным шрифтам, и `latin-ext` не запрашивается. Без
+ * предзагрузки браузер просил бы оба сразу. Остальные знаки он не затрагивает (`unicode-range`).
+ */
+const ruble = localFont({
+  src: "./fonts/inter-ruble.ttf",
+  variable: "--font-ruble",
+  weight: "100 900",
+  display: "swap",
+  adjustFontFallback: false,
+  declarations: [{ prop: "unicode-range", value: "U+20BD" }],
 });
 
 export const metadata: Metadata = {
@@ -48,6 +71,13 @@ export const metadata: Metadata = {
   },
   description: "Подбор персонала: кабинет клиента и рабочее место рекрутера",
   applicationName: "Fattakhov HR Agency",
+  // Закрыто от индекса по умолчанию: всё приложение — кабинеты, вход, ссылки по
+  // токенам — не для поиска, и новая страница без явного разрешения в выдачу не
+  // попадёт. Открывает индексацию только макет сайта (app/(marketing)/layout.tsx).
+  // Роботу этот запрет виден только на страницах, которые robots.txt ему читать
+  // разрешает (вход и регистрация, app/robots.ts): закрытую от обхода страницу он не
+  // загружает. Остальное приложение закрыто от обхода, а не от индекса, — это запас
+  robots: { index: false, follow: false },
   // Ставится на экран телефона иконкой (см. app/manifest.ts) — иконки
   // временно от студенческой платформы, свои фирменные ещё не готовы
   manifest: "/manifest.webmanifest",
@@ -86,7 +116,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${ruble.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col font-sans">
@@ -96,7 +126,6 @@ export default function RootLayout({
         <UnsupportedBrowserNotice />
         <ThemeProvider>
           {children}
-          <Toaster />
           {/* Постоянная пустая область для читалки: «Сохранено» объявляется через неё (FormMessage) */}
           <LiveAnnouncer />
         </ThemeProvider>

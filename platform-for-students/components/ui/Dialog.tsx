@@ -107,7 +107,7 @@ export function Dialog({
             className="flex max-h-[88dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[var(--hairline)] bg-graphite-900 shadow-2xl outline-none sm:max-h-[85dvh] sm:w-[min(42rem,100%)] sm:rounded-3xl"
           >
             <header className="flex items-start justify-between gap-4 border-b border-[var(--hairline)] px-5 py-4 sm:px-7">
-              <h2 id={titleId} className="min-w-0 break-words text-[17px] font-semibold tracking-[-0.02em] text-paper">
+              <h2 id={titleId} className="min-w-0 break-words text-sub font-semibold tracking-[-0.02em] text-paper">
                 {title}
               </h2>
               <button

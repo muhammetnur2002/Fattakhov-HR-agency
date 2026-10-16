@@ -18,7 +18,7 @@ export function StudyVerificationNote({
   institutionSlug: string | null;
 }) {
   return (
-    <div className="-mt-2 space-y-1.5 pl-1 text-[12.5px] leading-snug">
+    <div className="-mt-2 space-y-1.5 pl-1 text-caption leading-snug">
       {verified && !changed && (
         <p className="flex items-center gap-1.5 text-yes-glow">
           <ShieldCheck className="size-3.5 shrink-0" aria-hidden />

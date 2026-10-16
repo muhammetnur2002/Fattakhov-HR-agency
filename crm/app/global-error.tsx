@@ -1,7 +1,8 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+
+import { captureClientException } from "@/lib/monitoring/capture-client";
 
 /**
  * Отказ на самом верхнем уровне: упала корневая разметка.
@@ -26,7 +27,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    captureClientException(error);
   }, [error]);
 
   return (

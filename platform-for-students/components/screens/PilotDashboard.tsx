@@ -41,8 +41,8 @@ export function PilotDashboard({ metrics }: { metrics: PilotMetricsDTO }) {
     <>
       <header className="mb-8">
         <p className="text-eyebrow uppercase text-accent-300">HR-менеджер</p>
-        <h1 className="mt-3 text-display-md text-paper">Метрики пилота</h1>
-        <p className="mt-2.5 max-w-[64ch] text-[14px] leading-relaxed text-paper-dim">
+        <h1 className="mt-3 text-headline text-paper">Метрики пилота</h1>
+        <p className="mt-2.5 max-w-[64ch] text-small leading-relaxed text-paper-dim">
           Доходят ли студенты и компании до результата. Считается по текущим данным и журналу событий.
         </p>
       </header>
@@ -93,7 +93,7 @@ export function PilotDashboard({ metrics }: { metrics: PilotMetricsDTO }) {
       <section className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel title="Путь студента" subtitle="Сколько человек дошло до каждого шага">
           <BarList items={path} total={students.registered} unit={['студент', 'студента', 'студентов']} />
-          <p className="mt-6 text-[12.5px] leading-relaxed text-paper-faint">
+          <p className="mt-6 text-caption leading-relaxed text-paper-faint">
             Учёба подтверждена у {students.verified} из {students.registered}. Компаний с вакансией в ленте:{' '}
             {companies.withPublishedVacancy}.
           </p>
@@ -101,7 +101,7 @@ export function PilotDashboard({ metrics }: { metrics: PilotMetricsDTO }) {
 
         <Panel title="Журнал событий" subtitle="Последние шаги на платформе">
           {metrics.events.length === 0 ? (
-            <p className="text-[13.5px] text-paper-faint">
+            <p className="text-small text-paper-faint">
               Событий пока нет — они появятся с первыми регистрациями и откликами.
             </p>
           ) : (
@@ -112,12 +112,12 @@ export function PilotDashboard({ metrics }: { metrics: PilotMetricsDTO }) {
                   className="flex items-baseline justify-between gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-paper/[0.03]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[13px] text-paper-dim">{event.label}</span>
+                    <span className="block truncate text-small text-paper-dim">{event.label}</span>
                     {event.subject && (
-                      <span className="block truncate text-[11.5px] text-paper-faint">{event.subject}</span>
+                      <span className="block truncate text-caption text-paper-faint">{event.subject}</span>
                     )}
                   </span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums text-paper-faint">
+                  <span className="shrink-0 text-caption tabular-nums text-paper-faint">
                     {timeAgo(event.createdAt)}
                   </span>
                 </li>
@@ -133,11 +133,11 @@ export function PilotDashboard({ metrics }: { metrics: PilotMetricsDTO }) {
 function Tile({ value, label, note }: { value: string; label: string; note?: string }) {
   return (
     <div className="h-full min-w-0 bg-ink px-5 py-6 sm:px-6">
-      <p className="text-[clamp(1.5rem,2.6vw,2.1rem)] font-semibold leading-none tracking-[-0.04em] text-paper">
+      <p className="text-title font-semibold leading-none tracking-[-0.04em] text-paper">
         {value}
       </p>
-      <p className="mt-2.5 text-[13px] leading-snug text-paper-dim">{label}</p>
-      {note && <p className="mt-1 text-[11.5px] leading-snug text-paper-faint">{note}</p>}
+      <p className="mt-2.5 text-small leading-snug text-paper-dim">{label}</p>
+      {note && <p className="mt-1 text-caption leading-snug text-paper-faint">{note}</p>}
     </div>
   );
 }
@@ -146,8 +146,8 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
   return (
     <section className="surface min-w-0 rounded-3xl p-5 sm:p-6">
       <header className="mb-5">
-        <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-paper">{title}</h2>
-        {subtitle && <p className="mt-1 text-[12.5px] text-paper-faint">{subtitle}</p>}
+        <h2 className="text-body font-semibold tracking-[-0.015em] text-paper">{title}</h2>
+        {subtitle && <p className="mt-1 text-caption text-paper-faint">{subtitle}</p>}
       </header>
       {children}
     </section>

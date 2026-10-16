@@ -122,12 +122,12 @@ export function UniversityInput({
               )}
             >
               <span className="min-w-0">
-                <span className="block text-[14px] text-paper">{institutionLabel(option)}</span>
+                <span className="block text-small text-paper">{institutionLabel(option)}</span>
                 {option.shortName && (
-                  <span className="block truncate text-[12px] text-paper-faint">{option.name}</span>
+                  <span className="block truncate text-caption text-paper-faint">{option.name}</span>
                 )}
               </span>
-              <span className="flex shrink-0 items-center gap-1 pt-0.5 text-[12px] text-paper-faint">
+              <span className="flex shrink-0 items-center gap-1 pt-0.5 text-caption text-paper-faint">
                 <MapPin className="size-3" aria-hidden />
                 {option.city}
               </span>

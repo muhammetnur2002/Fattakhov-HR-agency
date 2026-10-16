@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useMotionValue, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import { useReducedMotionSafe } from '@/lib/hooks/useReducedMotionSafe';
 import { SwipeCard } from '@/components/swipe/SwipeCard';
 import { VacancyDetail } from '@/components/swipe/VacancyDetail';
 import type { SwipeDirection, VacancyDTO } from '@/lib/types';
@@ -22,7 +23,7 @@ interface Slot {
  * интерфейс.
  */
 export function DemoDeck({ vacancies }: { vacancies: VacancyDTO[] }) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionSafe();
   const [slots, setSlots] = useState<Slot[]>(() =>
     vacancies.map((vacancy, index) => ({ key: `${vacancy.id}-${index}`, vacancy })),
   );
@@ -88,7 +89,7 @@ export function DemoDeck({ vacancies }: { vacancies: VacancyDTO[] }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: touched ? 0 : 1 }}
         transition={{ duration: 0.5, delay: 1.6 }}
-        className="pointer-events-none absolute -bottom-11 left-0 right-0 text-center text-[12px] text-paper-faint"
+        className="pointer-events-none absolute -bottom-11 left-0 right-0 text-center text-caption text-paper-faint"
       >
         Попробуйте — карточку можно смахнуть прямо здесь
       </motion.p>

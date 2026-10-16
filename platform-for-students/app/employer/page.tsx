@@ -39,8 +39,8 @@ export default async function EmployerPage() {
               <Building2 className="size-4.5 text-paper/60" aria-hidden />
             </span>
             <div>
-              <p className="text-[13.5px] font-medium text-paper">У нас есть ещё и кадровое агентство</p>
-              <p className="mt-0.5 text-[12.5px] text-paper-dim">
+              <p className="text-small font-medium text-paper">У нас есть ещё и кадровое агентство</p>
+              <p className="mt-0.5 text-caption text-paper-dim">
                 Нужен не студент, а готовый специалист — подберём сами. Загляните, что предлагаем.
               </p>
             </div>
@@ -49,7 +49,7 @@ export default async function EmployerPage() {
             href={agencyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-9 shrink-0 items-center rounded-xl border border-[var(--hairline-strong)] bg-graphite-900/40 px-3.5 text-[13px] text-paper backdrop-blur-sm transition-colors hover:bg-graphite-800/60 hover:border-paper/25"
+            className="flex h-9 shrink-0 items-center rounded-xl border border-[var(--hairline-strong)] bg-graphite-900/40 px-3.5 text-small text-paper backdrop-blur-sm transition-colors hover:bg-graphite-800/60 hover:border-paper/25"
           >
             Посмотреть
           </a>

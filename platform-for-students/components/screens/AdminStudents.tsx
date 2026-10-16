@@ -146,8 +146,8 @@ export function AdminStudents({
     <>
       <header className="mb-8">
         <p className="text-eyebrow uppercase text-accent-300">HR-менеджер</p>
-        <h1 className="mt-3 text-display-md text-paper">Студенты</h1>
-        <p className="mt-2.5 text-[14px] text-paper-dim">
+        <h1 className="mt-3 text-headline text-paper">Студенты</h1>
+        <p className="mt-2.5 text-small text-paper-dim">
           {students.length} {plural(students.length, 'студент', 'студента', 'студентов')} · учёба подтверждена у{' '}
           {verifiedCount}
           {pendingDocs > 0 && ` · справок на проверке: ${pendingDocs}`}
@@ -180,7 +180,7 @@ export function AdminStudents({
       </div>
 
       {visible.length === 0 ? (
-        <div className="surface rounded-3xl px-6 py-12 text-center text-[14.5px] text-paper-dim">
+        <div className="surface rounded-3xl px-6 py-12 text-center text-body text-paper-dim">
           {students.length === 0
             ? 'Студентов пока нет.'
             : verification === 'PENDING_DOC'
@@ -196,7 +196,7 @@ export function AdminStudents({
                 <div className="flex min-w-0 grow basis-64 items-center gap-3">
                   <Avatar name={student.fullName} src={student.photoUrl} size={40} />
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14.5px] font-medium text-paper">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body font-medium text-paper">
                       <span className="min-w-0 break-words">{student.fullName}</span>
                       {student.studyVerified && (
                         <Tag tone="accent">
@@ -206,7 +206,7 @@ export function AdminStudents({
                       )}
                       {student.study === 'PENDING' && <Tag tone="hot">Справка на проверке</Tag>}
                     </p>
-                    <p className="mt-0.5 break-words text-[12.5px] text-paper-faint">
+                    <p className="mt-0.5 break-words text-caption text-paper-faint">
                       {student.university}
                       {student.institutionId ? '' : ' (не из справочника)'} · {studyLine(student.studyLevel, student.studyYear)} ·{' '}
                       {student.applications} {plural(student.applications, 'отклик', 'отклика', 'откликов')} ·{' '}
@@ -221,7 +221,7 @@ export function AdminStudents({
                     value={student.status}
                     disabled={isBusy}
                     onChange={(e) => void update(student, { status: e.target.value as StudentStatus })}
-                    className="h-9 rounded-xl border border-[var(--hairline)] bg-graphite-900/60 px-2.5 text-[13px] text-paper outline-none transition-colors hover:border-paper/25 focus:border-accent-400/70 disabled:opacity-50 [&>option]:bg-graphite-900"
+                    className="h-9 rounded-xl border border-[var(--hairline)] bg-graphite-900/60 px-2.5 text-small text-paper transition-colors hover:border-paper/25 focus:border-accent-300 disabled:opacity-50 [&>option]:bg-graphite-900"
                   >
                     {STUDENT_STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -250,7 +250,7 @@ export function AdminStudents({
                   />
                 )}
                 {student.study === 'REJECTED' && student.studyReviewNote && (
-                  <p className="basis-full break-words text-[12.5px] text-paper-faint">
+                  <p className="basis-full break-words text-caption text-paper-faint">
                     Справка возвращена: {student.studyReviewNote}
                   </p>
                 )}
@@ -290,7 +290,7 @@ function StudyReview({
 
   return (
     <div className="basis-full rounded-2xl border border-accent-400/30 bg-accent-500/[0.06] p-3.5">
-      <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px]">
+      <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-small">
         <a
           href={student.studyDocUrl ?? undefined}
           target="_blank"
@@ -300,9 +300,9 @@ function StudyReview({
           <FileText className="size-4 shrink-0 text-accent-200" aria-hidden />
           <span className="min-w-0 break-all">{student.studyDocName ?? 'Справка'}</span>
         </a>
-        {student.studyDocAt && <span className="text-[12px] text-paper-faint">загружена {timeAgo(student.studyDocAt)}</span>}
+        {student.studyDocAt && <span className="text-caption text-paper-faint">загружена {timeAgo(student.studyDocAt)}</span>}
       </p>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-paper-faint">
+      <p className="mt-1 text-caption leading-relaxed text-paper-faint">
         Сверьте ФИО, учебное заведение и дату выдачи. После решения файл удаляется.
       </p>
 

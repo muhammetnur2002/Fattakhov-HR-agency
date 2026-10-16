@@ -203,7 +203,7 @@ function TourOverlay({ steps, onFinish }: { steps: TourStep[]; onFinish: () => v
         style={cardStyle}
       >
         <div className="flex items-start justify-between gap-3">
-          <p className="text-[11.5px] uppercase tracking-[0.12em] text-accent-300">
+          <p className="text-caption uppercase tracking-[0.12em] text-accent-300">
             Шаг {index + 1} из {steps.length}
           </p>
           <button
@@ -215,8 +215,8 @@ function TourOverlay({ steps, onFinish }: { steps: TourStep[]; onFinish: () => v
             <X className="size-4" aria-hidden />
           </button>
         </div>
-        <h2 className="mt-1.5 text-[16.5px] font-semibold tracking-[-0.02em] text-paper">{step.title}</h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">{step.text}</p>
+        <h2 className="mt-1.5 text-body font-semibold tracking-[-0.02em] text-paper">{step.title}</h2>
+        <p className="mt-2 text-small leading-relaxed text-paper-dim">{step.text}</p>
         <div className="mt-4 flex items-center justify-between gap-2">
           <Button variant="ghost" size="sm" onClick={onFinish}>
             Пропустить

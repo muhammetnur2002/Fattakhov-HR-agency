@@ -66,7 +66,7 @@ export async function AppShell({
           {user ? (
             <UserMenu name={user.name} photoUrl={user.photoUrl} subtitle={user.subtitle} href={user.href} backToCrmUrl={backToCrmUrl} bell={bell} />
           ) : (
-            <span className="text-[12.5px] text-paper-faint">Fattakhov HR Agency</span>
+            <span className="text-caption text-paper-faint">Fattakhov HR Agency</span>
           )}
         </div>
 

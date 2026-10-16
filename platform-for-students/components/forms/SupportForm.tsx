@@ -56,8 +56,8 @@ export function SupportForm() {
           <Check className="size-4 text-paper" aria-hidden />
         </span>
         <div>
-          <p className="text-[15px] font-medium text-paper">Сообщение отправлено</p>
-          <p className="mt-1 text-[13.5px] leading-relaxed text-paper-dim">
+          <p className="text-body font-medium text-paper">Сообщение отправлено</p>
+          <p className="mt-1 text-small leading-relaxed text-paper-dim">
             Ответим на {email} в течение рабочего дня.
           </p>
         </div>
@@ -68,8 +68,8 @@ export function SupportForm() {
   return (
     <form onSubmit={submit} className="glass space-y-3 rounded-2xl px-5 py-5" noValidate>
       <div>
-        <p className="text-[15px] font-medium text-paper">Не нашли ответ?</p>
-        <p className="mt-1 text-[13.5px] leading-relaxed text-paper-dim">
+        <p className="text-body font-medium text-paper">Не нашли ответ?</p>
+        <p className="mt-1 text-small leading-relaxed text-paper-dim">
           Опишите вопрос — ответим на почту.
         </p>
       </div>

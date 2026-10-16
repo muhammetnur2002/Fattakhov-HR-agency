@@ -51,14 +51,14 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
               {lookingFor.map((kind) => (
                 <span
                   key={kind}
-                  className="rounded-full border border-accent-400/35 bg-accent-500/12 px-2.5 py-1 text-[12px] text-accent-100"
+                  className="rounded-full border border-accent-400/35 bg-accent-500/12 px-2.5 py-1 text-caption text-accent-100"
                 >
                   {LOOKING_FOR_LABEL[kind]}
                 </span>
               ))}
             </div>
           )}
-          {goals && <p className="mt-2 whitespace-pre-line text-[14px] leading-relaxed text-paper-dim">{goals}</p>}
+          {goals && <p className="mt-2 whitespace-pre-line text-small leading-relaxed text-paper-dim">{goals}</p>}
         </Block>
       )}
 
@@ -67,12 +67,12 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
           <ul className="space-y-3">
             {projects.map((project, i) => (
               <li key={`${project.title}-${i}`} className="min-w-0">
-                <p className="text-[14px] font-medium text-paper">
+                <p className="text-small font-medium text-paper">
                   {project.title}
                   {project.link && <SafeLink href={project.link} className="ml-2 align-middle" />}
                 </p>
                 {project.description && (
-                  <p className="mt-1 whitespace-pre-line text-[13.5px] leading-relaxed text-paper-dim">
+                  <p className="mt-1 whitespace-pre-line text-small leading-relaxed text-paper-dim">
                     {project.description}
                   </p>
                 )}
@@ -86,10 +86,10 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
         <Block icon={<Trophy className="size-3" aria-hidden />} title="Достижения">
           <ul className="space-y-2">
             {achievements.map((item, i) => (
-              <li key={`${item.title}-${i}`} className="text-[14px] leading-relaxed text-paper-dim">
+              <li key={`${item.title}-${i}`} className="text-small leading-relaxed text-paper-dim">
                 <span className="text-paper">{item.title}</span>
                 {item.year && <span className="text-paper-faint"> · {item.year}</span>}
-                {item.description && <span className="block text-[13.5px]">{item.description}</span>}
+                {item.description && <span className="block text-small">{item.description}</span>}
               </li>
             ))}
           </ul>
@@ -104,9 +104,9 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
             <Block key={kind} title={ACTIVITY_KIND_LABEL[kind]}>
               <ul className="space-y-2">
                 {items.map((item, i) => (
-                  <li key={`${item.title}-${i}`} className="text-[14px] leading-relaxed text-paper-dim">
+                  <li key={`${item.title}-${i}`} className="text-small leading-relaxed text-paper-dim">
                     <span className="text-paper">{item.title}</span>
-                    {item.description && <span className="block text-[13.5px]">{item.description}</span>}
+                    {item.description && <span className="block text-small">{item.description}</span>}
                   </li>
                 ))}
               </ul>
@@ -116,7 +116,7 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
 
       {hobbies && (
         <Block title="Хобби и интересы">
-          <p className="whitespace-pre-line text-[14px] leading-relaxed text-paper-dim">{hobbies}</p>
+          <p className="whitespace-pre-line text-small leading-relaxed text-paper-dim">{hobbies}</p>
         </Block>
       )}
 
@@ -135,7 +135,7 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
                 href={videoUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow ugc"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-accent-500/35 bg-accent-500/12 px-3 py-2 text-[13px] text-accent-100 transition-colors hover:bg-accent-500/20"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-accent-500/35 bg-accent-500/12 px-3 py-2 text-small text-accent-100 transition-colors hover:bg-accent-500/20"
               >
                 <PlayCircle className="size-3.5" aria-hidden />
                 Видео-визитка
@@ -148,7 +148,7 @@ export function PortfolioView({ portfolio }: { portfolio: StudentPortfolio }) {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow ugc"
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3 py-2 text-[13px] text-paper/80 transition-colors hover:border-paper/25 hover:text-paper"
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3 py-2 text-small text-paper/80 transition-colors hover:border-paper/25 hover:text-paper"
                 >
                   <ExternalLink className="size-3.5 shrink-0" aria-hidden />
                   <span className="truncate">{link.label}</span>

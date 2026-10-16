@@ -1,10 +1,10 @@
-import NextAuth from "next-auth";
-import { NextResponse } from "next/server";
+import NextAuth, { type NextAuthRequest } from "next-auth";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 
 import { authConfig } from "@/auth.config";
 import { actionLoginResponse, isServerActionRequest, loginPathFor } from "@/lib/auth/login-redirect";
 import { AGENCY_HOME, CLIENT_HOME, homePathFor, TWO_FACTOR_SETUP_PATH } from "@/lib/nav";
-import { appOrigin, siteHost, siteOrigin } from "@/lib/urls";
+import { isApplicationHost, routeBeforeSession, routeByHost, SITE_NOT_FOUND_PATH } from "@/lib/site-routing";
 
 const { auth } = NextAuth(authConfig);
 
@@ -15,34 +15,6 @@ const { auth } = NextAuth(authConfig);
  * пути, и через startsWith он открыл бы наружу весь сайт целиком.
  */
 const LANDING_PATH = "/";
-
-/**
- * Что живёт на сайтовом домене, а не в приложении.
- *
- * Лендинг и маркетинговые страницы вроде экспресс-аудита. Список,
- * а не префикс: страницы сайта нужно добавлять сюда осознанно,
- * потому что каждая запись открывает путь наружу.
- */
-const SITE_PATHS = new Set([
-  LANDING_PATH,
-  "/audit",
-  "/tariffs",
-  "/cases",
-  "/privacy",
-  "/robots.txt",
-  "/sitemap.xml",
-]);
-
-/**
- * Домену приложения нужен собственный robots.txt.
- *
- * Всё прочее из SITE_PATHS уводится отсюда на витрину, но с этим
- * файлом так нельзя: редирект отдаёт корень сайта (new URL(siteOrigin())
- * теряет путь), робот получает в ответ html вместо правил и обращается
- * с доменом как с открытым. Отдаём файл на месте — app/robots.ts
- * отвечает на домене приложения «Disallow: /».
- */
-const ROBOTS_PATH = new Set(["/robots.txt"]);
 
 /** Доступно без сессии. Публичные ссылки для кандидатов — по одноразовым токенам. */
 const PUBLIC_PREFIXES = [
@@ -121,35 +93,75 @@ const PUBLIC_PREFIXES = [
  * Здесь только навигация — никаких решений о правах на объекты.
  * Настоящие проверки живут в lib/access и вызываются на уровне данных:
  * прокси знает лишь роль из токена и не ходит в БД.
+ *
+ * Порядок важен. Сначала решение по адресу (`routeBeforeSession`, lib/site-routing.ts): сайт,
+ * приложение и www отдают разное, и ему сессия не нужна. Оно выполняется ДО обёртки `auth()`:
+ * та, если задан `AUTH_URL`, подменяет адрес запроса (`req.nextUrl`) на адрес кабинета
+ * (`reqWithEnvURL` в next-auth), и переписывание страницы 404 на такой адрес Next считает
+ * чужим — проксирует наружу и отвечает 500 (проверка 13.10.2026; до этого неизвестный путь
+ * сайта был редиректом, и подмена ничего не ломала). Редиректы строятся из `APP_URL` и
+ * `SITE_URL`, не из адреса запроса, поэтому им подмена не мешает. Потом, внутри `auth()`, —
+ * единственное решение по адресу, которому нужна сессия, и роли. Ответы приложения помечены
+ * `X-Robots-Tag: noindex, nofollow`: робот, которому обход не запрещён (страницы входа и
+ * регистрации, на которые ссылается сайт, — app/robots.ts), увидит запрет индекса.
  */
-export default auth((req) => {
-  const { pathname } = req.nextUrl;
+export default function proxy(req: NextRequest, event: NextFetchEvent) {
+  const host = req.headers.get("host");
 
-  const site = siteHost();
-  const onSite = site !== null && req.headers.get("host") === site;
-
-  // Домены разведены: сайт отдаёт только лендинг, всё остальное живёт
-  // в приложении. Без этого кабинет открывался бы по двум адресам
-  // сразу, и поисковики индексировали бы страницу входа как часть сайта.
-  if (site !== null) {
-    if (onSite && !SITE_PATHS.has(pathname)) {
-      return NextResponse.redirect(new URL(`${appOrigin()}${pathname}${req.nextUrl.search}`));
-    }
-    if (
-      !onSite &&
-      SITE_PATHS.has(pathname) &&
-      !ROBOTS_PATH.has(pathname) &&
-      !req.auth?.user
-    ) {
-      // Путь сохраняем — как и в обратном направлении строкой выше.
-      // Без него любой сайтовый адрес, набранный на домене приложения,
-      // приводил на главную витрины: /privacy открывал не политику,
-      // а лендинг
-      return NextResponse.redirect(
-        new URL(`${siteOrigin()}${pathname}${req.nextUrl.search}`),
-      );
-    }
+  // Домены разведены: сайт отдаёт только свои страницы, всё остальное живёт
+  // в приложении. Без этого кабинет открывался бы по двум адресам сразу,
+  // и поисковики индексировали бы страницу входа как часть сайта
+  const route = routeBeforeSession({ host, pathname: req.nextUrl.pathname, search: req.nextUrl.search });
+  if (route.action === "redirect") {
+    return markApplication(NextResponse.redirect(new URL(route.location), route.status), host);
   }
+  if (route.action === "not-found") {
+    // Страница «не найдено» в оформлении сайта, с кодом 404: путь в адресной строке
+    // остаётся прежним, меняется только то, что нарисовано. Код задан здесь, потому что
+    // страница обычная; почему не `notFound()` и не корневой not-found — у SITE_NOT_FOUND_PATH.
+    // Адрес переписывания — из настоящего `req.nextUrl` (его здесь ещё не подменил `auth()`).
+    // `no-store`: страница статическая и по умолчанию отдаётся с годовым `s-maxage`, а
+    // запомнить на год «здесь ничего нет» чужому кешу значит закрыть адрес, на котором
+    // позже появится настоящая страница
+    const response = NextResponse.rewrite(new URL(SITE_NOT_FOUND_PATH, req.nextUrl), { status: 404 });
+    response.headers.set("Cache-Control", "no-store");
+    return markApplication(response, host);
+  }
+
+  return withSession(req, event);
+}
+
+/** Всё, что зависит от сессии. Запрос здесь уже с адресом из `AUTH_URL`: новых переписываний на его основе не строить. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- второй параметр нужен типу: с ним next-auth выбирает перегрузку «прокси», а не «обработчик маршрута»
+const withSession = auth((req: NextAuthRequest, _event: NextFetchEvent) => {
+  const host = req.headers.get("host");
+
+  // Единственное решение по адресу, которому нужна сессия: страница сайта, набранная на адресе
+  // приложения без входа, уходит на сайт (редирект, адрес назначения — из SITE_URL)
+  const route = routeByHost({
+    host,
+    pathname: req.nextUrl.pathname,
+    search: req.nextUrl.search,
+    signedIn: Boolean(req.auth?.user),
+  });
+  if (route.action === "redirect") {
+    return markApplication(NextResponse.redirect(new URL(route.location), route.status), host);
+  }
+
+  return markApplication(applicationResponse(req), host);
+});
+
+/** Ответы адреса приложения не для поиска: `noindex, nofollow` заголовком, а не только в теле страницы. */
+function markApplication(response: NextResponse, host: string | null): NextResponse {
+  if (isApplicationHost(host)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+}
+
+/** Защита и разведение по ролям — то, что было всем прокси, пока адреса не разводились. */
+function applicationResponse(req: NextAuthRequest): NextResponse {
+  const { pathname } = req.nextUrl;
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
@@ -200,7 +212,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   // Всё, кроме статики, картинок и видео — иначе фоновый ролик в hero

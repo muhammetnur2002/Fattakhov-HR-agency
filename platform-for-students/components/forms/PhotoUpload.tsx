@@ -92,7 +92,7 @@ export function PhotoUpload({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="group absolute inset-0 grid place-items-center"
+          className="group absolute inset-0 grid place-items-center rounded-4xl -outline-offset-4"
           aria-label={shown ? 'Заменить фотографию' : 'Загрузить фотографию'}
         >
           <AnimatePresence mode="wait">
@@ -121,7 +121,7 @@ export function PhotoUpload({
                 className="flex flex-col items-center gap-2 px-4 text-center"
               >
                 <Camera className="size-6 text-paper/40" />
-                <span className="text-[12.5px] leading-snug text-paper-faint">
+                <span className="text-caption leading-snug text-paper-faint">
                   Перетащите фото
                   <br />
                   или нажмите
@@ -157,6 +157,7 @@ export function PhotoUpload({
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="sr-only"
+        tabIndex={-1}
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void upload(file);
@@ -164,7 +165,7 @@ export function PhotoUpload({
         }}
       />
 
-      <p className="text-center text-[12.5px] leading-snug text-paper-faint">
+      <p className="text-center text-caption leading-snug text-paper-faint">
         JPG, PNG или WebP до 5 МБ.{' '}
         {kind === 'company'
           ? 'Студенты увидят после одобрения агентством.'

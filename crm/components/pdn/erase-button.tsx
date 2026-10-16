@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import {
   erasePersonalDataAction,
@@ -9,19 +9,10 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
-import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { panelClass } from "@/components/ui/panel";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
-
-function Submit() {
-  return (
-    <SubmitButtonBase size="sm" variant="destructive" pendingLabel="Удаляем…">
-      Удалить безвозвратно
-    </SubmitButtonBase>
-  );
-}
 
 /**
  * Удаление персональных данных кандидата.
@@ -43,34 +34,28 @@ export function EraseButton({
     erasePersonalDataAction,
     {},
   );
-  const [open, setOpen] = useState(false);
-  // «Удалить данные» заменяется формой подтверждения: фокус — в поле для слова, после «Отмены» — обратно на кнопку
-  const { triggerRef, focusRef, questionId } = useConfirmFocus<HTMLButtonElement, HTMLInputElement>(open);
 
   if (state.ok) {
     return <FormMessage ok={state.ok} />;
   }
 
-  if (!open) {
-    return (
-      <Button
-        ref={triggerRef}
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen(true)}
-      >
-        Удалить данные
-      </Button>
-    );
-  }
-
+  // «Удалить данные» заменяется формой подтверждения: фокус — в поле для слова, после «Отмены» — обратно на кнопку.
+  // Вопрос — абзац ниже, он длинный; форме для читалки нужно короткое название
   return (
-    <form action={formAction} aria-labelledby={questionId} className={panelClass("plain", "space-y-4")}>
-      {/* Вопрос — абзац ниже, он длинный; форме для читалки нужно короткое название */}
-      <span id={questionId} className="sr-only">
-        Удалить данные кандидата {candidateName}
-      </span>
+    <ConfirmBlock
+      trigger={
+        <Button type="button" size="sm" variant="outline">
+          Удалить данные
+        </Button>
+      }
+      formProps={{ action: formAction }}
+      className={panelClass("plain", "space-y-4")}
+      questionHidden
+      question={`Удалить данные кандидата ${candidateName}`}
+      confirmLabel="Удалить безвозвратно"
+      pendingLabel="Удаляем…"
+      error={state.error}
+    >
       <input type="hidden" name="candidateId" value={candidateId} />
 
       <p className="text-sm">
@@ -95,27 +80,12 @@ export function EraseButton({
           Впишите «удалить» для подтверждения
         </Label>
         <Input
-          ref={focusRef}
           id={`confirm-${candidateId}`}
           name="confirm"
           autoComplete="off"
           required
         />
       </div>
-
-      <div className="flex gap-2">
-        <Submit />
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => setOpen(false)}
-        >
-          Отмена
-        </Button>
-      </div>
-
-      <FormMessage error={state.error} />
-    </form>
+    </ConfirmBlock>
   );
 }

@@ -90,6 +90,16 @@ function TabsTrigger({
   )
 }
 
+/*
+  Radix делает панель вкладки остановкой Tab (tabindex=0, role="tabpanel"), и у
+  неё должно быть видно, что фокус пришёл: прежний `outline-none` без замены
+  оставлял «немую» остановку — человек жмёт Tab, на экране ничего не меняется
+  (WCAG 2.4.7; замер 15.10.2026: /register, страница вакансии, клиента и
+  настройки ПДн). Контур, а не тень: его подхватывает правило высокой
+  контрастности в globals.css (`:focus-visible` в forced-colors). Голого
+  `outline-none` здесь быть не должно: он пишет `--tw-outline-style: none`, и
+  `focus-visible:outline-2` остаётся без линии.
+*/
 function TabsContent({
   className,
   ...props
@@ -97,7 +107,10 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      className={cn(
+        "flex-1 rounded-md text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        className
+      )}
       {...props}
     />
   )

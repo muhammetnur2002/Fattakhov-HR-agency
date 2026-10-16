@@ -1,6 +1,8 @@
 import { Check } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
@@ -75,9 +77,13 @@ export function Pricing() {
         С 2xl лента — сетка без обрезки, там пара не нужна (2xl:mt-0 2xl:pt-0);
         дуга поднимает центральную плитку на 20px выше края — это её цена.
       */}
-      <div
+      <ScrollRegion
+        label="Тарифы"
         className={cn(
           "flex snap-x snap-mandatory gap-4 overflow-x-auto -mt-4 pt-4 pb-2",
+          // ScrollRegion: пока лента прокручивается, у неё есть остановка Tab (в Safari сама она фокус не получает);
+          // кольцо внутрь — лента выходит под край окна, и снаружи у краёв его не видно
+          "focus-visible:ring-inset focus-visible:ring-offset-0",
           SITE_GUTTER_BLEED,
           SITE_GUTTER,
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -190,7 +196,7 @@ export function Pricing() {
             </div>
           );
         })}
-      </div>
+      </ScrollRegion>
 
       {/*
         Пять точек — не декор, а счётчик: край соседней карточки в
@@ -240,8 +246,12 @@ export function Pricing() {
             по вашему рынку. Вы платите за мощность команды, а не за отдельные
             резюме.
           </p>
+          {/* «/#diagnostic», а не «#diagnostic»: форма диагностики есть только на главной,
+              а прайс стоит ещё и на /tariffs — там голый якорь указывал в пустоту, и кнопка
+              не делала ничего (проверка сайта 11.10.2026). На главной ссылка ведёт на ту
+              же страницу и прокручивает к форме */}
           <Button asChild size="lg" className="mt-6">
-            <a href="#diagnostic">Рассчитать под мой план</a>
+            <Link href="/#diagnostic">Рассчитать под мой план</Link>
           </Button>
         </div>
       </div>

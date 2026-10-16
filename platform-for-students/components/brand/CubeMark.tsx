@@ -1,6 +1,7 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useReducedMotionSafe } from '@/lib/hooks/useReducedMotionSafe';
 import { cn } from '@/lib/utils';
 import { easeOutExpo } from '@/lib/motion';
 
@@ -25,7 +26,7 @@ interface CubeMarkProps {
 }
 
 export function CubeMark({ className, animate = true, strokeWidth = 3 }: CubeMarkProps) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionSafe();
   const shouldAnimate = animate && !reduced;
 
   const draw = (delay: number) => ({
@@ -36,6 +37,11 @@ export function CubeMark({ className, animate = true, strokeWidth = 3 }: CubeMar
 
   return (
     <svg
+      // key по режиму: `initial` framer-motion запоминает при монтировании и не пересматривает, а хук
+      // отдаёт `false` на гидратационном рендере и настоящее значение сразу следом. Без key у человека
+      // с «уменьшением движения» рёбра уже начали бы прочерчиваться; с key каркас пересоздаётся
+      // с initial={false} и сразу стоит целиком
+      key={shouldAnimate ? 'draw' : 'still'}
       viewBox="-64 -72 128 144"
       fill="none"
       aria-hidden

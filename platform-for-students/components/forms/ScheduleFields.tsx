@@ -40,7 +40,7 @@ export function ScheduleFields({
   return (
     <div className="space-y-8">
       <fieldset>
-        <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+        <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
           В какие дни готовы работать
         </legend>
         <Chip selected={everyDay} onToggle={() => setDays(everyDay ? [] : [...WEEKDAYS])} className="mb-3">
@@ -60,11 +60,11 @@ export function ScheduleFields({
             </Chip>
           ))}
         </div>
-        {errors.workDays && <p className="pt-2.5 text-[12.5px] text-danger">{errors.workDays}</p>}
+        {errors.workDays && <p className="pt-2.5 text-caption text-danger">{errors.workDays}</p>}
       </fieldset>
 
       <fieldset>
-        <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+        <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
           Сколько часов в неделю
         </legend>
         <div className="flex flex-wrap gap-2">
@@ -82,13 +82,13 @@ export function ScheduleFields({
             </Chip>
           ))}
         </div>
-        {errors.hoursPerWeek && <p className="pt-2.5 text-[12.5px] text-danger">{errors.hoursPerWeek}</p>}
+        {errors.hoursPerWeek && <p className="pt-2.5 text-caption text-danger">{errors.hoursPerWeek}</p>}
         {reducedFrom !== null && hoursPerWeek !== null && (
-          <p className="pt-3 text-[12.5px] leading-snug text-warn">
+          <p className="pt-3 text-caption leading-snug text-warn">
             Часы уменьшены с {reducedFrom} до {hoursPerWeek}: столько не помещается в выбранные дни.
           </p>
         )}
-        <p className="pt-3 text-[12.5px] leading-snug text-paper-faint">
+        <p className="pt-3 text-caption leading-snug text-paper-faint">
           {workDays.length === 0
             ? 'Сначала отметьте дни — часы подстроятся под них.'
             : `При ${daysPhrase} — не больше ${max} часов в неделю.`}{' '}

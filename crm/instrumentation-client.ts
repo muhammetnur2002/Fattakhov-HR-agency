@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { initClientSentry } from "@/lib/monitoring/capture-client";
 
 /**
  * Браузерная половина Sentry — см. комментарий в instrumentation.ts:
@@ -7,10 +7,9 @@ import * as Sentry from "@sentry/nextjs";
  * Имя файла — соглашение самого Next (require-instrumentation-client
  * в next/dist), а не что-то специфичное для Sentry: подключается сам,
  * без правки next.config.ts.
+ *
+ * Сам Sentry подгружается динамически и только при заданном DSN
+ * (lib/monitoring/capture-client.ts): обычный импорт клал его код в
+ * первую загрузку каждой страницы, хотя при пустом DSN он не делал ничего.
  */
-if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    sendDefaultPii: false,
-  });
-}
+initClientSentry();

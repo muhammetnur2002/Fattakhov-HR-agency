@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, type RefObject } from "react";
 
 /**
  * Фокус возвращается туда, откуда его взяли: после закрытия окна и блока
@@ -35,6 +35,10 @@ import { useCallback, useEffect, useId, useMemo, useRef } from "react";
  *
  * Элемент, которого уже нет в странице (список перерисовался, строку удалили),
  * пропускается: фокус не уходит в пустоту и не бросает ошибку.
+ *
+ * Новые блоки подтверждения («Да / Отмена») сам хук не вызывают: их рисует `ConfirmBlock`
+ * (`components/ui/confirm-block.tsx`) — вопрос, кнопки, ожидание, ошибка, Escape и этот хук внутри.
+ * Напрямую он нужен только раскрывашкам, где на месте кнопки встаёт обычная форма, не подтверждение.
  */
 
 function canFocus(el: HTMLElement | null | undefined): el is HTMLElement {
@@ -106,13 +110,27 @@ export function useReturnFocus(): ReturnFocus {
  * `questionId` — на абзац или подпись с вопросом, `groupProps` — на контейнер блока:
  * читалка экрана называет группу вопросом, когда фокус входит в неё. Хуков на одном
  * экране может быть несколько (удаление и закрытие рядом) — идентификаторы у каждого свои.
+ *
+ * Вторым аргументом `ConfirmBlock` передаёт своё: `triggerRef` — кнопка, которая живёт вне
+ * блока и принадлежит родителю (строка в шапке комментария, ряд кнопок), и `resolveFocus` —
+ * что получает фокус при открытии, когда это не одна известная ссылка (первое поле блока
+ * либо «Отмена»). Читается в момент открытия, поэтому поле, появившееся в этой же отрисовке,
+ * находится.
  */
 export function useConfirmFocus<
   Trigger extends HTMLElement = HTMLButtonElement,
   Focus extends HTMLElement = HTMLButtonElement,
->(open: boolean) {
-  const triggerRef = useRef<Trigger | null>(null);
+>(
+  open: boolean,
+  options: {
+    triggerRef?: RefObject<Trigger | null>;
+    resolveFocus?: () => HTMLElement | null;
+  } = {},
+) {
+  const ownTrigger = useRef<Trigger | null>(null);
+  const triggerRef = options.triggerRef ?? ownTrigger;
   const focusRef = useRef<Focus | null>(null);
+  const resolveFocus = useRef(options.resolveFocus);
   const wasOpen = useRef(open);
   const questionId = useId();
   const groupProps = useMemo(
@@ -121,11 +139,15 @@ export function useConfirmFocus<
   );
 
   useEffect(() => {
+    resolveFocus.current = options.resolveFocus;
+  });
+
+  useEffect(() => {
     if (open === wasOpen.current) return;
     wasOpen.current = open;
-    const target = open ? focusRef.current : triggerRef.current;
+    const target = open ? (resolveFocus.current?.() ?? focusRef.current) : triggerRef.current;
     if (canFocus(target)) target.focus({ preventScroll: true });
-  }, [open]);
+  }, [open, triggerRef]);
 
   return { triggerRef, focusRef, questionId, groupProps };
 }

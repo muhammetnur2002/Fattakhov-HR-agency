@@ -15,11 +15,11 @@ export function LegalDocumentView({
   const Heading = headingLevel;
 
   return (
-    <div className="text-[14.5px] leading-relaxed text-paper-dim">
-      <p className="text-[12.5px] text-paper-faint">Редакция от {versionLabel(doc.version)}</p>
+    <div className="text-body leading-relaxed text-paper-dim">
+      <p className="text-caption text-paper-faint">Редакция от {versionLabel(doc.version)}</p>
 
       {LEGAL_REQUISITES_PENDING && (
-        <p className="mt-3 rounded-2xl border border-warn/35 bg-warn/[0.08] px-4 py-3 text-[13px] text-warn">
+        <p className="mt-3 rounded-2xl border border-warn/35 bg-warn/[0.08] px-4 py-3 text-small text-warn">
           Реквизиты оператора будут добавлены до запуска платформы.
         </p>
       )}
@@ -28,7 +28,7 @@ export function LegalDocumentView({
 
       {doc.sections.map((section) => (
         <section key={section.title} className="mt-6">
-          <Heading className="text-[15px] font-semibold tracking-[-0.01em] text-paper">{section.title}</Heading>
+          <Heading className="text-body font-semibold tracking-[-0.01em] text-paper">{section.title}</Heading>
           {section.items && (
             <ul className="mt-2.5 list-disc space-y-1.5 pl-5 marker:text-paper-faint">
               {section.items.map((item) => (

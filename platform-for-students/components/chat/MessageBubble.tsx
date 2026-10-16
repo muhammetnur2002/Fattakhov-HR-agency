@@ -62,14 +62,14 @@ export function MessageBubble({
           failed && 'border-danger/70',
         )}
       >
-        <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed text-paper">
+        <p className="whitespace-pre-wrap break-words text-body leading-relaxed text-paper">
           {message.body}
         </p>
 
         {lastInBurst && (
           <div
             className={cn(
-              'mt-1 flex items-center gap-1.5 text-[11px] tabular-nums',
+              'mt-1 flex items-center gap-1.5 text-caption tabular-nums',
               mine ? 'justify-end text-paper/70' : 'text-paper-faint',
             )}
           >
@@ -86,7 +86,7 @@ export function MessageBubble({
       </div>
 
       {failed && (
-        <div role="status" className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[12px]">
+        <div role="status" className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-caption">
           <span className="text-danger">Не отправлено</span>
           {onRetry && (
             <button type="button" onClick={onRetry} className="font-medium text-paper underline underline-offset-2 hover:text-accent-200">
@@ -108,7 +108,7 @@ export function MessageBubble({
 export function DaySeparator({ label }: { label: string }) {
   return (
     <div className="sticky top-0 z-10 flex justify-center py-3">
-      <span className="rounded-full border border-[var(--hairline)] bg-graphite-900/90 px-3 py-1 text-[11.5px] text-paper-faint backdrop-blur">
+      <span className="rounded-full border border-[var(--hairline)] bg-graphite-900/90 px-3 py-1 text-caption text-paper-faint backdrop-blur">
         {label}
       </span>
     </div>

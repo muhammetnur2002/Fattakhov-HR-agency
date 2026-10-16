@@ -100,9 +100,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             >
               <span className="mt-0.5 shrink-0">{ICON[item.tone]}</span>
               <div className="flex-1 space-y-0.5">
-                <p className="text-[13.5px] font-medium leading-snug text-paper">{item.title}</p>
+                <p className="text-small font-medium leading-snug text-paper">{item.title}</p>
                 {item.description && (
-                  <p className="text-[12.5px] leading-snug text-paper-dim">{item.description}</p>
+                  <p className="text-caption leading-snug text-paper-dim">{item.description}</p>
                 )}
               </div>
               <button

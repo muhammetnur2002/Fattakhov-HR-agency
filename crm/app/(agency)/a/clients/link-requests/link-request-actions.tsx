@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +16,7 @@ import {
   rejectLinkRequestAction as rejectAction,
 } from "./actions";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import {
   Select,
@@ -65,11 +66,8 @@ export function LinkRequestActions({
     focusRef: existingFocus,
     questionId: existingQuestionId,
   } = useConfirmFocus(mode === "existing");
-  const {
-    triggerRef: rejectTrigger,
-    focusRef: rejectFocus,
-    questionId: rejectQuestionId,
-  } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(mode === "reject");
+  // «Отклонить» — подтверждение с полем пояснения: его ведёт ConfirmBlock, ссылка на кнопку — наша
+  const rejectTrigger = useRef<HTMLButtonElement>(null);
   const [clientId, setClientId] = useState("");
   const [linkState, linkFormAction] = useActionState<FormState, FormData>(linkAction, {});
   const [rejectState, rejectFormAction] = useActionState<FormState, FormData>(rejectAction, {});
@@ -85,89 +83,85 @@ export function LinkRequestActions({
     if (rejectState.error) toast.error(rejectState.error);
   }, [rejectState]);
 
-  if (mode === "closed") {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Button ref={createTrigger} size="sm" onClick={() => setMode("create")}>
-          Создать клиента
-        </Button>
-        <Button ref={existingTrigger} size="sm" variant="outline" onClick={() => setMode("existing")}>
-          Привязать к существующему
-        </Button>
-        <Button ref={rejectTrigger} size="sm" variant="ghost" onClick={() => setMode("reject")}>
-          Отклонить
-        </Button>
-      </div>
-    );
-  }
-
-  if (mode === "create") {
-    return (
-      <Panel {...createGroup}>
-        <span id={createQuestionId} className="sr-only">
-          Новый клиент из заявки компании
-        </span>
-        <ClientForm
-          action={createClientFromLinkRequestAction}
-          employerId={employerId}
-          values={prefill}
-          managers={managers}
-          submitLabel="Создать клиента и привязать"
-        />
-        <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
-          Отмена
-        </Button>
-      </Panel>
-    );
-  }
-
-  if (mode === "existing") {
-    return (
-      <form action={linkFormAction} aria-labelledby={existingQuestionId} className="flex flex-wrap items-center gap-2">
-        <span id={existingQuestionId} className="sr-only">
-          Привязать компанию к существующему клиенту
-        </span>
-        <input type="hidden" name="employerId" value={employerId} />
-        <input type="hidden" name="clientId" value={clientId} />
-        <Select value={clientId} onValueChange={setClientId}>
-          <SelectTrigger ref={existingFocus} className="w-56">
-            <SelectValue placeholder="Выберите клиента" />
-          </SelectTrigger>
-          <SelectContent>
-            {existingClients.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <SubmitButton label="Привязать" />
-        <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
-          Отмена
-        </Button>
-      </form>
-    );
-  }
-
   return (
-    <form action={rejectFormAction} aria-labelledby={rejectQuestionId} className="space-y-2">
-      <span id={rejectQuestionId} className="sr-only">
-        Отклонить заявку с пояснением
-      </span>
-      <input type="hidden" name="employerId" value={employerId} />
-      <Textarea
-        ref={rejectFocus}
-        name="note"
-        required
-        rows={2}
-        placeholder="Что нужно поправить или уточнить — компания увидит этот текст"
-      />
-      <div className="flex gap-2">
-        <SubmitButton label="Отклонить с пояснением" />
-        <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
-          Отмена
-        </Button>
-      </div>
-    </form>
+    <>
+      {mode === "closed" && (
+        <div className="flex flex-wrap gap-2">
+          <Button ref={createTrigger} size="sm" onClick={() => setMode("create")}>
+            Создать клиента
+          </Button>
+          <Button ref={existingTrigger} size="sm" variant="outline" onClick={() => setMode("existing")}>
+            Привязать к существующему
+          </Button>
+          <Button ref={rejectTrigger} size="sm" variant="ghost" onClick={() => setMode("reject")}>
+            Отклонить
+          </Button>
+        </div>
+      )}
+
+      {mode === "create" && (
+        <Panel {...createGroup}>
+          <span id={createQuestionId} className="sr-only">
+            Новый клиент из заявки компании
+          </span>
+          <ClientForm
+            action={createClientFromLinkRequestAction}
+            employerId={employerId}
+            values={prefill}
+            managers={managers}
+            submitLabel="Создать клиента и привязать"
+          />
+          <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
+            Отмена
+          </Button>
+        </Panel>
+      )}
+
+      {mode === "existing" && (
+        <form action={linkFormAction} aria-labelledby={existingQuestionId} className="flex flex-wrap items-center gap-2">
+          <span id={existingQuestionId} className="sr-only">
+            Привязать компанию к существующему клиенту
+          </span>
+          <input type="hidden" name="employerId" value={employerId} />
+          <input type="hidden" name="clientId" value={clientId} />
+          <Select value={clientId} onValueChange={setClientId}>
+            <SelectTrigger ref={existingFocus} className="w-56">
+              <SelectValue placeholder="Выберите клиента" />
+            </SelectTrigger>
+            <SelectContent>
+              {existingClients.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <SubmitButton label="Привязать" />
+          <Button type="button" size="sm" variant="ghost" onClick={() => setMode("closed")}>
+            Отмена
+          </Button>
+        </form>
+      )}
+
+      <ConfirmBlock
+        open={mode === "reject"}
+        onOpenChange={(next) => setMode(next ? "reject" : "closed")}
+        triggerRef={rejectTrigger}
+        formProps={{ action: rejectFormAction }}
+        questionHidden
+        question="Отклонить заявку с пояснением"
+        confirmLabel="Отклонить с пояснением"
+        pendingLabel="Сохраняем…"
+        confirmVariant="default"
+      >
+        <input type="hidden" name="employerId" value={employerId} />
+        <Textarea
+          name="note"
+          required
+          rows={2}
+          placeholder="Что нужно поправить или уточнить — компания увидит этот текст"
+        />
+      </ConfirmBlock>
+    </>
   );
 }

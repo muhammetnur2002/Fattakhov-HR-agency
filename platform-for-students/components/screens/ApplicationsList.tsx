@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Clock3, MapPin } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { Reveal, Stagger } from '@/components/motion/Reveal';
 import { VacancyDetail } from '@/components/swipe/VacancyDetail';
@@ -54,11 +54,9 @@ export function ApplicationsList({
             : 'Смахните карточку вправо в ленте — отклик сохранится и уйдёт работодателю, как только HR-менеджер подтвердит учёбу.'
         }
         action={
-          <Link href="/feed">
-            <Button size="lg" iconRight={<ArrowRight />}>
-              В ленту вакансий
-            </Button>
-          </Link>
+          <ButtonLink href="/feed" size="lg" iconRight={<ArrowRight />}>
+            В ленту вакансий
+          </ButtonLink>
         }
       />
     );
@@ -69,8 +67,8 @@ export function ApplicationsList({
   return (
     <>
       <header className="mb-8">
-        <h1 className="text-display-md text-paper">Мои отклики</h1>
-        <p className="mt-2.5 text-[14.5px] text-paper-dim">
+        <h1 className="text-headline text-paper">Мои отклики</h1>
+        <p className="mt-2.5 text-body text-paper-dim">
           {applications.length} {plural(applications.length, 'отклик', 'отклика', 'откликов')}
           {active > 0 && ` · ${active} в работе`}
           {pending.length > 0 && ` · ${pending.length} ${plural(pending.length, 'ждёт', 'ждут', 'ждут')} подтверждения учёбы`}
@@ -79,10 +77,10 @@ export function ApplicationsList({
 
       {pending.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">Ждут подтверждения учёбы</h2>
+          <h2 className="text-caption uppercase tracking-[0.12em] text-paper-faint">Ждут подтверждения учёбы</h2>
           <Link
             href="/profile#study"
-            className="mt-3 block rounded-2xl border border-warn/35 bg-warn/[0.08] px-4 py-3 text-[13px] leading-snug text-paper-dim transition-colors hover:bg-warn/[0.13]"
+            className="mt-3 block rounded-2xl border border-warn/35 bg-warn/[0.08] px-4 py-3 text-small leading-snug text-paper-dim transition-colors hover:bg-warn/[0.13]"
           >
             {study.status === 'PENDING'
               ? 'Справка на проверке у HR-менеджера — после подтверждения эти отклики уйдут работодателям.'
@@ -117,13 +115,13 @@ function PendingCard({ item, onOpen }: { item: PendingApplicationDTO; onOpen: ()
 
   return (
     <article className="surface min-w-0 overflow-hidden rounded-3xl">
-      <button type="button" onClick={onOpen} className="block w-full p-5 text-left sm:p-6">
+      <button type="button" onClick={onOpen} className="block w-full rounded-3xl p-5 text-left -outline-offset-4 sm:p-6">
         <div className="flex items-start gap-4">
           <Avatar name={vacancy.company} src={vacancy.companyLogoUrl} size={46} rounded="square" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] text-paper-faint">{vacancy.company}</p>
-            <h3 className="mt-0.5 truncate text-[17px] font-semibold tracking-[-0.02em] text-paper">{vacancy.title}</h3>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-paper-dim">
+            <p className="truncate text-small text-paper-faint">{vacancy.company}</p>
+            <h3 className="mt-0.5 truncate text-body font-semibold tracking-[-0.02em] text-paper">{vacancy.title}</h3>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-paper-dim">
               <span className="text-accent-200">{formatSalary(vacancy.salaryFrom, vacancy.salaryTo)}</span>
               <span className="flex items-center gap-1 text-paper-faint">
                 <MapPin className="size-3" aria-hidden />
@@ -132,7 +130,7 @@ function PendingCard({ item, onOpen }: { item: PendingApplicationDTO; onOpen: ()
             </p>
           </div>
         </div>
-        <p className="mt-4 flex items-start gap-1.5 text-[12.5px] leading-snug text-warn">
+        <p className="mt-4 flex items-start gap-1.5 text-caption leading-snug text-warn">
           <Clock3 className="mt-px size-3.5 shrink-0" aria-hidden />
           Уйдёт работодателю после подтверждения учёбы.{' '}
           {left > 0
@@ -159,16 +157,16 @@ function ApplicationCard({
       transition={springSoft}
       className="surface min-w-0 overflow-hidden rounded-3xl"
     >
-      <button type="button" onClick={onOpen} className="block w-full p-5 text-left sm:p-6">
+      <button type="button" onClick={onOpen} className="block w-full rounded-3xl p-5 text-left -outline-offset-4 sm:p-6">
         <div className="flex items-start gap-4">
           <Avatar name={vacancy.company} src={vacancy.companyLogoUrl} size={46} rounded="square" />
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] text-paper-faint">{vacancy.company}</p>
-            <h2 className="mt-0.5 truncate text-[17px] font-semibold tracking-[-0.02em] text-paper">
+            <p className="truncate text-small text-paper-faint">{vacancy.company}</p>
+            <h2 className="mt-0.5 truncate text-body font-semibold tracking-[-0.02em] text-paper">
               {vacancy.title}
             </h2>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-paper-dim">
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-paper-dim">
               <span className="text-accent-200">{formatSalary(vacancy.salaryFrom, vacancy.salaryTo)}</span>
               <span className="flex items-center gap-1 text-paper-faint">
                 <MapPin className="size-3" aria-hidden />
@@ -182,13 +180,13 @@ function ApplicationCard({
 
         <Funnel status={application.status} />
 
-        <p className="mt-3 text-[12.5px] text-paper-faint">
+        <p className="mt-3 text-caption text-paper-faint">
           Отклик отправлен {timeAgo(application.createdAt)}
           {application.status !== 'NEW' && ` · статус обновлён ${timeAgo(application.statusChangedAt)}`}
         </p>
 
         {application.employerNote && (
-          <p className="mt-3 rounded-xl border border-[var(--hairline)] bg-graphite-950/50 p-3 text-[13px] leading-relaxed text-paper-dim">
+          <p className="mt-3 rounded-xl border border-[var(--hairline)] bg-graphite-950/50 p-3 text-small leading-relaxed text-paper-dim">
             {application.employerNote}
           </p>
         )}
@@ -231,7 +229,7 @@ function Funnel({ status }: { status: ApplicationStatus }) {
           );
         })}
       </div>
-      <p className="mt-2 text-[11.5px] text-paper-faint">
+      <p className="mt-2 text-caption text-paper-faint">
         {rejected
           ? 'Работодатель отказал — вакансия закрыта для вас'
           : `Этап: ${APPLICATION_STATUS_LABEL[status]}`}

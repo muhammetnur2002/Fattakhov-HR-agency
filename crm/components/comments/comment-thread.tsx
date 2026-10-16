@@ -19,6 +19,7 @@ import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { ROLE_LABELS } from "@/lib/labels";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { useStaleGuard } from "@/lib/hooks/use-stale-guard";
 import { useTimeZone } from "@/components/shell/time-zone-provider";
@@ -319,12 +320,7 @@ function CommentItem({
     questionId: editQuestionId,
     groupProps: editGroup,
   } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(mode === "editing");
-  const {
-    triggerRef: deleteTrigger,
-    focusRef: deleteFocus,
-    questionId: deleteQuestionId,
-    groupProps: deleteGroup,
-  } = useConfirmFocus(mode === "confirmDelete");
+  const deleteTrigger = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState(comment.body);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,14 +338,8 @@ function CommentItem({
   }
 
   async function confirmDelete() {
-    setPending(true);
     const result = await onDelete(comment.id);
-    setPending(false);
-    if (result.error) {
-      setError(result.error);
-      setMode("view");
-      return;
-    }
+    if (result.error) return { error: result.error };
     // Комментарий исчезнет из пропа после revalidatePath — до тех пор
     // просто прячем его, чтобы не ждать с открытой формой подтверждения
     setRemoved(true);
@@ -472,43 +462,37 @@ function CommentItem({
             </Button>
           </div>
         </div>
-      ) : mode === "confirmDelete" ? (
-        <div className="mt-2 space-y-2">
-          <p className="whitespace-pre-line text-sm text-muted-foreground line-through">
-            {comment.body}
-          </p>
-          <div {...deleteGroup} className="flex items-center gap-2 text-sm">
-            {/* Удаление чужого — не рядовое действие, и спрашивать
-                о нём той же фразой значит дать промахнуться мимо */}
-            <span id={deleteQuestionId}>
-              {own
-                ? "Удалить комментарий?"
-                : `Удалить комментарий — ${comment.author?.fullName ?? "другой автор"}?`}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              loading={pending}
-              onClick={confirmDelete}
-            >
-              {pending ? "Удаляем…" : "Да, удалить"}
-            </Button>
-            <Button
-              ref={deleteFocus}
-              aria-describedby={deleteQuestionId}
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setMode("view")}
-            >
-              Отмена
-            </Button>
-          </div>
-        </div>
       ) : (
-        <p className="mt-2 whitespace-pre-line text-sm">{comment.body}</p>
+        // На время вопроса «Удалить?» текст зачёркнут и приглушён: видно, что именно удаляется
+        <p
+          className={cn(
+            "mt-2 whitespace-pre-line text-sm",
+            mode === "confirmDelete" && "text-muted-foreground line-through",
+          )}
+        >
+          {comment.body}
+        </p>
       )}
+
+      {/* Блок всегда в разметке и сам закрыт, пока не нажали «Удалить»: фокус вернётся на эту кнопку.
+          Удаление чужого — не рядовое действие, и спрашивать о нём той же фразой значит дать промахнуться мимо */}
+      <ConfirmBlock
+        open={mode === "confirmDelete"}
+        onOpenChange={(next) => setMode(next ? "confirmDelete" : "view")}
+        triggerRef={deleteTrigger}
+        layout="inline"
+        // Как и было: вопрос и кнопки в одной строке без переноса (на телефоне вопрос сжимается до двух строк)
+        className="mt-2 flex-nowrap"
+        errorClassName="mt-2"
+        question={
+          own
+            ? "Удалить комментарий?"
+            : `Удалить комментарий — ${comment.author?.fullName ?? "другой автор"}?`
+        }
+        confirmLabel="Да, удалить"
+        pendingLabel="Удаляем…"
+        onConfirm={confirmDelete}
+      />
 
       <FormMessage compact error={error} className="mt-2" />
     </div>

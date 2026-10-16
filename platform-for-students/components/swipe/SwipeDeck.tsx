@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Check, Inbox } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { SwipeControls } from './SwipeControls';
 import { VacancyDetail } from './VacancyDetail';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { CubeMark } from '@/components/brand/CubeMark';
 import { durations, easeOutExpo, springSoft } from '@/lib/motion';
@@ -234,7 +233,9 @@ export function SwipeDeck({ initial }: { initial: VacancyDTO[] }) {
         {cards.length === 0 && <EmptyDeck applied={counts.applied} />}
       </div>
 
-      <div className="mt-4 w-full max-w-[26rem] shrink-0">
+      {/* pb-1: контейнер ленты обрезает по краю (overflow-hidden), и кольцо фокуса у нижних кнопок срезалось.
+          z-[45]: карточки стопки (z до 40) заходят нижним краем на кнопки и перекрывали верх кольца фокуса */}
+      <div className="relative z-[45] mt-4 w-full max-w-[26rem] shrink-0 pb-1">
         <SwipeControls
           progress={progress}
           onSkip={() => decide('LEFT')}
@@ -263,7 +264,7 @@ function DeckProgress({
 
   return (
     <div className="w-full max-w-[26rem] shrink-0">
-      <div className="flex items-baseline justify-between text-[12.5px]">
+      <div className="flex items-baseline justify-between text-caption">
         <span className="text-paper-faint">
           {total - done > 0
             ? `Осталось ${total - done} ${plural(total - done, 'вакансия', 'вакансии', 'вакансий')}`
@@ -301,24 +302,20 @@ function EmptyDeck({ applied }: { applied: number }) {
     >
       <CubeMark className="h-20 w-20 text-paper/25" />
       <div className="space-y-2">
-        <h3 className="text-display-sm text-paper">Вакансии закончились</h3>
-        <p className="mx-auto max-w-[22rem] text-[14px] leading-relaxed text-paper-dim">
+        <h3 className="text-title text-paper">Вакансии закончились</h3>
+        <p className="mx-auto max-w-[22rem] text-small leading-relaxed text-paper-dim">
           {applied > 0
             ? `Вы отправили ${applied} ${plural(applied, 'отклик', 'отклика', 'откликов')}. Работодатели ответят в течение двух рабочих дней — следите за разделом «Отклики».`
             : 'Новые вакансии появляются каждый день. Загляните завтра или посмотрите пропущенные — их можно вернуть в ленту.'}
         </p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        <Link href="/skipped">
-          <Button variant="outline" size="sm">
-            Пропущенные
-          </Button>
-        </Link>
-        <Link href="/applications">
-          <Button variant="ghost" size="sm" icon={<Inbox />}>
-            Мои отклики
-          </Button>
-        </Link>
+        <ButtonLink href="/skipped" variant="outline" size="sm">
+          Пропущенные
+        </ButtonLink>
+        <ButtonLink href="/applications" variant="ghost" size="sm" icon={<Inbox />}>
+          Мои отклики
+        </ButtonLink>
       </div>
     </motion.div>
   );

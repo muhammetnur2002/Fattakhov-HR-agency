@@ -37,6 +37,14 @@ const METHOD_LABELS: Record<RegisterMethod, string> = {
 };
 
 /*
+  Цель касания не мельче 24x24 (WCAG 2.5.8): раскрывашка была 89x16 на телефоне и
+  111x20 на ноутбуке, ссылка рядом — того же роста. min-h-6 растит область нажатия,
+  а -my-1 забирает рост из полей, поэтому строка остаётся прежней высоты и вёрстка
+  не сдвигается (замер 15.10.2026).
+*/
+const TARGET_24 = "-my-1 inline-flex min-h-6 items-center";
+
+/*
   Текст согласия — дословный, из юридического пакета
   (lib/legal/registration-consent.ts), менять формулировки нельзя. Целиком
   открытым абзацем он читается как «слишком длинная строка»: на большинстве
@@ -110,12 +118,12 @@ function ConsentCheckbox({
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={textId}
-          className="underline underline-offset-2 hover:text-foreground"
+          className={cn(TARGET_24, "underline underline-offset-2 hover:text-foreground")}
         >
           {expanded ? "Скрыть текст" : "Текст согласия"}
         </button>
         {" · "}
-        <a href={privacyHref} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+        <a href={privacyHref} target="_blank" rel="noreferrer" className={cn(TARGET_24, "underline underline-offset-2")}>
           Политика обработки данных
         </a>
         {expanded && (

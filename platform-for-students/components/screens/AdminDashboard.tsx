@@ -97,8 +97,8 @@ export function AdminDashboard({
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-eyebrow uppercase text-accent-300">HR-менеджер</p>
-          <h1 className="mt-3 text-display-md text-paper">Панель управления</h1>
-          <p className="mt-2.5 text-[14px] text-paper-dim">
+          <h1 className="mt-3 text-headline text-paper">Панель управления</h1>
+          <p className="mt-2.5 text-small text-paper-dim">
             {stats.lastSync
               ? `Последняя синхронизация с CRM — ${timeAgo(stats.lastSync.startedAt)}`
               : 'Синхронизация с CRM ещё не запускалась'}
@@ -122,13 +122,13 @@ export function AdminDashboard({
           href="/admin/moderation"
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 transition-colors hover:bg-warn/[0.12]"
         >
-          <span className="flex items-center gap-2 text-[13.5px] text-paper">
+          <span className="flex items-center gap-2 text-small text-paper">
             <ShieldAlert className="size-4 shrink-0 text-warn" aria-hidden />
             Ждут проверки: {stats.moderation.companies}{' '}
             {plural(stats.moderation.companies, 'компания', 'компании', 'компаний')},{' '}
             {stats.moderation.vacancies} {plural(stats.moderation.vacancies, 'вакансия', 'вакансии', 'вакансий')}
           </span>
-          <span className="text-[13px] text-paper/80">Открыть очередь →</span>
+          <span className="text-small text-paper/80">Открыть очередь →</span>
         </Link>
       )}
 
@@ -151,8 +151,8 @@ export function AdminDashboard({
       {/* ---------- КТО В ПРОЦЕССЕ ---------- */}
       <section className="mt-10">
         <div className="mb-4 flex items-baseline justify-between">
-          <h2 className="text-display-sm text-paper">Кто в процессе</h2>
-          <span className="text-[13px] text-paper-faint">
+          <h2 className="text-title text-paper">Кто в процессе</h2>
+          <span className="text-small text-paper-faint">
             {stats.inProgress.length}{' '}
             {plural(stats.inProgress.length, 'человек', 'человека', 'человек')} между просмотром и
             выходом
@@ -161,7 +161,7 @@ export function AdminDashboard({
 
         {stats.inProgress.length === 0 ? (
           <div className="surface rounded-3xl px-6 py-12 text-center">
-            <p className="text-[14.5px] text-paper-dim">
+            <p className="text-body text-paper-dim">
               Сейчас никто не находится в активной стадии отбора.
             </p>
           </div>
@@ -173,16 +173,16 @@ export function AdminDashboard({
                   <div className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-paper/[0.02]">
                     <Avatar name={row.fullName} src={row.photoUrl} size={40} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14.5px] font-medium text-paper">{row.fullName}</p>
-                      <p className="truncate text-[12.5px] text-paper-faint">{row.university}</p>
+                      <p className="truncate text-body font-medium text-paper">{row.fullName}</p>
+                      <p className="truncate text-caption text-paper-faint">{row.university}</p>
                     </div>
                     <div className="hidden min-w-0 flex-1 sm:block">
-                      <p className="truncate text-[13.5px] text-paper-dim">{row.vacancyTitle}</p>
-                      <p className="truncate text-[12.5px] text-paper-faint">{row.company}</p>
+                      <p className="truncate text-small text-paper-dim">{row.vacancyTitle}</p>
+                      <p className="truncate text-caption text-paper-faint">{row.company}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <ApplicationStatusPill status={row.status} />
-                      <span className="text-[11.5px] text-paper-faint">{timeAgo(row.updatedAt)}</span>
+                      <span className="text-caption text-paper-faint">{timeAgo(row.updatedAt)}</span>
                     </div>
                   </div>
                 </Reveal>
@@ -214,7 +214,7 @@ export function AdminDashboard({
             filled={stats.swipes.right}
             rest={stats.swipes.left}
           />
-          <p className="mt-6 text-[12.5px] leading-relaxed text-paper-faint">
+          <p className="mt-6 text-caption leading-relaxed text-paper-faint">
             Доля свайпов вправо — качество подборки. Если она падает ниже 30%, лента показывает
             студентам не то: стоит проверить фильтры графика и города.
           </p>
@@ -225,7 +225,7 @@ export function AdminDashboard({
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <Panel title="Студенты по учреждениям" subtitle="Из справочника вузов и вписанные вручную">
           {stats.institutions.length === 0 ? (
-            <p className="text-[13.5px] text-paper-faint">Студентов пока нет.</p>
+            <p className="text-small text-paper-faint">Студентов пока нет.</p>
           ) : (
             <BarList
               items={stats.institutions.slice(0, 8).map((row) => ({
@@ -250,7 +250,7 @@ export function AdminDashboard({
           />
           <Link
             href="/admin/students"
-            className="mt-6 inline-flex text-[13px] text-paper/80 underline-offset-4 transition-colors hover:text-paper hover:underline"
+            className="mt-6 inline-flex text-small text-paper/80 underline-offset-4 transition-colors hover:text-paper hover:underline"
           >
             Открыть список студентов →
           </Link>
@@ -262,7 +262,7 @@ export function AdminDashboard({
         <Panel title="История синхронизаций" subtitle="Последние запуски">
           <AnimatePresence initial={false} mode="popLayout">
             {history.length === 0 ? (
-              <p className="text-[13.5px] text-paper-faint">Запусков ещё не было.</p>
+              <p className="text-small text-paper-faint">Запусков ещё не было.</p>
             ) : (
               <ul className="space-y-2">
                 {history.map((run) => (
@@ -288,16 +288,16 @@ export function AdminDashboard({
                       )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] text-paper">
+                      <p className="text-small text-paper">
                         {run.status === 'FAILED'
                           ? 'Сбой синхронизации'
                           : `Создано ${run.created} · обновлено ${run.updated} · снято ${run.deactivated}`}
                       </p>
-                      <p className="mt-0.5 text-[12px] text-paper-faint">
+                      <p className="mt-0.5 text-caption text-paper-faint">
                         {formatDateTime(run.startedAt)} · источник {run.source}
                       </p>
                       {run.error && (
-                        <p className="mt-1.5 text-[12px] leading-snug text-danger">{run.error}</p>
+                        <p className="mt-1.5 text-caption leading-snug text-danger">{run.error}</p>
                       )}
                     </div>
                   </motion.li>
@@ -313,7 +313,7 @@ export function AdminDashboard({
           icon={<ScrollText className="size-4" />}
         >
           {audit.length === 0 ? (
-            <p className="text-[13.5px] text-paper-faint">Событий пока нет.</p>
+            <p className="text-small text-paper-faint">Событий пока нет.</p>
           ) : (
             <ul className="max-h-[22rem] space-y-1.5 overflow-y-auto pr-1">
               {audit.map((entry) => (
@@ -322,13 +322,13 @@ export function AdminDashboard({
                   className="flex items-baseline justify-between gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-paper/[0.03]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[13px] text-paper-dim">{entry.action}</span>
-                    <span className="block truncate text-[11.5px] text-paper-faint">
+                    <span className="block truncate text-small text-paper-dim">{entry.action}</span>
+                    <span className="block truncate text-caption text-paper-faint">
                       {entry.actorLabel}
                       {entry.ip ? ` · ${entry.ip}` : ''}
                     </span>
                   </span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums text-paper-faint">
+                  <span className="shrink-0 text-caption tabular-nums text-paper-faint">
                     {timeAgo(entry.createdAt)}
                   </span>
                 </li>
@@ -355,11 +355,11 @@ function Kpi({
   return (
     <Reveal variants={fadeUp}>
       <div className="h-full bg-ink px-5 py-6 sm:px-6">
-        <p className="text-[clamp(1.75rem,3vw,2.25rem)] font-semibold leading-none tracking-[-0.04em] text-paper">
+        <p className="text-title font-semibold leading-none tracking-[-0.04em] text-paper">
           <CountUp to={value} suffix={suffix} />
         </p>
-        <p className="mt-2.5 text-[13px] text-paper-dim">{label}</p>
-        {note && <p className="mt-1 text-[11.5px] text-paper-faint">{note}</p>}
+        <p className="mt-2.5 text-small text-paper-dim">{label}</p>
+        {note && <p className="mt-1 text-caption text-paper-faint">{note}</p>}
       </div>
     </Reveal>
   );
@@ -388,11 +388,11 @@ function Panel({
     >
       <header className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h3 className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.015em] text-paper">
+          <h3 className="flex items-center gap-2 text-body font-semibold tracking-[-0.015em] text-paper">
             {icon}
             {title}
           </h3>
-          {subtitle && <p className="mt-1 text-[12.5px] text-paper-faint">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-caption text-paper-faint">{subtitle}</p>}
         </div>
       </header>
       {children}

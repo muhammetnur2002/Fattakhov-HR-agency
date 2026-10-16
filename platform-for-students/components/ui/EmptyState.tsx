@@ -28,8 +28,8 @@ export function EmptyState({
       className="glass mx-auto flex max-w-lg flex-col items-center rounded-4xl px-8 py-16 text-center"
     >
       <CubeMark className="h-16 w-16 text-paper/20" />
-      <h2 className="mt-8 text-display-sm text-paper">{title}</h2>
-      <p className="mt-3 max-w-[38ch] text-[14.5px] leading-relaxed text-paper-dim">{description}</p>
+      <h2 className="mt-8 text-title text-paper">{title}</h2>
+      <p className="mt-3 max-w-[38ch] text-body leading-relaxed text-paper-dim">{description}</p>
       {action && <div className="mt-8">{action}</div>}
     </motion.div>
   );

@@ -205,9 +205,10 @@ test.describe("фокус после окна", () => {
     await expect(opener).toBeFocused();
   });
 
-  test("«+ Задание» в календаре: Escape возвращает фокус на кнопку", async ({ page }) => {
+  test("«Задача» в календаре: Escape возвращает фокус на кнопку", async ({ page }) => {
     await page.goto("/a/calendar");
-    const opener = page.getByRole("button", { name: "+ Задание" });
+    // Кнопка называлась «+ Задание»; календарь задач переименовал её в «Задача» (иконка «+» — декоративная)
+    const opener = page.getByRole("button", { name: "Задача", exact: true });
     await opener.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog")).toBeVisible();
@@ -269,7 +270,7 @@ for (const c of [
     test("чип-фильтр той же высоты и кегля, что Button size=sm", async ({ page }) => {
       await page.goto("/a/calendar");
       const chip = page.locator('main [data-slot="filter-chip"]:not([data-tall])').first();
-      const sm = page.getByRole("button", { name: "+ Задание" });
+      const sm = page.getByRole("button", { name: "Задача", exact: true });
       await expect(chip).toBeVisible();
       await expect(sm).toBeVisible();
 
@@ -279,6 +280,115 @@ for (const c of [
     });
   });
 }
+
+/**
+ * Ширина чипа при выборе не меняется (решение владельца, 16.10.2026): слот под галочку — 14 точек плюс зазор — занят у
+ * ВСЕХ чипов, у невыбранного он пуст. До правки выбор растил нажатый чип на 18 точек, прежний выбранный сужался на
+ * столько же, а чипы между ними сдвигались (замер до правки: ровно на эту ширину; на границе строки переносимого ряда
+ * сдвиг мог перестроить строки). Меряется живая раскладка: рамка каждого чипа ряда до и после выбора, положение —
+ * внутри ряда (прокрутка ряда и рост шапки страницы выше сдвигом не считаются: у /a/candidates шапка при выборе
+ * статуса на телефоне растёт на 40 точек из-за счётчика в подзаголовке, к чипам это не относится).
+ */
+type ChipBox = { label: string; x: number; y: number; w: number; h: number; mark: number };
+
+async function chipBoxes(group: Locator): Promise<{ chips: ChipBox[]; height: number }> {
+  return group.evaluate((g) => {
+    const gr = g.getBoundingClientRect();
+    return {
+      height: gr.height,
+      chips: [...g.querySelectorAll('[data-slot="filter-chip"]')].map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          label: (el.textContent ?? "").trim().replace(/\s+/g, " "),
+          x: r.x - gr.x + g.scrollLeft,
+          y: r.y - gr.y,
+          w: r.width,
+          h: r.height,
+          mark: el.querySelector('[data-slot="filter-chip-mark"]')?.getBoundingClientRect().width ?? 0,
+        };
+      }),
+    };
+  });
+}
+
+function expectSameBoxes(before: { chips: ChipBox[]; height: number }, after: { chips: ChipBox[]; height: number }, what: string) {
+  expect(after.chips.map((c) => c.label), `${what}: те же чипы`).toEqual(before.chips.map((c) => c.label));
+  expect(after.height, `${what}: высота ряда`).toBeCloseTo(before.height, 1);
+  before.chips.forEach((b, i) => {
+    const a = after.chips[i];
+    expect(a.w, `${what}: ширина «${b.label}»`).toBeCloseTo(b.w, 1);
+    expect(a.x, `${what}: сдвиг «${b.label}» по горизонтали`).toBeCloseTo(b.x, 1);
+    expect(a.y, `${what}: сдвиг «${b.label}» по вертикали`).toBeCloseTo(b.y, 1);
+    expect(a.h, `${what}: высота «${b.label}»`).toBeCloseTo(b.h, 1);
+    expect(a.mark, `${what}: слот «${b.label}»`).toBeGreaterThan(0);
+    expect(a.mark, `${what}: слот «${b.label}» не меняется`).toBeCloseTo(b.mark, 1);
+  });
+}
+
+for (const c of [
+  { name: "ноутбук", viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false },
+  { name: "телефон 375", viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true },
+  { name: "телефон 320", viewport: { width: 320, height: 700 }, hasTouch: true, isMobile: true },
+]) {
+  test.describe(`ширина чипа не меняется при выборе: ${c.name}`, () => {
+    test.use({ viewport: c.viewport, hasTouch: c.hasTouch, isMobile: c.isMobile });
+
+    test("чипы-ссылки «Все · Лиды · Активные»: выбор и ожидание не двигают соседей", async ({ page }) => {
+      await page.goto("/a/clients");
+      const group = page.getByRole("group", { name: "Статус клиента" });
+      await expect(group.locator('a[aria-current="true"]')).toContainText("Все");
+      const before = await chipBoxes(group);
+      expect(before.chips.length).toBe(3);
+      // Невыбранные чипы тоже со слотом: иначе выбор снова растил бы их на 18 точек
+      for (const chip of before.chips) expect(chip.mark, `слот «${chip.label}»`).toBeGreaterThan(10);
+
+      // Ожидание: ответ сервера задержан, на месте слота крутится индикатор, ширина прежняя
+      await page.route(/_rsc=/, async (route) => {
+        await new Promise((r) => setTimeout(r, 1500));
+        await route.continue();
+      });
+      await group.getByRole("link", { name: /Лиды/ }).click();
+      await expect(group.locator('[data-slot="filter-chip-pending"]')).toHaveCount(1, { timeout: 4000 });
+      expectSameBoxes(before, await chipBoxes(group), "ожидание перехода");
+
+      // Выбор: ответ пришёл, «Лиды» выбран, остальное на месте
+      await expect(group.locator('a[aria-current="true"]')).toContainText("Лиды", { timeout: 15_000 });
+      await expect(group.locator('[data-slot="filter-chip-pending"]')).toHaveCount(0);
+      expectSameBoxes(before, await chipBoxes(group), "после выбора");
+    });
+
+    test("ряд статусов кандидатов (восемь чипов, переносится): выбор не перестраивает строки", async ({ page }) => {
+      await page.goto("/a/candidates");
+      const group = page.getByRole("group", { name: "Статус кандидата" });
+      await expect(group.locator('a[aria-current="true"]')).toContainText("Все");
+      const before = await chipBoxes(group);
+      expect(before.chips.length).toBe(8);
+
+      await group.getByRole("link", { name: "Новый" }).click();
+      await expect(group.locator('a[aria-current="true"]')).toContainText("Новый", { timeout: 15_000 });
+      expectSameBoxes(before, await chipBoxes(group), "после выбора");
+    });
+  });
+}
+
+test.describe("ширина чипа не меняется при выборе: этапы воронки на телефоне (кнопки-вкладки)", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test("переключение этапа не сдвигает вкладки в ряду", async ({ page }) => {
+    await page.goto("/a/vacancies/vac_1");
+    const tabs = page.getByRole("tablist", { name: "Этапы воронки" });
+    await expect(tabs).toBeVisible();
+    const before = await chipBoxes(tabs);
+    expect(before.chips.length).toBeGreaterThan(2);
+    const selected = tabs.getByRole("tab", { selected: true });
+    await expect(selected).toHaveCount(1);
+    const other = tabs.getByRole("tab", { selected: false }).first();
+    const otherLabel = (await other.textContent()) ?? "";
+    await other.click();
+    await expect(tabs.getByRole("tab", { selected: true })).toContainText(otherLabel.replace(/\d+$/, ""));
+    expectSameBoxes(before, await chipBoxes(tabs), "после смены этапа");
+  });
+});
 
 test.describe("недоступное поле", () => {
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });

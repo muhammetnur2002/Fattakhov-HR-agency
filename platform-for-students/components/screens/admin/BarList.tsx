@@ -54,15 +54,15 @@ export function BarList({
             <div className="flex items-baseline justify-between gap-3">
               <span
                 className={cn(
-                  'text-[13px] transition-colors duration-200',
+                  'text-small transition-colors duration-200',
                   active ? 'text-paper' : 'text-paper-dim',
                 )}
               >
                 {item.label}
               </span>
-              <span className="shrink-0 text-[13px] tabular-nums text-paper">
+              <span className="shrink-0 text-small tabular-nums text-paper">
                 {item.value}
-                <span className="ml-1.5 text-[11.5px] text-paper-faint">{share}%</span>
+                <span className="ml-1.5 text-caption text-paper-faint">{share}%</span>
               </span>
             </div>
 
@@ -91,7 +91,7 @@ export function BarList({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.15 }}
-                className="pointer-events-none absolute -top-1 right-0 z-10 -translate-y-full rounded-lg border border-[var(--hairline-strong)] bg-graphite-850 px-2.5 py-1.5 text-[11.5px] text-paper shadow-lift"
+                className="pointer-events-none absolute -top-1 right-0 z-10 -translate-y-full rounded-lg border border-[var(--hairline-strong)] bg-graphite-850 px-2.5 py-1.5 text-caption text-paper shadow-lift"
               >
                 {item.value} {plural(item.value, ...unit)}
               </motion.span>
@@ -129,8 +129,8 @@ export function ShareBar({
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <span className="text-[13px] text-paper-dim">{label}</span>
-        <span className="text-[13px] tabular-nums text-paper">{total}</span>
+        <span className="text-small text-paper-dim">{label}</span>
+        <span className="text-small tabular-nums text-paper">{total}</span>
       </div>
 
       <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-paper/[0.06]">
@@ -143,7 +143,7 @@ export function ShareBar({
         />
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between text-[12px]">
+      <div className="mt-2.5 flex items-center justify-between text-caption">
         <span className="flex items-center gap-1.5 text-paper-dim">
           <span className="size-2 rounded-full bg-accent-400" aria-hidden />
           {filledLabel}: <span className="tabular-nums text-paper">{filled}</span>

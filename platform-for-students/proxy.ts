@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { HOME_BY_ROLE, SESSION_COOKIE, verifySession } from '@/lib/security/session';
+import { isNoindexPath } from '@/lib/seo-paths';
 import type { Role } from '@/lib/types';
 
 /**
@@ -31,13 +32,13 @@ export async function proxy(request: NextRequest) {
       url.pathname = '/login';
       // Куда вернуть после входа: иначе человек всегда попадает на витрину
       url.searchParams.set('next', pathname);
-      return withSecurityHeaders(NextResponse.redirect(url));
+      return withSecurityHeaders(NextResponse.redirect(url), pathname);
     }
     if (!rule.roles.includes(session.role)) {
       const url = request.nextUrl.clone();
       url.pathname = HOME_BY_ROLE[session.role];
       url.search = '';
-      return withSecurityHeaders(NextResponse.redirect(url));
+      return withSecurityHeaders(NextResponse.redirect(url), pathname);
     }
   }
 
@@ -54,13 +55,13 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = HOME_BY_ROLE[session.role];
     url.search = '';
-    return withSecurityHeaders(NextResponse.redirect(url));
+    return withSecurityHeaders(NextResponse.redirect(url), pathname);
   }
 
-  return withSecurityHeaders(NextResponse.next());
+  return withSecurityHeaders(NextResponse.next(), pathname);
 }
 
-function withSecurityHeaders(response: NextResponse): NextResponse {
+function withSecurityHeaders(response: NextResponse, pathname: string): NextResponse {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -75,6 +76,9 @@ function withSecurityHeaders(response: NextResponse): NextResponse {
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   );
+  // Кабинеты, вход и API не для выдачи. Заголовок, а не только <meta>: у ответов API и файлов
+  // разметки нет, а закрытый только в robots.txt адрес может остаться в выдаче голой ссылкой
+  if (isNoindexPath(pathname)) response.headers.set('X-Robots-Tag', 'noindex, nofollow');
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   }

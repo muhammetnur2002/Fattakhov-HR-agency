@@ -152,8 +152,8 @@ export function CompanyEditor({
       className="mx-auto w-full max-w-[42rem] pb-28"
     >
       <header className="mb-8">
-        <h1 className="text-display-md text-paper">Страница компании</h1>
-        <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
+        <h1 className="text-headline text-paper">Страница компании</h1>
+        <p className="mt-2 text-small leading-relaxed text-paper-dim">
           Её видит студент, прежде чем откликнуться. Живое описание и фото команды
           работают сильнее, чем строка «динамично развивающаяся компания».
         </p>
@@ -174,7 +174,7 @@ export function CompanyEditor({
             name={form.companyName || 'Компания'}
             onChange={(logoUrl) => patch({ logoUrl })}
           />
-          {errors.logoUrl && <p className="pt-2 text-[12.5px] text-danger">{errors.logoUrl}</p>}
+          {errors.logoUrl && <p className="pt-2 text-caption text-danger">{errors.logoUrl}</p>}
         </Section>
 
         <Section title="О компании">
@@ -209,10 +209,10 @@ export function CompanyEditor({
         </Section>
 
         <Section title="Фото">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Офис, команда, рабочее место — до {LIMITS.photos} фото.
           </p>
-          {errors.photos && <p className="mb-3 text-[12.5px] text-danger">{errors.photos}</p>}
+          {errors.photos && <p className="mb-3 text-caption text-danger">{errors.photos}</p>}
           {form.photos.length > 0 && (
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {form.photos.map((src, i) => (
@@ -260,7 +260,7 @@ export function CompanyEditor({
               onChange={(e) => patch({ website: e.target.value })}
             />
 
-            {errors.socials && <p className="text-[12.5px] text-danger">{errors.socials}</p>}
+            {errors.socials && <p className="text-caption text-danger">{errors.socials}</p>}
             {form.socials.map((link, i) => (
               <div
                 key={i}
@@ -379,7 +379,7 @@ export function CompanyEditor({
             className="page-x fixed inset-x-0 bottom-0 z-40 border-t border-[var(--hairline)] bg-ink/85 py-4 backdrop-blur-glass"
           >
             <div className="clear-theme-toggle mx-auto flex max-w-[42rem] items-center justify-between gap-4">
-              <span className="text-[13px] text-paper-dim">Есть несохранённые изменения</span>
+              <span className="text-small text-paper-dim">Есть несохранённые изменения</span>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
@@ -416,13 +416,13 @@ function ModerationBanner({
   if (status === 'APPROVED') {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4">
-        <p className="flex items-center gap-2 text-[13.5px] text-paper">
+        <p className="flex items-center gap-2 text-small text-paper">
           <ShieldCheck className="size-4 shrink-0 text-yes-glow" aria-hidden />
           Страница опубликована — её видят студенты.
         </p>
         <Link
           href={`/companies/${companyId}`}
-          className="inline-flex items-center gap-1.5 text-[13px] text-paper/80 underline-offset-4 hover:text-paper hover:underline"
+          className="inline-flex items-center gap-1.5 text-small text-paper/80 underline-offset-4 hover:text-paper hover:underline"
         >
           Открыть как студент
           <ExternalLink className="size-3.5" aria-hidden />
@@ -432,7 +432,7 @@ function ModerationBanner({
   }
   if (status === 'REJECTED') {
     return (
-      <div className="rounded-2xl border border-danger/35 bg-danger/[0.07] p-4 text-[13.5px] leading-relaxed">
+      <div className="rounded-2xl border border-danger/35 bg-danger/[0.07] p-4 text-small leading-relaxed">
         <p className="flex items-center gap-2 font-medium text-danger">
           <TriangleAlert className="size-4 shrink-0" aria-hidden />
           Агентство не одобрило компанию
@@ -443,7 +443,7 @@ function ModerationBanner({
     );
   }
   return (
-    <div className="rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13.5px] leading-relaxed">
+    <div className="rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed">
       <p className="flex items-center gap-2 font-medium text-warn">
         <Clock3 className="size-4 shrink-0" aria-hidden />
         Компания на проверке у агентства
@@ -461,8 +461,8 @@ function CrmEnterPanel() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--hairline)] bg-graphite-950/40 p-4">
       <div>
-        <p className="text-[13.5px] font-medium text-paper">Профиль объединён с CRM агентства</p>
-        <p className="mt-1 text-[12.5px] text-paper-dim">Тот же вход, без второго пароля.</p>
+        <p className="text-small font-medium text-paper">Профиль объединён с CRM агентства</p>
+        <p className="mt-1 text-caption text-paper-dim">Тот же вход, без второго пароля.</p>
       </div>
       <Button
         variant="outline"
@@ -492,7 +492,7 @@ function CrmLinkPanel({ requestedAt, note }: { requestedAt: string | null; note:
 
   if (requestedAt || justSent) {
     return (
-      <div className="rounded-2xl border border-accent-400/35 bg-accent-500/[0.08] p-4 text-[13.5px] leading-relaxed">
+      <div className="rounded-2xl border border-accent-400/35 bg-accent-500/[0.08] p-4 text-small leading-relaxed">
         <p className="flex items-center gap-2 font-medium text-accent-200">
           <Clock3 className="size-4 shrink-0" aria-hidden />
           Заявка на объединение с CRM на рассмотрении
@@ -527,13 +527,13 @@ function CrmLinkPanel({ requestedAt, note }: { requestedAt: string | null; note:
 
   return (
     <div className="rounded-2xl border border-[var(--hairline)] bg-graphite-950/40 p-4">
-      <p className="text-[13.5px] font-medium text-paper">Уже работаете с нами через CRM?</p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-paper-dim">
+      <p className="text-small font-medium text-paper">Уже работаете с нами через CRM?</p>
+      <p className="mt-1.5 text-small leading-relaxed text-paper-dim">
         Оставьте заявку — агентство объединит эту страницу с вашим профилем в CRM, данные заполнять
         заново не придётся.
       </p>
       {note && (
-        <p className="mt-3 rounded-xl border border-warn/30 bg-warn/[0.08] p-3 text-[12.5px] leading-relaxed text-warn">
+        <p className="mt-3 rounded-xl border border-warn/30 bg-warn/[0.08] p-3 text-caption leading-relaxed text-warn">
           По прошлой заявке: {note}
         </p>
       )}
@@ -554,7 +554,7 @@ function CrmLinkPanel({ requestedAt, note }: { requestedAt: string | null; note:
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="glass rounded-3xl p-6 sm:p-7">
-      <h2 className="mb-5 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
+      <h2 className="mb-5 text-caption uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
       {children}
     </section>
   );

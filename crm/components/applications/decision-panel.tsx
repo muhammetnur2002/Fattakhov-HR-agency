@@ -7,6 +7,7 @@ import { decideAction, type DecisionState } from "@/app/actions/decisions";
 import { Field } from "@/components/ui/field";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { panelClass } from "@/components/ui/panel";
 import {
@@ -26,7 +27,6 @@ import type {
   RejectionReason,
 } from "@/lib/generated/prisma/enums";
 import { useFormAction } from "@/lib/hooks/use-form-action";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function DecisionButton({
   label,
@@ -79,8 +79,8 @@ export function DecisionPanel({
   // отказа идёт через onSubmit: комментарий не должен пропадать, если сервер отказал
   const { state, fields, pending, formAction, formProps, messageRef } = useFormAction<DecisionState>(decideAction, {});
   const [rejecting, setRejecting] = useState(false);
-  // «Отказать» заменяет кнопки формой причины: фокус — на первое поле, после «Отмены» — на «Отказать»
-  const { triggerRef, focusRef, questionId } = useConfirmFocus(rejecting);
+  // «Отказать» заменяет кнопки формой причины: фокус — на первое поле, после «Отмены» — на «Отказать» (ConfirmBlock)
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [reason, setReason] = useState("");
   const lastDecision = useRef<ClientDecision | null>(null);
 
@@ -145,74 +145,71 @@ export function DecisionPanel({
         </div>
       )}
 
-      {rejecting && (
-        <form
-          {...formProps}
-          onSubmit={(event) => {
+      {/* Вопроса на экране нет — форма сама просит причину; для читалки она названа, чтобы фокус в поле не был «ниоткуда» */}
+      <ConfirmBlock
+        open={rejecting}
+        onOpenChange={setRejecting}
+        triggerRef={triggerRef}
+        formProps={{
+          ...formProps,
+          onSubmit: (event) => {
             lastDecision.current = "REJECT";
             formProps.onSubmit(event);
-          }}
-          aria-labelledby={questionId}
-          className={panelClass("plain", "space-y-4")}
+          },
+        }}
+        className={panelClass("plain", "space-y-4")}
+        questionHidden
+        question="Отказ кандидату: укажите причину"
+        confirmLabel={
+          <>
+            <ThumbsDown className="size-4" />
+            Отказать
+          </>
+        }
+        pendingLabel="Отказать"
+        confirmVariant="outline"
+        confirmClassName="gap-2"
+        size="default"
+        pending={pending}
+      >
+        <input type="hidden" name="applicationId" value={applicationId} />
+        <input type="hidden" name="decision" value="REJECT" />
+        <input type="hidden" name="rejectedBy" value="CLIENT" />
+
+        <Field
+          label="Почему не подходит"
+          id="rejectionReason"
+          error={fields.rejectionReason}
+          hint="Причина нужна не для отчётности: по ней рекрутер поймёт, кого искать дальше."
         >
-          {/* Вопроса на экране нет — форма сама просит причину; для читалки она названа, чтобы фокус в поле не был «ниоткуда» */}
-          <span id={questionId} className="sr-only">
-            Отказ кандидату: укажите причину
-          </span>
-          <input type="hidden" name="applicationId" value={applicationId} />
-          <input type="hidden" name="decision" value="REJECT" />
-          <input type="hidden" name="rejectedBy" value="CLIENT" />
+          {(control) => (
+            <Select name="rejectionReason" value={reason} onValueChange={setReason}>
+              <SelectTrigger {...control} className="w-full">
+                <SelectValue placeholder="Выберите причину" />
+              </SelectTrigger>
+              <SelectContent>
+                {REJECTION_REASONS_BY_SIDE.CLIENT.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {REJECTION_REASON_LABELS[code]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
 
-          <Field
-            label="Почему не подходит"
-            id="rejectionReason"
-            error={fields.rejectionReason}
-            hint="Причина нужна не для отчётности: по ней рекрутер поймёт, кого искать дальше."
-          >
-            {(control) => (
-              <Select name="rejectionReason" value={reason} onValueChange={setReason}>
-                <SelectTrigger ref={focusRef} {...control} className="w-full">
-                  <SelectValue placeholder="Выберите причину" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REJECTION_REASONS_BY_SIDE.CLIENT.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {REJECTION_REASON_LABELS[code]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </Field>
-
-          <Field
-            label={`Комментарий${reason === "OTHER" ? "" : " (необязательно)"}`}
-            error={fields.rejectionComment}
-          >
-            <Textarea
-              id="rejectionComment"
-              name="rejectionComment"
-              rows={2}
-              required={reason === "OTHER"}
-            />
-          </Field>
-
-          <div className="flex gap-2">
-            <DecisionButton
-              label="Отказать"
-              icon={<ThumbsDown className="size-4" />}
-              loading={pending}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setRejecting(false)}
-            >
-              Отмена
-            </Button>
-          </div>
-        </form>
-      )}
+        <Field
+          label={`Комментарий${reason === "OTHER" ? "" : " (необязательно)"}`}
+          error={fields.rejectionComment}
+        >
+          <Textarea
+            id="rejectionComment"
+            name="rejectionComment"
+            rows={2}
+            required={reason === "OTHER"}
+          />
+        </Field>
+      </ConfirmBlock>
 
       {currentDecision && !state.ok && (
         <p className="text-xs text-muted-foreground">

@@ -359,9 +359,10 @@ main[tabindex="-1"]:focus {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* Знак рубля — свой крошечный файл и первым в списке (app/layout.tsx), дальше Inter */
+  --font-sans: var(--font-ruble), var(--font-inter);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-ruble), var(--font-inter);
   --color-field: var(--field);
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
@@ -385,6 +386,7 @@ main[tabindex="-1"]:focus {
   --color-chart-1: var(--chart-1);
   --color-cal-sat: var(--cal-sat);
   --color-cal-sun: var(--cal-sun);
+  --color-cal-today: var(--cal-today);
   --color-cal-interview: var(--cal-interview);
   --color-ring: var(--ring);
   --color-input: var(--input);
@@ -456,6 +458,14 @@ main[tabindex="-1"]:focus {
   --cal-sat: #ef9f27;
   --cal-sun: #e24b4a;
   --cal-interview: rgb(46 139 120);
+  /*
+    Круг «сегодня» — сплошная заливка с белым числом. --cal-sun для этого
+    светел: белый на нём 3,93:1 (нужно 4,5:1 для текста, WCAG 1.4.3). Отдельный
+    токен темнее: 4,73:1 с белым, к карточке 4,2:1 в светлой теме и 3,7:1 в
+    тёмной. --cal-sun остаётся для рамки воскресенья и линии «сейчас»: там
+    нужно 3:1. Значения сверяет tests/contrast-tokens.test.ts.
+  */
+  --cal-today: #d03e3d;
 
   --background: rgb(238 237 234);
   --foreground: rgb(7 7 7);
@@ -858,6 +868,8 @@ main[tabindex="-1"]:focus {
     Галочка остаётся 16px на вид — крупная галочка выглядит чужой, —
     но ловит нажатие в квадрате 40px вокруг себя. Так делают системные
     списки iOS: видимый значок маленький, область касания — нет.
+    Отступ считается от внутренней границы кнопки (рамка 1px уже внутри
+    16px): -12px давали 14 + 24 = 38px, а не 40 (замер 15.10.2026) — нужно -13px.
   */
   :where(.cabinet-shell, .public-shell) [data-slot="checkbox"] {
     position: relative;
@@ -865,7 +877,7 @@ main[tabindex="-1"]:focus {
   :where(.cabinet-shell, .public-shell) [data-slot="checkbox"]::after {
     content: "";
     position: absolute;
-    inset: -12px;
+    inset: -13px;
   }
 
   :where(.cabinet-shell, .public-shell)

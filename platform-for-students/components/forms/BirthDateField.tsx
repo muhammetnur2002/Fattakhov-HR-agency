@@ -52,9 +52,22 @@ export function BirthDateField({
 
   return (
     <fieldset aria-describedby={error ? errorId : undefined}>
-      <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">Дата рождения</legend>
-      <div className="grid grid-cols-[minmax(0,5.5rem)_minmax(0,1fr)_minmax(0,6.75rem)] gap-2">
+      <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">Дата рождения</legend>
+      {/*
+        Ряд, который сам переносится: «День» и «Год» занимают столько, сколько нужно самому длинному
+        значению («31», «2008»), «Месяц» — всё остальное, но не меньше, чем нужно для «Сентябрь».
+        Раньше колонки были minmax(0,5.5rem)/1fr/minmax(0,6.75rem): день и год забирали свой максимум,
+        а месяц получал остаток — 32px на 320 и 71px на 375, название обрезалось («Апре»).
+        Не помещаются три в ряд (около 275px и уже) — «Год» уходит на вторую строку на всю ширину;
+        порядок в разметке не меняется, поэтому Tab идёт день → месяц → год и на узком экране.
+        Ширины в rem: настройка размера шрифта в браузере растягивает и текст, и поля.
+        От 640px (sm:) — прежний вид: день 5,5rem, год 6,75rem, зазор 8px и обычные отступы списка;
+        сжатие нужно только телефону; на ноутбуке и планшете места хватает, и вид поля не менялся.
+      */}
+      <div className="flex flex-wrap gap-x-1.5 gap-y-2 sm:gap-x-2">
         <SelectField
+          compact
+          className="shrink-0 grow-0 basis-[3.875rem] sm:basis-[5.5rem]"
           label="День"
           value={day}
           aria-invalid={!!error}
@@ -62,6 +75,10 @@ export function BirthDateField({
           options={[placeholder, ...Array.from({ length: maxDay }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))]}
         />
         <SelectField
+          compact
+          // grow 1000 против 1 у года: в одной строке остаток целиком уходит месяцу, а год,
+          // оставшийся на строке один, растягивается на всю ширину
+          className="shrink-0 grow-[1000] basis-[7.375rem]"
           label="Месяц"
           value={month}
           aria-invalid={!!error}
@@ -69,6 +86,8 @@ export function BirthDateField({
           options={[placeholder, ...MONTH_LABEL.map((label, i) => ({ value: String(i + 1), label }))]}
         />
         <SelectField
+          compact
+          className="shrink-0 grow basis-[5.125rem] sm:basis-[6.75rem]"
           label="Год"
           value={year}
           aria-invalid={!!error}
@@ -83,11 +102,11 @@ export function BirthDateField({
         />
       </div>
       {error ? (
-        <p id={errorId} className="pl-1 pt-1.5 text-[12.5px] leading-snug text-danger">
+        <p id={errorId} className="pl-1 pt-1.5 text-caption leading-snug text-danger">
           {error}
         </p>
       ) : (
-        <p className="pl-1 pt-1.5 text-[12.5px] leading-snug text-paper-faint">
+        <p className="pl-1 pt-1.5 text-caption leading-snug text-paper-faint">
           Регистрация — с {MIN_AGE} лет. Работодатель видит только возраст, не дату.
         </p>
       )}

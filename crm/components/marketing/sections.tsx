@@ -6,7 +6,9 @@ import {
   StaggerItem,
 } from "@/components/motion/primitives";
 import { ScrollRegion } from "@/components/ui/scroll-region";
+import { FAQ_ITEMS } from "@/lib/marketing/faq";
 import { SECTION_HEAD_GAP, SITE_CONTAINER, SPLIT_EVEN, SPLIT_MAIN } from "./layout";
+import { RibbedTexture } from "./texture";
 
 /**
  * Заголовок раздела.
@@ -125,10 +127,7 @@ export function Section({
   return (
     <section id={id} className={`relative overflow-clip ${bg}`}>
       {tone === "dark" && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
-        />
+        <RibbedTexture className="opacity-20" />
       )}
       <div className={`relative ${column} ${padding}`}>{children}</div>
     </section>
@@ -304,8 +303,13 @@ export function Responsibility() {
  * Без придуманных цифр: на сайте сознательно нет ни сроков, ни числа
  * закрытий, потому что подтверждённых данных пока нет. Вместо них
  * задача и результат словами, и это честнее, чем «закрываем за 14 дней».
+ *
+ * Имя клиента — h3 под h2 раздела (на главной). На странице /cases раздела с
+ * заголовком нет: сразу под h1 идут сами кейсы, и h3 там пропускал уровень
+ * (h1 → h3, проверка сайта 11.10.2026). Поэтому страница передаёт `headingAs="h2"`:
+ * кейс — раздел страницы. Размер шрифта от уровня не зависит, он в классах.
  */
-export function Cases() {
+export function Cases({ headingAs: Heading = "h3" }: { headingAs?: "h2" | "h3" } = {}) {
   const cases = [
     {
       kind: "IT-компания",
@@ -360,9 +364,9 @@ export function Cases() {
                 {/* Крупно: имя клиента здесь работает как доказательство,
                     и мелким кеглем его никто не заметит. Но не крупнее h2 раздела
                     (28 на телефоне, 45 на ноутбуке): было text-4xl — 36 при h2 28 */}
-                <h3 className="mt-3 text-3xl leading-[1.05] font-semibold tracking-tight text-balance md:text-4xl">
+                <Heading className="mt-3 text-3xl leading-[1.05] font-semibold tracking-tight text-balance md:text-4xl">
                   {c.name}
-                </h3>
+                </Heading>
                 <p
                   className={`mt-4 text-lg leading-relaxed ${
                     тёмный ? "text-white/70" : "text-muted-foreground"
@@ -529,26 +533,14 @@ export function Comparison() {
   );
 }
 
-/** Вопросы и ответы. Раскрытие штатным disclosure, без своей механики. */
+/**
+ * Вопросы и ответы. Раскрытие штатным disclosure, без своей механики.
+ *
+ * Список лежит в `lib/marketing/faq.ts` и тот же уходит в разметку FAQPage:
+ * копия здесь разошлась бы с ней по словам.
+ */
 export function Faq() {
-  const items = [
-    {
-      q: "Чем подписка отличается от обычного агентства?",
-      a: "Мы резервируем для вас мощность команды и ведём несколько вакансий параллельно. Платите фиксированную сумму в месяц, а не гонорар за каждое закрытие.",
-    },
-    {
-      q: "Что считается активным слотом?",
-      a: "Один слот это одна вакансия, по которой сейчас идёт активный поиск. После закрытия или паузы слот передаётся следующей позиции.",
-    },
-    {
-      q: "Можно ли начать с одной вакансии?",
-      a: "Да, но для одной точечной позиции разовый подбор иногда экономичнее. Сравним оба варианта на диагностике и скажем прямо, что выгоднее.",
-    },
-    {
-      q: "Кто общается с кандидатами?",
-      a: "Команда агентства ведёт первичную коммуникацию и координацию. Руководитель подключается на согласованных этапах.",
-    },
-  ];
+  const items = FAQ_ITEMS;
 
   return (
     <div className="divide-y overflow-hidden rounded-xl border bg-card">

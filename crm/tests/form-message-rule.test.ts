@@ -161,8 +161,12 @@ describe("форма с полями не теряет набранное", () =
     for (const file of FILES) {
       const tree = jsxTree(read(file));
       const n = tree.filter(
-        // `action={`${base}/search`}` — адрес, а не функция: строку React не вызывает, поля она не стирает
-        (x) => /^(motion\.)?form$/.test(x.name) && /\baction=\{(?!\s*[`"'])/.test(x.text) && hasTextControl(x),
+        (x) =>
+          // `action={`${base}/search`}` — адрес, а не функция: строку React не вызывает, поля она не стирает
+          ((/^(motion\.)?form$/.test(x.name) && /\baction=\{(?!\s*[`"'])/.test(x.text)) ||
+            // ConfirmBlock рисует <form> сам: его `formProps={{ action }}` — та же форма с тем же сбросом полей
+            (x.name === "ConfirmBlock" && /\bformProps=\{\{\s*action\b/.test(x.text))) &&
+          hasTextControl(x),
       ).length;
       if (n > 0) found[file] = n;
     }

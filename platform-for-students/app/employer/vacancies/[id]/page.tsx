@@ -37,14 +37,14 @@ export default async function EditVacancyPage(props: Props) {
         <div className="mx-auto w-full max-w-[46rem]">
           <Link
             href="/employer/vacancies"
-            className="inline-flex items-center gap-1.5 text-[13px] text-paper-faint transition-colors hover:text-paper"
+            className="inline-flex items-center gap-1.5 text-small text-paper-faint transition-colors hover:text-paper"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             Все вакансии
           </Link>
           <section className="glass mt-4 rounded-3xl p-6 sm:p-8">
-            <h1 className="break-words text-display-sm text-paper">{vacancy.title}</h1>
-            <p className="mt-3 text-[14.5px] leading-relaxed text-paper-dim">
+            <h1 className="break-words text-title text-paper">{vacancy.title}</h1>
+            <p className="mt-3 text-body leading-relaxed text-paper-dim">
               Эту вакансию ведёт агентство через CRM: правку отсюда перезаписала бы следующая
               синхронизация. Чтобы изменить вакансию или снять её, напишите своему менеджеру в агентстве.
             </p>

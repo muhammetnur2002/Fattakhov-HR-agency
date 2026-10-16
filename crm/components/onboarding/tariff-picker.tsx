@@ -7,7 +7,7 @@ import { acceptTariffAction } from "@/app/(onboarding)/onboarding/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Card, CardContent } from "@/components/ui/card";
-import { SelectionCheck } from "@/components/ui/filter-chip";
+import { SelectionSlot } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/format-money";
@@ -172,8 +172,9 @@ function TariffCard({
             <div className="font-medium">{preset.title}</div>
             <div className="text-xs text-muted-foreground">{preset.bestFor}</div>
           </div>
-          {/* Выбор — не только цвет рамки: галочка видна и без различения оттенков */}
-          {selected && <SelectionCheck />}
+          {/* Выбор — не только цвет рамки: галочка видна и без различения оттенков. Место под неё занято
+              и у невыбранной карточки: иначе название от галочки переносится, и карточка прыгает на строку */}
+          <SelectionSlot selected={selected} />
         </div>
 
         <div>

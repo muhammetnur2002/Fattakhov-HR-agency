@@ -10,7 +10,8 @@ import {
   useState,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useReducedMotionSafe } from '@/lib/hooks/useReducedMotionSafe';
 import { CubeMark } from '@/components/brand/CubeMark';
 import { easeInOutQuint } from '@/lib/motion';
 
@@ -37,7 +38,7 @@ export function useCurtainNav() {
 export function RouteCurtain({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionSafe();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const target = useRef<string | null>(null);

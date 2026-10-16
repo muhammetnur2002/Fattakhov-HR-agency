@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Building2, Check, Eye, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TextAreaField } from '@/components/ui/Field';
@@ -101,9 +100,7 @@ export function ModerationQueue({
           title="Очередь пуста"
           description="Новые компании и вакансии из кабинетов появятся здесь. До вашего решения студенты их не видят."
           action={
-            <Link href="/admin">
-              <Button variant="outline">На панель</Button>
-            </Link>
+            <ButtonLink href="/admin" variant="outline">На панель</ButtonLink>
           }
         />
       </>
@@ -117,7 +114,7 @@ export function ModerationQueue({
       <section>
         <SectionTitle title="Компании" count={companies.length} />
         {companies.length === 0 ? (
-          <p className="text-[13.5px] text-paper-faint">Новых компаний нет.</p>
+          <p className="text-small text-paper-faint">Новых компаний нет.</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             {companies.map((company) => (
@@ -135,7 +132,7 @@ export function ModerationQueue({
       <section className="mt-10">
         <SectionTitle title="Вакансии" count={vacancies.length} />
         {vacancies.length === 0 ? (
-          <p className="text-[13.5px] text-paper-faint">Новых вакансий нет.</p>
+          <p className="text-small text-paper-faint">Новых вакансий нет.</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             {vacancies.map((item) => (
@@ -160,8 +157,8 @@ function Header() {
   return (
     <header className="mb-8">
       <p className="text-eyebrow uppercase text-accent-300">HR-менеджер</p>
-      <h1 className="mt-3 text-display-md text-paper">Модерация</h1>
-      <p className="mt-2.5 max-w-[60ch] text-[14px] leading-relaxed text-paper-dim">
+      <h1 className="mt-3 text-headline text-paper">Модерация</h1>
+      <p className="mt-2.5 max-w-[60ch] text-small leading-relaxed text-paper-dim">
         Компании, которые зарегистрировались сами, и вакансии из их кабинетов. До вашего решения
         студенты не видят ни то, ни другое.
       </p>
@@ -172,8 +169,8 @@ function Header() {
 function SectionTitle({ title, count }: { title: string; count: number }) {
   return (
     <div className="mb-4 flex items-baseline gap-3">
-      <h2 className="text-display-sm text-paper">{title}</h2>
-      <span className="text-[13px] tabular-nums text-paper-faint">{count}</span>
+      <h2 className="text-title text-paper">{title}</h2>
+      <span className="text-small tabular-nums text-paper-faint">{count}</span>
     </div>
   );
 }
@@ -195,15 +192,15 @@ function CompanyCard({
       <div className="flex min-w-0 items-start gap-4">
         <Avatar name={company.companyName} src={company.logoUrl} size={52} rounded="square" />
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-[16.5px] font-semibold tracking-[-0.02em] text-paper">
+          <h3 className="break-words text-body font-semibold tracking-[-0.02em] text-paper">
             {company.companyName}
           </h3>
-          <p className="mt-1 text-[13px] text-paper-faint">{meta || 'Отрасль и город не указаны'}</p>
+          <p className="mt-1 text-small text-paper-faint">{meta || 'Отрасль и город не указаны'}</p>
         </div>
-        <span className="shrink-0 text-[12px] text-paper-faint">{timeAgo(company.createdAt)}</span>
+        <span className="shrink-0 text-caption text-paper-faint">{timeAgo(company.createdAt)}</span>
       </div>
 
-      <dl className="mt-4 space-y-1.5 text-[13.5px]">
+      <dl className="mt-4 space-y-1.5 text-small">
         <div className="flex flex-wrap gap-x-2">
           <dt className="text-paper-faint">Контакт:</dt>
           <dd className="min-w-0 break-words text-paper-dim">{company.contactName}</dd>
@@ -277,21 +274,21 @@ function CompanyCard({
           {!company.inn && <Tag tone="hot">Нет ИНН</Tag>}
         </div>
       )}
-      <p className="mt-3 text-[12.5px] leading-relaxed text-paper-faint">
+      <p className="mt-3 text-caption leading-relaxed text-paper-faint">
         Сверьте ИНН на сайте ФНС: компания действующая, название совпадает. Если о компании ничего
         не нашлось — позвоните по телефону.
       </p>
 
       {company.about ? (
-        <p className="mt-4 line-clamp-4 whitespace-pre-line break-words text-[14px] leading-relaxed text-paper-dim">
+        <p className="mt-4 line-clamp-4 whitespace-pre-line break-words text-small leading-relaxed text-paper-dim">
           {company.about}
         </p>
       ) : (
-        <p className="mt-4 text-[13.5px] text-paper-faint">Страница компании пока не заполнена.</p>
+        <p className="mt-4 text-small text-paper-faint">Страница компании пока не заполнена.</p>
       )}
 
       {company.pendingVacancies > 0 && (
-        <p className="mt-3 text-[12.5px] text-paper-faint">
+        <p className="mt-3 text-caption text-paper-faint">
           На проверке {company.pendingVacancies}{' '}
           {plural(company.pendingVacancies, 'вакансия', 'вакансии', 'вакансий')} этой компании
         </p>
@@ -320,10 +317,10 @@ function VacancyCard({
     <article className="surface rounded-3xl p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-[16.5px] font-semibold tracking-[-0.02em] text-paper">
+          <h3 className="break-words text-body font-semibold tracking-[-0.02em] text-paper">
             {vacancy.title}
           </h3>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-paper-dim">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-small text-paper-dim">
             <Building2 className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
             <span className="min-w-0 break-words">{vacancy.company}</span>
             {!companyReady && (
@@ -331,17 +328,17 @@ function VacancyCard({
             )}
           </p>
         </div>
-        <span className="shrink-0 text-[12px] text-paper-faint">{timeAgo(item.submittedAt)}</span>
+        <span className="shrink-0 text-caption text-paper-faint">{timeAgo(item.submittedAt)}</span>
       </div>
 
-      <p className="mt-3 text-[14px] text-accent-200">
+      <p className="mt-3 text-small text-accent-200">
         {formatSalary(vacancy.salaryFrom, vacancy.salaryTo)}
         <span className="text-paper-faint">
           {' '}
           · {vacancy.city} · {EMPLOYMENT_TYPE_LABEL[vacancy.employmentType]}
         </span>
       </p>
-      <p className="mt-3 line-clamp-3 break-words text-[14px] leading-relaxed text-paper-dim">{vacancy.summary}</p>
+      <p className="mt-3 line-clamp-3 break-words text-small leading-relaxed text-paper-dim">{vacancy.summary}</p>
 
       <Button variant="ghost" size="sm" className="-ml-2 mt-3" icon={<Eye />} onClick={onPreview}>
         Открыть карточку, как у студента
@@ -434,7 +431,7 @@ function DecisionBar({
           Отклонить
         </Button>
       </div>
-      {approveBlockedReason && <p className="mt-2 text-[12.5px] text-paper-faint">{approveBlockedReason}</p>}
+      {approveBlockedReason && <p className="mt-2 text-caption text-paper-faint">{approveBlockedReason}</p>}
     </div>
   );
 }

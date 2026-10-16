@@ -111,11 +111,10 @@ export function VacancyDetail({
 
             <div className="relative overflow-y-auto overscroll-contain px-6 pb-6 pt-6 sm:px-8">
               {/*
-                Имя и город компании лежат на companyGradient (см. выше) —
-                он всегда тёмный независимо от темы страницы, поэтому текст
-                здесь тоже фиксированный светлый, а не paper: тот в светлой
-                теме становится тёмным и пропадает на этой подложке (тот же
-                баг, что был с инициалами в Avatar).
+                Имя и город компании лежат на полупрозрачном слое companyGradient
+                поверх листа (см. выше): в светлой теме он светло-серый, и белый
+                текст на нём давал 1,8–2,7:1. Цвет — роль paper (светлый в тёмной
+                теме, тёмный в светлой), как у названия вакансии ниже.
               */}
               <header className="flex items-start gap-4">
                 <Avatar name={vacancy.company} src={vacancy.companyLogoUrl} size={52} rounded="square" />
@@ -123,14 +122,14 @@ export function VacancyDetail({
                   {vacancy.companyId ? (
                     <Link
                       href={`/companies/${vacancy.companyId}`}
-                      className="text-[14px] font-medium text-white/90 underline-offset-4 transition-colors hover:text-white hover:underline"
+                      className="text-small font-medium text-paper underline-offset-4 transition-colors hover:underline"
                     >
                       {vacancy.company}
                     </Link>
                   ) : (
-                    <p className="text-[14px] font-medium text-white/90">{vacancy.company}</p>
+                    <p className="text-small font-medium text-paper">{vacancy.company}</p>
                   )}
-                  <p className="mt-1 flex items-center gap-1.5 text-[13px] text-white/60">
+                  <p className="mt-1 flex items-center gap-1.5 text-small text-paper-dim">
                     <MapPin className="size-3.5" aria-hidden />
                     {vacancy.city}
                     {vacancy.district ? `, ${vacancy.district}` : ''}
@@ -139,11 +138,11 @@ export function VacancyDetail({
                 {vacancy.matchScore !== null && <MatchRing value={vacancy.matchScore} size={52} />}
               </header>
 
-              <h2 className="mt-6 text-display-sm text-paper">{vacancy.title}</h2>
+              <h2 className="mt-6 text-title text-paper">{vacancy.title}</h2>
 
-              <p className="mt-3 text-[19px] font-medium text-accent-200">
+              <p className="mt-3 text-sub font-medium text-accent-200">
                 {formatSalary(vacancy.salaryFrom, vacancy.salaryTo)}
-                <span className="ml-2 text-[14px] font-normal text-paper-faint">
+                <span className="ml-2 text-small font-normal text-paper-faint">
                   {PERIOD_LABEL[vacancy.salaryPeriod]}
                 </span>
               </p>
@@ -163,13 +162,13 @@ export function VacancyDetail({
 
               {vacancy.matchReasons.length > 0 && (
                 <div className="mt-6 rounded-2xl border border-accent-500/25 bg-accent-500/[0.07] p-4">
-                  <p className="flex items-center gap-2 text-[12px] uppercase tracking-[0.14em] text-accent-200">
+                  <p className="flex items-center gap-2 text-caption uppercase tracking-[0.14em] text-accent-200">
                     <Sparkles className="size-3.5" aria-hidden />
                     Почему подходит вам
                   </p>
                   <ul className="mt-2.5 space-y-1.5">
                     {vacancy.matchReasons.map((reason) => (
-                      <li key={reason} className="text-[13.5px] leading-snug text-paper-dim">
+                      <li key={reason} className="text-small leading-snug text-paper-dim">
                         {reason}
                       </li>
                     ))}
@@ -179,12 +178,12 @@ export function VacancyDetail({
 
               {vacancy.address && (
                 <div className="mt-6 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--hairline)] bg-graphite-900/45 p-4">
-                  <p className="flex min-w-0 items-start gap-2 text-[14px] leading-snug text-paper">
+                  <p className="flex min-w-0 items-start gap-2 text-small leading-snug text-paper">
                     <MapPin className="mt-0.5 size-4 shrink-0 text-accent-300" aria-hidden />
                     <span className="min-w-0 break-words">
                       {vacancy.city}, {vacancy.address}
                       {vacancy.addressDetails && (
-                        <span className="block text-[12.5px] text-paper-faint">{vacancy.addressDetails}</span>
+                        <span className="block text-caption text-paper-faint">{vacancy.addressDetails}</span>
                       )}
                     </span>
                   </p>
@@ -192,14 +191,14 @@ export function VacancyDetail({
                     href={mapUrl(vacancy.city, vacancy.address)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 text-[13px] text-accent-200 underline-offset-4 transition-colors hover:text-paper hover:underline"
+                    className="shrink-0 text-small text-accent-200 underline-offset-4 transition-colors hover:text-paper hover:underline"
                   >
                     Открыть на карте
                   </a>
                 </div>
               )}
 
-              <p className="mt-6 text-[15px] leading-relaxed text-paper-dim">{vacancy.summary}</p>
+              <p className="mt-6 text-body leading-relaxed text-paper-dim">{vacancy.summary}</p>
 
               <Section title="Что делать" items={vacancy.responsibilities} icon={<Check className="size-3.5" />} />
               <Section title="Что нужно от вас" items={vacancy.requirements} icon={<Check className="size-3.5" />} />
@@ -207,7 +206,7 @@ export function VacancyDetail({
               {vacancy.team && (
                 <section className="mt-7">
                   <h3 className="text-eyebrow uppercase text-paper-faint">С кем будете работать</h3>
-                  <p className="mt-3 flex items-start gap-2.5 text-[14.5px] leading-relaxed text-paper-dim">
+                  <p className="mt-3 flex items-start gap-2.5 text-body leading-relaxed text-paper-dim">
                     <Users className="mt-1 size-3.5 shrink-0 text-accent-300" aria-hidden />
                     <span className="min-w-0 whitespace-pre-line break-words">{vacancy.team}</span>
                   </p>
@@ -238,14 +237,14 @@ export function VacancyDetail({
                   href={vacancy.videoUrl}
                   target="_blank"
                   rel="noopener noreferrer nofollow ugc"
-                  className="mt-7 inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3.5 py-2.5 text-[13.5px] text-paper/85 transition-colors hover:border-paper/25 hover:text-paper"
+                  className="mt-7 inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3.5 py-2.5 text-small text-paper/85 transition-colors hover:border-paper/25 hover:text-paper"
                 >
                   <PlayCircle className="size-4 shrink-0" aria-hidden />
                   Видео о работе
                 </a>
               )}
 
-              <div className="mt-7 flex items-center gap-2 text-[13px] text-paper-faint">
+              <div className="mt-7 flex items-center gap-2 text-small text-paper-faint">
                 <Clock className="size-3.5 shrink-0" aria-hidden />
                 <span>
                   Смены: {vacancy.shiftDays.map((d) => WEEKDAY_LABEL[d]).join(', ')}
@@ -302,7 +301,7 @@ function Section({
       <h3 className="text-eyebrow uppercase text-paper-faint">{title}</h3>
       <ul className="mt-3 space-y-2.5">
         {items.map((item) => (
-          <li key={item} className="flex items-start gap-2.5 text-[14.5px] leading-relaxed text-paper-dim">
+          <li key={item} className="flex items-start gap-2.5 text-body leading-relaxed text-paper-dim">
             <span className="mt-1 shrink-0 text-accent-300">{icon}</span>
             {item}
           </li>

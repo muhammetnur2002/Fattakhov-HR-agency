@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { cn, companyGradient, initials } from '@/lib/utils';
 
 /**
+ * Размер инициалов — ступень шкалы шрифтов, а не доля от размера аватара: доля (size × 0,34)
+ * давала 13,6 / 15 / 15,6 / 17,7 px — размеры, которых больше нигде нет (README, «Шкала шрифтов»).
+ */
+function initialsStep(size: number): string {
+  if (size < 36) return 'text-caption';
+  if (size < 48) return 'text-small';
+  if (size < 64) return 'text-body';
+  return 'text-sub';
+}
+
+/**
  * Аватар человека или компании.
  *
  * Пока фото нет (а у студента его чаще всего нет), показываются инициалы
@@ -54,10 +65,7 @@ export function Avatar({
           className="size-full object-cover"
         />
       ) : (
-        <span
-          className="font-medium leading-none text-white/90"
-          style={{ fontSize: Math.max(11, size * 0.34) }}
-        >
+        <span className={cn('font-medium leading-none text-white/90', initialsStep(size))}>
           {initials(name)}
         </span>
       )}

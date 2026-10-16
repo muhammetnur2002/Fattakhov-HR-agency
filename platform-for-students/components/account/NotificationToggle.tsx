@@ -68,10 +68,10 @@ export function NotificationToggle({
   return (
     <div className={cn('flex items-start justify-between gap-4', bordered && 'border-t border-[var(--hairline)] pt-4')}>
       <div className="min-w-0">
-        <p id={`notify-email-${audience}`} className="text-[13.5px] text-paper">
+        <p id={`notify-email-${audience}`} className="text-small text-paper">
           Напоминания на почту
         </p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-paper-faint">{COPY[audience]}</p>
+        <p className="mt-1 text-caption leading-relaxed text-paper-faint">{COPY[audience]}</p>
       </div>
       <button
         type="button"

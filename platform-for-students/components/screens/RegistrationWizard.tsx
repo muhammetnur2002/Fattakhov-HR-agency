@@ -18,6 +18,7 @@ import { ScheduleFields } from '@/components/forms/ScheduleFields';
 import { SkillsInput } from '@/components/forms/SkillsInput';
 import { ConsentChecks } from '@/components/legal/ConsentChecks';
 import { useCurtainNav } from '@/components/motion/RouteCurtain';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { durations, easeOutExpo, springSoft, stepVariants } from '@/lib/motion';
 import { PILOT_CITY } from '@/lib/pilot';
 import { passwordProblem } from '@/lib/password-policy';
@@ -287,9 +288,14 @@ export function RegistrationWizard() {
     <div className="flex min-h-dvh flex-col">
       <header className="page-x mx-auto flex h-[var(--header-h)] w-full max-w-2xl items-center justify-between">
         <Logo href="/" />
-        <span className="text-[12.5px] tabular-nums text-paper-faint">
-          Шаг {step + 1} из {STEP_META.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-caption tabular-nums text-paper-faint">
+            Шаг {step + 1} из {STEP_META.length}
+          </span>
+          {/* Кнопка темы — здесь, а не плавающей в углу: ряд «Назад / Далее» стоит у нижнего края,
+              и угловая кнопка закрывала его на коротких экранах при любой прокрутке */}
+          <ThemeToggle inline />
+        </div>
       </header>
 
       <div className="page-x mx-auto w-full max-w-2xl">
@@ -304,7 +310,7 @@ export function RegistrationWizard() {
         </div>
       </div>
 
-      <main className="page-x mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center pb-12 pt-10">
+      <main className="page-x mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center overflow-x-clip pb-12 pt-10">
         <AnimatePresence mode="wait" custom={direction} initial={false}>
           {done ? (
             <SuccessState key="done" name={form.fullName} />
@@ -339,13 +345,13 @@ export function RegistrationWizard() {
             >
               <motion.h1
                 variants={stepVariants}
-                className="text-display-md text-paper"
+                className="text-headline text-paper"
               >
                 {meta.title}
               </motion.h1>
-              <p className="mt-2.5 text-[14.5px] text-paper-dim">{meta.hint}</p>
+              <p className="mt-2.5 text-body text-paper-dim">{meta.hint}</p>
               {restored && (
-                <p role="status" className="mt-3 text-[13px] text-paper-faint">
+                <p role="status" className="mt-3 text-small text-paper-faint">
                   Мы сохранили ваши ответы и вернули вас на этот шаг. Пароль и согласия нужно ввести заново.
                 </p>
               )}
@@ -400,7 +406,7 @@ export function RegistrationWizard() {
             />
 
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Пол
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -432,7 +438,7 @@ export function RegistrationWizard() {
               name={form.fullName || 'Профиль'}
               onChange={(photoUrl) => patch({ photoUrl })}
             />
-            <p className="text-center text-[13px] text-paper-faint">
+            <p className="text-center text-small text-paper-faint">
               Шаг можно пропустить — фото добавляется и позже.
             </p>
           </div>
@@ -452,7 +458,7 @@ export function RegistrationWizard() {
         return (
           <div className="space-y-7">
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Что ищете
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -472,16 +478,16 @@ export function RegistrationWizard() {
                   </Chip>
                 ))}
               </div>
-              <p className="pt-3 text-[12.5px] leading-snug text-paper-faint">
+              <p className="pt-3 text-caption leading-snug text-paper-faint">
                 Проекты, достижения и остальное портфолио — в разделе «Профиль» после регистрации.
               </p>
             </fieldset>
             <div>
-              <p className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <p className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Навыки
               </p>
               <SkillsInput value={form.skills} onChange={(skills) => patch({ skills })} />
-              {errors.skills && <p className="pt-2 text-[12.5px] text-danger">{errors.skills}</p>}
+              {errors.skills && <p className="pt-2 text-caption text-danger">{errors.skills}</p>}
             </div>
 
             <TextAreaField
@@ -586,18 +592,18 @@ function SuccessState({ name }: { name: string }) {
         />
       </motion.svg>
 
-      <h2 className="mt-8 text-display-sm text-paper">Профиль создан</h2>
-      <p className="mt-3 max-w-[36ch] text-[15px] leading-relaxed text-paper-dim">
+      <h2 className="mt-8 text-title text-paper">Профиль создан</h2>
+      <p className="mt-3 max-w-[36ch] text-body leading-relaxed text-paper-dim">
         {name ? `${name.split(' ')[0]}, п` : 'П'}одборка уже собирается под ваш график. Сейчас
         откроем ленту.
       </p>
-      <p className="mt-3 max-w-[40ch] text-[13.5px] leading-relaxed text-paper-faint">
+      <p className="mt-3 max-w-[40ch] text-small leading-relaxed text-paper-faint">
         Чтобы отклики уходили работодателям, загрузите в профиле справку об обучении —
         HR-менеджер подтвердит учёбу.
       </p>
       <Link
         href="/feed"
-        className="mt-6 text-[13px] text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
+        className="mt-6 text-small text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
       >
         Перейти сразу
       </Link>

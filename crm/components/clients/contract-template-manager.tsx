@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, Trash2 } from "lucide-react";
-import { startTransition as startUpload, useActionState, useState, useTransition } from "react";
+import { startTransition as startUpload, useActionState, useState } from "react";
 
 import {
   deleteContractTemplateAction,
@@ -10,10 +10,10 @@ import {
 } from "@/app/(agency)/a/clients/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FileInput } from "@/components/ui/file-input";
 import { Label } from "@/components/ui/label";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function Submit({ label, pending }: { label: string; pending: boolean }) {
   return (
@@ -34,15 +34,11 @@ export function ContractTemplateManager({
 }) {
   const [uploadState, upload, uploading] = useActionState<FormState, FormData>(uploadContractTemplateAction, {});
   const [deleteState, setDeleteState] = useState<FormState>({});
-  const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
-  const [pending, startTransition] = useTransition();
 
-  function remove() {
-    startTransition(async () => {
-      setDeleteState(await deleteContractTemplateAction());
-      setConfirming(false);
-    });
+  async function remove() {
+    const result = await deleteContractTemplateAction();
+    setDeleteState(result.error ? {} : result);
+    return result;
   }
 
   return (
@@ -58,31 +54,27 @@ export function ContractTemplateManager({
               </a>
             </Button>
             <span className="text-xs text-muted-foreground">загружен {current.uploadedAt}</span>
-            {confirming ? (
-              <span {...groupProps} className="flex flex-wrap items-center gap-2">
-                <span id={questionId} className="text-sm">
-                  Удалить шаблон?
-                </span>
-                <Button type="button" size="sm" variant="destructive" loading={pending} onClick={remove}>
-                  {pending ? "Удаляем…" : "Да, удалить"}
+            <ConfirmBlock
+              trigger={
+                <Button type="button" size="sm" variant="ghost">
+                  <Trash2 className="mr-1 size-4" aria-hidden />
+                  Удалить
                 </Button>
-                <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-                  Оставить
-                </Button>
-              </span>
-            ) : (
-              <Button ref={triggerRef} type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
-                <Trash2 className="mr-1 size-4" aria-hidden />
-                Удалить
-              </Button>
-            )}
+              }
+              layout="inline"
+              question="Удалить шаблон?"
+              confirmLabel="Да, удалить"
+              pendingLabel="Удаляем…"
+              cancelLabel="Оставить"
+              onConfirm={remove}
+            />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
             Шаблона нет — клиенты видят подсказку написать менеджеру. Загрузите файл ниже.
           </p>
         )}
-        <FormMessage error={deleteState.error} ok={current ? null : deleteState.ok} />
+        <FormMessage ok={current ? null : deleteState.ok} />
       </div>
 
       {/* `action` — ради отправки без скриптов (POST серверному действию, не GET); после загрузки

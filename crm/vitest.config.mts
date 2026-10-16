@@ -14,6 +14,9 @@ export default defineConfig({
     // Vitest способ задать среду по файлам — опция environmentMatchGlobs
     // здесь не типизирована и на деле тоже не переключает среду.
     environment: "node",
+    // next-auth импортирует "next/server" без расширения: Node в ESM такой путь не находит, и
+    // настоящий proxy.ts (tests/site-proxy.test.ts) не загружается. Vite это разрешает сам
+    server: { deps: { inline: ["next-auth"] } },
     setupFiles: ["tests/setup.ts"],
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     // Файлы идут по одному: часть тестов пишет в общую тестовую базу,

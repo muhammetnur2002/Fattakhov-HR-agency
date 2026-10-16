@@ -186,8 +186,8 @@ export function ChatScreen({
         <div className="flex items-baseline justify-between px-4 pb-3 pt-4">
           {/* Единственный заголовок раздела — страница сама его не
               дублирует (см. app/(student)/messages/page.tsx) */}
-          <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-paper">Сообщения</h1>
-          <span className="text-[12px] text-paper-faint">
+          <h1 className="text-sub font-semibold tracking-[-0.015em] text-paper">Сообщения</h1>
+          <span className="text-caption text-paper-faint">
             {totalUnread > 0
               ? `${totalUnread} ${plural(totalUnread, 'новое', 'новых', 'новых')}`
               : `${threads.length} ${plural(threads.length, 'диалог', 'диалога', 'диалогов')}`}
@@ -197,14 +197,14 @@ export function ChatScreen({
         {threads.length > 0 && (
           <>
             <div className="px-4 pb-2.5">
-              <div className="flex h-9 items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/50 px-3">
+              <div className="field-focus flex h-9 items-center gap-2 rounded-xl border border-[var(--hairline)] bg-graphite-900/50 px-3">
                 <Search className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Поиск"
-                  className="min-w-0 flex-1 bg-transparent text-[13px] text-paper placeholder:text-paper-faint focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-small text-paper placeholder:text-paper-faint outline-0"
                 />
               </div>
             </div>
@@ -218,7 +218,7 @@ export function ChatScreen({
                 onClick={() => setUnreadOnly(false)}
                 aria-pressed={!unreadOnly}
                 className={cn(
-                  'rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors',
+                  'rounded-full border px-3.5 py-1.5 text-caption font-medium transition-colors',
                   !unreadOnly
                     ? 'border-accent-400/40 bg-accent-500/25 text-paper'
                     : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
@@ -231,7 +231,7 @@ export function ChatScreen({
                 onClick={() => setUnreadOnly(true)}
                 aria-pressed={unreadOnly}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors',
+                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-caption font-medium transition-colors',
                   unreadOnly
                     ? 'border-accent-400/40 bg-accent-500/25 text-paper'
                     : 'border-[var(--hairline)] bg-graphite-900/50 text-paper-faint hover:text-paper/85',
@@ -239,7 +239,7 @@ export function ChatScreen({
               >
                 Непрочитанные
                 {totalUnread > 0 && (
-                  <span className="grid min-w-[17px] place-items-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold tabular-nums leading-[17px] text-paper">
+                  <span className="grid min-w-[18px] place-items-center rounded-full bg-accent-300 px-1 text-caption font-semibold tabular-nums leading-[18px] text-ink">
                     {totalUnread}
                   </span>
                 )}
@@ -250,12 +250,12 @@ export function ChatScreen({
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
           {threads.length === 0 ? (
-            <p className="px-3 py-10 text-center text-[13px] leading-relaxed text-paper-faint">
+            <p className="px-3 py-10 text-center text-small leading-relaxed text-paper-faint">
               Диалогов пока нет. Они появятся, когда вы откликнетесь на вакансию и работодатель
               ответит.
             </p>
           ) : visibleThreads.length === 0 ? (
-            <p className="px-3 py-10 text-center text-[13px] leading-relaxed text-paper-faint">
+            <p className="px-3 py-10 text-center text-small leading-relaxed text-paper-faint">
               Ничего не нашлось.
             </p>
           ) : (
@@ -305,8 +305,8 @@ export function ChatEmpty({
       <span className="grid size-14 place-items-center rounded-2xl border border-[var(--hairline)] bg-graphite-900/50">
         <MessagesSquare className="size-6 text-paper/30" aria-hidden />
       </span>
-      <h2 className="mt-7 text-display-sm text-paper">Переписки пока нет</h2>
-      <p className="mt-3 max-w-[38ch] text-[14.5px] leading-relaxed text-paper-dim">
+      <h2 className="mt-7 text-title text-paper">Переписки пока нет</h2>
+      <p className="mt-3 max-w-[38ch] text-body leading-relaxed text-paper-dim">
         {viewerRole === 'STUDENT'
           ? 'Диалог открывает работодатель — после того, как посмотрит ваш отклик. Смахните вправо вакансию, которая подходит, и ждите ответа здесь.'
           : 'Диалоги появятся вместе с откликами: как только студент смахнёт вашу вакансию вправо, здесь можно будет ему написать.'}

@@ -6,7 +6,6 @@ import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion,
   useTransform,
   type PanInfo,
 } from 'framer-motion';
@@ -14,6 +13,7 @@ import { Clock, Flame, MapPin, Sparkles } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tag } from '@/components/ui/Chip';
 import { MatchRing } from './MatchRing';
+import { useReducedMotionSafe } from '@/lib/hooks/useReducedMotionSafe';
 import { SWIPE, springDeck, springSoft } from '@/lib/motion';
 import { cn, companyGradient, formatSalary } from '@/lib/utils';
 import {
@@ -75,7 +75,7 @@ export function SwipeCard({
   enterFrom = 'stack',
   entryToken = 0,
 }: SwipeCardProps) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionSafe();
   // Возвращённая карточка стартует за краем экрана и приезжает на место
   // пружиной — это и есть визуальная отмена решения.
   const entryX = enterFrom === 'stack' ? 0 : enterFrom === 'right' ? 520 : -520;
@@ -253,11 +253,12 @@ export function SwipeCard({
 
         <div className="relative flex h-full flex-col p-6 sm:p-7">
           {/*
-            Имя и город компании лежат на companyGradient (см. выше) — он
-            всегда тёмный независимо от темы страницы, поэтому текст здесь
-            тоже фиксированный светлый, а не paper: тот в светлой теме
-            становится тёмным и пропадает на этой подложке (тот же баг,
-            что был с инициалами в Avatar).
+            Имя и город компании лежат не на «чистом» companyGradient, а на его
+            полупрозрачном слое поверх карточки (opacity-60 и растворение в цвет
+            карточки выше): в тёмной теме это тёмная шапка, в светлой — светло-серая.
+            Белый текст давал на ней 1,8–2,7:1, поэтому цвет — роль paper (светлый
+            в тёмной теме, тёмный в светлой), как у названия вакансии ниже. Только
+            инициалы в Avatar остаются белыми: там подложка сплошная и всегда тёмная.
           */}
           <header className="flex items-start gap-3.5">
             <Avatar
@@ -267,8 +268,8 @@ export function SwipeCard({
               rounded="square"
             />
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="truncate text-[13.5px] font-medium text-white/90">{vacancy.company}</p>
-              <p className="mt-0.5 flex items-center gap-1 truncate text-[12.5px] text-white/60">
+              <p className="truncate text-small font-medium text-paper">{vacancy.company}</p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-caption text-paper-dim">
                 <MapPin className="size-3 shrink-0" aria-hidden />
                 {vacancy.city}
                 {vacancy.district ? `, ${vacancy.district}` : ''}
@@ -277,20 +278,20 @@ export function SwipeCard({
             {vacancy.matchScore !== null && <MatchRing value={vacancy.matchScore} />}
           </header>
 
-          <h2 className="mt-5 text-[clamp(1.375rem,4.4vw,1.75rem)] font-semibold leading-[1.1] tracking-[-0.028em] text-paper">
+          <h2 className="mt-5 text-title font-semibold leading-[1.1] tracking-[-0.028em] text-paper">
             {vacancy.title}
           </h2>
 
-          <p className="mt-2.5 text-[15px] font-medium text-accent-200">
+          <p className="mt-2.5 text-body font-medium text-accent-200">
             {formatSalary(vacancy.salaryFrom, vacancy.salaryTo)}
-            <span className="ml-1.5 text-[13px] font-normal text-paper-faint">
+            <span className="ml-1.5 text-small font-normal text-paper-faint">
               {PERIOD_LABEL[vacancy.salaryPeriod]}
             </span>
           </p>
 
           <div className="hairline-x my-5" />
 
-          <p className="line-clamp-3 text-[14px] leading-relaxed text-paper-dim">{vacancy.summary}</p>
+          <p className="line-clamp-3 text-small leading-relaxed text-paper-dim">{vacancy.summary}</p>
 
           <div className="mt-5 space-y-3">
             <div className="flex items-center gap-2">
@@ -299,13 +300,13 @@ export function SwipeCard({
                 {vacancy.shiftDays.map((day) => (
                   <span
                     key={day}
-                    className="rounded-md bg-paper/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-paper/70"
+                    className="rounded-md bg-paper/[0.06] px-1.5 py-0.5 text-caption font-medium text-paper/70"
                   >
                     {WEEKDAY_LABEL[day]}
                   </span>
                 ))}
                 {vacancy.hoursPerWeek && (
-                  <span className="px-1 py-0.5 text-[11px] text-paper-faint">
+                  <span className="px-1 py-0.5 text-caption text-paper-faint">
                     · до {vacancy.hoursPerWeek} ч/нед
                   </span>
                 )}
@@ -332,7 +333,7 @@ export function SwipeCard({
               {vacancy.matchReasons.map((reason, index) => (
                 <li
                   key={reason}
-                  className="flex items-start gap-1.5 text-[12.5px] leading-snug text-paper-faint"
+                  className="flex items-start gap-1.5 text-caption leading-snug text-paper-faint"
                 >
                   <Sparkles
                     className={cn('mt-px size-3.5 shrink-0', index === 0 ? 'text-accent-300' : 'opacity-0')}
@@ -348,7 +349,7 @@ export function SwipeCard({
             type="button"
             onClick={onOpen}
             disabled={!isTop}
-            className="mt-auto pt-5 text-left text-[13px] font-medium text-paper/55 underline-offset-4 transition-colors hover:text-paper hover:underline"
+            className="mt-auto pt-5 text-left text-small font-medium text-paper-dim underline-offset-4 transition-colors hover:text-paper hover:underline"
           >
             Подробнее об условиях
           </button>
@@ -358,14 +359,14 @@ export function SwipeCard({
         <motion.div
           aria-hidden
           style={{ opacity: yesOpacity }}
-          className="pointer-events-none absolute left-6 top-8 -rotate-[14deg] rounded-xl border-[3px] border-yes-bright px-3.5 py-1.5 text-[15px] font-bold uppercase tracking-[0.1em] text-yes-bright"
+          className="pointer-events-none absolute left-6 top-8 -rotate-[14deg] rounded-xl border-[3px] border-yes-bright px-3.5 py-1.5 text-body font-bold uppercase tracking-[0.1em] text-yes-bright"
         >
           Отклик
         </motion.div>
         <motion.div
           aria-hidden
           style={{ opacity: noOpacity }}
-          className="pointer-events-none absolute right-6 top-8 rotate-[14deg] rounded-xl border-[3px] border-paper/45 px-3.5 py-1.5 text-[15px] font-bold uppercase tracking-[0.1em] text-paper/70"
+          className="pointer-events-none absolute right-6 top-8 rotate-[14deg] rounded-xl border-[3px] border-paper/45 px-3.5 py-1.5 text-body font-bold uppercase tracking-[0.1em] text-paper/70"
         >
           Позже
         </motion.div>

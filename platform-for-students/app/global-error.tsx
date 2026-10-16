@@ -3,6 +3,7 @@
 /**
  * Сбой самого корневого каркаса: заменяет весь документ, поэтому стили приложения здесь не загружены.
  * Оформление встроенное, текст русский, кнопка «Повторить» и ссылка на главную.
+ * Размеры шрифта — числом (24 и 15px, как ступени title и body шкалы): токенов Tailwind здесь нет.
  */
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
@@ -16,6 +17,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
           padding: 24,
           background: '#070707',
           color: '#f8f8f8',
+          fontSize: 15,
           fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
           textAlign: 'center',
         }}

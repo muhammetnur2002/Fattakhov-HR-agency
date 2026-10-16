@@ -93,6 +93,50 @@ test("кнопки на сенсорном экране — высота про�
   }
 });
 
+/*
+  Место под галочку занято у всех чипов (решение владельца, 16.10.2026): каждый невыбранный чип на 18 точек шире, чем
+  был, и слева у него пустой слот. На телефоне ряд обязан это выдержать: чипы переносятся на следующую строку (ряд —
+  `flex-wrap`), а не выходят за край и не уводят страницу вбок. Ряд этапов воронки (`role=tablist`) — исключение по
+  замыслу: он прокручивается внутри себя. До правки на 320–390 страница вакансии на 320 точках и так была шире экрана
+  на 37 точек из-за кнопок шапки — это не чипы, и проверка ряда чипов от неё не зависит.
+*/
+for (const width of [320, 375, 390]) {
+  test(`чипы-фильтры на ${width}px: у каждого слот под галочку, ряд переносится и не выходит за край`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    // Аналитика рекрутёру отдаёт 404 (тесты идут под ним), поэтому здесь её нет: ряды «Период» — те же FilterChip
+    for (const path of ["/a/clients", "/a/candidates", "/a/calendar"]) {
+      await page.goto(path);
+      // Календарь — клиентский компонент: ряд появляется после гидрации, а не вместе с загрузкой страницы
+      await expect(page.locator('[data-slot="filter-chip-group"]').first()).toBeVisible();
+      const groups = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-slot="filter-chip-group"]')]
+          .filter((g) => g.getBoundingClientRect().width > 0)
+          .map((g) => {
+            const gr = g.getBoundingClientRect();
+            const chips = [...g.querySelectorAll('[data-slot="filter-chip"]')];
+            return {
+              label: g.getAttribute("aria-label"),
+              chips: chips.length,
+              noMark: chips.filter((c) => !(c.querySelector('[data-slot="filter-chip-mark"]')?.getBoundingClientRect().width ?? 0)).length,
+              outside: chips
+                .filter((c) => {
+                  const r = c.getBoundingClientRect();
+                  return r.right > gr.right + 0.5 || r.left < gr.left - 0.5;
+                })
+                .map((c) => (c.textContent ?? "").trim()),
+            };
+          }),
+      );
+      expect(groups.length, `${path}: на странице есть ряд чипов`).toBeGreaterThan(0);
+      for (const g of groups) {
+        expect(g.noMark, `${path}, «${g.label}»: у каждого чипа слот под галочку`).toBe(0);
+        expect(g.outside, `${path}, «${g.label}»: чипы не выходят за край ряда`).toEqual([]);
+      }
+      expect(await horizontalOverflow(page), `${path}: страница не уезжает вбок на ${width}px`).toBe(0);
+    }
+  });
+}
+
 test("конец страницы не прячется под панель", async ({ page }) => {
   await page.goto("/a/vacancies");
   await page.waitForSelector("nav[data-bottom-tabs]");

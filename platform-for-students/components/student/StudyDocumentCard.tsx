@@ -85,6 +85,7 @@ export function StudyDocumentCard({ state }: { state: StudyStateDTO }) {
       type="file"
       accept={ACCEPT}
       className="sr-only"
+      tabIndex={-1}
       onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) void upload(file);
@@ -108,7 +109,7 @@ export function StudyDocumentCard({ state }: { state: StudyStateDTO }) {
   return (
     <div id="study" className="scroll-mt-28">
       {state.status === 'PENDING' && (
-        <div className="rounded-2xl border border-accent-400/30 bg-accent-500/[0.08] p-4 text-[13.5px] leading-relaxed">
+        <div className="rounded-2xl border border-accent-400/30 bg-accent-500/[0.08] p-4 text-small leading-relaxed">
           <p className="flex items-center gap-2 font-medium text-accent-200">
             <Clock3 className="size-4 shrink-0" aria-hidden />
             Справка на проверке у HR-менеджера
@@ -131,7 +132,7 @@ export function StudyDocumentCard({ state }: { state: StudyStateDTO }) {
       )}
 
       {state.status === 'REJECTED' && (
-        <div className="rounded-2xl border border-danger/35 bg-danger/[0.07] p-4 text-[13.5px] leading-relaxed">
+        <div className="rounded-2xl border border-danger/35 bg-danger/[0.07] p-4 text-small leading-relaxed">
           <p className="flex items-center gap-2 font-medium text-danger">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />
             HR-менеджер не принял справку
@@ -146,7 +147,7 @@ export function StudyDocumentCard({ state }: { state: StudyStateDTO }) {
       )}
 
       {state.status === 'NONE' && (
-        <div className="rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13.5px] leading-relaxed">
+        <div className="rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed">
           <p className="flex items-center gap-2 font-medium text-warn">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />
             Загрузите справку об обучении

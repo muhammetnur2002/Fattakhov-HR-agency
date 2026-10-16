@@ -22,7 +22,8 @@
     "db:generate": "prisma generate",
     "worker": "tsx jobs/scheduler.ts",
     "worker:once": "tsx jobs/run-once.ts",
-    "setup:real": "tsx -r dotenv/config scripts/setup-real.ts"
+    "setup:real": "tsx -r dotenv/config scripts/setup-real.ts",
+    "og:cards": "tsx scripts/generate-og-cards.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",

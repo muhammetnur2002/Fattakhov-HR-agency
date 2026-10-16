@@ -103,7 +103,7 @@ export function VideoUpload({
             <button
               type="button"
               onClick={() => onChange('')}
-              className="flex items-center gap-2 text-[13px] text-paper-faint transition-colors hover:text-danger"
+              className="flex items-center gap-2 text-small text-paper-faint transition-colors hover:text-danger"
             >
               <X className="size-4" />
               Удалить видео
@@ -127,10 +127,10 @@ export function VideoUpload({
               {uploading ? <Loader2 className="size-4.5 animate-spin" /> : <Upload className="size-4.5" />}
             </span>
             <div>
-              <p className="text-[14px] font-medium text-paper/85">
+              <p className="text-small font-medium text-paper/85">
                 {uploading ? `Загружаем… ${progress}%` : 'Загрузить видеофайл'}
               </p>
-              <p className="text-[12px] text-paper-faint">MP4 или WebM до 50 МБ</p>
+              <p className="text-caption text-paper-faint">MP4 или WebM до 50 МБ</p>
             </div>
           </motion.button>
         )}
@@ -141,6 +141,7 @@ export function VideoUpload({
         type="file"
         accept="video/mp4,video/webm"
         className="sr-only"
+        tabIndex={-1}
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void upload(file);

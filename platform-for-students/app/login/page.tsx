@@ -5,8 +5,9 @@ import { LoginForm } from '@/components/screens/LoginForm';
 import { isDemoMode } from '@/lib/db';
 import { DEMO_CREDENTIALS } from '@/lib/db/seed-data';
 import { agencySiteUrl } from '@/lib/agency';
+import { NOINDEX_METADATA } from '@/lib/seo';
 
-export const metadata: Metadata = { title: 'Вход' };
+export const metadata: Metadata = { title: 'Вход', ...NOINDEX_METADATA };
 
 export default async function LoginPage(props: { searchParams: Promise<{ role?: string }> }) {
   const searchParams = await props.searchParams;

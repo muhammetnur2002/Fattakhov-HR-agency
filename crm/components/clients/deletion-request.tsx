@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { decideAccountDeletionAction } from "@/app/(agency)/a/clients/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { Panel } from "@/components/ui/panel";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /**
  * Клиент с договором просит удалить свой аккаунт. Владелец агентства подтверждает
@@ -24,15 +24,21 @@ export function DeletionRequest({
   canDecide: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
 
-  function decide(decision: "confirm" | "reject") {
+  function reject() {
     startTransition(async () => {
-      setMessage(await decideAccountDeletionAction(userId, clientId, decision));
-      setConfirming(false);
+      setMessage(await decideAccountDeletionAction(userId, clientId, "reject"));
     });
+  }
+
+  async function confirmDeletion() {
+    const result = await decideAccountDeletionAction(userId, clientId, "confirm");
+    // Отказ покажет сам блок; здесь — только «готово»
+    setMessage(result.error ? {} : result);
+    return result;
   }
 
   return (
@@ -41,31 +47,28 @@ export function DeletionRequest({
         <StatusBadge tone="warning">Просит удалить аккаунт</StatusBadge>
         {!canDecide && <span className="text-xs text-muted-foreground">Решает владелец агентства</span>}
       </div>
-      {canDecide &&
-        (confirming ? (
-          <div {...groupProps} className="space-y-2">
-            <p id={questionId} className="text-sm">
-              Удалить аккаунт? Имя, почта и пароль будут стёрты, вход закроется. Это нельзя отменить.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => decide("confirm")}>
-                {pending ? "Подождите…" : "Да, удалить"}
-              </Button>
-              <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-                Назад
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button ref={triggerRef} type="button" size="sm" variant="destructive" onClick={() => setConfirming(true)}>
-              Подтвердить удаление
-            </Button>
-            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => decide("reject")}>
-              Отклонить
-            </Button>
-          </div>
-        ))}
+      {canDecide && !confirming && (
+        <div className="flex flex-wrap gap-2">
+          <Button ref={triggerRef} type="button" size="sm" variant="destructive" onClick={() => setConfirming(true)}>
+            Подтвердить удаление
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={reject}>
+            Отклонить
+          </Button>
+        </div>
+      )}
+      {canDecide && (
+        <ConfirmBlock
+          open={confirming}
+          onOpenChange={setConfirming}
+          triggerRef={triggerRef}
+          question="Удалить аккаунт? Имя, почта и пароль будут стёрты, вход закроется. Это нельзя отменить."
+          confirmLabel="Да, удалить"
+          pendingLabel="Подождите…"
+          cancelLabel="Назад"
+          onConfirm={confirmDeletion}
+        />
+      )}
       <FormMessage error={message.error} ok={message.ok} />
     </Panel>
   );

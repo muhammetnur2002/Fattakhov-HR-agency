@@ -38,8 +38,14 @@
   --color-ink-raise: 243 242 239;
   --color-ink-deep: 233 232 229;
   --color-paper: 7 7 7;
-  --color-paper-dim: rgba(7, 7, 7, 0.62);
-  --color-paper-faint: rgba(7, 7, 7, 0.38);
+  /* Лестница текста: основной → dim (абзацы, подписи) → faint (третий уровень: даты, пояснения,
+     подсказки). Обе нижние ступени не ниже 4,5:1 на полотне, карточке, плашке с заливкой
+     paper/6% и полотне в тени карточки (tests/unit.ts считает это по значениям отсюда; тень
+     замерена в браузере: подпись под колодой на главной лежала на фоне 220, а не 238).
+     Раньше faint был 0,38 → 2,5:1, а dim 0,62; чтобы ступени не слиплись после подъёма
+     faint, dim поднят вместе с ним */
+  --color-paper-dim: rgba(7, 7, 7, 0.76);
+  --color-paper-faint: rgba(7, 7, 7, 0.64);
 
   --color-graphite-950: 242 243 244;
   --color-graphite-900: 234 235 237;
@@ -98,10 +104,13 @@
   --text-gradient-from: #070707;
   --text-gradient-to: rgba(7, 7, 7, 0.62);
   --shimmer-tint: rgba(7, 7, 7, 0.06);
-  --focus-ring-bg: #ffffff;
+  /* Кольцо фокуса: accent-200 светлой темы (47 63 79) — 9:1 к полотну, 4,3:1 даже к серому 165
+     под стопкой карточек ленты, где кольцо кнопок решения лежит на тени (accent-300 давал там 2,8:1) */
+  --focus-ring-color: rgb(47 63 79);
   --scrollbar-thumb: rgba(7, 7, 7, 0.16);
   --scrollbar-thumb-hover: rgba(7, 7, 7, 0.26);
-  --placeholder-color: rgba(7, 7, 7, 0.32);
+  /* Подсказка в поле — тоже текст: тот же уровень, что faint (≥ 4,5:1) */
+  --placeholder-color: var(--color-paper-faint);
   --selection-fg: #070707;
   --autofill-bg: #edeeef;
   /* Тень главной кнопки (components/ui/Button.tsx, primary): в тёмной
@@ -123,8 +132,9 @@
   --color-ink-raise: 8 9 10;
   --color-ink-deep: 5 5 6;
   --color-paper: 248 248 248;
-  --color-paper-dim: rgba(248, 248, 248, 0.62);
-  --color-paper-faint: rgba(248, 248, 248, 0.38);
+  /* см. комментарий у светлой темы: faint был 0,38 → 3,25:1 */
+  --color-paper-dim: rgba(248, 248, 248, 0.72);
+  --color-paper-faint: rgba(248, 248, 248, 0.56);
 
   --color-graphite-950: 11 12 13;
   --color-graphite-900: 18 20 21;
@@ -170,13 +180,61 @@
   --text-gradient-from: #f8f8f8;
   --text-gradient-to: rgba(248, 248, 248, 0.62);
   --shimmer-tint: rgba(248, 248, 248, 0.08);
-  --focus-ring-bg: #000000;
+  /* accent-300 тёмной темы (141 163 185) — 8:1 к чёрному полотну */
+  --focus-ring-color: rgb(141 163 185);
   --scrollbar-thumb: rgba(248, 248, 248, 0.14);
   --scrollbar-thumb-hover: rgba(248, 248, 248, 0.24);
-  --placeholder-color: rgba(248, 248, 248, 0.3);
+  --placeholder-color: var(--color-paper-faint);
   --selection-fg: #f8f8f8;
   --autofill-bg: #1e2124;
   --shadow-button-primary: rgba(248, 248, 248, 0.35);
+}
+
+/*
+ * Шкала шрифтов: шесть обычных ступеней и одна акцентная. Токены text-caption … text-display
+ * (tailwind.config.ts) читают эти переменные. Размер зависит от роли текста, а не от места
+ * в разметке, поэтому на любом экране на странице не больше семи размеров.
+ *
+ * Крупные ступени меняются по ширине окна шагом, а не плавно через clamp(): плавная шкала на
+ * промежуточной ширине давала размеры, которых нет ни на телефоне, ни на ноутбуке (24,48,
+ * 12,76, 15,64 в замере до правки). Шаги — на 768px (планшет) и на 1280px (ноутбук); на втором
+ * меняется только акцентная ступень: на 1024px в две колонки герой в 72px занимал пять строк
+ * и уводил кнопки под сгиб. Мелкие ступени на ширину не реагируют: 12/14/15 одинаковы
+ * на телефоне и на мониторе. Значения в rem: настройка размера шрифта в браузере
+ * масштабирует всю шкалу вместе.
+ *
+ *   ступень     телефон   от 768   от 1280
+ *   caption        12       12       12
+ *   small          14       14       14
+ *   body           15       15       15
+ *   sub            18       18       18
+ *   title          24       28       28
+ *   headline       32       44       44
+ *   display        44       56       72
+ *
+ * Меняете значение — правьте и таблицу в README (раздел «Шкала шрифтов») и lib/type-scale.ts:
+ * tests/unit.ts сверяет все три и следит за порядком и зазором между ступенями.
+ */
+:root {
+  --fs-caption: 0.75rem;
+  --fs-small: 0.875rem;
+  --fs-body: 0.9375rem;
+  --fs-sub: 1.125rem;
+  --fs-title: 1.5rem;
+  --fs-headline: 2rem;
+  --fs-display: 2.75rem;
+}
+@media (min-width: 768px) {
+  :root {
+    --fs-title: 1.75rem;
+    --fs-headline: 2.75rem;
+    --fs-display: 3.5rem;
+  }
+}
+@media (min-width: 1280px) {
+  :root {
+    --fs-display: 4.5rem;
+  }
 }
 
 @layer base {
@@ -190,7 +248,8 @@
   }
 
   body {
-    @apply bg-ink text-paper font-sans antialiased;
+    /* text-body: текст без своей ступени берёт основной размер шкалы (15px), а не 16px браузера по умолчанию */
+    @apply bg-ink text-paper text-body font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
     font-variant-numeric: tabular-nums;
     /* Свайп по карточке не должен утаскивать страницу */
@@ -222,12 +281,18 @@
     background: transparent;
   }
 
+  /*
+    Кольцо фокуса — outline, а не box-shadow. Тень перебивалась любой утилитой shadow-* и
+    классами .glass/.surface/.glass-card (у главных кнопок и карточек списков кольца не было
+    вовсе), а в режиме высокой контрастности (forced-colors) браузер тени снимает, outline —
+    нет. Цвет — токен темы, не слабее 3:1 к полотну и карточке в обеих темах.
+    Правило одно на всё: поля ввода рисуют кольцо на своей рамке (.field-focus ниже), для них
+    у самого <input> стоит outline-0 (не outline-none: тот оставляет прозрачный outline, который
+    режим высокой контрастности делает видимым — вокруг каждого поля вечная квадратная рамка).
+  */
   :focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--focus-ring-bg),
-      0 0 0 4px rgba(110, 136, 162, 0.75);
-    border-radius: inherit;
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
   }
 
   input,
@@ -281,6 +346,19 @@
     background: var(--surface-surface);
     border: 1px solid var(--hairline);
     box-shadow: var(--shadow-surface);
+  }
+
+  /* Рамка поля ввода: кольцо фокуса рисует она, а не сам <input> (у него outline-0) */
+  .field-focus:focus-within {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  /* Кнопка внутри рамки (отправка в чате): Tab стоит на ней — кольцо у самой кнопки, а не ещё
+     и вокруг всего поля. Без :has() в старом браузере остаётся прежнее двойное кольцо — хуже,
+     чем одно, но не пропажа индикатора. */
+  .field-focus:has(button:focus-visible, a:focus-visible) {
+    outline-style: none;
   }
 
   .glass-soft {
@@ -350,6 +428,16 @@
   html[data-app-keyboard] [data-site-header] {
     display: none;
   }
+}
+
+/*
+  Страница, у которой кнопка темы стоит в собственной шапке (мастер регистрации), плавающую в углу
+  не показывает: та закрывала бы главный ряд кнопок у нижнего края. Без :has() в старом браузере
+  остаются обе — как было до правки. Правило без слоя, как соседнее про data-app-screen: слоёные
+  утилиты Tailwind (grid, fixed) его не перебьют.
+*/
+body:has([data-theme-toggle-inline]) [data-theme-toggle]:not([data-theme-toggle-inline]) {
+  display: none;
 }
 
 @layer utilities {
@@ -448,5 +536,33 @@
   .rise-in,
   .word-rise {
     animation: none;
+  }
+}
+
+/*
+  Поля ввода на сенсорном экране — 16px. iOS Safari увеличивает страницу при фокусе на поле
+  мельче 16px, и после ввода её приходится возвращать щипком. Масштаб при этом разрешён
+  (viewport без maximum-scale), поэтому правка — в размере поля, а не в запрете зума.
+  !important нужен намеренно: размер полей задан классами ступеней шкалы, text-body и др. (специфичность выше
+  правила на тег), а перечислять их в каждом компоненте значит забыть следующий. Флажки,
+  кнопки и файлы правило не трогает; остальная шкала шрифтов на мыши не меняется.
+  Исключение — поле с атрибутом data-keep-size: оно уже крупнее 16px (код из письма, text-sub, 18px
+  с разрядкой), и правило не должно его ужимать. Классом исключение не сделать: !important
+  выше любой утилиты. Ставить атрибут можно только полю не мельче 16px — следит tests/unit.ts
+  (мельче 16px iOS снова увеличит страницу при фокусе).
+*/
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='color'], [type='hidden'], [data-keep-size]),
+  textarea:not([data-keep-size]),
+  select:not([data-keep-size]) {
+    font-size: 16px !important;
+  }
+}
+
+/* Режим высокой контрастности: цвет кольца задаёт система (в нём снимаются тени и фоны, outline остаётся) */
+@media (forced-colors: active) {
+  :focus-visible,
+  .field-focus:focus-within {
+    outline-color: Highlight;
   }
 }

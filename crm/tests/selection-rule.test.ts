@@ -99,6 +99,33 @@ describe("один компонент выбора (FilterChip)", () => {
     expect(chip).toContain("CheckIcon");
   });
 
+  /**
+   * Место под галочку — у всех чипов (решение владельца, 16.10.2026). Прежняя схема монтировала значок только у
+   * выбранного: выбор растил чип на 18 точек (14 + зазор 4), прежний выбранный сужался на столько же, и чипы между ними
+   * сдвигались (в переносимом ряду на границе строки это могло перестроить строки). Слот обязан оставаться в разметке у каждого чипа с галочкой
+   * (`shape="chip"`), а пустой — быть пустым. Живая проверка ширины — tests/e2e/selection-states.spec.ts.
+   */
+  it("слот под галочку не монтируется по условию: Mark всегда рисует `filter-chip-mark` размером с галочку", () => {
+    const chip = read("components/ui/filter-chip.tsx");
+    const mark = /function Mark\([\s\S]*?\n}\n/.exec(chip)?.[0] ?? "";
+    expect(mark, "в filter-chip.tsx есть функция Mark").not.toBe("");
+    expect(mark).toContain('data-slot="filter-chip-mark"');
+    expect(mark).toMatch(/\baria-hidden\b/);
+    expect(mark).toContain("size-3.5");
+    expect(mark).toContain("shrink-0");
+    expect(mark, "Mark не возвращает null: пустой слот — тоже слот").not.toMatch(/return null/);
+    // Ссылка и кнопка рисуют слот от формы чипа, а не от выбора
+    expect(chip).toMatch(/shape === "chip" \? <LinkMark selected=\{selected\} \/> : null/);
+    expect(chip).toMatch(/shape === "chip" \? <Mark selected=\{selected\} pending=\{pending\} \/> : null/);
+    expect(chip, "значок не монтируется условием `selected &&`").not.toMatch(/selected\s*&&\s*<(Link)?Mark/);
+  });
+
+  it("карточка тарифа держит место под галочку: SelectionSlot, а не `{selected && <SelectionCheck />}`", () => {
+    const picker = read("components/onboarding/tariff-picker.tsx");
+    expect(picker).toMatch(/<SelectionSlot selected=\{selected\} \/>/);
+    expect(picker).not.toMatch(/selected\s*&&\s*<SelectionCheck/);
+  });
+
   it("чип той же высоты, что Button size=sm: h-7, text-xs, на сенсорном экране — правило 2.4em в globals.css", () => {
     const chip = read("components/ui/filter-chip.tsx");
     const button = read("components/ui/button.tsx");
@@ -372,13 +399,14 @@ describe("блок на месте кнопки ведёт фокус и наз�
     for (const reason of Object.values(KEEPS_FOCUS)) expect(reason.length).toBeGreaterThan(20);
   });
 
-  it("кнопка «Да, …» всегда в файле с useConfirmFocus: блок подтверждения не обходит сторожа, меняя устройство состояния", () => {
-    // Витрина не в счёт: «Да, но для одной позиции…» там — ответ в частых вопросах, а не кнопка
+  it("кнопка «Да, …» всегда в файле с ConfirmBlock (он ведёт фокус сам) или useConfirmFocus: блок подтверждения не обходит сторожа", () => {
+    // Витрина не в счёт: «Да, но для одной позиции…» там — ответ в частых вопросах, а не кнопка.
+    // Строже — tests/confirm-block-rule.test.ts: «Да, …» только как confirmLabel у <ConfirmBlock>
     const offenders = files
       .filter((f) => !f.includes("components/marketing/"))
       .filter((f) => {
         const text = read(f);
-        return /(>\s*|["'`])Да, [а-яё]/.test(text) && !text.includes("useConfirmFocus");
+        return /(>\s*|["'`])Да, [а-яё]/.test(text) && !text.includes("useConfirmFocus") && !/<ConfirmBlock\b/.test(text);
       });
     expect(offenders).toEqual([]);
   });

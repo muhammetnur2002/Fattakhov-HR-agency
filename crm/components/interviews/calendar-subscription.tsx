@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 
 import { regenerateCalendarLinkAction } from "@/app/actions/calendar";
 
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
+import { Panel, panelClass } from "@/components/ui/panel";
 
 /**
  * Подписка на календарь.
@@ -19,10 +19,7 @@ import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 export function CalendarSubscription({ url }: { url: string }) {
   const [open, setOpen] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
-  const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   if (!open) {
     return (
@@ -54,37 +51,23 @@ export function CalendarSubscription({ url }: { url: string }) {
         подписку по ссылке — встречи появятся сами и будут обновляться.
         Ссылка личная, не пересылайте её.
       </p>
-      {confirming ? (
-        <Panel tone="danger" {...groupProps}>
-          <p id={questionId} className="text-xs">
-            Прежняя ссылка перестанет работать, а подписку в календаре придётся добавить заново. Обновить?
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              loading={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await regenerateCalendarLinkAction();
-                  setMessage(result.ok ?? result.error ?? null);
-                  setConfirming(false);
-                })
-              }
-            >
-              {pending ? "Обновляем…" : "Да, обновить"}
-            </Button>
-            <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-              Отмена
-            </Button>
-          </div>
-        </Panel>
-      ) : (
-        <Button ref={triggerRef} type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
-          Обновить ссылку
-        </Button>
-      )}
+      <ConfirmBlock
+        trigger={
+          <Button type="button" size="sm" variant="ghost">
+            Обновить ссылку
+          </Button>
+        }
+        className={panelClass("danger")}
+        compact
+        question="Прежняя ссылка перестанет работать, а подписку в календаре придётся добавить заново. Обновить?"
+        confirmLabel="Да, обновить"
+        pendingLabel="Обновляем…"
+        onConfirm={async () => {
+          const result = await regenerateCalendarLinkAction();
+          setMessage(result.ok ?? null);
+          return result;
+        }}
+      />
       {message && <p className="text-xs text-muted-foreground">{message}</p>}
     </Panel>
   );

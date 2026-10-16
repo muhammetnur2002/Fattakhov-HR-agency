@@ -230,8 +230,8 @@ export function ProfileEditor({
       className="mx-auto w-full max-w-[42rem] pb-28"
     >
       <header className="mb-8">
-        <h1 className="text-display-md text-paper">Профиль</h1>
-        <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
+        <h1 className="text-headline text-paper">Профиль</h1>
+        <p className="mt-2 text-small leading-relaxed text-paper-dim">
           Так вас видит работодатель, которому вы откликнулись. Это не резюме:
           здесь считается и то, что вы делали, пробовали и организовывали.
         </p>
@@ -240,10 +240,10 @@ export function ProfileEditor({
       <div className="space-y-8">
         <section className="glass rounded-3xl p-6 sm:p-7" aria-live="polite">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+            <h2 className="text-caption uppercase tracking-[0.12em] text-paper-faint">
               Заполненность профиля
             </h2>
-            <span className="text-[20px] font-semibold tabular-nums text-paper">{completeness.percent}%</span>
+            <span className="text-sub font-semibold tabular-nums text-paper">{completeness.percent}%</span>
           </div>
           <div className="mt-3 h-[5px] w-full overflow-hidden rounded-full bg-paper/[0.08]">
             <motion.div
@@ -253,7 +253,7 @@ export function ProfileEditor({
               transition={{ duration: durations.base, ease: easeOutExpo }}
             />
           </div>
-          <p className="mt-3 text-[13px] leading-relaxed text-paper-dim">
+          <p className="mt-3 text-small leading-relaxed text-paper-dim">
             {complete
               ? 'Профиль выглядит полно — работодатель увидит больше, чем резюме.'
               : 'Работодатели охотнее отвечают на заполненные профили.'}
@@ -282,7 +282,7 @@ export function ProfileEditor({
             />
 
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Пол
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -342,7 +342,7 @@ export function ProfileEditor({
               onChange={(e) => patch({ speciality: e.target.value })}
             />
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Уровень обучения
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -363,10 +363,10 @@ export function ProfileEditor({
                   </Chip>
                 ))}
               </div>
-              {errors.studyLevel && <p className="pt-2 text-[12.5px] text-danger">{errors.studyLevel}</p>}
+              {errors.studyLevel && <p className="pt-2 text-caption text-danger">{errors.studyLevel}</p>}
             </fieldset>
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Курс
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -380,7 +380,7 @@ export function ProfileEditor({
                   </Chip>
                 ))}
               </div>
-              {errors.studyYear && <p className="pt-2 text-[12.5px] text-danger">{errors.studyYear}</p>}
+              {errors.studyYear && <p className="pt-2 text-caption text-danger">{errors.studyYear}</p>}
             </fieldset>
             <TextField
               label="Город"
@@ -403,7 +403,7 @@ export function ProfileEditor({
         <Section title="Что ищете и зачем">
           <div className="space-y-5">
             <fieldset>
-              <legend className="mb-3 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+              <legend className="mb-3 text-caption uppercase tracking-[0.12em] text-paper-faint">
                 Что ищете
               </legend>
               <div className="flex flex-wrap gap-2">
@@ -436,10 +436,10 @@ export function ProfileEditor({
         </Section>
 
         <Section title="Проекты">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Учебные, свои, предпринимательские, IT, творческие — всё, что вы делали сами.
           </p>
-          {errors.projects && <p className="mb-3 text-[12.5px] text-danger">{errors.projects}</p>}
+          {errors.projects && <p className="mb-3 text-caption text-danger">{errors.projects}</p>}
           <div className="space-y-3">
             {form.projects.map((project, i) => (
               <ItemCard key={i} onRemove={() => patch({ projects: removeAt(form.projects, i) })} label="проект">
@@ -479,10 +479,10 @@ export function ProfileEditor({
         </Section>
 
         <Section title="Достижения">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Олимпиады, конкурсы, конференции, дипломы — и участие тоже, не только победы.
           </p>
-          {errors.achievements && <p className="mb-3 text-[12.5px] text-danger">{errors.achievements}</p>}
+          {errors.achievements && <p className="mb-3 text-caption text-danger">{errors.achievements}</p>}
           <div className="space-y-3">
             {form.achievements.map((item, i) => (
               <ItemCard key={i} onRemove={() => patch({ achievements: removeAt(form.achievements, i) })} label="достижение">
@@ -534,10 +534,10 @@ export function ProfileEditor({
         </Section>
 
         <Section title="Занятия и активность">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Спорт, музыкальная или художественная школа, языки, кружки, староста, волонтёрство, клубы.
           </p>
-          {errors.activities && <p className="mb-3 text-[12.5px] text-danger">{errors.activities}</p>}
+          {errors.activities && <p className="mb-3 text-caption text-danger">{errors.activities}</p>}
           <div className="space-y-3">
             {form.activities.map((item, i) => (
               <ItemCard key={i} onRemove={() => patch({ activities: removeAt(form.activities, i) })} label="занятие">
@@ -594,7 +594,7 @@ export function ProfileEditor({
           <div className="space-y-7">
             <div>
               <SkillsInput value={form.skills} onChange={(skills) => patch({ skills })} />
-              {errors.skills && <p className="pt-2 text-[12.5px] text-danger">{errors.skills}</p>}
+              {errors.skills && <p className="pt-2 text-caption text-danger">{errors.skills}</p>}
             </div>
 
             <ResumeUpload
@@ -606,10 +606,10 @@ export function ProfileEditor({
         </Section>
 
         <Section title="Ссылки и видео-визитка">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Портфолио, сертификаты, GitHub, публикации. Только ссылки https://
           </p>
-          {errors.links && <p className="mb-3 text-[12.5px] text-danger">{errors.links}</p>}
+          {errors.links && <p className="mb-3 text-caption text-danger">{errors.links}</p>}
           <div className="space-y-3">
             {form.links.map((link, i) => (
               <ItemCard key={i} onRemove={() => patch({ links: removeAt(form.links, i) })} label="ссылку">
@@ -656,12 +656,12 @@ export function ProfileEditor({
         </Section>
 
         <Section title="Вход и согласие">
-          <div className="space-y-4 text-[13.5px] leading-relaxed">
+          <div className="space-y-4 text-small leading-relaxed">
             <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
               <span className="text-paper-faint">Почта</span>
               <span className="min-w-0 break-all text-paper">{email}</span>
             </div>
-            <p className="text-[12.5px] leading-relaxed text-paper-faint">
+            <p className="text-caption leading-relaxed text-paper-faint">
               Почта — это вход в аккаунт, поменять её здесь нельзя: смена
               требует подтверждения нового адреса. Напишите в агентство, если
               адрес нужно изменить.
@@ -675,7 +675,7 @@ export function ProfileEditor({
                 дано {consent.at}.
               </span>
             </div>
-            <p className="flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-caption">
               <Link href="/legal/consent" className="text-paper/80 underline underline-offset-4 hover:text-paper">
                 Текст согласия
               </Link>
@@ -708,7 +708,7 @@ export function ProfileEditor({
             className="page-x fixed inset-x-0 bottom-0 z-40 border-t border-[var(--hairline)] bg-ink/85 py-4 backdrop-blur-glass"
           >
             <div className="clear-theme-toggle mx-auto flex max-w-[42rem] items-center justify-between gap-4">
-              <span className="text-[13px] text-paper-dim">Есть несохранённые изменения</span>
+              <span className="text-small text-paper-dim">Есть несохранённые изменения</span>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
@@ -736,7 +736,7 @@ export function ProfileEditor({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="glass rounded-3xl p-6 sm:p-7">
-      <h2 className="mb-5 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
+      <h2 className="mb-5 text-caption uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
       {children}
     </section>
   );
@@ -809,11 +809,11 @@ function LogoutSection() {
 
   return (
     <section className="rounded-3xl border border-[var(--hairline)] bg-graphite-900/40 p-6 sm:p-7">
-      <h2 className="mb-2 flex items-center gap-2 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">
+      <h2 className="mb-2 flex items-center gap-2 text-caption uppercase tracking-[0.12em] text-paper-faint">
         <LogOut className="size-3.5" aria-hidden />
         Выход из аккаунта
       </h2>
-      <p className="text-[13.5px] leading-relaxed text-paper-dim">
+      <p className="text-small leading-relaxed text-paper-dim">
         Вы выйдете на этом устройстве. Вернуться можно в любой момент — по почте и паролю.
       </p>
       <Button variant="outline" size="sm" className="mt-5" loading={pending} onClick={() => void logout()} icon={<LogOut />}>
@@ -853,11 +853,11 @@ function DangerZone() {
 
   return (
     <section className="rounded-3xl border border-danger/25 bg-danger/[0.05] p-6 sm:p-7">
-      <h2 className="mb-2 flex items-center gap-2 text-[12.5px] uppercase tracking-[0.12em] text-danger">
+      <h2 className="mb-2 flex items-center gap-2 text-caption uppercase tracking-[0.12em] text-danger">
         <TriangleAlert className="size-3.5" aria-hidden />
         Удаление профиля
       </h2>
-      <p className="text-[13.5px] leading-relaxed text-paper-dim">
+      <p className="text-small leading-relaxed text-paper-dim">
         Удаляются анкета, отклики и переписка с работодателями. Восстановить
         их нельзя. Работодатели, которым вы уже откликнулись, перестанут
         видеть ваши контакты.

@@ -4,12 +4,20 @@ import { ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { SupportForm } from '@/components/forms/SupportForm';
 import { ShowTourButton } from '@/components/onboarding/ShowTourButton';
+import { SectionTitle } from '@/components/ui/SectionTitle';
+import { pageMetadata } from '@/lib/seo';
 import { PENDING_APPLICATION_DAYS, STUDY_DOC_WORKDAYS } from '@/lib/study';
 
-export const metadata: Metadata = {
-  title: 'Помощь',
-  description: 'Как пользоваться платформой: студентам, компаниям и HR-менеджеру агентства.',
-};
+// Адрес в canonical и og:url — из APP_URL на запрос (см. lib/seo.ts)
+export const dynamic = 'force-dynamic';
+
+export function generateMetadata(): Metadata {
+  return pageMetadata({
+    title: 'Помощь',
+    description: 'Как пользоваться платформой: студентам, компаниям и HR-менеджеру агентства.',
+    path: '/help',
+  });
+}
 
 interface Question {
   q: string;
@@ -105,14 +113,14 @@ export default function HelpPage() {
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
         <Logo href="/" />
-        <Link href="/login" className="text-[13px] text-paper-faint transition-colors hover:text-paper">
+        <Link href="/login" className="text-small text-paper-faint transition-colors hover:text-paper">
           Войти
         </Link>
       </header>
 
       <main className="page-x mx-auto max-w-3xl pb-24 pt-4">
-        <h1 className="text-display-md text-paper">Помощь</h1>
-        <p className="mt-2.5 max-w-[56ch] text-[14.5px] leading-relaxed text-paper-dim">
+        <h1 className="text-headline text-paper">Помощь</h1>
+        <p className="mt-2.5 max-w-[56ch] text-body leading-relaxed text-paper-dim">
           Как устроена платформа для студентов, компаний и HR-менеджера агентства. Внутри кабинета эта
           страница и короткая инструкция — под кнопкой «?» в шапке.
         </p>
@@ -125,13 +133,13 @@ export default function HelpPage() {
         <Group title="HR-менеджеру агентства" items={HR} />
 
         <section className="mt-10">
-          <h2 className="text-eyebrow uppercase text-paper-faint">Написать в поддержку</h2>
-          <div className="mt-3">
+          <SectionTitle>Написать в поддержку</SectionTitle>
+          <div className="mt-4">
             <SupportForm />
           </div>
         </section>
 
-        <p className="mt-10 text-[13px] leading-relaxed text-paper-faint">
+        <p className="mt-10 text-small leading-relaxed text-paper-faint">
           Документы: <Link href="/legal/terms" className="underline underline-offset-4 hover:text-paper">пользовательское соглашение</Link>,{' '}
           <Link href="/legal/privacy" className="underline underline-offset-4 hover:text-paper">политика обработки персональных данных</Link>.
         </p>
@@ -143,15 +151,15 @@ export default function HelpPage() {
 function Group({ title, items }: { title: string; items: Question[] }) {
   return (
     <section className="mt-10">
-      <h2 className="text-eyebrow uppercase text-paper-faint">{title}</h2>
-      <div className="mt-3 space-y-2.5">
+      <SectionTitle>{title}</SectionTitle>
+      <div className="mt-4 space-y-2.5">
         {items.map((item) => (
           <details key={item.q} className="glass group rounded-2xl px-5 py-4">
-            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-[15px] font-medium text-paper [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-body font-medium text-paper [&::-webkit-details-marker]:hidden">
               {item.q}
               <ChevronDown className="mt-0.5 size-4 shrink-0 text-paper-faint transition-transform group-open:rotate-180" aria-hidden />
             </summary>
-            <p className="mt-2.5 text-[14px] leading-relaxed text-paper-dim">{item.a}</p>
+            <p className="mt-2.5 text-small leading-relaxed text-paper-dim">{item.a}</p>
           </details>
         ))}
       </div>

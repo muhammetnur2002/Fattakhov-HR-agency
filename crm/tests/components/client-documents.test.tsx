@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname.current,
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  // ConfirmBlock берёт useStaleGuard: без этой подмены «страница устарела» в catch не отличить от обычной ошибки
+  unstable_isUnrecognizedActionError: () => false,
 }));
 vi.mock("@/app/(client)/documents/actions", () => ({
   uploadSignedContractAction: actions.uploadSignedContractAction,

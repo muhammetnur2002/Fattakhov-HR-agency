@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Building2 } from 'lucide-react';
 import { ChatEmpty, ChatScreen } from '@/components/chat/ChatScreen';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
 import { getStudentThread } from '@/lib/agency-chat';
 import { getThread, listThreads } from '@/lib/chat';
 import { requireStudentPage } from '@/lib/security/guards';
@@ -32,11 +32,9 @@ export default async function MessagesPage(
     return (
       <ChatEmpty
         action={
-          <Link href="/feed">
-            <Button size="lg" iconRight={<ArrowRight />}>
-              В ленту вакансий
-            </Button>
-          </Link>
+          <ButtonLink href="/feed" size="lg" iconRight={<ArrowRight />}>
+            В ленту вакансий
+          </ButtonLink>
         }
       />
     );
@@ -71,13 +69,13 @@ function AgencyLink({ unread, last }: { unread: number; last: string }) {
         <Building2 className="size-5 text-paper/60" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14.5px] font-medium text-paper">Агентство</span>
-        <span className="block truncate text-[13px] text-paper-dim">
+        <span className="block text-body font-medium text-paper">Агентство</span>
+        <span className="block truncate text-small text-paper-dim">
           {preview.length > 90 ? `${preview.slice(0, 89)}…` : preview}
         </span>
       </span>
       {unread > 0 && (
-        <span className="rounded-full bg-paper px-2 py-0.5 text-[12px] font-semibold text-ink">{unread}</span>
+        <span className="rounded-full bg-paper px-2 py-0.5 text-caption font-semibold text-ink">{unread}</span>
       )}
     </Link>
   );

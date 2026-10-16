@@ -1,6 +1,7 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useReducedMotionSafe } from '@/lib/hooks/useReducedMotionSafe';
 import { cn } from '@/lib/utils';
 import { easeOutExpo, rise } from '@/lib/motion';
 
@@ -67,7 +68,7 @@ export function SplitTextInView({
   each?: number;
   as?: 'h1' | 'h2' | 'h3' | 'p';
 }) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotionSafe();
   const words = text.split(' ');
 
   if (reduced) return <Tag className={className}>{text}</Tag>;

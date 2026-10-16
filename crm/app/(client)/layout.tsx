@@ -18,6 +18,7 @@ import { pushConfigured } from "@/lib/notifications/push-config";
 import type { ContractGateAccess, ContractState } from "@/lib/contract-gate";
 import { getActiveAgreement, hasAgreement } from "@/lib/services/agreements";
 import { needsBrief } from "@/lib/services/registration";
+import { Toaster } from "@/components/ui/sonner";
 
 // Установка на экран «Домой» и цифры без автоссылок — см. lib/cabinet-metadata.ts
 export const metadata = CABINET_METADATA;
@@ -125,6 +126,9 @@ export default async function ClientLayout({
           {children}
         </ContractGate>
       </AppShell>
+      {/* Уведомления-«тосты» нужны только кабинетам (доска, модерация, заявки): в корневом макете
+          они клали код sonner в первую загрузку сайта и входа, где ни одного тоста нет */}
+      <Toaster />
     </TimeZoneProvider>
   );
 }

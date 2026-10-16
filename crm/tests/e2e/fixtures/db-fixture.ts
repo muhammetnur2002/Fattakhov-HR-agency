@@ -17,6 +17,7 @@
  */
 import "dotenv/config";
 
+import { inviteTokenColumns } from "../../../lib/auth/invite-token";
 import { prisma, prismaRaw } from "../../../lib/db/prisma";
 
 type Input =
@@ -79,7 +80,22 @@ type Input =
     }
   | { op: "cleanupLeads"; namePrefix: string }
   | { op: "createSelfRegisteredClient"; email: string; briefCompleted: boolean }
-  | { op: "deleteSelfRegisteredClient"; email: string };
+  | { op: "deleteSelfRegisteredClient"; email: string }
+  | {
+      op: "createInvitation";
+      organizationId: string;
+      /** `null` — приглашение сотрудника агентства (экран «Сотрудники»), иначе — в кабинет клиента */
+      clientId: string | null;
+      email: string;
+      createdById: string;
+      role?: "CLIENT_ADMIN" | "RECRUITER";
+      /** Со ссылкой, которую экран может показать (шифр токена); без — только хеш, ссылки на экране нет */
+      withLink?: boolean;
+    }
+  | { op: "invitationExists"; invitationId: string }
+  | { op: "deleteInvitation"; invitationId: string }
+  | { op: "setVkUser"; userId: string; vkUserId: string | null }
+  | { op: "getVkUser"; userId: string };
 
 async function run(input: Input) {
   switch (input.op) {
@@ -372,6 +388,46 @@ async function run(input: Input) {
       await prismaRaw.user.delete({ where: { id: user.id } });
       if (user.clientId) await prismaRaw.client.delete({ where: { id: user.clientId } });
       return { removed: 1 };
+    }
+
+    case "createInvitation": {
+      // Неотвеченное приглашение: для проверки «Отозвать». Токен — случайный; без `withLink` в базе только хеш,
+      // и экран показывает подсказку вместо ссылки; с ним — шифр, и рядом с «Отозвать» стоит строка ссылки
+      const { randomBytes } = await import("node:crypto");
+      const token = randomBytes(32).toString("hex");
+      const invitation = await prismaRaw.invitation.create({
+        data: {
+          organizationId: input.organizationId,
+          email: input.email,
+          role: input.role ?? "CLIENT_ADMIN",
+          clientId: input.clientId,
+          ...(input.withLink ? inviteTokenColumns(token) : { tokenHash: token }),
+          expiresAt: new Date(Date.now() + 7 * 24 * 3_600_000),
+          createdById: input.createdById,
+        },
+        select: { id: true },
+      });
+      return { invitationId: invitation.id };
+    }
+
+    case "invitationExists": {
+      const found = await prismaRaw.invitation.findUnique({ where: { id: input.invitationId }, select: { id: true } });
+      return { exists: Boolean(found) };
+    }
+
+    case "deleteInvitation": {
+      const removed = await prismaRaw.invitation.deleteMany({ where: { id: input.invitationId } });
+      return { removed: removed.count };
+    }
+
+    case "setVkUser": {
+      await prismaRaw.user.update({ where: { id: input.userId }, data: { vkUserId: input.vkUserId } });
+      return {};
+    }
+
+    case "getVkUser": {
+      const user = await prismaRaw.user.findUniqueOrThrow({ where: { id: input.userId }, select: { vkUserId: true } });
+      return { vkUserId: user.vkUserId };
     }
 
     case "cleanupCandidate": {

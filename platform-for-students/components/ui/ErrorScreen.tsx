@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { unstable_isUnrecognizedActionError as isStaleAction } from 'next/navigation';
 import { useEffect } from 'react';
 import { CubeMark } from '@/components/brand/CubeMark';
 import { Logo } from '@/components/brand/Logo';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 
 /**
  * Что видит человек, когда страница упала.
@@ -47,14 +46,14 @@ export function ErrorScreen({
       }
     >
       <CubeMark className="h-16 w-16 text-paper/25" />
-      <h1 className="mt-8 text-display-sm text-paper">{stale ? 'Страница устарела' : 'Что-то пошло не так'}</h1>
-      <p className="mt-3.5 text-[14.5px] leading-relaxed text-paper-dim">
+      <h1 className="mt-8 text-title text-paper">{stale ? 'Страница устарела' : 'Что-то пошло не так'}</h1>
+      <p className="mt-3.5 text-body leading-relaxed text-paper-dim">
         {stale
           ? 'Пока она была открыта, мы выложили новую версию, и ваше последнее действие не выполнилось. Обновите страницу и повторите его.'
           : 'Страница не открылась. Попробуйте ещё раз; если повторится, напишите нам и назовите код ниже: по нему мы найдём, что случилось.'}
       </p>
       {!stale && error.digest && (
-        <code className="mt-4 rounded-lg bg-paper/[0.06] px-2.5 py-1 text-[12px] text-paper-faint">{error.digest}</code>
+        <code className="mt-4 rounded-lg bg-paper/[0.06] px-2.5 py-1 text-caption text-paper-faint">{error.digest}</code>
       )}
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         {stale ? (
@@ -66,11 +65,9 @@ export function ErrorScreen({
             Повторить
           </Button>
         )}
-        <Link href={home.href}>
-          <Button variant="ghost" size="lg">
-            {home.label}
-          </Button>
-        </Link>
+        <ButtonLink href={home.href} variant="ghost" size="lg">
+          {home.label}
+        </ButtonLink>
       </div>
     </main>
   );

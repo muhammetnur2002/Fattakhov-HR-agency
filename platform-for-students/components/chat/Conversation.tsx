@@ -106,7 +106,7 @@ export function Conversation({
           <MessageSquare className="size-6 text-paper/30" aria-hidden />
         </span>
         {/* Формулировка нейтральная: этот экран видят обе стороны */}
-        <p className="max-w-[30ch] text-[14px] leading-relaxed text-paper-dim">
+        <p className="max-w-[30ch] text-small leading-relaxed text-paper-dim">
           Выберите диалог слева. Переписка ведётся по каждому отклику отдельно — по конкретной
           вакансии.
         </p>
@@ -131,14 +131,14 @@ export function Conversation({
         )}
         <Avatar name={thread.counterpartName} src={thread.counterpartPhotoUrl} size={40} rounded="square" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14.5px] font-medium text-paper">{thread.counterpartName}</p>
-          <p className="truncate text-[12.5px] text-paper-faint">
+          <p className="truncate text-body font-medium text-paper">{thread.counterpartName}</p>
+          <p className="truncate text-caption text-paper-faint">
             {thread.vacancyTitle} · {thread.counterpartSubtitle}
           </p>
           {/* Отдельной строкой, а не в хвосте предыдущей: там уже две
               склеенные подписи, и на узком экране статус терялся бы
               первым. Строки нет вовсе, когда статус показывать нечего */}
-          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="text-[11.5px] text-paper-faint" />
+          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="text-caption text-paper-faint" />
         </div>
         {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0" />}
       </header>
@@ -156,7 +156,7 @@ export function Conversation({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: durations.base, ease: easeOutExpo }}
-            className="mx-auto mt-16 max-w-[34ch] text-center text-[13.5px] leading-relaxed text-paper-faint"
+            className="mx-auto mt-16 max-w-[34ch] text-center text-small leading-relaxed text-paper-faint"
           >
             Сообщений пока нет. Здесь появится переписка по вакансии «{thread.vacancyTitle}».
           </motion.p>
@@ -265,9 +265,9 @@ export function ThreadRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="truncate text-[14px] font-medium text-paper">{thread.counterpartName}</p>
+          <p className="truncate text-small font-medium text-paper">{thread.counterpartName}</p>
           {thread.lastMessageAt && (
-            <span className="shrink-0 text-[11px] tabular-nums text-paper-faint">
+            <span className="shrink-0 text-caption tabular-nums text-paper-faint">
               {threadStamp(thread.lastMessageAt)}
             </span>
           )}
@@ -275,7 +275,7 @@ export function ThreadRow({
         {/* Статус — в одной строке с вакансией: четвёртая строка раздула бы
             карточку, а строк в списке много. Название ужимается первым,
             статус короткий и остаётся читаемым */}
-        <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-paper-faint">
+        <div className="flex min-w-0 items-center gap-1.5 text-caption text-paper-faint">
           <span className="truncate">{thread.vacancyTitle}</span>
           {thread.counterpartLastSeen && (
             <>
@@ -286,12 +286,12 @@ export function ThreadRow({
             </>
           )}
         </div>
-        <p className={cn('mt-0.5 truncate text-[12.5px]', previewTone)}>
+        <p className={cn('mt-0.5 truncate text-caption', previewTone)}>
           {preview ?? 'Переписки ещё не было'}
         </p>
       </div>
       {thread.unread > 0 && (
-        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent-500 text-[10.5px] font-medium tabular-nums text-paper">
+        <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-accent-300 px-1 text-caption font-medium tabular-nums text-ink">
           {thread.unread}
         </span>
       )}

@@ -51,7 +51,7 @@ export function ConsentChecks({
 
   return (
     <div className="space-y-3">
-      <p className="rounded-2xl border border-accent-500/25 bg-accent-500/[0.07] px-4 py-3 text-[13px] leading-relaxed text-paper-dim">
+      <p className="rounded-2xl border border-accent-500/25 bg-accent-500/[0.07] px-4 py-3 text-small leading-relaxed text-paper-dim">
         Прочитайте внимательно: отмечая пункты ниже, вы соглашаетесь с документами. Каждый открывается
         по ссылке «Прочитать».
       </p>
@@ -89,7 +89,7 @@ export function ConsentChecks({
         hint="Необязательно. Отказаться можно в любой момент."
       />
 
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-1 text-[12px] text-paper-faint">
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-1 text-caption text-paper-faint">
         <ShieldCheck className="size-3.5 shrink-0 text-accent-400" aria-hidden />
         Как мы храним и защищаем данные —
         <button
@@ -178,15 +178,15 @@ function CheckRow({
               <Check className="size-3.5 text-ink" strokeWidth={3} aria-hidden />
             </motion.span>
           </span>
-          <span className="text-[13.5px] leading-relaxed text-paper">
+          <span className="text-small leading-relaxed text-paper">
             {label}
             {required && <span className="text-paper-faint"> (обязательно)</span>}
-            {hint && <span className="mt-0.5 block text-[12.5px] text-paper-faint">{hint}</span>}
+            {hint && <span className="mt-0.5 block text-caption text-paper-faint">{hint}</span>}
           </span>
         </button>
         {action && <div className="mt-2 pl-8">{action}</div>}
       </div>
-      {error && <p className="pl-1 pt-1.5 text-[12.5px] text-danger">{error}</p>}
+      {error && <p className="pl-1 pt-1.5 text-caption text-danger">{error}</p>}
     </div>
   );
 }
@@ -196,7 +196,7 @@ function ReadLink({ onClick, children }: { onClick: () => void; children: React.
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 text-[13px] text-accent-200 underline-offset-4 transition-colors hover:text-paper hover:underline"
+      className="inline-flex items-center gap-1.5 text-small text-accent-200 underline-offset-4 transition-colors hover:text-paper hover:underline"
     >
       <FileText className="size-3.5" aria-hidden />
       {children}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   clientTransitionAction,
@@ -8,13 +8,12 @@ import {
 } from "@/app/actions/vacancies";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { VacancyStatus } from "@/lib/generated/prisma/enums";
 import { panelClass } from "@/components/ui/panel";
 import { useFormAction } from "@/lib/hooks/use-form-action";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 function Submit({ label, loading }: { label: string; loading?: boolean }) {
   return (
@@ -42,8 +41,8 @@ export function ClientVacancyActions({
     {},
   );
   const [cancelling, setCancelling] = useState(false);
-  // «Отменить заявку» заменяется формой причины: фокус — в поле, а после «Не отменять» — обратно на кнопку
-  const { triggerRef, focusRef, questionId } = useConfirmFocus<HTMLButtonElement, HTMLInputElement>(cancelling);
+  // «Отменить заявку» заменяется формой причины: фокус — в поле, а после «Не отменять» — обратно на кнопку (ConfirmBlock)
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const showHold = canHold && status === "ACTIVE";
   const showResume = canHold && status === "ON_HOLD";
@@ -86,33 +85,28 @@ export function ClientVacancyActions({
 
       {/* Причина обязательна: без неё в аналитике останется дыра,
           а рекрутер не поймёт, что пошло не так */}
-      {cancelling && (
-        <form {...formProps} aria-labelledby={questionId} className={panelClass("plain", "space-y-2")}>
-          <input type="hidden" name="vacancyId" value={vacancyId} />
-          <input type="hidden" name="to" value="CLOSED_CANCELLED" />
-          <Label id={questionId} htmlFor="closeReason">
-            Почему отменяете?
-          </Label>
-          <Input
-            ref={focusRef}
-            id="closeReason"
-            name="closeReason"
-            required
-            placeholder="Закрыли внутренним переводом"
-          />
-          <div className="flex gap-2">
-            <Submit label="Отменить заявку" loading={pending} />
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setCancelling(false)}
-            >
-              Не отменять
-            </Button>
-          </div>
-        </form>
-      )}
+      <ConfirmBlock
+        open={cancelling}
+        onOpenChange={setCancelling}
+        triggerRef={triggerRef}
+        formProps={formProps}
+        className={panelClass("plain", "space-y-2")}
+        question="Почему отменяете?"
+        questionFor="closeReason"
+        confirmLabel="Отменить заявку"
+        confirmVariant="outline"
+        cancelLabel="Не отменять"
+        pending={pending}
+      >
+        <input type="hidden" name="vacancyId" value={vacancyId} />
+        <input type="hidden" name="to" value="CLOSED_CANCELLED" />
+        <Input
+          id="closeReason"
+          name="closeReason"
+          required
+          placeholder="Закрыли внутренним переводом"
+        />
+      </ConfirmBlock>
 
       <FormMessage ref={messageRef} error={state.error} />
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 
 import {
   deleteCandidateFileAction,
@@ -12,10 +12,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FormMessage } from "@/components/ui/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { FileInput } from "@/components/ui/file-input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { MAX_FILE_SIZE, oversizeMessage } from "@/lib/upload-limits";
 
 export type CandidateFileRow = {
@@ -142,22 +142,6 @@ export function CandidateFilesCard({
 }
 
 function FileItem({ file }: { file: CandidateFileRow }) {
-  const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-
-  function remove() {
-    setError(null);
-    start(async () => {
-      const result = await deleteCandidateFileAction(file.id);
-      if (result.error) {
-        setError(result.error);
-        setConfirming(false);
-      }
-    });
-  }
-
   return (
     <li className="space-y-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -180,25 +164,25 @@ function FileItem({ file }: { file: CandidateFileRow }) {
             <Badge variant="outline">только мы</Badge>
           )}
         </div>
-        {confirming ? (
-          <span {...groupProps} className="flex items-center gap-2 text-xs">
-            <span id={questionId}>
+        <ConfirmBlock
+          trigger={
+            <Button type="button" size="sm" variant="ghost">
+              Удалить
+            </Button>
+          }
+          layout="inline"
+          compact
+          question={
+            <>
               Удалить файл<span className="sr-only"> «{file.fileName}»</span>?
-            </span>
-            <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>
-              Да, удалить
-            </Button>
-            <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
-              Нет
-            </Button>
-          </span>
-        ) : (
-          <Button ref={triggerRef} type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>
-            Удалить
-          </Button>
-        )}
+            </>
+          }
+          confirmLabel="Да, удалить"
+          cancelLabel="Нет"
+          cancelVariant="outline"
+          onConfirm={() => deleteCandidateFileAction(file.id)}
+        />
       </div>
-      <FormMessage compact error={error} />
     </li>
   );
 }

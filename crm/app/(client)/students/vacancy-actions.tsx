@@ -1,49 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmBlock, ConfirmExtraAction } from "@/components/ui/confirm-block";
 import type { StudentsVacancyStatus } from "@/lib/students-service";
 import { vacancyActionAction } from "./actions";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 
 /** Снять с публикации (с выбором — сохранить или удалить сразу) и удалить снятую. */
 export function VacancyActions({ id, status }: { id: string; status: StudentsVacancyStatus }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [closing, setClosing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const {
-    triggerRef: closeTrigger,
-    focusRef: closeFocus,
-    questionId: closeQuestionId,
-    groupProps: closeGroup,
-  } = useConfirmFocus(closing);
-  const {
-    triggerRef: deleteTrigger,
-    focusRef: deleteFocus,
-    questionId: deleteQuestionId,
-    groupProps: deleteGroup,
-  } = useConfirmFocus(confirmingDelete);
-
-  function run(action: "close" | "delete", keep?: boolean) {
-    setError(null);
-    startTransition(async () => {
-      const result = await vacancyActionAction(id, action, keep);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setClosing(false);
-      // Удалённой вакансии больше нет — на её странице делать нечего
-      if (action === "delete") router.push("/students");
-      else router.refresh();
-    });
+  async function run(action: "close" | "delete", keep?: boolean) {
+    const result = await vacancyActionAction(id, action, keep);
+    if (result.error) return { error: result.error };
+    // Удалённой вакансии больше нет — на её странице делать нечего
+    if (action === "delete") router.push("/students");
+    else router.refresh();
   }
 
   // Уже не работает: снятую, отклонённую и черновик можно убрать из списка совсем
@@ -54,26 +28,14 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
           <CardTitle className="text-base">Управление</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <FormMessage error={error} />
-          {confirmingDelete ? (
-            <div {...deleteGroup} className="space-y-2">
-              <p id={deleteQuestionId} className="text-sm">
-                Удалить вакансию из списка? Это нельзя отменить.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="destructive" loading={pending} onClick={() => run("delete")}>
-                  {pending ? "Удаляем…" : "Да, удалить"}
-                </Button>
-                <Button ref={deleteFocus} aria-describedby={deleteQuestionId} variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(false)}>
-                  Отмена
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button ref={deleteTrigger} variant="destructive" disabled={pending} onClick={() => setConfirmingDelete(true)}>
-              Удалить
-            </Button>
-          )}
+          <ConfirmBlock
+            trigger={<Button variant="destructive">Удалить</Button>}
+            size="default"
+            question="Удалить вакансию из списка? Это нельзя отменить."
+            confirmLabel="Да, удалить"
+            pendingLabel="Удаляем…"
+            onConfirm={() => run("delete")}
+          />
         </CardContent>
       </Card>
     );
@@ -85,29 +47,16 @@ export function VacancyActions({ id, status }: { id: string; status: StudentsVac
         <CardTitle className="text-base">Управление</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <FormMessage error={error} />
-        {closing ? (
-          <div {...closeGroup} className="space-y-2">
-            <p id={closeQuestionId} className="text-sm text-muted-foreground">
-              Закрыть вакансию? Студенты её не увидят, отклики сохранятся. Сохранить её в истории?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={pending} onClick={() => run("close", true)}>
-                Сохранить и закрыть
-              </Button>
-              <Button variant="destructive" disabled={pending} onClick={() => run("close", false)}>
-                Не сохранять
-              </Button>
-              <Button ref={closeFocus} aria-describedby={closeQuestionId} variant="ghost" disabled={pending} onClick={() => setClosing(false)}>
-                Отмена
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Button ref={closeTrigger} variant="outline" disabled={pending} onClick={() => setClosing(true)}>
-            Снять с публикации
-          </Button>
-        )}
+        <ConfirmBlock
+          trigger={<Button variant="outline">Снять с публикации</Button>}
+          size="default"
+          questionClassName="text-muted-foreground"
+          question="Закрыть вакансию? Студенты её не увидят, отклики сохранятся. Сохранить её в истории?"
+          confirmLabel="Не сохранять"
+          onConfirm={() => run("close", false)}
+          // Третий исход: закрыть, оставив вакансию в истории — не красная кнопка, ничего не теряется
+          extraActions={<ConfirmExtraAction task={() => run("close", true)}>Сохранить и закрыть</ConfirmExtraAction>}
+        />
       </CardContent>
     </Card>
   );

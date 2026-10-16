@@ -2,7 +2,7 @@
 
 import { Check, FileText, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { decideStudyReviewAction } from "./actions";
@@ -14,8 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { studentsFileProxyUrl } from "@/lib/students-file-url";
 import type { PendingStudyStudent } from "@/lib/students-service";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
-import { FormMessage } from "@/components/ui/form-message";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 
 export function StudyBoard({ students: initial }: { students: PendingStudyStudent[] }) {
   const router = useRouter();
@@ -96,21 +95,19 @@ function StudentCard({
   onDecide: (decision: "APPROVE" | "REJECT", note?: string) => Promise<boolean>;
 }) {
   const [rejecting, setRejecting] = useState(false);
-  // «Вернуть с причиной» заменяет кнопки полем причины: фокус — в поле, после «Отмены» — на кнопку
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
+  // «Вернуть с причиной» заменяет кнопки полем причины: фокус — в поле, после «Отмены» — на кнопку (ConfirmBlock)
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
   async function reject() {
     if (note.trim().length < 5) {
       setError("Напишите причину — студент увидит её в профиле");
-      return;
+      return false;
     }
     const done = await onDecide("REJECT", note.trim());
-    if (done) {
-      setRejecting(false);
-      setNote("");
-    }
+    if (!done) return false; // отказ сервера уже показан плашкой выше, блок остаётся открытым
+    setNote("");
   }
 
   return (
@@ -144,33 +141,7 @@ function StudentCard({
           Сверьте ФИО, учебное заведение и дату выдачи. После решения файл удаляется.
         </p>
 
-        {rejecting ? (
-          <div {...groupProps} className="space-y-2">
-            {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
-            <span id={questionId} className="sr-only">
-              Вернуть справку с причиной
-            </span>
-            <Textarea
-              ref={focusRef}
-              value={note}
-              rows={2}
-              placeholder="Причина — студент увидит её в профиле"
-              onChange={(e) => {
-                setNote(e.target.value);
-                setError(undefined);
-              }}
-            />
-            <FormMessage compact error={error} />
-            <div className="flex gap-2">
-              <Button variant="destructive" size="sm" disabled={busy} onClick={() => void reject()}>
-                <X /> Вернуть справку
-              </Button>
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setRejecting(false)}>
-                Отмена
-              </Button>
-            </div>
-          </div>
-        ) : (
+        {!rejecting && (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" disabled={busy} onClick={() => void onDecide("APPROVE")}>
               <Check /> Подтвердить учёбу
@@ -180,6 +151,33 @@ function StudentCard({
             </Button>
           </div>
         )}
+        {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
+        <ConfirmBlock
+          open={rejecting}
+          onOpenChange={setRejecting}
+          triggerRef={triggerRef}
+          questionHidden
+          question="Вернуть справку с причиной"
+          confirmLabel={
+            <>
+              <X /> Вернуть справку
+            </>
+          }
+          pending={busy}
+          error={error}
+          errorLine
+          onConfirm={reject}
+        >
+          <Textarea
+            value={note}
+            rows={2}
+            placeholder="Причина — студент увидит её в профиле"
+            onChange={(e) => {
+              setNote(e.target.value);
+              setError(undefined);
+            }}
+          />
+        </ConfirmBlock>
       </CardContent>
     </Card>
   );

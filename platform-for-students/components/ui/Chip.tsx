@@ -42,7 +42,10 @@ export function Chip({
       className={cn(
         'relative inline-flex select-none items-center gap-1.5 rounded-full border font-medium',
         'transition-colors duration-300 ease-out-expo disabled:opacity-40',
-        size === 'sm' ? 'h-8 px-3 text-[12.5px]' : 'h-10 px-4 text-[13.5px]',
+        // min-h, а не h: длинная подпись («Доп. обучение: школы, языки, кружки») переносится на вторую
+        // строку, и при фиксированных 40px текст упирался в рамку (зазор 1px сверху и снизу).
+        // Отступ py даёт воздух у двух строк (≈9px до букв вместо 1px); одна строка остаётся прежних 40 (32) px
+        size === 'sm' ? 'min-h-8 px-3 py-1 text-caption' : 'min-h-10 px-4 py-1.5 text-small',
         selected
           ? 'border-accent-400/60 bg-accent-500/22 text-paper shadow-[0_0_0_1px_rgba(110,136,162,0.25),0_6px_20px_-8px_rgba(84,110,136,0.6)]'
           : 'border-[var(--hairline)] bg-graphite-900/50 text-paper/70 hover:border-paper/22 hover:text-paper',
@@ -78,8 +81,8 @@ export function Tag({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] font-medium leading-none',
-        tone === 'neutral' && 'border-[var(--hairline)] bg-paper/[0.04] text-paper/65',
+        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-caption font-medium leading-none',
+        tone === 'neutral' && 'border-[var(--hairline)] bg-paper/[0.04] text-paper-dim',
         tone === 'accent' && 'border-accent-500/35 bg-accent-500/15 text-accent-200',
         tone === 'hot' && 'border-warn/35 bg-warn/12 text-warn',
         className,

@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  Шаблон картинки для превью ссылок (og:image и twitter:image): public/brand/og-students.png, 1200×630.
+  Одна картинка на все публичные страницы (lib/seo.ts, pageMetadata) — фирменный знак, главный
+  заголовок витрины и строка-пояснение. Чисел и обещаний здесь нет намеренно: то, что нельзя
+  подтвердить, в превью ссылки не попадает.
+
+  Перерисовать (Playwright есть в crm/node_modules; из папки platform-for-students):
+
+    node -e "const {chromium}=require('../crm/node_modules/playwright');(async()=>{const b=await chromium.launch();
+      const p=await b.newPage({viewport:{width:1200,height:630}});
+      await p.goto('file://'+process.cwd()+'/scripts/og-image/template.html');await p.evaluate(()=>document.fonts.ready);
+      await p.screenshot({path:'public/brand/og-students.png'});await b.close()})()"
+
+  Шрифт и логотип — из public/, те же, что на сайте.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400 700; src: url('../../public/fonts/inter-cyrillic.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: 'Inter'; font-weight: 400 700; src: url('../../public/fonts/inter-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; background: #000; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #f8f8f8;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  /* холодное свечение сверху и виньетка — как атмосфера тёмной темы сайта (--aurora-top, --aurora-vignette) */
+  .glow { position: absolute; inset: 0; background:
+    radial-gradient(60% 70% at 78% 0%, rgba(84, 110, 136, 0.55), rgba(84, 110, 136, 0.14) 55%, transparent 78%),
+    radial-gradient(90% 90% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%); }
+  .mark { position: absolute; right: 64px; top: 50%; height: 400px; transform: translateY(-50%); opacity: 0.16; }
+  .logo { position: absolute; left: 72px; top: 56px; height: 52px; }
+  .eyebrow { position: absolute; left: 72px; top: 156px; font-size: 20px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #8da3b9; }
+  h1 {
+    position: absolute; left: 72px; top: 196px; width: 780px;
+    font-size: 80px; line-height: 0.98; font-weight: 600; letter-spacing: -0.045em;
+    background: linear-gradient(180deg, #f8f8f8 0%, rgba(248, 248, 248, 0.68) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lead { position: absolute; left: 72px; bottom: 56px; width: 760px; font-size: 28px; line-height: 1.4; color: rgba(248, 248, 248, 0.78); }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <img class="mark" src="../../public/brand/mark-light.png" alt="" />
+  <img class="logo" src="../../public/brand/logo-light.png" alt="" />
+  <p class="eyebrow">Для студентов</p>
+  <h1>Работа, которая помещается между парами</h1>
+  <p class="lead">Смахните вправо — отклик уходит работодателю. Проверенные компании, график под учёбу.</p>
+</body>
+</html>

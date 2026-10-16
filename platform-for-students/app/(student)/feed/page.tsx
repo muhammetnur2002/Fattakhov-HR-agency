@@ -34,7 +34,7 @@ export default async function FeedPage() {
       {completeness.percent < COMPLETE_PROFILE_PERCENT && (
         <Link
           href="/profile"
-          className="mb-2 block w-full max-w-[26rem] shrink-0 rounded-2xl border border-accent-500/30 bg-accent-500/[0.08] px-4 py-3 text-[13px] leading-snug text-paper-dim transition-colors hover:bg-accent-500/[0.14]"
+          className="mb-2 block w-full max-w-[26rem] shrink-0 rounded-2xl border border-accent-500/30 bg-accent-500/[0.08] px-4 py-3 text-small leading-snug text-paper-dim transition-colors hover:bg-accent-500/[0.14]"
         >
           <span className="font-medium text-paper">Профиль заполнен на {completeness.percent}%.</span>{' '}
           Добавьте проекты и достижения — работодатель увидит больше, чем резюме.
@@ -64,7 +64,7 @@ function StudyBanner({ study }: { study: StudyStateDTO }) {
       href="/profile#study"
       data-tour="study"
       className={cn(
-        'mb-2 block w-full max-w-[26rem] shrink-0 rounded-2xl border px-4 py-3 text-[13px] leading-snug transition-colors',
+        'mb-2 block w-full max-w-[26rem] shrink-0 rounded-2xl border px-4 py-3 text-small leading-snug transition-colors',
         warn
           ? 'border-warn/35 bg-warn/[0.08] text-paper-dim hover:bg-warn/[0.13]'
           : 'border-accent-500/30 bg-accent-500/[0.08] text-paper-dim hover:bg-accent-500/[0.14]',

@@ -57,7 +57,7 @@ export function SkillsInput({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-[var(--hairline)] bg-graphite-900/55 p-3 transition-colors focus-within:border-accent-400/70">
+      <div className="field-focus rounded-xl border border-[var(--hairline)] bg-graphite-900/55 p-3 transition-colors focus-within:border-accent-300">
         <div className="flex flex-wrap gap-1.5">
           <AnimatePresence initial={false}>
             {value.map((skill) => (
@@ -68,7 +68,7 @@ export function SkillsInput({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={springSnappy}
-                className="inline-flex items-center gap-1 rounded-full border border-accent-400/45 bg-accent-500/18 py-1 pl-3 pr-1.5 text-[13px] text-paper"
+                className="inline-flex items-center gap-1 rounded-full border border-accent-400/45 bg-accent-500/18 py-1 pl-3 pr-1.5 text-small text-paper"
               >
                 {skill}
                 <button
@@ -96,7 +96,7 @@ export function SkillsInput({
             }}
             placeholder={value.length ? 'Ещё навык…' : 'Например, Excel'}
             aria-label="Добавить навык"
-            className="h-8 min-w-[8rem] flex-1 bg-transparent px-1.5 text-[14px] text-paper outline-none placeholder:text-paper/30"
+            className="h-8 min-w-[8rem] flex-1 bg-transparent px-1.5 text-small text-paper outline-0 placeholder:text-paper-faint"
           />
         </div>
       </div>
@@ -112,7 +112,7 @@ export function SkillsInput({
               transition={springSnappy}
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-graphite-900/40',
-                'px-2.5 py-1.5 text-[12.5px] text-paper/55 transition-colors hover:border-paper/25 hover:text-paper',
+                'px-2.5 py-1.5 text-caption text-paper-dim transition-colors hover:border-paper/25 hover:text-paper',
               )}
             >
               <Plus className="size-3" aria-hidden />

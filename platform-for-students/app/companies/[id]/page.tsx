@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ExternalLink, Globe, MapPin, PlayCircle } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
+import { pageMetadata } from '@/lib/seo';
 import { getCompanyPublic } from '@/lib/services';
 import { plural } from '@/lib/utils';
 import { EMPLOYMENT_TYPE_LABEL } from '@/lib/types';
@@ -17,7 +17,12 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
   const company = await getCompanyPublic(params.id);
-  return { title: company ? company.companyName : 'Компания не найдена' };
+  if (!company) return { title: 'Компания не найдена' };
+  return pageMetadata({
+    title: company.companyName,
+    description: `${company.companyName}: страница компании и открытые вакансии для студентов.`,
+    path: `/companies/${params.id}`,
+  });
 }
 
 const isHttp = (url: string) => /^https?:\/\//i.test(url);
@@ -61,9 +66,9 @@ export default async function CompanyPage(props: Props) {
             <Avatar name={company.companyName} src={company.logoUrl} size={72} rounded="square" />
             <div className="min-w-0">
               <p className="text-eyebrow uppercase text-paper-faint">Компания</p>
-              <h1 className="mt-1 break-words text-display-sm text-paper">{company.companyName}</h1>
+              <h1 className="mt-1 break-words text-title text-paper">{company.companyName}</h1>
               {company.city && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-[13.5px] text-paper-dim">
+                <p className="mt-1.5 flex items-center gap-1.5 text-small text-paper-dim">
                   <MapPin className="size-3.5 shrink-0" aria-hidden />
                   {company.city}
                 </p>
@@ -72,7 +77,7 @@ export default async function CompanyPage(props: Props) {
           </div>
 
           {company.about && (
-            <p className="mt-6 whitespace-pre-line text-[15px] leading-relaxed text-paper-dim">{company.about}</p>
+            <p className="mt-6 whitespace-pre-line text-body leading-relaxed text-paper-dim">{company.about}</p>
           )}
 
           {links.length > 0 && (
@@ -83,7 +88,7 @@ export default async function CompanyPage(props: Props) {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow ugc"
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3 py-2 text-[13px] text-paper/80 transition-colors hover:border-paper/25 hover:text-paper"
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-[var(--hairline)] bg-graphite-900/45 px-3 py-2 text-small text-paper/80 transition-colors hover:border-paper/25 hover:text-paper"
                 >
                   {link.icon}
                   <span className="truncate">{link.label}</span>
@@ -110,7 +115,7 @@ export default async function CompanyPage(props: Props) {
 
         <section className="glass mt-6 rounded-3xl p-6 sm:p-8">
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[15px] text-paper">
+            <p className="text-body text-paper">
               {company.activeVacancies > 0 ? (
                 <>
                   <span className="font-semibold">{company.activeVacancies}</span>{' '}
@@ -120,18 +125,16 @@ export default async function CompanyPage(props: Props) {
                 'Открытых вакансий сейчас нет'
               )}
             </p>
-            <Link href="/feed">
-              <Button variant="accent" size="md">
-                Смотреть вакансии
-              </Button>
-            </Link>
+            <ButtonLink href="/feed" variant="accent" size="md">
+              Смотреть вакансии
+            </ButtonLink>
           </div>
           {company.vacancies.length > 0 && (
             <ul className="mt-5 divide-y divide-[var(--hairline)] border-t border-[var(--hairline)]">
               {company.vacancies.map((vacancy) => (
                 <li key={vacancy.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
-                  <span className="min-w-0 break-words text-[14.5px] text-paper">{vacancy.title}</span>
-                  <span className="text-[12.5px] text-paper-faint">
+                  <span className="min-w-0 break-words text-body text-paper">{vacancy.title}</span>
+                  <span className="text-caption text-paper-faint">
                     {vacancy.city} · {EMPLOYMENT_TYPE_LABEL[vacancy.employmentType]}
                   </span>
                 </li>

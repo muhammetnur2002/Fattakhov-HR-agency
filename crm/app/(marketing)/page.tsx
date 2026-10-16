@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BeyondSalary } from "@/components/marketing/beyond-salary";
@@ -10,6 +11,7 @@ import { Pricing } from "@/components/marketing/pricing";
 import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { StructuredData } from "@/components/marketing/structured-data";
 import { SPLIT_EVEN, SPLIT_MAIN } from "@/components/marketing/layout";
+import { pageMetadata } from "@/lib/marketing/seo";
 import { studentsUrl } from "@/lib/urls";
 import {
   Cases,
@@ -22,6 +24,8 @@ import {
   SectionHead,
   WhenSubscription,
 } from "@/components/marketing/sections";
+
+export const metadata: Metadata = pageMetadata("home");
 
 /**
  * Главная страница сайта.
@@ -53,7 +57,7 @@ export default function LandingPage() {
 
   return (
     <>
-      <StructuredData />
+      <StructuredData page="home" />
       <Hero />
       <Facts />
 

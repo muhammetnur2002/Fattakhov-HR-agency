@@ -4,22 +4,12 @@ import Link from "next/link";
 import { RoleMosaic } from "@/components/marketing/role-mosaic";
 import { Cases, Section, SectionHead } from "@/components/marketing/sections";
 import { Button } from "@/components/ui/button";
+import { pageMetadata } from "@/lib/marketing/seo";
 import { appUrl } from "@/lib/urls";
 import { PageHero, PageIntro } from "@/components/marketing/page-intro";
+import { StructuredData } from "@/components/marketing/structured-data";
 
-export const metadata: Metadata = {
-  title: { absolute: "Кейсы подбора персонала · Fattakhov HR Agency" },
-  description:
-    "Реальные задачи найма из практики агентства: сложные роли на стыке аналитики и инженерии, подбор под разные бизнес-направления, оценка кандидатов. Без выдуманных цифр.",
-  alternates: { canonical: "/cases" },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    title: "Кейсы: не обещания, а реальные рабочие ситуации",
-    description:
-      "Что агентство закрывало на практике и по каким задачам клиенты возвращались.",
-  },
-};
+export const metadata: Metadata = pageMetadata("cases");
 
 /**
  * Отдельная страница кейсов.
@@ -36,6 +26,7 @@ export const metadata: Metadata = {
 export default function CasesPage() {
   return (
     <>
+      <StructuredData page="cases" />
       <PageHero>
         <PageIntro eyebrow="Кейсы" title="Не обещания. Реальные рабочие ситуации.">
           Здесь только то, что уже было в практике агентства: сложные роли,
@@ -44,7 +35,7 @@ export default function CasesPage() {
       </PageHero>
 
       <Section id="cases">
-        <Cases />
+        <Cases headingAs="h2" />
       </Section>
 
       <Section tone="muted">

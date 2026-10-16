@@ -1,11 +1,11 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { unstable_isUnrecognizedActionError as isStaleAction } from "next/navigation";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { captureClientException } from "@/lib/monitoring/capture-client";
 import { PageTitle } from "@/components/ui/page-title";
 import { MAIN_LANDMARK_PROPS } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
@@ -66,12 +66,12 @@ export function ErrorScreen({
   useEffect(() => {
     // В браузере это единственное место, где ошибка вообще видна:
     // серверную запись человек, сидящий в кабинете, не откроет.
-    // captureException молча ничего не делает, пока Sentry не поднят
+    // captureClientException ничего не делает и ничего не грузит, пока Sentry не поднят
     // (см. instrumentation-client.ts) — вызывать безусловно можно.
     // Устаревшую вкладку сбоем не считаем
     if (stale) return;
     console.error("[error]", error.digest ?? "", error);
-    Sentry.captureException(error);
+    captureClientException(error);
   }, [error, stale]);
 
   const body = stale ? (

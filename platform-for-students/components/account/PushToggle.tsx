@@ -141,10 +141,10 @@ export function PushToggle({ audience, bordered = true }: { audience: 'student' 
   return (
     <div className={cn('flex items-start justify-between gap-4', bordered && 'border-t border-[var(--hairline)] pt-4')}>
       <div className="min-w-0">
-        <p id={`notify-push-${audience}`} className="text-[13.5px] text-paper">
+        <p id={`notify-push-${audience}`} className="text-small text-paper">
           Уведомления на это устройство
         </p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-paper-faint">
+        <p className="mt-1 text-caption leading-relaxed text-paper-faint">
           {view.kind === 'blocked' ? view.text : COPY[audience]}
         </p>
         {view.kind === 'ready' && view.enabled && (
@@ -152,7 +152,7 @@ export function PushToggle({ audience, bordered = true }: { audience: 'student' 
             type="button"
             disabled={saving}
             onClick={() => void sendTest()}
-            className="mt-2 text-[12.5px] text-paper underline underline-offset-4 disabled:opacity-50"
+            className="mt-2 text-caption text-paper underline underline-offset-4 disabled:opacity-50"
           >
             Отправить проверочное уведомление
           </button>

@@ -98,9 +98,11 @@ export function CalendarMonth({
             <div
               key={day}
               className={cn(
-                "group relative min-h-16 min-w-0 rounded-md bg-card p-1 sm:min-h-28",
+                // Соседний месяц — другой фон и серое число, а не opacity на всей ячейке:
+                // она гасила и чипы с событиями (3,3:1 у интервью) и число (3,75:1)
+                "group relative min-h-16 min-w-0 rounded-md p-1 sm:min-h-28",
+                inMonth ? "bg-card" : "bg-muted",
                 weekendBorder(day),
-                !inMonth && "opacity-50",
               )}
             >
               <div className="flex items-center justify-between">
@@ -109,8 +111,12 @@ export function CalendarMonth({
                   data-daykey={day}
                   aria-label={`${dayTitle(day)}${isToday ? ", сегодня" : ""}${total ? `, событий: ${total}` : ""}`}
                   className={cn(
-                    "flex size-6 items-center justify-center rounded-full text-xs tabular-nums hover:bg-muted focus-visible:outline-2",
-                    isToday && "bg-cal-sun font-semibold text-white hover:bg-cal-sun",
+                    "flex size-6 items-center justify-center rounded-full text-xs tabular-nums focus-visible:outline-2",
+                    isToday
+                      ? "bg-cal-today font-semibold text-white hover:bg-cal-today"
+                      : inMonth
+                        ? "hover:bg-muted"
+                        : "text-muted-foreground hover:bg-card",
                   )}
                 >
                   {dayOfMonth(day)}

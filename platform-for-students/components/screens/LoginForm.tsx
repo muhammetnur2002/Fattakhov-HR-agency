@@ -111,22 +111,22 @@ export function LoginForm({
             которого больше нет. Без пояснения человек видит форму входа
             без причины и решает, что его выкинуло просто так. */}
         {params.get('crm') && (
-          <div className="mb-4 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13px] leading-relaxed text-warn">
+          <div className="mb-4 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed text-warn">
             {CRM_LOGIN_MESSAGES[params.get('crm') ?? ''] ?? CRM_LOGIN_MESSAGES.expired}
           </div>
         )}
         {params.get('reset') === '1' && (
-          <div className="mb-4 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4 text-[13px] leading-relaxed text-paper">
+          <div className="mb-4 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4 text-small leading-relaxed text-paper">
             Пароль изменён — войдите с новым.
           </div>
         )}
         {params.get('reason') === 'sessions-revoked' && (
-          <div className="mb-4 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4 text-[13px] leading-relaxed text-paper">
+          <div className="mb-4 rounded-2xl border border-yes/30 bg-yes/[0.08] p-4 text-small leading-relaxed text-paper">
             Все сессии завершены. Войдите заново; если подозреваете чужой доступ, смените пароль.
           </div>
         )}
         {params.get('reason') === 'stale' && (
-          <div className="mb-4 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13px] leading-relaxed text-warn">
+          <div className="mb-4 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed text-warn">
             Сессия устарела — данные аккаунта изменились на сервере. Войдите заново.
           </div>
         )}
@@ -154,7 +154,7 @@ export function LoginForm({
               <div className="flex justify-end">
                 <Link
                   href="/forgot"
-                  className="text-[12.5px] text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
+                  className="text-caption text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
                 >
                   Забыли пароль?
                 </Link>
@@ -168,7 +168,7 @@ export function LoginForm({
                   animate={{ opacity: 1, height: 'auto', y: 0 }}
                   exit={{ opacity: 0, height: 0, y: -6 }}
                   transition={{ duration: durations.fast, ease: easeOutExpo }}
-                  className="overflow-hidden pt-3 text-[13px] leading-snug text-danger"
+                  className="overflow-hidden pt-3 text-small leading-snug text-danger"
                 >
                   {error}
                 </motion.p>
@@ -187,7 +187,7 @@ export function LoginForm({
               вручную больше не нужно. */}
           {demoHint && (
             <div className="mt-6 rounded-2xl border border-[var(--hairline)] bg-graphite-950/50 p-4">
-              <p className="text-[12px] text-paper/70">Демо-режим — войти одним нажатием</p>
+              <p className="text-caption text-paper/70">Демо-режим — войти одним нажатием</p>
               <div className="mt-3 grid gap-2">
                 <Button
                   variant="outline"
@@ -206,7 +206,7 @@ export function LoginForm({
                   Работодатель — Кофейни «Север»
                 </Button>
               </div>
-              <div className="mt-3 space-y-1 text-[11.5px] leading-relaxed text-paper-faint">
+              <div className="mt-3 space-y-1 text-caption leading-relaxed text-paper-faint">
                 <p>
                   Студент: <code className="text-accent-200">{demoHint.student.email}</code> ·{' '}
                   <code className="text-accent-200">{demoHint.student.password}</code>
@@ -221,14 +221,14 @@ export function LoginForm({
           )}
         </div>
 
-        <p className="mt-6 text-center text-[13px] text-paper-faint">
+        <p className="mt-6 text-center text-small text-paper-faint">
           Ещё нет профиля?{' '}
           <Link href="/register" className="text-paper underline-offset-4 transition-colors hover:underline">
             Регистрация студента
           </Link>
         </p>
         {employerRegisterUrl && (
-          <p className="mt-1.5 text-center text-[13px] text-paper-faint">
+          <p className="mt-1.5 text-center text-small text-paper-faint">
             Вы работодатель?{' '}
             <a href={employerRegisterUrl} className="text-paper underline-offset-4 transition-colors hover:underline">
               Зарегистрировать компанию

@@ -10,6 +10,7 @@ import { CABINET_METADATA } from "@/lib/cabinet-metadata";
 import { prisma } from "@/lib/db/prisma";
 import { AGENCY_NAV } from "@/lib/nav";
 import { pushConfigured } from "@/lib/notifications/push-config";
+import { Toaster } from "@/components/ui/sonner";
 
 // Установка на экран «Домой» и цифры без автоссылок — см. lib/cabinet-metadata.ts
 export const metadata = CABINET_METADATA;
@@ -59,6 +60,9 @@ export default async function AgencyLayout({
         {pushConfigured() && <PushPromptGate userId={actor.id} />}
         {children}
       </AppShell>
+      {/* Уведомления-«тосты» нужны только кабинетам (доска, модерация, заявки): в корневом макете
+          они клали код sonner в первую загрузку сайта и входа, где ни одного тоста нет */}
+      <Toaster />
     </TimeZoneProvider>
   );
 }

@@ -6,38 +6,26 @@ import { MarketingHeader } from "@/components/marketing/header";
 import { MarketingFooter } from "@/components/marketing/footer";
 import { SkipLink } from "@/components/shell/skip-link";
 import { MAIN_LANDMARK_PROPS } from "@/lib/a11y";
+import { SITE_PAGES, TITLE_TEMPLATE, fullTitle } from "@/lib/marketing/seo";
 import { siteOrigin } from "@/lib/urls";
 
+/**
+ * Общие метаданные сайта. Страница задаёт свои целиком через `pageMetadata`
+ * (lib/marketing/seo.ts): Next не сливает вложенные поля, а заменяет их, поэтому
+ * здесь нет ни canonical, ни openGraph — унаследованные, они называли бы
+ * главную оригиналом каждой страницы и подставляли её заголовок в карточку.
+ *
+ * Здесь остаётся то, что верно для любой страницы витрины: адрес сайта для
+ * абсолютных ссылок, а также заголовок (`absolute` — иначе шаблон корневого
+ * макета «%s · Платформа» дописался бы к нему) и шаблон с брендом для заголовков
+ * страниц. Разрешения на индексацию здесь нет намеренно: корневой макет закрывает
+ * от неё всё приложение, и открывает её только сама страница в `pageMetadata`.
+ * Новая страница без явного разрешения в выдачу не попадёт.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin()),
-
-  // absolute, иначе корневой шаблон допишет «· Платформа»: для главной
-  // страницы сайта это лишнее слово в выдаче и в заголовке вкладки
-  title: {
-    absolute: "Fattakhov HR Agency: внешняя команда найма",
-  },
-  description:
-    "Берём в работу 2-5 вакансий одновременно. Выделенная команда, прозрачная воронка и фиксированная стоимость в месяц.",
-
-  // Канонический адрес: сайт открывается и с www, и без, и поисковик
-  // иначе считает это двумя разными страницами с одинаковым текстом
-  alternates: { canonical: "/" },
-
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Fattakhov HR Agency",
-    title: "Отдел найма, который не нужно нанимать",
-    description:
-      "Выделенная команда, 30+ источников поиска и прозрачная воронка. От 100 000 ₽ в месяц, оплата фиксированная, без процентов за закрытие.",
-  },
-
-  // Заголовок в соцсетях и мессенджерах отличается от заголовка
-  // в выдаче намеренно: в поиске человек ищет услугу словами,
-  // а в ленте его останавливает обещание
-  twitter: { card: "summary_large_image" },
-
-  robots: { index: true, follow: true },
+  title: { absolute: fullTitle("home"), template: TITLE_TEMPLATE },
+  description: SITE_PAGES.home.description,
 };
 
 /**
@@ -50,6 +38,9 @@ export const metadata: Metadata = {
  * сервису делать нечего. Там вводят персональные данные, и пускать
  * туда чужой скрипт значит своими руками отдать то, что по выбранной
  * архитектуре наружу не уходит вовсе.
+ *
+ * Страница «не найдено» сайта (`site-not-found`, см. lib/site-routing.ts) живёт в этой же
+ * группе и потому получает этот каркас сама.
  */
 export default function MarketingLayout({
   children,

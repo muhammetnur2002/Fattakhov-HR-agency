@@ -61,8 +61,8 @@ export function ResumeUpload({
               <FileText className="size-4.5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-medium text-paper">{fileName ?? 'Резюме'}</p>
-              <p className="text-[12px] text-paper-faint">Загружено</p>
+              <p className="truncate text-small font-medium text-paper">{fileName ?? 'Резюме'}</p>
+              <p className="text-caption text-paper-faint">Загружено</p>
             </div>
             <button
               type="button"
@@ -104,10 +104,10 @@ export function ResumeUpload({
               {uploading ? <Loader2 className="size-4.5 animate-spin" /> : <Upload className="size-4.5" />}
             </span>
             <div>
-              <p className="text-[14px] font-medium text-paper/85">
+              <p className="text-small font-medium text-paper/85">
                 {uploading ? 'Загружаем…' : 'Прикрепить резюме'}
               </p>
-              <p className="text-[12px] text-paper-faint">PDF или DOC/DOCX до 8 МБ · необязательно</p>
+              <p className="text-caption text-paper-faint">PDF или DOC/DOCX до 8 МБ · необязательно</p>
             </div>
           </motion.button>
         )}
@@ -118,6 +118,7 @@ export function ResumeUpload({
         type="file"
         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="sr-only"
+        tabIndex={-1}
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void upload(file);

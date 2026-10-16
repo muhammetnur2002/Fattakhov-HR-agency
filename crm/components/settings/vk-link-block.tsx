@@ -9,8 +9,8 @@ import {
   vkLinkStatusAction,
 } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { Panel } from "@/components/ui/panel";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
 import { FormMessage } from "@/components/ui/form-message";
 import { useTimeZone } from "@/components/shell/time-zone-provider";
 import { formatTime } from "@/lib/format-date";
@@ -48,12 +48,7 @@ export function VkLinkBlock({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingUnlink, setConfirmingUnlink] = useState(false);
-  const {
-    triggerRef: unlinkTrigger,
-    focusRef: unlinkFocus,
-    questionId: unlinkQuestionId,
-    groupProps: unlinkGroup,
-  } = useConfirmFocus(confirmingUnlink);
+  const unlinkTrigger = useRef<HTMLButtonElement>(null);
   const codeRef = useRef<HTMLParagraphElement>(null);
 
   // Пока код на экране — ждём сообщение. Не опрашиваем вкладку в фоне:
@@ -99,15 +94,12 @@ export function VkLinkBlock({
     });
   }
 
-  function unlink() {
+  async function unlink() {
     setError(null);
-    startTransition(async () => {
-      await unlinkVkAction();
-      setCode(null);
-      setConfirmingUnlink(false);
-      setNotice("Страница отвязана. Привязать можно снова — получите новый код.");
-      router.refresh();
-    });
+    await unlinkVkAction();
+    setCode(null);
+    setNotice("Страница отвязана. Привязать можно снова — получите новый код.");
+    router.refresh();
   }
 
   return (
@@ -187,27 +179,7 @@ export function VkLinkBlock({
             </Button>
           </div>
         </Panel>
-      ) : confirmingUnlink ? (
-        <div {...unlinkGroup} className="flex flex-wrap items-center gap-2">
-          <span id={unlinkQuestionId} className="text-sm">
-            Отвязать страницу? Уведомления в ВКонтакте перестанут приходить.
-          </span>
-          <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={unlink}>
-            Да, отвязать
-          </Button>
-          <Button
-            ref={unlinkFocus}
-            aria-describedby={unlinkQuestionId}
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            onClick={() => setConfirmingUnlink(false)}
-          >
-            Отмена
-          </Button>
-        </div>
-      ) : (
+      ) : confirmingUnlink ? null : (
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled={pending} onClick={requestCode}>
             {vkUserId ? "Привязать заново" : "Получить код привязки"}
@@ -229,6 +201,17 @@ export function VkLinkBlock({
           )}
         </div>
       )}
+
+      {/* Блок стоит на месте ряда кнопок и в разметке всегда: фокус вернётся на «Отвязать», когда он закроется */}
+      <ConfirmBlock
+        open={confirmingUnlink && !code}
+        onOpenChange={setConfirmingUnlink}
+        triggerRef={unlinkTrigger}
+        layout="inline"
+        question="Отвязать страницу? Уведомления в ВКонтакте перестанут приходить."
+        confirmLabel="Да, отвязать"
+        onConfirm={unlink}
+      />
 
       <FormMessage error={error} />
     </div>

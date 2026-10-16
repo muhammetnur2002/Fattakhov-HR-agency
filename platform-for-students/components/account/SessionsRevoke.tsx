@@ -35,7 +35,7 @@ export function SessionsRevoke({ className }: { className?: string }) {
 
   return (
     <div className={className}>
-      <p className="text-[13.5px] leading-relaxed text-paper-dim">
+      <p className="text-small leading-relaxed text-paper-dim">
         Если подозреваете, что кто-то вошёл в ваш аккаунт, завершите все сессии. Пароль не изменится, а войти придётся заново везде.
       </p>
       <Button variant="outline" size="sm" className="mt-4" loading={pending} onClick={() => void revoke()} icon={<LogOut />}>

@@ -2,16 +2,22 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Info } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
+import { SectionTitle } from '@/components/ui/SectionTitle';
 import { PILOT_CITY } from '@/lib/pilot';
 import { RATING_MIN_PUBLIC, RATING_MIN_RANKED, type RatingRow } from '@/lib/rating';
+import { pageMetadata } from '@/lib/seo';
 import { buildInstitutionRating } from '@/lib/services';
 
-export const metadata: Metadata = {
-  title: 'Рейтинг учебных заведений',
-  description: 'Где студенты находят работу через платформу: доля трудоустроенных по вузам Казани.',
-};
 export const dynamic = 'force-dynamic';
+
+export function generateMetadata(): Metadata {
+  return pageMetadata({
+    title: 'Рейтинг учебных заведений',
+    description: 'Где студенты находят работу через платформу: доля трудоустроенных по вузам Казани.',
+    path: '/institutions/rating',
+  });
+}
 
 /**
  * Публичный рейтинг учебных заведений.
@@ -31,30 +37,28 @@ export default async function InstitutionRatingPage() {
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-5xl items-center justify-between gap-4">
         <Logo href="/" />
         <div className="flex items-center gap-4">
-          <Link href="/institutions" className="text-[13px] text-paper-faint transition-colors hover:text-paper">
+          <Link href="/institutions" className="text-small text-paper-faint transition-colors hover:text-paper">
             Все вузы
           </Link>
-          <Link href="/register">
-            <Button variant="accent" size="sm">
-              Регистрация
-            </Button>
-          </Link>
+          <ButtonLink href="/register" variant="accent" size="sm">
+            Регистрация
+          </ButtonLink>
         </div>
       </header>
 
       <main className="page-x mx-auto max-w-5xl pb-24 pt-4">
         <p className="text-eyebrow uppercase text-accent-300">{PILOT_CITY} · пилот платформы</p>
-        <h1 className="mt-3 text-display-md text-paper">Рейтинг учебных заведений</h1>
-        <p className="mt-2.5 max-w-[64ch] text-[14.5px] leading-relaxed text-paper-dim">
+        <h1 className="mt-3 text-headline text-paper">Рейтинг учебных заведений</h1>
+        <p className="mt-2.5 max-w-[64ch] text-body leading-relaxed text-paper-dim">
           Где студенты находят работу через платформу: сколько студентов каждого вуза откликаются на
           вакансии, получают приглашения и выходят на работу.
         </p>
 
-        <section className="glass mt-6 rounded-3xl p-5 text-[13.5px] leading-relaxed sm:p-6">
-          <h2 className="flex items-center gap-2 font-medium text-paper">
+        <section className="glass mt-6 rounded-3xl p-5 text-small leading-relaxed sm:p-6">
+          <SectionTitle className="flex items-center gap-2">
             <Info className="size-4 shrink-0 text-accent-300" aria-hidden />
             Как считаем
-          </h2>
+          </SectionTitle>
           <ul className="mt-2.5 list-disc space-y-1.5 pl-5 text-paper-dim marker:text-paper-faint">
             <li>Только студенты, чью учёбу подтвердил HR-менеджер агентства по справке или студенческому билету.</li>
             <li>Место — по доле студентов, вышедших на работу. При равной доле выше тот, где работающих больше.</li>
@@ -69,7 +73,7 @@ export default async function InstitutionRatingPage() {
         </section>
 
         {!ranked && (
-          <p className="mt-8 rounded-2xl border border-[var(--hairline)] bg-graphite-900/45 px-5 py-4 text-[14px] leading-relaxed text-paper-dim">
+          <p className="mt-8 rounded-2xl border border-[var(--hairline)] bg-graphite-900/45 px-5 py-4 text-small leading-relaxed text-paper-dim">
             Мест пока нет: рейтинг появится, когда у вузов наберётся хотя бы по {RATING_MIN_RANKED} студентов с
             подтверждённой учёбой.
           </p>
@@ -79,8 +83,8 @@ export default async function InstitutionRatingPage() {
 
         {few.length > 0 && (
           <section className="mt-10">
-            <h2 className="text-eyebrow uppercase text-paper-faint">Пока мало данных</h2>
-            <p className="mt-2 text-[13px] text-paper-faint">
+            <SectionTitle>Пока мало данных</SectionTitle>
+            <p className="mt-2 text-small text-paper-faint">
               Меньше {RATING_MIN_PUBLIC} студентов с подтверждённой учёбой — цифры не публикуются.
             </p>
             <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -90,8 +94,8 @@ export default async function InstitutionRatingPage() {
                     href={`/institutions/${row.slug}`}
                     className="glass block min-w-0 rounded-2xl p-3.5 transition-colors hover:border-paper/25"
                   >
-                    <span className="block truncate text-[14.5px] font-medium text-paper">{row.label}</span>
-                    <span className="block truncate text-[12.5px] text-paper-faint">{row.name}</span>
+                    <span className="block truncate text-body font-medium text-paper">{row.label}</span>
+                    <span className="block truncate text-caption text-paper-faint">{row.name}</span>
                   </Link>
                 </li>
               ))}
@@ -107,8 +111,8 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
   return (
     <>
       <div className="glass mt-8 hidden overflow-x-auto rounded-3xl sm:block">
-        <table className="w-full min-w-[44rem] text-left text-[14px]">
-          <thead className="text-[11.5px] uppercase tracking-[0.1em] text-paper-faint">
+        <table className="w-full min-w-[44rem] text-left text-small">
+          <thead className="text-caption uppercase tracking-[0.1em] text-paper-faint">
             <tr className="border-b border-[var(--hairline)]">
               <th className="px-5 py-3.5 font-medium">Место</th>
               <th className="py-3.5 pr-4 font-medium">Учебное заведение</th>
@@ -127,7 +131,7 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
                   <Link href={`/institutions/${row.slug}`} className="font-medium text-paper underline-offset-4 hover:underline">
                     {row.label}
                   </Link>
-                  <span className="block text-[12px] text-paper-faint">{row.name}</span>
+                  <span className="block text-caption text-paper-faint">{row.name}</span>
                 </td>
                 <td className="px-3 py-3.5 text-right tabular-nums text-paper-dim">{row.students}</td>
                 <td className="px-3 py-3.5 text-right tabular-nums text-paper-dim">{row.applications}</td>
@@ -139,7 +143,7 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
           </tbody>
         </table>
         {rows.some((row) => row.place === null) && (
-          <p className="border-t border-[var(--hairline)] px-5 py-3 text-[12.5px] text-paper-faint">
+          <p className="border-t border-[var(--hairline)] px-5 py-3 text-caption text-paper-faint">
             «—» вместо места — у вуза меньше {RATING_MIN_RANKED} студентов с подтверждённой учёбой.
           </p>
         )}
@@ -149,18 +153,18 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
         {rows.map((row) => (
           <li key={row.slug} className="glass rounded-3xl p-4">
             <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-paper/[0.06] text-[15px] font-semibold tabular-nums text-paper">
+              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-paper/[0.06] text-body font-semibold tabular-nums text-paper">
                 {row.place ?? '—'}
               </span>
               <div className="min-w-0 flex-1">
                 <Link href={`/institutions/${row.slug}`} className="block truncate font-medium text-paper">
                   {row.label}
                 </Link>
-                <span className="block truncate text-[12px] text-paper-faint">{row.name}</span>
+                <span className="block truncate text-caption text-paper-faint">{row.name}</span>
               </div>
-              <span className="shrink-0 text-[17px] font-semibold tabular-nums text-accent-200">{row.share}%</span>
+              <span className="shrink-0 text-body font-semibold tabular-nums text-accent-200">{row.share}%</span>
             </div>
-            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[13px]">
+            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-small">
               <MobileStat label="Студентов" value={row.students} />
               <MobileStat label="Откликов" value={row.applications} />
               <MobileStat label="Приглашены" value={row.invited} />
@@ -169,7 +173,7 @@ function RatingTable({ rows }: { rows: RatingRow[] }) {
           </li>
         ))}
         {rows.some((row) => row.place === null) && (
-          <li className="px-1 text-[12.5px] text-paper-faint">
+          <li className="px-1 text-caption text-paper-faint">
             «—» вместо места — у вуза меньше {RATING_MIN_RANKED} студентов с подтверждённой учёбой.
           </li>
         )}

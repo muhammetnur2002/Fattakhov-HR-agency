@@ -35,8 +35,9 @@ test.describe("ось: заголовок страницы стоит на од�
           const logo = document.querySelector("header a[aria-label='Fattakhov HR Agency']")!.getBoundingClientRect().left;
           const h1 = document.querySelector("main h1")!.getBoundingClientRect().left;
           const eyebrow = document.querySelector("main h1")!.previousElementSibling!.getBoundingClientRect().left;
-          // первый раздел под героем — та же ось, что у героя
-          const h2 = document.querySelector("main h2")!.getBoundingClientRect().left;
+          // первый раздел под героем — та же ось, что у героя. h2 внутри карточки-статьи — не заголовок раздела:
+          // на /cases имя клиента — h2 (под h1 сразу h3 пропускал уровень), и стоит оно во внутреннем поле карточки
+          const h2 = [...document.querySelectorAll("main h2")].find((h) => !h.closest("article"))!.getBoundingClientRect().left;
           return { logo, h1, eyebrow, h2 };
         });
         expect(Math.abs(x.h1 - x.logo), `h1 ${x.h1} против логотипа ${x.logo}`).toBeLessThanOrEqual(TOLERANCE);

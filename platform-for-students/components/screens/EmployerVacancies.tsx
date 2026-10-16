@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock3, Pencil, Plus, Send, Trash2, TriangleAlert } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { VacancyStatusPill } from '@/components/ui/StatusPill';
@@ -108,11 +107,9 @@ export function EmployerVacancies({
   }
 
   const newButton = (
-    <Link href="/employer/vacancies/new">
-      <Button variant="accent" icon={<Plus />}>
-        Новая вакансия
-      </Button>
-    </Link>
+    <ButtonLink href="/employer/vacancies/new" variant="accent" icon={<Plus />}>
+      Новая вакансия
+    </ButtonLink>
   );
 
   return (
@@ -120,8 +117,8 @@ export function EmployerVacancies({
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
-          <h1 className="mt-3 text-display-md text-paper">Вакансии</h1>
-          <p className="mt-2.5 max-w-[52ch] text-[14px] leading-relaxed text-paper-dim">
+          <h1 className="mt-3 text-headline text-paper">Вакансии</h1>
+          <p className="mt-2.5 max-w-[52ch] text-small leading-relaxed text-paper-dim">
             {skipsModeration
               ? 'По вашему договору вакансии публикуются сразу, без проверки агентством.'
               : 'Агентство проверяет каждую вакансию перед публикацией в ленте студентов.'}
@@ -131,7 +128,7 @@ export function EmployerVacancies({
       </header>
 
       {companyStatus !== 'APPROVED' && (
-        <div className="mb-6 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-[13.5px] leading-relaxed">
+        <div className="mb-6 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed">
           <p className="flex items-center gap-2 font-medium text-warn">
             <Clock3 className="size-4 shrink-0" aria-hidden />
             {companyStatus === 'PENDING' ? 'Компания на проверке у агентства' : 'Компания не одобрена'}
@@ -164,10 +161,10 @@ export function EmployerVacancies({
                     название сжималось до столбика и рвалось посреди слова */}
                 <div className="flex flex-col-reverse items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
                   <div className="min-w-0 sm:flex-1">
-                    <h2 className="break-words text-[16.5px] font-semibold tracking-[-0.02em] text-paper">
+                    <h2 className="break-words text-body font-semibold tracking-[-0.02em] text-paper">
                       {vacancy.title}
                     </h2>
-                    <p className="mt-1 text-[13px] text-paper-faint">
+                    <p className="mt-1 text-small text-paper-faint">
                       {vacancy.city} · {EMPLOYMENT_TYPE_LABEL[vacancy.employmentType]} · {vacancy.applications}{' '}
                       {plural(vacancy.applications, 'отклик', 'отклика', 'откликов')}
                     </p>
@@ -178,12 +175,12 @@ export function EmployerVacancies({
                   </div>
                 </div>
 
-                <p className="mt-3 text-[13.5px] leading-relaxed text-paper-dim">
+                <p className="mt-3 text-small leading-relaxed text-paper-dim">
                   {statusHint(vacancy, companyStatus, skipsModeration)}
                 </p>
 
                 {vacancy.moderationNote && (
-                  <p className="mt-2.5 flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/[0.07] px-3 py-2.5 text-[13px] leading-relaxed text-paper-dim">
+                  <p className="mt-2.5 flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/[0.07] px-3 py-2.5 text-small leading-relaxed text-paper-dim">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
                     <span className="min-w-0 break-words">
                       <span className="font-medium text-danger">Причина: </span>
@@ -195,7 +192,7 @@ export function EmployerVacancies({
                 {!vacancy.fromCrm &&
                   (closing === vacancy.id ? (
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--hairline)] pt-4">
-                      <span className="mr-1 basis-full text-[13px] text-paper-dim">
+                      <span className="mr-1 basis-full text-small text-paper-dim">
                         Закрыть вакансию? Студенты её не увидят, отклики сохранятся. Сохранить её в истории?
                       </span>
                       <Button variant="accent" size="sm" loading={isBusy} onClick={() => void act(vacancy, 'close', true)}>
@@ -210,7 +207,7 @@ export function EmployerVacancies({
                     </div>
                   ) : deleting === vacancy.id ? (
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--hairline)] pt-4">
-                      <span className="mr-1 basis-full text-[13px] text-paper-dim">
+                      <span className="mr-1 basis-full text-small text-paper-dim">
                         Удалить вакансию навсегда? Отклики и переписка по ней исчезнут — это нельзя отменить.
                       </span>
                       <Button variant="danger" size="sm" loading={isBusy} onClick={() => void act(vacancy, 'delete')}>
@@ -222,11 +219,9 @@ export function EmployerVacancies({
                     </div>
                   ) : (
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--hairline)] pt-4">
-                      <Link href={`/employer/vacancies/${vacancy.id}`}>
-                        <Button variant="outline" size="sm" icon={<Pencil />}>
-                          Изменить
-                        </Button>
-                      </Link>
+                      <ButtonLink href={`/employer/vacancies/${vacancy.id}`} variant="outline" size="sm" icon={<Pencil />}>
+                        Изменить
+                      </ButtonLink>
                       {SUBMITTABLE_STATUSES.includes(vacancy.status) && (
                         <Button
                           variant="accent"
@@ -254,7 +249,7 @@ export function EmployerVacancies({
                           Удалить
                         </Button>
                       )}
-                      <span className="ml-auto text-[12px] text-paper-faint">
+                      <span className="ml-auto text-caption text-paper-faint">
                         Изменена {timeAgo(vacancy.updatedAt)}
                       </span>
                     </div>

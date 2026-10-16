@@ -58,10 +58,10 @@ export function ConsentRenewalBanner() {
       <div className="flex items-start gap-3">
         <ScrollText className="mt-0.5 size-5 shrink-0 text-accent-300" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h2 id="consent-renewal-title" className="text-[14px] font-medium text-paper">
+          <h2 id="consent-renewal-title" className="text-small font-medium text-paper">
             Обновлён текст согласия на обработку персональных данных
           </h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-paper-dim">
+          <p className="mt-1 text-small leading-relaxed text-paper-dim">
             Мы уточнили, какие сведения о вас видят работодатели и когда им открываются контакты. Прочитайте
             новую редакцию от {versionLabel(STUDENT_CONSENT.version)} и подтвердите её. Платформа работает как
             обычно, пока вы не ответили.
@@ -76,7 +76,7 @@ export function ConsentRenewalBanner() {
             </Button>
           </div>
           {error && (
-            <p role="alert" className="mt-2 text-[12.5px] leading-snug text-danger">
+            <p role="alert" className="mt-2 text-caption leading-snug text-danger">
               {error}
             </p>
           )}

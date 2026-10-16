@@ -20,6 +20,7 @@ import {
 } from "@/lib/contacts";
 import { studentsUrl } from "@/lib/urls";
 import { SITE_CONTAINER } from "./layout";
+import { RibbedTexture } from "./texture";
 
 const CONTACTS = [
   { label: "Telegram", value: TELEGRAM_DISPLAY, href: TELEGRAM_HREF },
@@ -47,10 +48,7 @@ export function MarketingFooter() {
 
   return (
     <footer className="relative overflow-hidden bg-brand-graphite text-white">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
-      />
+      <RibbedTexture className="opacity-20" />
 
       <div className={`relative ${SITE_CONTAINER} py-10`}>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">

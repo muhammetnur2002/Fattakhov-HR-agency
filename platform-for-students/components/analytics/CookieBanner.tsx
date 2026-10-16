@@ -24,7 +24,7 @@ export function CookieBanner() {
       className="clear-theme-toggle fixed inset-x-0 bottom-0 z-50 border-t border-[var(--hairline)] bg-ink/95 backdrop-blur"
     >
       <div className="page-x mx-auto flex max-w-[2200px] flex-col gap-4 py-4 sm:flex-row sm:items-center">
-        <p className="flex-1 text-[12.5px] leading-relaxed text-paper-dim">
+        <p className="flex-1 text-caption leading-relaxed text-paper-dim">
           Мы используем обязательные cookie для работы сайта, а с вашего согласия — аналитические, чтобы понимать
           посещаемость и улучшать сайт. Аналитический инструмент: Яндекс.Метрика. Подробнее в{' '}
           <Link href="/legal/privacy" className="underline underline-offset-2 hover:text-paper">

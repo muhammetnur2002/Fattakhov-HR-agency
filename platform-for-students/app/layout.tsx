@@ -41,8 +41,11 @@ export const viewport: Viewport = {
   colorScheme: 'light dark',
   width: 'device-width',
   initialScale: 1,
-  // Свайп по карточке не должен превращаться в зум страницы
-  maximumScale: 1,
+  // Масштаб страницы разрешён: maximumScale/userScalable запрещали его людям, которым нужен
+  // крупный текст (WCAG 1.4.4). Свайп по карточке в зум не превращается и без запрета:
+  // у карточки touch-action: pan-y (.touch-pan-y-only), щипок на ней браузер не перехватывает.
+  // Зум iOS при фокусе на поле лечится размером поля (16px на сенсорных, см. globals.css),
+  // а не запретом масштаба.
 };
 
 /**
@@ -95,7 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="grain min-h-dvh bg-ink text-paper" suppressHydrationWarning>
         <noscript>
-          <p className="relative z-[80] bg-graphite-900 px-4 py-3 text-center text-sm text-paper">
+          <p className="relative z-[80] bg-graphite-900 px-4 py-3 text-center text-small text-paper">
             Платформе нужен JavaScript: включите его в настройках браузера, чтобы войти и откликаться на вакансии.
           </p>
         </noscript>

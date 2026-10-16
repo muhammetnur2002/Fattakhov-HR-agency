@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Building2, CalendarCheck, Hand, ShieldCheck } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { CubeMark } from '@/components/brand/CubeMark';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Chip';
 import { CountUp } from '@/components/motion/CountUp';
 import { Reveal, Stagger } from '@/components/motion/Reveal';
@@ -64,11 +64,9 @@ export function Landing({
         </div>
 
         <div className="rise-in flex items-center gap-2" style={rise(0.08, -12)}>
-          <Link href="/login">
-            <Button variant="ghost" size="sm">
-              Войти
-            </Button>
-          </Link>
+          <ButtonLink href="/login" variant="ghost" size="sm">
+            Войти
+          </ButtonLink>
           <Button size="sm" onClick={() => navigate('/register')} iconRight={<ArrowRight />}>
             Начать
           </Button>
@@ -84,13 +82,13 @@ export function Landing({
 
           <SplitText
             text="Работа, которая помещается между парами"
-            className="mt-7 max-w-[15ch] text-display-lg xl:text-[4.75rem] 2xl:text-[5.5rem]"
+            className="mt-7 max-w-[15ch] text-display"
             wordClassName="text-gradient"
             delay={0.22}
           />
 
           <p
-            className="rise-in mt-7 max-w-[46ch] text-[16.5px] leading-relaxed text-paper-dim"
+            className="rise-in mt-7 max-w-[46ch] text-body leading-relaxed text-paper-dim"
             style={rise(0.55, 14, durations.slow)}
           >
             Смахните вправо — отклик уходит работодателю в ту же секунду. Никаких сопроводительных
@@ -113,25 +111,23 @@ export function Landing({
               Я студент
             </Button>
             {employerRegisterUrl && (
-              <a href={employerRegisterUrl} onClick={() => reachGoal(GOALS.ctaEmployer)}>
-                <Button size="lg" variant="outline">
-                  Я работодатель
-                </Button>
-              </a>
+              <ButtonLink href={employerRegisterUrl} onClick={() => reachGoal(GOALS.ctaEmployer)} size="lg" variant="outline">
+                Я работодатель
+              </ButtonLink>
             )}
           </div>
 
           <div className="rise-in mt-4" style={rise(0.78, 10, durations.slow)}>
             <Link
               href="/login"
-              className="text-[13.5px] text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
+              className="text-small text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
             >
               Уже есть аккаунт? Войти
             </Link>
           </div>
 
           <div
-            className="rise-in mt-8 flex items-center gap-2 text-[12.5px] text-paper-faint"
+            className="rise-in mt-8 flex items-center gap-2 text-caption text-paper-faint"
             style={rise(0.9, 0, durations.slow)}
           >
             <ShieldCheck className="size-3.5 shrink-0 text-accent-400" aria-hidden />
@@ -159,7 +155,7 @@ export function Landing({
       <section className="page-x mx-auto max-w-[2200px] py-16 sm:py-24">
         <SplitTextInView
           text="Три шага вместо трёх недель"
-          className="max-w-[14ch] text-display-lg"
+          className="max-w-[14ch] text-headline"
           wordClassName="text-gradient"
         />
 
@@ -171,14 +167,18 @@ export function Landing({
                   <span className="grid size-11 place-items-center rounded-2xl border border-accent-500/30 bg-accent-500/12 text-accent-200">
                     {step.icon}
                   </span>
-                  <span className="text-[42px] font-semibold leading-none tracking-tight text-paper/[0.07] transition-colors duration-500 group-hover:text-paper/[0.13]">
+                  {/* Узор: порядок шагов виден из порядка карточек, а цифра на 1,2:1 — не текст для чтения */}
+                  <span
+                    aria-hidden
+                    className="text-headline font-semibold leading-none tracking-tight text-paper/[0.07] transition-colors duration-500 group-hover:text-paper/[0.13]"
+                  >
                     0{index + 1}
                   </span>
                 </div>
-                <h3 className="mt-6 text-[19px] font-semibold tracking-[-0.02em] text-paper">
+                <h3 className="mt-6 text-sub font-semibold tracking-[-0.02em] text-paper">
                   {step.title}
                 </h3>
-                <p className="mt-2.5 text-[14.5px] leading-relaxed text-paper-dim">{step.body}</p>
+                <p className="mt-2.5 text-body leading-relaxed text-paper-dim">{step.body}</p>
               </article>
             </Reveal>
           ))}
@@ -201,7 +201,7 @@ export function Landing({
             {[...companies, ...companies].map((company, index) => (
               <span
                 key={`${company}-${index}`}
-                className="whitespace-nowrap rounded-full border border-[var(--hairline)] bg-graphite-900/40 px-5 py-2.5 text-[14px] text-paper/70"
+                className="whitespace-nowrap rounded-full border border-[var(--hairline)] bg-graphite-900/40 px-5 py-2.5 text-small text-paper/70"
               >
                 {company}
               </span>
@@ -220,10 +220,10 @@ export function Landing({
           <CubeMark className="mx-auto h-14 w-14 text-paper/70" />
           <SplitTextInView
             text="Первая подборка ждёт вас"
-            className="mx-auto mt-8 max-w-[16ch] text-display-md text-paper"
+            className="mx-auto mt-8 max-w-[16ch] text-headline text-paper"
             as="h2"
           />
-          <p className="mx-auto mt-5 max-w-[48ch] text-[15.5px] leading-relaxed text-paper-dim">
+          <p className="mx-auto mt-5 max-w-[48ch] text-body leading-relaxed text-paper-dim">
             Заполните профиль — и лента соберётся под ваш график, город и навыки. Отказаться от
             вакансии можно одним движением, вернуть — тоже.
           </p>
@@ -232,11 +232,9 @@ export function Landing({
               Создать профиль
             </Button>
             {employerRegisterUrl && (
-              <a href={employerRegisterUrl}>
-                <Button variant="ghost" size="lg">
-                  Я работодатель
-                </Button>
-              </a>
+              <ButtonLink href={employerRegisterUrl} variant="ghost" size="lg">
+                Я работодатель
+              </ButtonLink>
             )}
           </div>
         </div>
@@ -245,7 +243,7 @@ export function Landing({
       <footer className="page-x mx-auto max-w-[2200px] border-t border-[var(--hairline)] py-10">
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <Logo href={null} />
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-paper-faint">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-small text-paper-faint">
             {/* Сайт агентства — отдельное приложение, поэтому <a>, а не Link */}
             {agencyUrl && (
               <a href={agencyUrl} className="transition-colors hover:text-paper">
@@ -274,7 +272,7 @@ export function Landing({
           </div>
           <div className="flex items-center gap-2">
             <Tag>ПДн шифруются</Tag>
-            <span className="text-[12.5px] text-paper-faint">© {new Date().getFullYear()}</span>
+            <span className="text-caption text-paper-faint">© {new Date().getFullYear()}</span>
           </div>
         </div>
       </footer>
@@ -286,10 +284,10 @@ function Metric({ value, label, suffix }: { value: number; label: string; suffix
   return (
     <Reveal variants={fadeUp}>
       <div className="h-full bg-ink px-6 py-8 sm:px-8 sm:py-10">
-        <p className="text-[clamp(2rem,4vw,2.75rem)] font-semibold leading-none tracking-[-0.04em] text-paper">
+        <p className="text-headline font-semibold leading-none tracking-[-0.04em] text-paper">
           <CountUp to={value} suffix={suffix} />
         </p>
-        <p className="mt-3 text-[13px] leading-snug text-paper-faint">{label}</p>
+        <p className="mt-3 text-small leading-snug text-paper-faint">{label}</p>
       </div>
     </Reveal>
   );

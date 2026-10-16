@@ -2,12 +2,10 @@
 
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
 import { deleteVacanciesAction } from "@/app/actions/vacancies";
-import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 
 /**
  * Удаление закрытых вакансий с подтверждением. Используется в двух видах:
@@ -29,48 +27,24 @@ export function DeleteVacancies({
   variant?: "outline" | "ghost";
 }) {
   const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function run() {
-    setError(null);
-    startTransition(async () => {
-      const result = await deleteVacanciesAction(ids);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setConfirming(false);
-      if (redirectTo) router.push(redirectTo);
-      else router.refresh();
-    });
-  }
-
-  if (!confirming) {
-    return (
-      <Button ref={triggerRef} type="button" size="sm" variant={variant} onClick={() => setConfirming(true)}>
-        <Trash2 className="mr-1 size-4" aria-hidden />
-        {label}
-      </Button>
-    );
-  }
 
   return (
-    <div {...groupProps} className="space-y-2">
-      <p id={questionId} className="text-sm">
-        {question}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="destructive" loading={pending} onClick={run}>
-          {pending ? "Удаляем…" : "Да, удалить"}
+    <ConfirmBlock
+      trigger={
+        <Button type="button" size="sm" variant={variant}>
+          <Trash2 className="mr-1 size-4" aria-hidden />
+          {label}
         </Button>
-        <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-          Отмена
-        </Button>
-      </div>
-      <FormMessage error={error} />
-    </div>
+      }
+      question={question}
+      confirmLabel="Да, удалить"
+      pendingLabel="Удаляем…"
+      onConfirm={async () => {
+        const result = await deleteVacanciesAction(ids);
+        if (result.error) return { error: result.error };
+        if (redirectTo) router.push(redirectTo);
+        else router.refresh();
+      }}
+    />
   );
 }

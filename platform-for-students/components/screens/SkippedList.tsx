@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, MapPin, Undo2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { VacancyDetail } from '@/components/swipe/VacancyDetail';
@@ -56,11 +55,9 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
         title="Ничего не пропущено"
         description="Вакансии, которые вы смахнёте влево, окажутся здесь. Любую можно вернуть в ленту одной кнопкой."
         action={
-          <Link href="/feed">
-            <Button size="lg" iconRight={<ArrowRight />}>
-              В ленту вакансий
-            </Button>
-          </Link>
+          <ButtonLink href="/feed" size="lg" iconRight={<ArrowRight />}>
+            В ленту вакансий
+          </ButtonLink>
         }
       />
     );
@@ -69,8 +66,8 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
   return (
     <>
       <header className="mb-8">
-        <h1 className="text-display-md text-paper">Пропущенные</h1>
-        <p className="mt-2.5 text-[14.5px] text-paper-dim">
+        <h1 className="text-headline text-paper">Пропущенные</h1>
+        <p className="mt-2.5 text-body text-paper-dim">
           {list.length} {plural(list.length, 'вакансия', 'вакансии', 'вакансий')} · любую можно
           вернуть в ленту
         </p>
@@ -104,11 +101,11 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
                   className="opacity-65"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12.5px] text-paper-faint">{item.vacancy.company}</p>
-                  <h2 className="truncate text-[15.5px] font-medium text-paper/85">
+                  <p className="truncate text-caption text-paper-faint">{item.vacancy.company}</p>
+                  <h2 className="truncate text-body font-medium text-paper/85">
                     {item.vacancy.title}
                   </h2>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[12.5px] text-paper-faint">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 text-caption text-paper-faint">
                     <span>{formatSalary(item.vacancy.salaryFrom, item.vacancy.salaryTo)}</span>
                     <span className="flex items-center gap-1">
                       <MapPin className="size-3" aria-hidden />

@@ -80,11 +80,11 @@ export function UserMenu({
     <>
       <Avatar name={name} src={photoUrl} size={30} />
       <span className="hidden min-w-0 sm:block">
-        <span className="block max-w-[11rem] truncate text-[13px] font-medium leading-tight text-paper">
+        <span className="block max-w-[11rem] truncate text-small font-medium leading-tight text-paper">
           {name}
         </span>
         {subtitle && (
-          <span className="block max-w-[11rem] truncate text-[11px] leading-tight text-paper-faint">
+          <span className="block max-w-[11rem] truncate text-caption leading-tight text-paper-faint">
             {subtitle}
           </span>
         )}
@@ -147,7 +147,7 @@ export function UserMenu({
                 setHelpOpen(false);
                 window.dispatchEvent(new Event(TOUR_START_EVENT));
               }}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13.5px] text-paper transition-colors hover:bg-paper/[0.06]"
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-small text-paper transition-colors hover:bg-paper/[0.06]"
             >
               <Compass className="size-4 shrink-0 text-accent-300" aria-hidden />
               Как пользоваться
@@ -155,7 +155,7 @@ export function UserMenu({
             <Link
               href="/help"
               onClick={() => setHelpOpen(false)}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13.5px] text-paper transition-colors hover:bg-paper/[0.06]"
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-small text-paper transition-colors hover:bg-paper/[0.06]"
             >
               <BookOpen className="size-4 shrink-0 text-accent-300" aria-hidden />
               Частые вопросы

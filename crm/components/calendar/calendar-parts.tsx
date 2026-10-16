@@ -63,6 +63,20 @@ export function onGridArrows(event: React.KeyboardEvent<HTMLElement>) {
 export const TASK_TINT = "bg-[color-mix(in_srgb,var(--primary)_22%,transparent)]";
 export const INTERVIEW_TINT = "bg-[color-mix(in_srgb,var(--cal-interview)_24%,transparent)]";
 
+/*
+  Чип в ячейке месяца: значок и время в начале, название следом.
+
+  Название стоит рядом со временем, только если помещается целиком; не помещается —
+  переносится под время и получает всю ширину чипа (flex-wrap и базис по содержимому
+  у CHIP_TITLE), а длинное делится по словам на две строки. Раньше чип был одной строкой
+  с `truncate`, и в узкой ячейке от имени кандидата оставалась одна буква: «15:00 Э…»
+  (замер 15.10.2026: видимая доля имени 15–19% на 1280 и 8–10% на планшете). Многоточие
+  осталось у названия длиннее двух строк; полное — в подсказке и в имени кнопки.
+*/
+const CHIP =
+  "flex w-full flex-wrap items-center gap-x-1 overflow-hidden rounded border-l-2 px-1.5 py-0.5 text-left text-xs leading-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-1";
+const CHIP_TITLE = "min-w-0 max-w-full flex-auto line-clamp-2 break-words";
+
 /** Чип задачи в ячейке месяца: время и название; клик открывает карточку. */
 export function TaskChip({
   task,
@@ -80,7 +94,7 @@ export function TaskChip({
       title={task.title}
       aria-label={`Задача ${task.title}, ${time}${done ? ", выполнена" : task.overdue ? ", просрочена" : ""}`}
       className={cn(
-        "flex w-full items-center gap-1 truncate rounded border-l-2 px-1.5 py-0.5 text-left text-xs leading-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-1",
+        CHIP,
         TASK_TINT,
         task.overdue ? "border-destructive" : "border-primary",
         done && "line-through opacity-60",
@@ -89,7 +103,7 @@ export function TaskChip({
       {task.personal && <Lock className="size-3 shrink-0" aria-hidden />}
       {task.recurrenceRule && <Repeat className="size-3 shrink-0" aria-hidden />}
       <span className="shrink-0 tabular-nums">{time}</span>
-      <span className="truncate">{task.title}</span>
+      <span className={CHIP_TITLE}>{task.title}</span>
     </button>
   );
 }
@@ -102,14 +116,11 @@ export function InterviewChip({ interview, hrefBase }: { interview: CalendarInte
       href={`${hrefBase}/${interview.applicationId}`}
       title={`${interview.title}, ${interview.subtitle}`}
       aria-label={`Интервью ${interview.title}, ${time}`}
-      className={cn(
-        "flex w-full items-center gap-1 truncate rounded border-l-2 border-cal-interview px-1.5 py-0.5 text-left text-xs leading-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-1",
-        INTERVIEW_TINT,
-      )}
+      className={cn(CHIP, "border-cal-interview", INTERVIEW_TINT)}
     >
       <CalendarClock className="size-3 shrink-0" aria-hidden />
       <span className="shrink-0 tabular-nums">{time}</span>
-      <span className="truncate">{interview.title}</span>
+      <span className={CHIP_TITLE}>{interview.title}</span>
     </Link>
   );
 }

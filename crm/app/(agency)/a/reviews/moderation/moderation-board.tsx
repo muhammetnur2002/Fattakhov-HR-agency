@@ -2,7 +2,7 @@
 
 import { Building2, Check, Flame, MapPin, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { decideModerationAction } from "./actions";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import {
   Dialog,
   DialogContent,
@@ -32,8 +33,7 @@ import type {
 } from "@/lib/students-service";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, panelClass } from "@/components/ui/panel";
-import { useConfirmFocus, useReturnFocus } from "@/lib/hooks/use-return-focus";
-import { FormMessage } from "@/components/ui/form-message";
+import { useReturnFocus } from "@/lib/hooks/use-return-focus";
 
 type Decide = (decision: "APPROVE" | "REJECT", note?: string) => Promise<boolean>;
 
@@ -527,32 +527,51 @@ function DecisionBar({
   onDecide: Decide;
 }) {
   const [rejecting, setRejecting] = useState(false);
-  // «Отклонить» заменяет кнопки полем причины: фокус — в поле, а после «Отмены» — на «Отклонить»
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus<HTMLButtonElement, HTMLTextAreaElement>(rejecting);
+  // «Отклонить» заменяет кнопки полем причины: фокус — в поле, а после «Отмены» — на «Отклонить» (ConfirmBlock)
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
 
   async function reject() {
     if (note.trim().length < 5) {
       setError("Напишите причину — хотя бы пару слов");
-      return;
+      return false;
     }
     const done = await onDecide("REJECT", note.trim());
-    if (done) {
-      setRejecting(false);
-      setNote("");
-    }
+    if (!done) return false; // отказ сервера уже показан, блок остаётся открытым
+    setNote("");
   }
 
-  if (rejecting) {
-    return (
-      <div {...groupProps} className="space-y-2 border-t pt-3">
-        {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
-        <span id={questionId} className="sr-only">
-          Отклонить с причиной
-        </span>
+  return (
+    <div className="border-t pt-3">
+      {!rejecting && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" disabled={busy || !!approveBlockedReason} onClick={() => void onDecide("APPROVE")}>
+            <Check /> Одобрить
+          </Button>
+          <Button ref={triggerRef} variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
+            <X /> Отклонить
+          </Button>
+        </div>
+      )}
+      {/* Вопроса на экране нет — поле само просит причину; для читалки блок назван, чтобы фокус в поле не был «ниоткуда» */}
+      <ConfirmBlock
+        open={rejecting}
+        onOpenChange={setRejecting}
+        triggerRef={triggerRef}
+        questionHidden
+        question="Отклонить с причиной"
+        confirmLabel={
+          <>
+            <X /> Отклонить
+          </>
+        }
+        pending={busy}
+        error={error}
+        errorLine
+        onConfirm={reject}
+      >
         <Textarea
-          ref={focusRef}
           value={note}
           rows={2}
           placeholder="Причина отказа — компания увидит её в кабинете"
@@ -561,30 +580,8 @@ function DecisionBar({
             setError(undefined);
           }}
         />
-        <FormMessage compact error={error} />
-        <div className="flex gap-2">
-          <Button variant="destructive" size="sm" disabled={busy} onClick={() => void reject()}>
-            <X /> Отклонить
-          </Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setRejecting(false)}>
-            Отмена
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="border-t pt-3">
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy || !!approveBlockedReason} onClick={() => void onDecide("APPROVE")}>
-          <Check /> Одобрить
-        </Button>
-        <Button ref={triggerRef} variant="outline" size="sm" disabled={busy} onClick={() => setRejecting(true)}>
-          <X /> Отклонить
-        </Button>
-      </div>
-      {approveBlockedReason && <p className="mt-2 text-xs text-muted-foreground">{approveBlockedReason}</p>}
+      </ConfirmBlock>
+      {!rejecting && approveBlockedReason && <p className="mt-2 text-xs text-muted-foreground">{approveBlockedReason}</p>}
     </div>
   );
 }

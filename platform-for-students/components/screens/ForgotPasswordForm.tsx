@@ -70,10 +70,10 @@ export function ForgotPasswordForm() {
         </div>
 
         <div className="glass rounded-3xl p-6 sm:p-8">
-          <h1 className="text-[20px] font-semibold text-paper">Восстановление пароля</h1>
+          <h1 className="text-sub font-semibold text-paper">Восстановление пароля</h1>
 
           {sent ? (
-            <div className="mt-4 space-y-3 text-[14px] leading-relaxed text-paper-dim">
+            <div className="mt-4 space-y-3 text-small leading-relaxed text-paper-dim">
               <p className="flex items-start gap-2.5 text-paper">
                 <MailCheck className="mt-0.5 size-4 shrink-0 text-yes-glow" aria-hidden />
                 Если аккаунт с адресом {email.trim()} есть, мы отправили на него письмо.
@@ -92,7 +92,7 @@ export function ForgotPasswordForm() {
             </div>
           ) : (
             <form onSubmit={submit} className="mt-4 space-y-3">
-              <p className="text-[13.5px] leading-relaxed text-paper-dim">
+              <p className="text-small leading-relaxed text-paper-dim">
                 Укажите почту, с которой регистрировались, — пришлём ссылку, чтобы задать новый пароль.
               </p>
               <TextField
@@ -105,7 +105,7 @@ export function ForgotPasswordForm() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               {errorCode === 'NO_ACCOUNT' && (
-                <p className="text-[13px] leading-relaxed text-paper-dim">
+                <p className="text-small leading-relaxed text-paper-dim">
                   Возможно, вы регистрировались с другой почтой. Или{' '}
                   <Link href="/register" className="text-paper underline underline-offset-4">
                     создайте аккаунт
@@ -120,13 +120,13 @@ export function ForgotPasswordForm() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-[13px] text-paper-faint">
+        <p className="mt-6 text-center text-small text-paper-faint">
           Вспомнили пароль?{' '}
           <Link href="/login" className="text-paper underline-offset-4 transition-colors hover:underline">
             Войти
           </Link>
         </p>
-        <p className="mt-1.5 text-center text-[12.5px] leading-relaxed text-paper-faint">
+        <p className="mt-1.5 text-center text-caption leading-relaxed text-paper-faint">
           Работодатель, который входит по коду из CRM, получает новый код у своего менеджера.
         </p>
       </motion.div>

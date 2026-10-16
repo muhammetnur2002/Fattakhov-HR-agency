@@ -2,6 +2,7 @@ import { ArrowUpRight } from "lucide-react";
 
 import { Reveal } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
+import { RibbedTexture } from "./texture";
 
 /**
  * Мозаика ролей.
@@ -96,6 +97,9 @@ function mdSpan(row: Tile[], j: number): string | false {
   return плитки.length % 2 === 1 && row[j] === плитки.at(-1) && "md:col-span-2";
 }
 
+/** Плитка — треть ряда на xl (span 4 из 12), половина на md, во всю ширину ниже: не «100vw» (предупреждение Next). */
+const TILE_SIZES = "(min-width: 1280px) 34vw, (min-width: 768px) 50vw, 100vw";
+
 function TileCard({ tile }: { tile: Tile }) {
   const dark = tile.tone !== "light";
 
@@ -110,10 +114,7 @@ function TileCard({ tile }: { tile: Tile }) {
       )}
     >
       {tile.tone === "slate" && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-40 mix-blend-overlay"
-        />
+        <RibbedTexture className="opacity-40" sizes={TILE_SIZES} />
       )}
 
       <div className="relative flex items-start justify-between gap-4">

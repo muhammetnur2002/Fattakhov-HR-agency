@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Logo } from '@/components/brand/Logo';
 import { LegalDocumentView } from '@/components/legal/LegalDocumentView';
 import { LEGAL_DOCUMENTS, type LegalDocument } from '@/lib/legal';
+import { pageMetadata } from '@/lib/seo';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -15,13 +16,18 @@ function findDocument(slug: string): LegalDocument | null {
     : null;
 }
 
-export function generateStaticParams() {
-  return Object.keys(LEGAL_DOCUMENTS).map((slug) => ({ slug }));
-}
+// Адрес в canonical и og:url — из APP_URL на запрос, а не при сборке образа (см. lib/seo.ts)
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
-  return { title: findDocument(params.slug)?.title ?? 'Документ не найден' };
+  const doc = findDocument(params.slug);
+  if (!doc) return { title: 'Документ не найден' };
+  return pageMetadata({
+    title: doc.title,
+    description: `${doc.title} — документ платформы Fattakhov HR Agency для студентов и компаний.`,
+    path: `/legal/${doc.slug}`,
+  });
 }
 
 const NAV: Array<{ slug: LegalDocument['slug']; label: string }> = [
@@ -56,15 +62,15 @@ export default async function LegalPage(props: Props) {
               aria-current={item.slug === doc.slug ? 'page' : undefined}
               className={
                 item.slug === doc.slug
-                  ? 'rounded-full border border-accent-400/50 bg-accent-500/15 px-3 py-1.5 text-[12.5px] text-paper'
-                  : 'rounded-full border border-[var(--hairline)] px-3 py-1.5 text-[12.5px] text-paper-faint transition-colors hover:text-paper'
+                  ? 'rounded-full border border-accent-400/50 bg-accent-500/15 px-3 py-1.5 text-caption text-paper'
+                  : 'rounded-full border border-[var(--hairline)] px-3 py-1.5 text-caption text-paper-faint transition-colors hover:text-paper'
               }
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <h1 className="break-words text-display-sm text-paper">{doc.title}</h1>
+        <h1 className="break-words text-title text-paper">{doc.title}</h1>
         <div className="glass mt-6 rounded-3xl p-5 sm:p-8">
           <LegalDocumentView doc={doc} />
         </div>

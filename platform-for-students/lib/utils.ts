@@ -1,5 +1,22 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+import { FONT_STEP_CLASSES } from '@/lib/type-scale';
+
+/**
+ * tailwind-merge про наши ступени шрифта ничего не знает: text-small для него «какой-то цвет»,
+ * и в cn('text-ink', 'text-small') он выбрасывал text-ink как конфликтующий — главная кнопка
+ * оставалась тёмной на тёмном без подписи. Поэтому ступени заведены отдельной группой:
+ * они конфликтуют только друг с другом (последняя побеждает), с цветом текста — нет, и не
+ * съедают leading-*, как стандартные размеры Tailwind (наши ступени межстрочье не задают).
+ * Список имён — lib/type-scale.ts; сторож в tests/unit.ts проверяет оба направления.
+ */
+const twMerge = extendTailwindMerge<'font-step'>({
+  extend: {
+    classGroups: {
+      'font-step': [{ text: FONT_STEP_CLASSES }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -28,12 +45,20 @@ export function formatSalary(from?: number | null, to?: number | null, currency 
   return `${from ? 'от ' : 'до '}${formatMoney(single)} ${currency}`;
 }
 
+/**
+ * Две буквы для аватара: первые буквы (или цифры) двух первых слов.
+ *
+ * Слово без буквы и цифры — «—», «&», одинокая кавычка — в счёт не идёт, а кавычки и скобки в
+ * начале слова пропускаются: у «Кофейня «Север»» раньше выходило «К«» (первый символ слова
+ * «Север» — открывающая кавычка), у «Даркстор «Ближний»» — «Д«» (сверка 16.10.2026).
+ */
 export function initials(fullName: string): string {
   return fullName
-    .trim()
     .split(/\s+/)
+    .map((part) => part.match(/[\p{L}\p{N}]/u)?.[0] ?? '')
+    .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
+    .map((letter) => letter.toUpperCase())
     .join('');
 }
 

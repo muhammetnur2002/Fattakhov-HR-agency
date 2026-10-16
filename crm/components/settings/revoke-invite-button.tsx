@@ -1,19 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
-
-import { SubmitButton as SubmitButtonBase } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { useFormAction } from "@/lib/hooks/use-form-action";
 
 export type RevokeInviteState = { error?: string };
-
-function Submit() {
-  return (
-    <SubmitButtonBase size="sm" variant="ghost" pendingLabel="Отзываем…">
-      Отозвать
-    </SubmitButtonBase>
-  );
-}
 
 /**
  * «Отозвать» у неотвеченного приглашения — одна кнопка на три экрана.
@@ -23,6 +14,19 @@ function Submit() {
  * команда в кабинете клиента, — и право за каждым стоит своё, а значит
  * и проверка разная. Разметка при этом одна и та же, и повторять её
  * трижды незачем.
+ *
+ * Отзыв — ОДНИМ нажатием, без вопроса «Отозвать приглашение?» (решение владельца,
+ * 16.10.2026). С 13.10 кнопка переспрашивала через ConfirmBlock; прежнее поведение
+ * возвращено: действие обратимо — приглашение можно создать заново, и это новая ссылка.
+ * Поэтому приглашения не входят в перечень ConfirmBlock и не должны туда возвращаться без
+ * решения владельца (`tests/confirm-block-rule.test.ts`, исключение с причиной).
+ *
+ * Что осталось полезным от переработки подтверждений: на время запроса кнопка
+ * показывает ход («Отзываем…») и не даёт нажать повторно; отказ сервера — строкой
+ * рядом с кнопкой, а фокус после него идёт на эту строку, а не слетает на `<body>`
+ * (`useFormAction`). Исключение действия, в том числе «страница устарела»
+ * (UnrecognizedActionError), `useActionState` отдаёт ближайшей границе ошибок сам:
+ * отдельная ловля (`useStaleGuard`) здесь не нужна, и проглотить его некому.
  *
  * Форма и состояние у каждой кнопки свои: ошибка относится к конкретному
  * приглашению и показывается в его строке, а не общим сообщением наверху,
@@ -46,16 +50,23 @@ export function RevokeInviteButton({
    */
   clientId?: string;
 }) {
-  const [state, formAction] = useActionState<RevokeInviteState, FormData>(
+  const { state, pending, formProps } = useFormAction<RevokeInviteState>(
     action,
     {},
   );
 
   return (
-    <form action={formAction} className="space-y-2">
+    <form {...formProps} className="space-y-2">
       <input type="hidden" name="id" value={id} />
       {clientId && <input type="hidden" name="clientId" value={clientId} />}
-      <Submit />
+      <SubmitButton
+        size="sm"
+        variant="ghost"
+        pendingLabel="Отзываем…"
+        loading={pending}
+      >
+        Отозвать
+      </SubmitButton>
       <FormMessage compact error={state.error} className="max-w-64" />
     </form>
   );

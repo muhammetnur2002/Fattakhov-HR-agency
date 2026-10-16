@@ -36,6 +36,36 @@ const config: Config = {
     './lib/**/*.{ts,tsx}',
   ],
   theme: {
+    /*
+     * Шкала шрифтов: шесть обычных ступеней и одна акцентная (решение заказчицы: «шесть плюс одна»).
+     * Значения — переменные --fs-* из app/globals.css: на телефоне (< 768px) крупные ступени
+     * меньше, с планшета и с 1280px — крупнее. Ступень описывает роль текста, а не число, поэтому
+     * на одном экране их не больше семи, на какой бы ширине он ни открылся. Теория и причины — README,
+     * раздел «Шкала шрифтов». Весь `theme.fontSize` заменён, а не расширен: стандартные
+     * text-xs / text-sm / text-lg и прочие молча не создают CSS, и их место в коде занимает
+     * только ступень шкалы (сторож — tests/unit.ts, «Шкала шрифтов»).
+     *
+     *   caption   12        подпись, примечание, значок, метка капсом (eyebrow — она же с разрядкой)
+     *   small     14        основной мелкий: кнопка, метка поля, чип, строка списка, пояснение
+     *   body      15        основной текст, абзац, заголовок строки списка, поле ввода (на сенсорных 16)
+     *   sub       18        подзаголовок: заголовок карточки, шага, окна, группы в форме
+     *   title     24/28     заголовок раздела или карточки вакансии, число на плитке
+     *   headline  32/44     крупный заголовок страницы, большие числа
+     *   display   44/56/72  акцентная ступень — только первый экран (герой)
+     */
+    fontSize: {
+      caption: 'var(--fs-caption)',
+      eyebrow: ['var(--fs-caption)', { lineHeight: '1', letterSpacing: '0.18em', fontWeight: '500' }],
+      small: 'var(--fs-small)',
+      body: 'var(--fs-body)',
+      sub: 'var(--fs-sub)',
+      // Заголовки несут межстрочье, разрядку и насыщенность прежних display-*, которые они заменили;
+      // подпись, мелкий текст, основной и подзаголовок задают только размер: у них эти свойства
+      // всегда выставлялись на месте
+      title: ['var(--fs-title)', { lineHeight: '1.12', letterSpacing: '-0.024em', fontWeight: '600' }],
+      headline: ['var(--fs-headline)', { lineHeight: '1.04', letterSpacing: '-0.032em', fontWeight: '600' }],
+      display: ['var(--fs-display)', { lineHeight: '0.98', letterSpacing: '-0.04em', fontWeight: '600' }],
+    },
     extend: {
       // Тайповые определения Tailwind 3 не знают о функциях-значениях цвета
       // (opacityValue-хелпер) — паттерн полностью официальный и рабочий
@@ -99,15 +129,6 @@ const config: Config = {
       } as any,
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
-      },
-      fontSize: {
-        // Дисплейная шкала на clamp: заголовки должны дышать на десктопе
-        // и не ломать перенос на 360px.
-        'display-xl': ['clamp(2.75rem, 7.2vw, 6rem)', { lineHeight: '0.94', letterSpacing: '-0.045em', fontWeight: '600' }],
-        'display-lg': ['clamp(2.25rem, 5.4vw, 4rem)', { lineHeight: '0.98', letterSpacing: '-0.04em', fontWeight: '600' }],
-        'display-md': ['clamp(1.75rem, 3.6vw, 2.75rem)', { lineHeight: '1.04', letterSpacing: '-0.032em', fontWeight: '600' }],
-        'display-sm': ['clamp(1.375rem, 2.4vw, 1.875rem)', { lineHeight: '1.12', letterSpacing: '-0.024em', fontWeight: '600' }],
-        eyebrow: ['0.6875rem', { lineHeight: '1', letterSpacing: '0.18em', fontWeight: '500' }],
       },
       borderRadius: {
         xl: '0.875rem',

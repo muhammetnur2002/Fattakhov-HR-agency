@@ -55,12 +55,12 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
             aria-label={item.hideLabel ? item.label : undefined}
             title={item.hideLabel ? item.label : undefined}
             className={cn(
-              'relative flex items-center rounded-full text-[13px] font-medium transition-colors duration-300',
+              'relative flex items-center rounded-full text-small font-medium transition-colors duration-300',
               // Иконка без подписи — фиксированный квадрат: у всех вкладок
               // одинаковая ширина, поэтому подложка активной вкладки просто
               // скользит, а не меняет размер, переезжая между ними
               item.hideLabel ? 'size-10 justify-center' : 'gap-1.5 px-3.5 py-2',
-              active ? 'text-paper' : 'text-paper/55 hover:text-paper/85',
+              active ? 'text-paper' : 'text-paper-dim hover:text-paper',
             )}
           >
             {active && (
@@ -77,7 +77,7 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
               // и растягивал бы вкладку ровно так же, как раньше текст
               <span
                 aria-hidden
-                className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-accent-500 px-1 text-center text-[9.5px] font-semibold leading-[16px] text-ink"
+                className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-accent-300 px-1 text-center text-caption font-semibold leading-[18px] text-ink"
               >
                 {badge}
               </span>
@@ -85,8 +85,8 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
             {hasBadge && !item.hideLabel && (
               <span
                 className={cn(
-                  'relative min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10.5px] leading-none tabular-nums',
-                  active ? 'bg-accent-500/35 text-accent-100' : 'bg-paper/[0.08] text-paper/60',
+                  'relative min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-caption leading-none tabular-nums',
+                  active ? 'bg-accent-500/35 text-accent-100' : 'bg-paper/[0.08] text-paper-dim',
                 )}
               >
                 {badge}

@@ -122,10 +122,10 @@ export function PushPrompt({ accountId, audience }: { accountId: string; audienc
       <div className="flex items-start gap-3">
         <BellRing className="mt-0.5 size-5 shrink-0 text-accent-300" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium text-paper">
+          <p className="text-small font-medium text-paper">
             {view.kind === 'ask' ? 'Разрешите уведомления от платформы' : 'Уведомления от платформы'}
           </p>
-          <p className="mt-1 text-[13px] leading-relaxed text-paper-dim">
+          <p className="mt-1 text-small leading-relaxed text-paper-dim">
             {view.kind === 'ask' ? COPY[audience] : view.text}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -134,7 +134,7 @@ export function PushPrompt({ accountId, audience }: { accountId: string; audienc
                 Разрешить уведомления
               </Button>
             )}
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-paper-dim">
+            <label className="flex cursor-pointer items-center gap-2 text-caption text-paper-dim">
               <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} className="size-4" />
               Больше не показывать
             </label>

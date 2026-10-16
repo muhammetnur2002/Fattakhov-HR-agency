@@ -71,7 +71,7 @@ export function CalendarYear({
                     <span
                       className={cn(
                         "flex size-5 items-center justify-center rounded-full",
-                        isToday && "bg-cal-sun font-semibold text-white",
+                        isToday && "bg-cal-today font-semibold text-white",
                       )}
                     >
                       {dayOfMonth(day)}

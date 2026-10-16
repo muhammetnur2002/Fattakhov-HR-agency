@@ -41,7 +41,7 @@ export function HeroOffer() {
 
       {/* Ради этой строки блок и существует: чем больше вакансий,
           тем дешевле каждая, и это видно одним числом */}
-      <div className="mt-6 rounded-xl bg-white px-5 py-4 text-brand-graphite">
+      <div className="mt-6 rounded-xl bg-[#eeedea] px-5 py-4 text-brand-graphite">
         <div className="text-sm font-medium tracking-[0.12em] uppercase opacity-75">
           Одна вакансия в работе
         </div>

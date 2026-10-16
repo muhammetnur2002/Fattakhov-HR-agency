@@ -9,22 +9,10 @@ import { Button } from "@/components/ui/button";
 import { ENTRY_PRICE, TARIFFS, pricePerSlot } from "@/lib/marketing/inhouse-cost";
 import { formatMoney } from "@/lib/format-money";
 import { PageHero, PageIntro } from "@/components/marketing/page-intro";
+import { StructuredData } from "@/components/marketing/structured-data";
+import { pageMetadata } from "@/lib/marketing/seo";
 
-export const metadata: Metadata = {
-  title: {
-    absolute: "Стоимость подбора персонала: тарифы Fattakhov HR Agency",
-  },
-  description:
-    "Сколько стоит внешняя команда найма: от 100 000 ₽ в месяц за одну вакансию до 250 000 ₽ за пять. Открытый прайс, сравнение со своим отделом найма и расчёт цены за вакансию.",
-  alternates: { canonical: "/tariffs" },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    title: "Тарифы: от 100 000 ₽ в месяц за вакансию в работе",
-    description:
-      "Пять конфигураций, открытые цены и калькулятор: сравните подписку с расходами на свой отдел найма на своих цифрах.",
-  },
-};
+export const metadata: Metadata = pageMetadata("tariffs");
 
 /**
  * Отдельная страница тарифов.
@@ -46,6 +34,7 @@ export default function TariffsPage() {
 
   return (
     <>
+      <StructuredData page="tariffs" />
       <PageHero>
         <PageIntro eyebrow="Тарифы" title="Сколько стоит внешняя команда найма">
           От {formatMoney(ENTRY_PRICE)} в месяц за одну вакансию

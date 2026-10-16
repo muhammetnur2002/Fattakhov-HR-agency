@@ -37,7 +37,10 @@ export function InviteLink({ url }: { url: string }) {
         // Текст короткий намеренно: рядом три кнопки, колонка настроек
         // узкая, и длинная фраза обрезается на полуслове. Почему скрыта —
         // написано в описании карточки, где место есть.
-        <span className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+        // min-w-max: подпись не сжимается и не обрезается («Ссылка скр…» на
+        // телефоне, когда строка во всю ширину): нет места — переносится
+        // вниз кнопка «Копировать», а не подпись режется. Растёт до остатка.
+        <span className="min-w-max flex-1 rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
           Ссылка скрыта
         </span>
       )}

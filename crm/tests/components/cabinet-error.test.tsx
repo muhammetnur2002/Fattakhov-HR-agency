@@ -6,7 +6,7 @@
  * всю оболочку — пропадали меню и нижняя панель. Теперь у каждого кабинета свой error.tsx
  * (экран один на всех — ErrorScreen), а на уровне корня экран остаётся полноэкранным.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
@@ -18,14 +18,22 @@ import AgencyError from "@/app/(agency)/a/error";
 import ClientError from "@/app/(client)/error";
 import AppError from "@/app/error";
 
+// Sentry подгружается динамически и только при заданном DSN (lib/monitoring/capture-client.ts)
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://key@sentry.example.invalid/1");
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Тест мог не дожидаться отправки в Sentry (она идёт через динамический импорт): доводим её до конца,
+  // чтобы вызов не попал в следующий тест
+  await flush();
   captureException.mockReset();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const failure = () => Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:5432 secret-candidate-name"), { digest: "d1g3st" });
@@ -35,7 +43,7 @@ describe("error.tsx внутри кабинета", () => {
     ["клиента", ClientError, "/dashboard"],
     ["агентства", AgencyError, "/a"],
   ] as const) {
-    it(`кабинет ${name}: заголовок, код сбоя, три кнопки; «На главную» ведёт в свой кабинет`, () => {
+    it(`кабинет ${name}: заголовок, код сбоя, три кнопки; «На главную» ведёт в свой кабинет`, async () => {
       render(<Screen error={failure()} reset={() => {}} />);
 
       expect(screen.getByRole("heading", { level: 1, name: "Что-то пошло не так" })).toBeTruthy();
@@ -43,7 +51,7 @@ describe("error.tsx внутри кабинета", () => {
       expect(screen.getByRole("button", { name: "Попробовать снова" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Обновить страницу" })).toBeTruthy();
       expect(screen.getByRole("link", { name: "На главную" })).toHaveAttribute("href", home);
-      expect(captureException).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(captureException).toHaveBeenCalledTimes(1));
     });
 
     it(`кабинет ${name}: текста исключения на экране нет, свой main не добавляется`, () => {
@@ -55,12 +63,13 @@ describe("error.tsx внутри кабинета", () => {
       expect(container.querySelector("main")).toBeNull();
     });
 
-    it(`кабинет ${name}: устаревшая вкладка — «Страница устарела» без повтора и без Sentry`, () => {
+    it(`кабинет ${name}: устаревшая вкладка — «Страница устарела» без повтора и без Sentry`, async () => {
       render(<Screen error={new UnrecognizedActionError("Server Action not found")} reset={() => {}} />);
 
       expect(screen.getByRole("heading", { level: 1, name: "Страница устарела" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Обновить страницу" })).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Попробовать снова" })).toBeNull();
+      await flush();
       expect(captureException).not.toHaveBeenCalled();
     });
   }

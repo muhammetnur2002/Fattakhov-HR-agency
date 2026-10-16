@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowRight, Link2Off } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Toast';
 import { durations, easeOutExpo } from '@/lib/motion';
@@ -77,7 +77,7 @@ export function ResetPasswordForm({ token, state }: { token: string; state: 'VAL
         <div className="glass rounded-3xl p-6 sm:p-8">
           {state === 'VALID' ? (
             <>
-              <h1 className="text-[20px] font-semibold text-paper">Новый пароль</h1>
+              <h1 className="text-sub font-semibold text-paper">Новый пароль</h1>
               <form onSubmit={submit} className="mt-4 space-y-3">
                 <TextField
                   label="Новый пароль"
@@ -99,7 +99,7 @@ export function ResetPasswordForm({ token, state }: { token: string; state: 'VAL
                   onChange={(e) => setRepeat(e.target.value)}
                 />
                 {errors.form && (
-                  <p role="alert" className="text-[13px] leading-snug text-danger">
+                  <p role="alert" className="text-small leading-snug text-danger">
                     {errors.form}
                   </p>
                 )}
@@ -110,25 +110,23 @@ export function ResetPasswordForm({ token, state }: { token: string; state: 'VAL
             </>
           ) : (
             <div className="space-y-4">
-              <h1 className="flex items-center gap-2.5 text-[20px] font-semibold text-paper">
+              <h1 className="flex items-center gap-2.5 text-sub font-semibold text-paper">
                 <Link2Off className="size-5 shrink-0 text-warn" aria-hidden />
                 Ссылка не работает
               </h1>
-              <p className="text-[14px] leading-relaxed text-paper-dim">
+              <p className="text-small leading-relaxed text-paper-dim">
                 {state === 'EXPIRED'
                   ? 'Ссылка устарела — она работает час после письма.'
                   : 'Ссылка неполная или уже использована. Каждая ссылка срабатывает один раз.'}
               </p>
-              <Link href="/forgot" className="block">
-                <Button size="lg" className="w-full" iconRight={<ArrowRight />}>
-                  Запросить новую ссылку
-                </Button>
-              </Link>
+              <ButtonLink href="/forgot" size="lg" className="w-full" iconRight={<ArrowRight />}>
+                Запросить новую ссылку
+              </ButtonLink>
             </div>
           )}
         </div>
 
-        <p className="mt-6 text-center text-[13px] text-paper-faint">
+        <p className="mt-6 text-center text-small text-paper-faint">
           <Link href="/login" className="text-paper underline-offset-4 transition-colors hover:underline">
             Вернуться ко входу
           </Link>

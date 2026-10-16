@@ -165,7 +165,7 @@ export function VacancyEditor({
     <div className="mx-auto w-full max-w-[46rem]">
       <Link
         href="/employer/vacancies"
-        className="inline-flex items-center gap-1.5 text-[13px] text-paper-faint transition-colors hover:text-paper"
+        className="inline-flex items-center gap-1.5 text-small text-paper-faint transition-colors hover:text-paper"
       >
         <ArrowLeft className="size-3.5" aria-hidden />
         Все вакансии
@@ -173,10 +173,10 @@ export function VacancyEditor({
 
       <header className="mb-8 mt-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-display-md text-paper">{isNew ? 'Новая вакансия' : 'Вакансия'}</h1>
+          <h1 className="text-headline text-paper">{isNew ? 'Новая вакансия' : 'Вакансия'}</h1>
           {!isNew && <VacancyStatusPill status={current} />}
         </div>
-        <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">
+        <p className="mt-2 text-small leading-relaxed text-paper-dim">
           {skipsModeration
             ? 'Вакансия публикуется сразу — по вашему договору её не нужно ждать на проверке агентства. Чем конкретнее задачи и условия, тем точнее лента подберёт студентов.'
             : 'Агентство проверяет каждую вакансию перед публикацией. Чем конкретнее задачи и условия, тем точнее лента подберёт студентов.'}
@@ -259,7 +259,7 @@ export function VacancyEditor({
             </div>
             {knownAddresses.length > 0 && (
               <div>
-                <p className="mb-2 pl-1 text-[12.5px] text-paper-faint">Адреса ваших вакансий — нажмите, чтобы подставить:</p>
+                <p className="mb-2 pl-1 text-caption text-paper-faint">Адреса ваших вакансий — нажмите, чтобы подставить:</p>
                 <div className="flex flex-wrap gap-2">
                   {knownAddresses.map((item) => (
                     <Chip
@@ -332,12 +332,12 @@ export function VacancyEditor({
                 onChange={(e) => patch({ salaryPeriod: e.target.value as SalaryPeriod })}
               />
             </div>
-            <p className="-mt-3 pl-1 text-[12.5px] text-paper-faint">
+            <p className="-mt-3 pl-1 text-caption text-paper-faint">
               Оставьте пустым, если оплата обсуждается на собеседовании.
             </p>
 
             <div>
-              <p className="mb-2.5 pl-1 text-[12.5px] uppercase tracking-[0.1em] text-paper-faint">Дни смен</p>
+              <p className="mb-2.5 pl-1 text-caption uppercase tracking-[0.1em] text-paper-faint">Дни смен</p>
               <div className="flex flex-wrap gap-2">
                 {WEEKDAYS.map((day) => {
                   const selected = form.shiftDays.includes(day);
@@ -358,7 +358,7 @@ export function VacancyEditor({
                 })}
               </div>
               {fieldError('shiftDays') && (
-                <p className="pl-1 pt-1.5 text-[12.5px] text-danger">{fieldError('shiftDays')}</p>
+                <p className="pl-1 pt-1.5 text-caption text-danger">{fieldError('shiftDays')}</p>
               )}
             </div>
 
@@ -403,18 +403,18 @@ export function VacancyEditor({
         </Section>
 
         <Section title="Навыки">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             По этим тегам лента поднимает вакансию студентам с такими навыками. До {VACANCY_LIMITS.tags}.
           </p>
           <SkillsInput value={form.tags} max={VACANCY_LIMITS.tags} onChange={(tags) => patch({ tags })} />
-          {fieldError('tags') && <p className="pt-2 text-[12.5px] text-danger">{fieldError('tags')}</p>}
+          {fieldError('tags') && <p className="pt-2 text-caption text-danger">{fieldError('tags')}</p>}
         </Section>
 
         <Section title="Фото и видео">
-          <p className="mb-4 text-[13px] leading-relaxed text-paper-faint">
+          <p className="mb-4 text-small leading-relaxed text-paper-faint">
             Рабочее место, команда, смена — до {VACANCY_LIMITS.photos} фото.
           </p>
-          {fieldError('photos') && <p className="mb-3 text-[12.5px] text-danger">{fieldError('photos')}</p>}
+          {fieldError('photos') && <p className="mb-3 text-caption text-danger">{fieldError('photos')}</p>}
           {form.photos.length > 0 && (
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {form.photos.map((src, i) => (
@@ -510,7 +510,7 @@ function Notice({
   return (
     <div
       className={cn(
-        'rounded-2xl border p-4 text-[13.5px] leading-relaxed',
+        'rounded-2xl border p-4 text-small leading-relaxed',
         tone === 'warn' && 'border-warn/35 bg-warn/[0.08]',
         tone === 'danger' && 'border-danger/35 bg-danger/[0.07]',
         tone === 'info' && 'border-accent-400/30 bg-accent-500/[0.08]',
@@ -537,7 +537,7 @@ function Notice({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="glass rounded-3xl p-6 sm:p-7">
-      <h2 className="mb-5 text-[12.5px] uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
+      <h2 className="mb-5 text-caption uppercase tracking-[0.12em] text-paper-faint">{title}</h2>
       {children}
     </section>
   );

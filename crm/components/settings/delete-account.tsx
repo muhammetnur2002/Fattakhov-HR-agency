@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { cancelDeletionRequestAction, deleteAccountAction } from "@/app/(client)/settings/actions";
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 
 /**
  * Удаление своего аккаунта клиентом.
@@ -13,18 +13,8 @@ import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
  * пока он не подтвердит, аккаунт работает.
  */
 export function DeleteAccount({ contracted, requested }: { contracted: boolean; requested: boolean }) {
-  const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [pending, startTransition] = useTransition();
-
-  function run(action: () => Promise<{ error?: string; ok?: string }>) {
-    startTransition(async () => {
-      const result = await action();
-      setMessage(result);
-      setConfirming(false);
-    });
-  }
 
   if (requested) {
     return (
@@ -32,7 +22,17 @@ export function DeleteAccount({ contracted, requested }: { contracted: boolean; 
         <p className="text-sm">
           Запрос на удаление отправлен владельцу агентства. Пока он не подтвердит, аккаунт работает как обычно.
         </p>
-        <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => run(cancelDeletionRequestAction)}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              setMessage(await cancelDeletionRequestAction());
+            })
+          }
+        >
           Отозвать запрос
         </Button>
         <FormMessage error={message.error} />
@@ -48,27 +48,25 @@ export function DeleteAccount({ contracted, requested }: { contracted: boolean; 
           : "Аккаунт удалится сразу и насовсем: имя, почта, телефон и пароль будут стёрты, войти будет нельзя. Если вы последний сотрудник компании, её вакансии на студенческой платформе будут сняты."}
       </p>
 
-      {confirming ? (
-        <div {...groupProps} className="space-y-2">
-          <p id={questionId} className="text-sm font-medium">
-            {contracted ? "Отправить запрос на удаление аккаунта?" : "Удалить аккаунт? Это нельзя отменить."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="destructive" loading={pending} onClick={() => run(deleteAccountAction)}>
-              {pending ? "Подождите…" : contracted ? "Да, отправить запрос" : "Да, удалить аккаунт"}
-            </Button>
-            <Button ref={focusRef} aria-describedby={questionId} type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-              Отмена
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button ref={triggerRef} type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>
-          {contracted ? "Запросить удаление аккаунта" : "Удалить аккаунт"}
-        </Button>
-      )}
+      <ConfirmBlock
+        trigger={
+          <Button type="button" size="sm" variant="outline">
+            {contracted ? "Запросить удаление аккаунта" : "Удалить аккаунт"}
+          </Button>
+        }
+        question={contracted ? "Отправить запрос на удаление аккаунта?" : "Удалить аккаунт? Это нельзя отменить."}
+        questionClassName="font-medium"
+        confirmLabel={contracted ? "Да, отправить запрос" : "Да, удалить аккаунт"}
+        pendingLabel="Подождите…"
+        onConfirm={async () => {
+          const result = await deleteAccountAction();
+          // Отказ показывает сам блок; здесь — только «готово»
+          setMessage(result.error ? {} : result);
+          return result;
+        }}
+      />
 
-      <FormMessage error={message.error} ok={message.ok} />
+      <FormMessage ok={message.ok} />
     </div>
   );
 }

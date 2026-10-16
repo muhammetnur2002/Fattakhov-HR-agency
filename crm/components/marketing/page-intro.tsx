@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { SITE_CONTAINER } from "./layout";
+import { RibbedTexture } from "./texture";
 
 /**
  * Тёмная полоса-шапка внутренней страницы: фон, контейнер и вертикальный отступ.
@@ -17,10 +18,7 @@ import { SITE_CONTAINER } from "./layout";
 export function PageHero({ children }: { children: ReactNode }) {
   return (
     <section className="relative overflow-hidden bg-brand-slate text-white">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/brand/slate-ribbed.jpg')] bg-cover bg-center opacity-20 mix-blend-overlay"
-      />
+      <RibbedTexture className="opacity-20" eager />
       <div className={`relative ${SITE_CONTAINER} py-12 md:py-16`}>{children}</div>
     </section>
   );

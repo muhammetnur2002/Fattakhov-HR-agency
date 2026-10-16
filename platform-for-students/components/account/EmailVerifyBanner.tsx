@@ -95,8 +95,8 @@ export function EmailVerifyBanner({ email }: { email: string }) {
       <div className="flex items-start gap-3">
         <MailCheck className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium text-paper">Подтвердите почту</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-paper-dim">
+          <p className="text-small font-medium text-paper">Подтвердите почту</p>
+          <p className="mt-1 text-small leading-relaxed text-paper-dim">
             Код отправлен на {email}. Пока почта не подтверждена, отклики ждут, а вакансии не уходят на проверку.
           </p>
           <form onSubmit={verify} className="mt-3 flex flex-wrap items-center gap-2">
@@ -108,7 +108,7 @@ export function EmailVerifyBanner({ email }: { email: string }) {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(normalizeCode(e.target.value).slice(0, EMAIL_CODE_LENGTH))}
-              className="h-10 w-[9.5rem] rounded-xl border border-[var(--hairline-strong)] bg-graphite-950/60 px-3 text-center font-mono text-[16px] tracking-[0.3em] text-paper outline-none transition-colors placeholder:text-paper-faint focus:border-accent-300"
+              className="h-10 w-[9.5rem] rounded-xl border border-[var(--hairline-strong)] bg-graphite-950/60 px-3 text-center font-mono text-body tracking-[0.3em] text-paper transition-colors placeholder:text-paper-faint focus:border-accent-300"
             />
             <Button type="submit" size="sm" loading={verifying} disabled={code.length !== EMAIL_CODE_LENGTH}>
               Подтвердить
@@ -118,7 +118,7 @@ export function EmailVerifyBanner({ email }: { email: string }) {
             </Button>
           </form>
           {error && (
-            <p role="alert" className="mt-2 text-[12.5px] leading-snug text-danger">
+            <p role="alert" className="mt-2 text-caption leading-snug text-danger">
               {error}
             </p>
           )}

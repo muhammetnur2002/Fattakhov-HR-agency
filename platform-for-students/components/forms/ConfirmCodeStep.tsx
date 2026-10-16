@@ -130,8 +130,8 @@ export function ConfirmCodeStep({
       className="mx-auto w-full max-w-[26rem] text-center"
     >
       <MailCheck className="mx-auto size-9 text-accent-300" aria-hidden />
-      <h1 className="mt-5 text-display-sm text-paper">Подтвердите почту</h1>
-      <p className="mt-2.5 text-[14.5px] leading-relaxed text-paper-dim">
+      <h1 className="mt-5 text-title text-paper">Подтвердите почту</h1>
+      <p className="mt-2.5 text-body leading-relaxed text-paper-dim">
         Код отправлен на {email}. Введите его, чтобы открыть аккаунт.
       </p>
 
@@ -139,15 +139,17 @@ export function ConfirmCodeStep({
         <input
           inputMode="numeric"
           autoComplete="one-time-code"
+          // 18px (text-sub) крупнее 16px: правило «поля 16px на сенсорном экране» (globals.css) его не ужимает
+          data-keep-size
           autoFocus
           aria-label="Код из письма"
           placeholder="000000"
           value={code}
           onChange={(e) => setCode(normalizeCode(e.target.value).slice(0, EMAIL_CODE_LENGTH))}
-          className="h-14 w-48 rounded-2xl border border-[var(--hairline-strong)] bg-graphite-950/60 text-center font-mono text-[22px] tracking-[0.4em] text-paper outline-none transition-colors placeholder:text-paper-faint focus:border-accent-300"
+          className="h-14 w-48 rounded-2xl border border-[var(--hairline-strong)] bg-graphite-950/60 text-center font-mono text-sub tracking-[0.4em] text-paper transition-colors placeholder:text-paper-faint focus:border-accent-300"
         />
         {error && (
-          <p role="alert" className="text-[12.5px] leading-snug text-danger">
+          <p role="alert" className="text-caption leading-snug text-danger">
             {error}
           </p>
         )}
@@ -168,7 +170,7 @@ export function ConfirmCodeStep({
       <button
         type="button"
         onClick={onRestart}
-        className="mt-6 text-[12.5px] text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
+        className="mt-6 text-caption text-paper-faint underline-offset-4 transition-colors hover:text-paper hover:underline"
       >
         Неверная почта? Начать заново
       </button>

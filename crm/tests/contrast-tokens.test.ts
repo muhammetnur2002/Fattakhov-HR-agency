@@ -222,6 +222,38 @@ describe.each(THEMES)("контраст токенов: $name тема", ({ name
   });
 });
 
+/** Цвет `--name: #rrggbb` из блока токенов. */
+function hexToken(body: string, name: string): Rgba {
+  const m = new RegExp(`--${name}:\\s*#([0-9a-fA-F]{6})\\b`).exec(body);
+  if (!m) throw new Error(`нет токена --${name} в формате #rrggbb`);
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+}
+
+describe.each(THEMES)("календарь: контраст — $name тема", ({ body }) => {
+  const white: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+  // Календарные токены лежат в :root и тему не меняют
+  const palette = block(/^:root\s*\{/m);
+  const bg = token(body, "background");
+  const card = token(body, "card");
+  const muted = token(body, "muted");
+
+  it("круг «сегодня»: белое число на --cal-today — не ниже 4,5:1 (WCAG 1.4.3); на --cal-sun было 3,93:1", () => {
+    expect(ratio(white, hexToken(palette, "cal-today"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("круг «сегодня» отличим от ячейки: не ниже 3:1 к карточке, фону и ячейке соседнего месяца (WCAG 1.4.11)", () => {
+    const today = hexToken(palette, "cal-today");
+    for (const surface of [card, bg, muted]) expect(ratio(today, surface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("число соседнего месяца (--muted-foreground) читается на его ячейке (--muted) и на карточке — не ниже 4,5:1", () => {
+    const text = token(body, "muted-foreground");
+    expect(ratio(text, muted)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(text, card)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 /** Все .tsx в app/ и components/ — для проверок исходников. */
 function sources(): { file: string; text: string }[] {
   const out: { file: string; text: string }[] = [];
@@ -247,6 +279,13 @@ describe("контраст в исходниках", () => {
   it("белый текст не стоит на сплошном bg-destructive: в тёмной теме это 2:1 — нужен text-destructive-foreground", () => {
     const bad = all
       .filter(({ text }) => /bg-destructive(?![/\w-])[^"'`\n]*text-white|text-white[^"'`\n]*bg-destructive(?![/\w-])/.test(text))
+      .map((s) => s.file);
+    expect(bad).toEqual([]);
+  });
+
+  it("белый текст не стоит на сплошном bg-cal-sun: это 3,93:1 — нужен токен круга «сегодня» bg-cal-today", () => {
+    const bad = all
+      .filter(({ text }) => /bg-cal-sun(?![/\w-])[^"'`\n]*text-white|text-white[^"'`\n]*bg-cal-sun(?![/\w-])/.test(text))
       .map((s) => s.file);
     expect(bad).toEqual([]);
   });

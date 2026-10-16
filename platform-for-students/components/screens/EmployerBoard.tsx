@@ -3,10 +3,9 @@
 import { PortfolioView } from '@/components/student/PortfolioView';
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Link from 'next/link';
 import { ChevronDown, Download, GraduationCap, Mail, MessageSquare, Phone, ShieldCheck, Sparkles } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Chip';
 import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -130,11 +129,9 @@ export function EmployerBoard({ board }: { board: BoardData }) {
           title="Откликов пока нет"
           description="Как только студент смахнёт вашу вакансию вправо, его профиль появится здесь — с фото, контактами и резюме."
           action={
-            <Link href="/employer/vacancies">
-              <Button variant="accent" size="md">
-                Мои вакансии
-              </Button>
-            </Link>
+            <ButtonLink href="/employer/vacancies" variant="accent" size="md">
+              Мои вакансии
+            </ButtonLink>
           }
         />
       </>
@@ -182,7 +179,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
       </Stagger>
 
       {visible.length === 0 && (
-        <p className="py-16 text-center text-[14px] text-paper-faint">
+        <p className="py-16 text-center text-small text-paper-faint">
           По этой вакансии откликов пока нет.
         </p>
       )}
@@ -209,7 +206,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
           </div>
         }
       >
-        <p className="text-[14.5px] leading-relaxed text-paper-dim">
+        <p className="text-body leading-relaxed text-paper-dim">
           {rejecting?.student.fullName} сразу увидит статус «Отказ» в своих откликах и получит уведомление.
           Уведомление отозвать нельзя; сам статус при необходимости можно будет поменять.
         </p>
@@ -232,7 +229,7 @@ function BoardHeader({
   return (
     <header className="mb-8">
       <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
-      <h1 className="mt-3 text-display-md text-paper">{company}</h1>
+      <h1 className="mt-3 text-headline text-paper">{company}</h1>
 
       <div className="mt-7 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[var(--hairline)] bg-[var(--hairline)]">
         <Stat value={total} label={plural(total, 'отклик', 'отклика', 'откликов')} />
@@ -248,20 +245,20 @@ function Stat({ value, label, accent }: { value: number; label: string; accent?:
     <div className="bg-ink px-5 py-5">
       <p
         className={cn(
-          'text-[26px] font-semibold leading-none tracking-[-0.03em]',
+          'text-title font-semibold leading-none tracking-[-0.03em]',
           accent && value > 0 ? 'text-accent-200' : 'text-paper',
         )}
       >
         <CountUp to={value} />
       </p>
-      <p className="mt-2 text-[12.5px] text-paper-faint">{label}</p>
+      <p className="mt-2 text-caption text-paper-faint">{label}</p>
     </div>
   );
 }
 
 function Count({ children }: { children: React.ReactNode }) {
   return (
-    <span className="ml-1.5 rounded-full bg-paper/[0.09] px-1.5 py-0.5 text-[10.5px] tabular-nums">
+    <span className="ml-1.5 rounded-full bg-paper/[0.09] px-1.5 py-0.5 text-caption tabular-nums">
       {children}
     </span>
   );
@@ -283,10 +280,10 @@ function FilterChip({
       whileTap={{ scale: 0.96 }}
       transition={springSnappy}
       className={cn(
-        'relative flex shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-medium transition-colors duration-300',
+        'relative flex shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-2 text-small font-medium transition-colors duration-300',
         active
           ? 'border-accent-400/55 bg-accent-500/20 text-paper'
-          : 'border-[var(--hairline)] bg-graphite-900/45 text-paper/60 hover:border-paper/22 hover:text-paper',
+          : 'border-[var(--hairline)] bg-graphite-900/45 text-paper-dim hover:border-paper/22 hover:text-paper',
       )}
     >
       {children}
@@ -318,10 +315,10 @@ function CandidateRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="truncate text-[17px] font-semibold tracking-[-0.02em] text-paper">
+              <h2 className="truncate text-body font-semibold tracking-[-0.02em] text-paper">
                 {student.fullName}
               </h2>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-paper-dim">
+              <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-small text-paper-dim">
                 <span>
                   {age} {plural(age, 'год', 'года', 'лет')}
                 </span>
@@ -338,20 +335,20 @@ function CandidateRow({
                   </Tag>
                 )}
               </p>
-              <p className="mt-1 truncate text-[13px] text-paper-faint">{student.speciality}</p>
+              <p className="mt-1 truncate text-small text-paper-faint">{student.speciality}</p>
               {/* Статус — здесь же, где контакты: работодатель решает,
                   звонить сейчас или писать, и «был(а) вчера» меняет это
                   решение так же, как номер телефона */}
               <PresenceLine
                 lastSeenAt={application.studentLastSeen}
-                className="mt-1 text-[12.5px] text-paper-faint"
+                className="mt-1 text-caption text-paper-faint"
               />
             </div>
 
             <ApplicationStatusPill status={application.status} className="shrink-0" />
           </div>
 
-          <p className="mt-3 text-[12.5px] text-paper-faint">
+          <p className="mt-3 text-caption text-paper-faint">
             Откликнулся на «{application.vacancyTitle}» {timeAgo(application.createdAt)}
           </p>
 
@@ -397,7 +394,7 @@ function CandidateRow({
                     {student.email && (
                       <a
                         href={`mailto:${student.email}`}
-                        className="flex items-center gap-2 text-[14px] text-paper transition-colors hover:text-accent-200"
+                        className="flex items-center gap-2 text-small text-paper transition-colors hover:text-accent-200"
                       >
                         <Mail className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
                         {student.email}
@@ -406,7 +403,7 @@ function CandidateRow({
                     {student.phone && (
                       <a
                         href={`tel:${student.phone.replace(/[^\d+]/g, '')}`}
-                        className="flex items-center gap-2 text-[14px] text-paper transition-colors hover:text-accent-200"
+                        className="flex items-center gap-2 text-small text-paper transition-colors hover:text-accent-200"
                       >
                         <Phone className="size-3.5 shrink-0 text-paper-faint" aria-hidden />
                         {student.phone}
@@ -417,13 +414,13 @@ function CandidateRow({
                         href={student.resumeUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-xl border border-accent-500/35 bg-accent-500/12 px-3 py-2 text-[13px] text-accent-100 transition-colors hover:bg-accent-500/20"
+                        className="inline-flex items-center gap-2 rounded-xl border border-accent-500/35 bg-accent-500/12 px-3 py-2 text-small text-accent-100 transition-colors hover:bg-accent-500/20"
                       >
                         <Download className="size-3.5" aria-hidden />
                         {student.resumeName ?? 'Резюме'}
                       </a>
                     ) : (
-                      <p className="text-[13px] text-paper-faint">Резюме не приложено</p>
+                      <p className="text-small text-paper-faint">Резюме не приложено</p>
                     )}
                   </div>
                 </div>
@@ -434,19 +431,19 @@ function CandidateRow({
                     {student.workDays.map((day) => (
                       <span
                         key={day}
-                        className="rounded-md bg-paper/[0.07] px-2 py-1 text-[12px] text-paper/75"
+                        className="rounded-md bg-paper/[0.07] px-2 py-1 text-caption text-paper/75"
                       >
                         {WEEKDAY_LABEL[day]}
                       </span>
                     ))}
                   </div>
                   {student.hoursPerWeek && (
-                    <p className="mt-2 text-[13px] text-paper-dim">
+                    <p className="mt-2 text-small text-paper-dim">
                       до {student.hoursPerWeek} часов в неделю
                     </p>
                   )}
                   {student.city && (
-                    <p className="mt-1 text-[13px] text-paper-faint">{student.city}</p>
+                    <p className="mt-1 text-small text-paper-faint">{student.city}</p>
                   )}
                 </div>
               </div>
@@ -456,7 +453,7 @@ function CandidateRow({
                   <p className="flex items-center gap-1.5 text-eyebrow uppercase text-paper-faint">
                     <Sparkles className="size-3" aria-hidden />О себе
                   </p>
-                  <p className="mt-2 text-[14px] leading-relaxed text-paper-dim">{student.about}</p>
+                  <p className="mt-2 text-small leading-relaxed text-paper-dim">{student.about}</p>
                 </div>
               )}
 
@@ -469,11 +466,9 @@ function CandidateRow({
               {/* Переход в переписку прямо отсюда: решение «позвать»
                   принимается на карточке кандидата, а не в другом разделе */}
               <div className="mt-6">
-                <Link href={`/employer/messages?thread=${application.id}`}>
-                  <Button variant="accent" size="md" icon={<MessageSquare />}>
-                    Написать кандидату
-                  </Button>
-                </Link>
+                <ButtonLink href={`/employer/messages?thread=${application.id}`} variant="accent" size="md" icon={<MessageSquare />}>
+                  Написать кандидату
+                </ButtonLink>
               </div>
 
               <div className="mt-6">
@@ -489,10 +484,10 @@ function CandidateRow({
                       aria-pressed={status === application.status}
                       onClick={() => onStatus(status)}
                       className={cn(
-                        'rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-300',
+                        'rounded-full border px-3 py-1.5 text-caption font-medium transition-colors duration-300',
                         status === application.status
                           ? 'border-accent-400/55 bg-accent-500/20 text-paper'
-                          : 'border-[var(--hairline)] bg-graphite-900/45 text-paper/60 hover:border-paper/25 hover:text-paper',
+                          : 'border-[var(--hairline)] bg-graphite-900/45 text-paper-dim hover:border-paper/25 hover:text-paper',
                         pending && 'opacity-50',
                       )}
                     >

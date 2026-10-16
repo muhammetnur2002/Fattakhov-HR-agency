@@ -8,9 +8,13 @@ import { getStore } from '@/lib/db';
 import { studentName } from '@/lib/db/mappers';
 import { needsConsentRenewal } from '@/lib/legal';
 import { getSessionWithRole, redirectIfRevoked } from '@/lib/security/guards';
+import { NOINDEX_METADATA } from '@/lib/seo';
 import { listWaitingSwipes } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
+
+// Кабинет студента — не для выдачи: метка на макете закрывает и новые страницы раздела
+export const metadata = NOINDEX_METADATA;
 
 /**
  * Каркас студенческих разделов.

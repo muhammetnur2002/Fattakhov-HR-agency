@@ -121,3 +121,35 @@ export function createSelfRegisteredClient(params: {
 export function deleteSelfRegisteredClient(params: { email: string }): Promise<{ removed: number }> {
   return call({ op: "deleteSelfRegisteredClient", ...params }) as Promise<{ removed: number }>;
 }
+
+/**
+ * Неотвеченное приглашение (экран «Отозвать»): по умолчанию администратор клиента; `clientId: null` и
+ * `role: "RECRUITER"` — сотрудник агентства. `withLink` — со ссылкой, которую экран может показать.
+ */
+export function createInvitation(params: {
+  organizationId: string;
+  clientId: string | null;
+  email: string;
+  createdById: string;
+  role?: "CLIENT_ADMIN" | "RECRUITER";
+  withLink?: boolean;
+}): Promise<{ invitationId: string }> {
+  return call({ op: "createInvitation", ...params });
+}
+
+export function invitationExists(params: { invitationId: string }): Promise<{ exists: boolean }> {
+  return call({ op: "invitationExists", ...params });
+}
+
+export function deleteInvitation(params: { invitationId: string }): Promise<{ removed: number }> {
+  return call({ op: "deleteInvitation", ...params }) as Promise<{ removed: number }>;
+}
+
+/** Страница ВКонтакте у пользователя (экран «Отвязать»); `null` — отвязана. */
+export function setVkUser(params: { userId: string; vkUserId: string | null }): Promise<object> {
+  return call({ op: "setVkUser", ...params });
+}
+
+export function getVkUser(params: { userId: string }): Promise<{ vkUserId: string | null }> {
+  return call({ op: "getVkUser", ...params });
+}

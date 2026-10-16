@@ -26,8 +26,10 @@ import { durations, easeOutExpo } from '@/lib/motion';
  * высоту строки и дёргает всю форму.
  */
 
+// field-focus (globals.css) рисует кольцо фокуса на рамке: у самого <input> стоит outline-0,
+// а рамка в фокусе меняет цвет на accent-300 (в обеих темах ≥ 3:1 к полотну)
 const shellBase =
-  'relative w-full rounded-xl border bg-graphite-900/55 transition-[border-color,box-shadow,background-color] duration-300 ease-out-expo';
+  'field-focus relative w-full rounded-xl border bg-graphite-900/55 transition-[border-color,box-shadow,background-color] duration-300 ease-out-expo';
 
 function shellClasses(focused: boolean, invalid: boolean) {
   return cn(
@@ -35,7 +37,7 @@ function shellClasses(focused: boolean, invalid: boolean) {
     invalid
       ? 'border-danger/60 shadow-[0_0_0_3px_rgba(180,83,79,0.12)]'
       : focused
-        ? 'border-accent-400/70 bg-graphite-850/70 shadow-[0_0_0_3px_rgba(110,136,162,0.14)]'
+        ? 'border-accent-300 bg-graphite-850/70'
         : 'border-[var(--hairline)] hover:border-paper/20',
   );
 }
@@ -57,7 +59,7 @@ function FieldError({ error, hint }: { error?: string; hint?: string }) {
           animate={{ opacity: 1, y: 0, height: 'auto' }}
           exit={{ opacity: 0, y: -4, height: 0 }}
           transition={{ duration: durations.fast, ease: easeOutExpo }}
-          className="overflow-hidden pl-1 pt-1.5 text-[12.5px] leading-snug text-danger"
+          className="overflow-hidden pl-1 pt-1.5 text-caption leading-snug text-danger"
         >
           {error}
         </motion.p>
@@ -67,7 +69,7 @@ function FieldError({ error, hint }: { error?: string; hint?: string }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="pl-1 pt-1.5 text-[12.5px] leading-snug text-paper-faint"
+          className="pl-1 pt-1.5 text-caption leading-snug text-paper-faint"
         >
           {hint}
         </motion.p>
@@ -109,16 +111,18 @@ function FloatingLabel({
         aria-hidden
         initial={false}
         // Положение при исчезновении — то же, что у поднятой подписи:
-        // подпись гаснет на месте, а не уезжает одновременно с угасанием
+        // подпись гаснет на месте, а не уезжает одновременно с угасанием.
+        // Прозрачность не ниже 0,62: при 0,5 подпись давала 3,7:1 (проверено в браузере),
+        // а масштаб 0,8 от 15px — ровно 12px, меньше мелкие подписи не бывают
         animate={
           faded
-            ? { y: -14, scale: 0.76, opacity: 0 }
+            ? { y: -14, scale: 0.8, opacity: 0 }
             : lifted
-              ? { y: -14, scale: 0.76, opacity: 0.7 }
-              : { y: 0, scale: 1, opacity: 0.5 }
+              ? { y: -14, scale: 0.8, opacity: 0.8 }
+              : { y: 0, scale: 1, opacity: 0.62 }
         }
         transition={{ duration: durations.fast, ease: easeOutExpo }}
-        className="pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-[15px] text-paper"
+        className="pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-body text-paper"
       >
         {label}
       </motion.span>
@@ -156,7 +160,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
             setFocused(false);
             onBlur?.(e);
           }}
-          className="h-[62px] w-full bg-transparent px-4 pb-1.5 pt-6 text-[15px] text-paper outline-none placeholder:text-transparent"
+          className="h-[62px] w-full bg-transparent px-4 pb-1.5 pt-6 text-body text-paper outline-0 placeholder:text-transparent"
           {...props}
         />
       </div>
@@ -187,7 +191,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
             initial={false}
             animate={{ opacity: length > 0 ? 0 : 1 }}
             transition={{ duration: durations.fast, ease: easeOutExpo }}
-            className="pointer-events-none absolute left-4 right-4 top-3 text-[12.5px] uppercase tracking-[0.1em] text-paper-faint"
+            className="pointer-events-none absolute left-4 right-4 top-3 text-caption uppercase tracking-[0.1em] text-paper-faint"
           >
             {label}
           </motion.span>
@@ -204,13 +208,13 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
               setFocused(false);
               onBlur?.(e);
             }}
-            className="min-h-[124px] w-full resize-none bg-transparent px-4 pb-3 pt-9 text-[15px] leading-relaxed text-paper outline-none"
+            className="min-h-[124px] w-full resize-none bg-transparent px-4 pb-3 pt-9 text-body leading-relaxed text-paper outline-0"
             {...props}
           />
           {maxCount && (
             <span
               className={cn(
-                'absolute bottom-2.5 right-3 text-[11px] tabular-nums transition-colors',
+                'absolute bottom-2.5 right-3 text-caption tabular-nums transition-colors',
                 length > maxCount ? 'text-danger' : 'text-paper-faint',
               )}
             >
@@ -228,10 +232,16 @@ export interface SelectFieldProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'className'>,
     BaseProps {
   options: Array<{ value: string; label: string }>;
+  /**
+   * Узкий вариант для коротких значений в ряд (день, месяц, год) на телефоне, до 640px: отступы
+   * 12/24 вместо 16/40, шеврон 14px ближе к краю. От 640px вид тот же, что у обычного списка —
+   * на ноутбуке и планшете места хватает, и вид поля не менялся. Место под шеврон оставлено везде.
+   */
+  compact?: boolean;
 }
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(function SelectField(
-  { label, error, hint, className, options, onFocus, onBlur, ...props },
+  { label, error, hint, className, options, compact = false, onFocus, onBlur, ...props },
   ref,
 ) {
   const generated = useId();
@@ -243,7 +253,10 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
       <div className={shellClasses(focused, !!error)}>
         <label
           htmlFor={id}
-          className="pointer-events-none absolute left-4 top-2.5 text-[11px] uppercase tracking-[0.12em] text-paper-faint"
+          className={cn(
+            'pointer-events-none absolute top-2.5 text-caption uppercase tracking-[0.12em] text-paper-faint',
+            compact ? 'left-3 sm:left-4' : 'left-4',
+          )}
         >
           {label}
         </label>
@@ -259,7 +272,12 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
             setFocused(false);
             onBlur?.(e);
           }}
-          className="h-[62px] w-full appearance-none bg-transparent px-4 pb-1.5 pt-6 text-[15px] text-paper outline-none [&>option]:bg-graphite-900 [&>option]:text-paper"
+          // Правый отступ — вместе с местом под шеврон (он лежит поверх рамки и не двигает текст):
+          // раньше было 16px при шевроне на 16–32px от края, и длинное значение уходило под него
+          className={cn(
+            'h-[62px] w-full appearance-none bg-transparent pb-1.5 pt-6 text-body text-paper outline-0 [&>option]:bg-graphite-900 [&>option]:text-paper',
+            compact ? 'pl-3 pr-6 sm:pl-4 sm:pr-10' : 'pl-4 pr-10',
+          )}
           {...props}
         >
           {options.map((option) => (
@@ -269,7 +287,10 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
           ))}
         </select>
         <ChevronDown
-          className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-paper-faint"
+          className={cn(
+            'pointer-events-none absolute top-1/2 -translate-y-1/2 text-paper-faint',
+            compact ? 'right-2 size-3.5 sm:right-4 sm:size-4' : 'right-4 size-4',
+          )}
           aria-hidden
         />
       </div>

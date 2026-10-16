@@ -4,8 +4,6 @@ import Link from "next/link";
 import { Pencil, Repeat, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { useConfirmFocus } from "@/lib/hooks/use-return-focus";
-
 import {
   deleteTaskAction,
   saveTaskAction,
@@ -18,6 +16,7 @@ import {
 } from "@/components/calendar/calendar-model";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmBlock } from "@/components/ui/confirm-block";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
@@ -129,7 +128,8 @@ export function TaskDetailDialog({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const { triggerRef, focusRef, questionId, groupProps } = useConfirmFocus(confirming);
+  // «Удалить» заменяется вопросом на месте (ConfirmBlock): кнопка — наша, блок вернёт на неё фокус
+  const deleteTrigger = useRef<HTMLButtonElement>(null);
   const [scope, setScope] = useState<Scope>("this");
   const [pending, start] = useTransition();
   const done = Boolean(task.completedAt);
@@ -147,13 +147,11 @@ export function TaskDetailDialog({
     });
   }
 
-  function remove() {
-    setError(null);
-    start(async () => {
-      const result = await deleteTaskAction(task.id, recurring ? scope : undefined, recurring ? task.occurrence : undefined);
-      if (result.error) setError(result.error);
-      else onClose();
-    });
+  // Ошибку покажет сам блок; успех закрывает карточку
+  async function remove() {
+    const result = await deleteTaskAction(task.id, recurring ? scope : undefined, recurring ? task.occurrence : undefined);
+    if (result.error) return { error: result.error };
+    onClose();
   }
 
   return (
@@ -238,31 +236,37 @@ export function TaskDetailDialog({
               {done ? "Вернуть в работу" : "Выполнено"}
             </Button>
           )}
-          {task.canEdit &&
-            (confirming ? (
-              <span {...groupProps} className="flex flex-wrap items-center gap-2">
-                <span id={questionId} className="text-sm">
+          {task.canEdit && !confirming && (
+            <>
+              <Button type="button" variant="outline" onClick={() => onEdit(task)}>
+                <Pencil className="size-4" aria-hidden />
+                Изменить
+              </Button>
+              <Button ref={deleteTrigger} type="button" variant="ghost" aria-label="Удалить задачу" onClick={() => setConfirming(true)}>
+                <Trash2 className="size-4" aria-hidden />
+                Удалить
+              </Button>
+            </>
+          )}
+          {task.canEdit && (
+            <ConfirmBlock
+              open={confirming}
+              onOpenChange={setConfirming}
+              triggerRef={deleteTrigger}
+              layout="inline"
+              size="default"
+              // Видно «Удалить?», читалке — какая именно задача
+              question={
+                <>
                   Удалить<span className="sr-only"> задачу «{task.title}»</span>?
-                </span>
-                <Button type="button" variant="destructive" loading={pending} onClick={remove}>
-                  Удалить
-                </Button>
-                <Button ref={focusRef} aria-describedby={questionId} type="button" variant="outline" onClick={() => setConfirming(false)}>
-                  Не удалять
-                </Button>
-              </span>
-            ) : (
-              <>
-                <Button type="button" variant="outline" onClick={() => onEdit(task)}>
-                  <Pencil className="size-4" aria-hidden />
-                  Изменить
-                </Button>
-                <Button ref={triggerRef} type="button" variant="ghost" aria-label="Удалить задачу" onClick={() => setConfirming(true)}>
-                  <Trash2 className="size-4" aria-hidden />
-                  Удалить
-                </Button>
-              </>
-            ))}
+                </>
+              }
+              confirmLabel="Удалить"
+              cancelLabel="Не удалять"
+              cancelVariant="outline"
+              onConfirm={remove}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>

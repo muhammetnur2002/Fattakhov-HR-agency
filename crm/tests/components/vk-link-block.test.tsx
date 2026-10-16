@@ -20,7 +20,11 @@ vi.mock("@/app/actions/notifications", () => actions);
 // Один и тот же объект на каждый вызов — как у настоящего useRouter,
 // иначе опрос перезапускался бы на каждой отрисовке
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => router,
+  // ConfirmBlock берёт useStaleGuard: без этой подмены «страница устарела» в catch не отличить от обычной ошибки
+  unstable_isUnrecognizedActionError: () => false,
+}));
 
 import { VkLinkBlock } from "@/components/settings/vk-link-block";
 

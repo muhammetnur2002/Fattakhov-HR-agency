@@ -10,19 +10,9 @@ import {
   OPERATOR_OGRNIP,
   PRIVACY_EMAIL,
 } from "@/lib/legal/consent-texts";
+import { pageMetadata } from "@/lib/marketing/seo";
 
-export const metadata: Metadata = {
-  title: { absolute: "Политика обработки персональных данных · Fattakhov HR" },
-  description:
-    "Порядок обработки и защиты персональных данных в Fattakhov HR: цели, основания, сроки хранения, права субъекта и меры безопасности.",
-  // В выдаче политике делать нечего: она нужна для доверия и для
-  // закона, а не для поиска. Но ссылка должна работать всегда,
-  // поэтому follow оставлен
-  robots: { index: false, follow: true },
-  // Свой адрес, а не унаследованный «/» из макета: страница с запретом
-  // индексации не должна называть главную своей копией
-  alternates: { canonical: "/privacy" },
-};
+export const metadata: Metadata = pageMetadata("privacy");
 
 /**
  * Политика обработки персональных данных.

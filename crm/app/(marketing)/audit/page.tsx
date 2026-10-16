@@ -6,15 +6,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollRegion } from "@/components/ui/scroll-region";
 import { FUNNEL_SIGNALS, FUNNEL_STEPS, MAX_SCORE, STAGES } from "@/lib/audit/stages";
 import { PageHero, PageIntro } from "@/components/marketing/page-intro";
+import { StructuredData } from "@/components/marketing/structured-data";
+import { pageMetadata } from "@/lib/marketing/seo";
 
-export const metadata: Metadata = {
-  title: "Экспресс-аудит системы найма",
-  description:
-    "Проверьте за 15 минут, где компания теряет кандидатов, время и деньги: 12 этапов найма от диагностики потребности до испытательного срока, 24 балла и план действий.",
-  // Свой адрес, а не унаследованный «/» из макета: без него поисковик
-  // считал бы аудит копией главной страницы и оставил бы в выдаче одну
-  alternates: { canonical: "/audit" },
-};
+export const metadata: Metadata = pageMetadata("audit");
 
 /**
  * Экспресс-аудит системы найма.
@@ -31,6 +26,7 @@ export const metadata: Metadata = {
 export default function AuditPage() {
   return (
     <>
+      <StructuredData page="audit" />
       <PageHero>
         <PageIntro eyebrow="Диагностика системы найма" title="Почему ваш найм не работает">
           Проверьте, где компания теряет кандидатов, время и деньги: от
