@@ -4,9 +4,10 @@ import { Ellipsis, Lock, X } from "lucide-react";
 import { motion, useReducedMotion, type Transition } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRef, useState } from "react";
 
 import { NAV_ICONS, type NavIconName } from "./icons";
+import { TabbarDebug } from "./tabbar-debug";
 import { Logo } from "@/components/brand/logo";
 import {
   Sheet,
@@ -21,6 +22,7 @@ import type { NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { CountBadge } from "@/components/ui/count-badge";
 import { useReturnFocus } from "@/lib/hooks/use-return-focus";
+import { useTabbarVisibility } from "@/lib/hooks/use-tabbar-visibility";
 
 /**
  * Плашка под активной вкладкой. Объявлена здесь, а не внутри BottomTabs:
@@ -40,100 +42,9 @@ function Lens({ transition }: { transition: Transition }) {
       layoutId="bottom-tab-lens"
       transition={transition}
       aria-hidden
-      data-lens
       className="absolute inset-0 rounded-[24px] bg-primary shadow-[0_3px_10px_-4px_rgb(0_0_0/0.45)]"
     />
   );
-}
-
-/** Без касания панели дольше этого — она становится прозрачной. */
-const FADE_IDLE_MS = 3000;
-/** Сколько после последнего события прокрутки она считается «листают». */
-const FADE_SCROLL_SETTLE_MS = 700;
-/** Сколько после касания (и смены раздела) прокрутка её не гасит. */
-const FADE_QUIET_AFTER_TAP_MS = 800;
-
-/**
- * Панель вкладок прозрачнеет, когда не нужна (просьба заказчика 05.10.2026):
- * пока страница прокручивается и когда панель не трогали дольше FADE_IDLE_MS.
- * Касание или фокус с клавиатуры возвращают обычный вид — человек видит,
- * куда жмёт, — и отсчёт начинается заново. Вид обоих состояний — правила
- * [data-bottom-tabs] в globals.css; здесь только метка data-dim.
- *
- * Нажатия работают в любом виде. После касания прокрутка какое-то время
- * панель не гасит: переход на другой раздел прокручивает новую страницу
- * наверх, и без этой паузы панель мигнула бы под пальцем.
- *
- * Метка ставится прямо на элемент, без состояния React: прокрутка — десятки
- * событий в секунду, перерисовывать панель на каждое незачем. Слушаем
- * document с захватом: событие scroll не всплывает, а прокручиваться может
- * не только окно, но и вложенный список.
- */
-function useFadeWhenIdle(ref: RefObject<HTMLElement | null>, pathname: string) {
-  const quietUntil = useRef(0);
-
-  useEffect(() => {
-    const nav = ref.current;
-    if (!nav) return;
-    let lastTouch = performance.now();
-    let scrolling = false;
-    let idleTimer: number | undefined;
-    let settleTimer: number | undefined;
-
-    const apply = () => {
-      // Запас в 50 мс: таймер срабатывает не раньше срока, но округление
-      // performance.now() может дать на волос меньше
-      const idle = performance.now() - lastTouch >= FADE_IDLE_MS - 50;
-      if (scrolling || idle) nav.dataset.dim = "";
-      else delete nav.dataset.dim;
-    };
-    const armIdle = () => {
-      window.clearTimeout(idleTimer);
-      idleTimer = window.setTimeout(apply, FADE_IDLE_MS);
-    };
-    const onScroll = () => {
-      if (performance.now() < quietUntil.current) return;
-      scrolling = true;
-      apply();
-      window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(() => {
-        scrolling = false;
-        apply();
-      }, FADE_SCROLL_SETTLE_MS);
-    };
-    const onTouch = () => {
-      lastTouch = performance.now();
-      quietUntil.current = lastTouch + FADE_QUIET_AFTER_TAP_MS;
-      scrolling = false;
-      window.clearTimeout(settleTimer);
-      apply();
-      armIdle();
-    };
-
-    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
-    nav.addEventListener("pointerdown", onTouch);
-    nav.addEventListener("focusin", onTouch);
-    armIdle();
-    return () => {
-      document.removeEventListener("scroll", onScroll, { capture: true });
-      nav.removeEventListener("pointerdown", onTouch);
-      nav.removeEventListener("focusin", onTouch);
-      window.clearTimeout(idleTimer);
-      window.clearTimeout(settleTimer);
-    };
-  }, [ref]);
-
-  // Новый раздел открылся не касанием панели (ссылка на странице, назад) —
-  // его прокрутка наверх не «листают». Только при смене раздела, не при
-  // первом открытии: иначе листание в первую секунду после загрузки панель
-  // не трогало бы. Отсчёт трёх секунд смена раздела не сбрасывает —
-  // считается касание самой панели
-  const lastPath = useRef(pathname);
-  useEffect(() => {
-    if (lastPath.current === pathname) return;
-    lastPath.current = pathname;
-    quietUntil.current = performance.now() + FADE_QUIET_AFTER_TAP_MS;
-  }, [pathname]);
 }
 
 /*
@@ -160,10 +71,21 @@ function useFadeWhenIdle(ref: RefObject<HTMLElement | null>, pathname: string) {
  * «Вакансии» (портфель) и «Кандидаты» (люди) без слов не очевидны,
  * а кабинет открывают не каждый день.
  *
+ * Пока человек листает страницу вниз, панель прячется, а на прокрутку
+ * вверх, остановку, начало и конец страницы, смену раздела и фокус внутри
+ * неё возвращается (lib/tabbar-visibility.ts, метка data-hidden; просьба
+ * владельца 17.10.2026). Раньше она не уезжала, а тускнела и возвращалась
+ * только касанием — люди нажимали по памяти. Прячется только сдвигом
+ * (без прозрачности), на собственном слое, а на iOS мгновенно, без
+ * перехода, — иначе в Safari на iPhone она зависала на середине или
+ * повисала посреди страницы (lib/hooks/use-tabbar-visibility.ts: доводка
+ * перехода, самолечение положения, освежение слоя; globals.css). Временная
+ * отладочная строка (components/shell/tabbar-debug.tsx) выводится рядом.
+ *
  * Пока человек печатает, панель уезжает вниз (globals.css, правило про
  * data-bottom-tabs): клавиатура и так занимает половину экрана. Экран,
  * которому она мешает целиком (открытая переписка), убирает её меткой
- * data-hides-bottom-tabs — там же.
+ * data-hides-bottom-tabs — там же. Оба способа независимы.
  *
  * Отступ от низа — --tabbar-offset (globals.css): над жестовой полосой
  * iPhone, но не на всю её высоту. Плашка анимируется через layoutId;
@@ -186,7 +108,7 @@ export function BottomTabs({
   // Шторка открывается кнопкой «Ещё», но не через SheetTrigger: фокус возвращаем сами
   const returnFocus = useReturnFocus();
   const navRef = useRef<HTMLElement>(null);
-  useFadeWhenIdle(navRef, pathname);
+  useTabbarVisibility(navRef, pathname, more);
 
   const tabs = items.filter((i) => i.mobileTab).slice(0, 4);
   // В «Ещё» — только то, чего нет во вкладках: четыре раздела из шторки
@@ -207,7 +129,7 @@ export function BottomTabs({
     : { type: "spring" as const, stiffness: 520, damping: 40, mass: 0.8 };
 
   const itemClass =
-    "relative flex min-h-[46px] flex-1 touch-manipulation select-none flex-col items-center justify-center gap-[3px] rounded-[24px] text-[10px] leading-none tracking-tight max-[350px]:text-[9px] transition-[color,transform,opacity,filter] duration-150 [-webkit-tap-highlight-color:transparent] active:scale-[0.95] motion-reduce:transition-none";
+    "relative flex min-h-[46px] flex-1 touch-manipulation select-none flex-col items-center justify-center gap-[3px] rounded-[24px] text-[10px] leading-none tracking-tight max-[350px]:text-[9px] transition-[color,transform] duration-150 [-webkit-tap-highlight-color:transparent] active:scale-[0.95] motion-reduce:transition-none";
 
   return (
     <>
@@ -216,8 +138,12 @@ export function BottomTabs({
         aria-label="Разделы"
         data-bottom-tabs
         // Стекло — фон, размытие, кромка и блики — в globals.css
-        // ([data-bottom-tabs]): там же вид при прокрутке, рядом
-        className="fixed inset-x-4 bottom-[var(--tabbar-offset)] z-40 mx-auto flex max-w-[400px] items-stretch gap-0.5 rounded-[28px] border p-1 max-[350px]:inset-x-2 transition-[transform,opacity,background-color,border-color,box-shadow,backdrop-filter] duration-200 motion-reduce:transition-none md:hidden print:hidden"
+        // ([data-bottom-tabs]): там же вид спрятанной панели ([data-hidden]) и её
+        // постоянный композитный слой. Выезд и появление — только transform за
+        // --tabbar-slide-ms, без opacity: прозрачность у элемента с размытием фона, по
+        // всей видимости, и зависала на середине в Safari на iPhone. На iOS перехода нет
+        // вовсе (@supports в globals.css). При «уменьшить движение» мгновенно
+        className="fixed inset-x-4 bottom-[var(--tabbar-offset)] z-40 mx-auto flex max-w-[400px] items-stretch gap-0.5 rounded-[28px] border p-1 max-[350px]:inset-x-2 transition-[transform] duration-(--tabbar-slide-ms) motion-reduce:transition-none md:hidden print:hidden"
       >
         {tabs.map((item) => {
           const Icon = NAV_ICONS[item.icon as NavIconName];
@@ -228,9 +154,6 @@ export function BottomTabs({
               href={item.href}
               aria-current={active ? "page" : undefined}
               aria-label={navLinkLabel(item)}
-              // Для прозрачного вида панели: плашка почти исчезает, и активную
-              // вкладку красит акцентом сам текст (globals.css)
-              data-active={active || undefined}
               className={cn(
                 itemClass,
                 active ? "font-medium text-primary-foreground" : "text-muted-foreground",
@@ -256,7 +179,6 @@ export function BottomTabs({
                   )}
                   {!!item.badge && (
                     <CountBadge
-                      data-badge
                       aria-hidden
                       count={item.badge}
                       tone="alert"
@@ -282,7 +204,6 @@ export function BottomTabs({
             setMore(true);
           }}
           aria-haspopup="dialog"
-          data-active={moreActive || undefined}
           className={cn(
             itemClass,
             moreActive ? "font-medium text-primary-foreground" : "text-muted-foreground",
@@ -295,6 +216,9 @@ export function BottomTabs({
           </span>
         </button>
       </nav>
+
+      {/* Временная отладочная строка: без флага в «Настройках» не рисует ничего */}
+      <TabbarDebug navRef={navRef} />
 
       <Sheet open={more} onOpenChange={setMore}>
         <SheetContent

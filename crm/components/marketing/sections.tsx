@@ -262,12 +262,18 @@ export function HowItWorks() {
   return (
     <div className={SPLIT_EVEN}>
       <ol className="space-y-0 border-l border-white/15 pl-6 md:pl-8">
-        {steps.map((s) => (
+        {steps.map((s, i) => (
           <li key={s.name} className="pb-10 last:pb-0">
             <div className="text-sm font-medium tracking-[0.12em] text-white/65 uppercase">
               {s.name}
             </div>
-            <div className="mt-2 text-2xl font-medium text-white">{s.title}</div>
+            {/* Заголовок третьего шага — опорная строка для знака справа (`LogoAssembly`): он встаёт на её высоту */}
+            <div
+              className="mt-2 text-2xl font-medium text-white"
+              data-assembly-anchor={i === 2 ? "" : undefined}
+            >
+              {s.title}
+            </div>
             <p className="mt-2 max-w-2xl text-base leading-relaxed text-white/65">
               {s.body}
             </p>

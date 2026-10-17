@@ -2,6 +2,7 @@ import {
   inviteTeammateAction,
   revokeTeammateInvitationAction,
 } from "./actions";
+import { TabbarDebugToggle } from "@/components/settings/tabbar-debug-toggle";
 import { InviteForm } from "@/components/clients/invite-form";
 import { InviteLink } from "@/components/clients/invite-link";
 import { PresenceLabel } from "@/components/presence/presence-label";
@@ -303,6 +304,9 @@ export default async function ClientSettingsPage() {
           <DeleteAccount contracted={contracted} requested={Boolean(user?.deletionRequestedAt)} />
         </CardContent>
       </Card>
+
+      {/* Временная диагностика нижней панели на iPhone (lib/tabbar-debug.ts) */}
+      <TabbarDebugToggle />
     </div>
   );
 }

@@ -173,7 +173,10 @@ export function StartSetup({
             autoComplete={usesSms ? "one-time-code" : "current-password"}
             placeholder={usesSms ? "123456" : "Ваш текущий пароль"}
             required
-            autoFocus
+            // Фокус только когда поле появилось по нажатию («Получить код по SMS»). Поле пароля
+            // стоит на странице сразу: автофокус на нём при открытии настроек прокручивал страницу
+            // к карточке двухфакторной защиты и прятал панель разделов (фокус в поле ввода)
+            autoFocus={usesSms}
           />
         </div>
       )}

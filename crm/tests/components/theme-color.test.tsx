@@ -9,10 +9,17 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { createElement } from "react";
+import { hydrateRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider, useTheme } from "@/components/shell/theme-provider";
-import { THEME_COLOR_OVERRIDE_ID, THEME_COLOR_SCRIPT, THEME_COLORS } from "@/lib/theme-color";
+import {
+  OVERRIDE_COLORS,
+  THEME_COLOR_OVERRIDE_ID,
+  THEME_COLOR_SCRIPT,
+  THEME_COLORS,
+} from "@/lib/theme-color";
 
 function installMetas() {
   document.head.innerHTML = `
@@ -26,14 +33,22 @@ const nextMetas = () =>
   [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"][media]')];
 const override = () => document.getElementById(THEME_COLOR_OVERRIDE_ID) as HTMLMetaElement | null;
 
+/** Цвет в одной записи: «#EEE» и «#eee» — тот же, что «#eeeeee». Так его видит браузер. */
+function canonical(hex: string | null): string | null {
+  if (hex === null) return null;
+  const h = hex.trim().toLowerCase();
+  return /^#[0-9a-f]{3}$/.test(h) ? `#${[...h.slice(1)].map((c) => c + c).join("")}` : h;
+}
+
 /**
  * Цвет, который выберет браузер: первый тег, у которого нет media или оно подходит.
- * Системная тема в тесте задаётся аргументом.
+ * Системная тема в тесте задаётся аргументом. Запись цвета (регистр, короткая форма)
+ * браузеру безразлична, поэтому сравниваем цвет, а не строку.
  */
 function effective(systemDark: boolean): string | null {
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     const media = meta.getAttribute("media");
-    if (!media || media.includes(systemDark ? "dark" : "light")) return meta.getAttribute("content");
+    if (!media || media.includes(systemDark ? "dark" : "light")) return canonical(meta.getAttribute("content"));
   }
   return null;
 }
@@ -112,6 +127,78 @@ describe("meta theme-color", () => {
     );
     expect(effective(false)).toBe(THEME_COLORS.dark);
   });
+});
+
+/**
+ * React забирает себе чужой тег, если у него совпали name и content (media и id он не
+ * сверяет), — и тогда перебивка пропадает из документа, а переход по ссылке обрывается
+ * с TypeError (замер на Next 16.3.8 и 16.4.0, нижняя панель разделов не переключала
+ * раздел). Поэтому запись цвета у перебивки обязана отличаться от записи у Next.
+ */
+describe("перебивку не забирает React", () => {
+  it("цвета перебивки — те же, что у страницы", () => {
+    expect(canonical(OVERRIDE_COLORS.light)).toBe(THEME_COLORS.light);
+    expect(canonical(OVERRIDE_COLORS.dark)).toBe(THEME_COLORS.dark);
+  });
+
+  it("но записаны не так, как у тегов Next: строка не совпадает ни с одной", () => {
+    const nextContents: string[] = Object.values(THEME_COLORS);
+    for (const color of Object.values(OVERRIDE_COLORS)) {
+      expect(nextContents).not.toContain(color);
+    }
+  });
+
+  for (const mode of ["light", "dark"] as const) {
+    it(`гидратация страницы: перебивка «${mode}» остаётся в <head> одним тегом, React её не берёт`, async () => {
+      const act_ = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+      const previous = act_.IS_REACT_ACT_ENVIRONMENT;
+      act_.IS_REACT_ACT_ENVIRONMENT = true;
+      // Страница, как её отдал сервер: два тега Next в <head>; скрипт темы уже поставил перебивку
+      // (он стоит в разметке и срабатывает до гидратации)
+      document.head.innerHTML = "";
+      installMetas();
+      window.__applyThemeColor!(mode);
+      const mine = override()!;
+      expect(mine).not.toBeNull();
+
+      // Next гидратирует документ целиком, теги в <head> — hoistable-элементы: React ищет среди
+      // <meta> документа готовый с тем же name и content и забирает его себе
+      const errors: unknown[] = [];
+      let root!: ReturnType<typeof hydrateRoot>;
+      try {
+        await act(async () => {
+          // <head> через createElement: правило next/no-head-element относится к страницам, не к тесту
+          const head = createElement(
+            "head",
+            null,
+            <meta name="theme-color" media="(prefers-color-scheme: light)" content={THEME_COLORS.light} />,
+            <meta name="theme-color" media="(prefers-color-scheme: dark)" content={THEME_COLORS.dark} />,
+          );
+          root = hydrateRoot(
+            document,
+            <html>
+              {head}
+              <body />
+            </html>,
+            { onRecoverableError: (e) => errors.push(e) },
+          );
+        });
+
+        expect(override(), "перебивка на месте и та же").toBe(mine);
+        expect(document.querySelectorAll('meta[name="theme-color"]'), "два тега Next и наш").toHaveLength(3);
+        expect(mine.hasAttribute("media"), "React не навесил на неё чужое media").toBe(false);
+        expect(
+          Object.keys(mine).filter((k) => k.startsWith("__react")),
+          "React не пометил перебивку своей",
+        ).toEqual([]);
+        expect(document.head.firstElementChild).toBe(mine);
+        expect(errors).toEqual([]);
+      } finally {
+        await act(async () => root?.unmount());
+        act_.IS_REACT_ACT_ENVIRONMENT = previous;
+      }
+    });
+  }
 });
 
 describe("ThemeProvider передаёт выбор полосе", () => {

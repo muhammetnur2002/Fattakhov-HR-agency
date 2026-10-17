@@ -6,7 +6,9 @@ import { expect, test } from "@playwright/test";
  * Система тёмная, человек нажимает «светлая» — страница светлая, и полоса
  * должна стать светлой тоже, а не остаться чёрной по теме системы.
  * Меряется цвет, который выберет браузер: первый тег, у которого нет media
- * или оно подходит текущей системной теме.
+ * или оно подходит текущей системной теме. Цвет, а не его запись: у тега-перебивки
+ * запись нарочно другая («#EEEDEA», «#000»), чем у тегов Next, иначе React забирает
+ * его себе при гидратации (lib/theme-color.ts).
  */
 const LIGHT = "#eeedea";
 const DARK = "#000000";
@@ -17,7 +19,10 @@ const effectiveColor = (page: import("@playwright/test").Page) =>
   page.evaluate(() => {
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
       const media = meta.getAttribute("media");
-      if (!media || matchMedia(media).matches) return meta.getAttribute("content");
+      if (!media || matchMedia(media).matches) {
+        const hex = (meta.getAttribute("content") ?? "").trim().toLowerCase();
+        return /^#[0-9a-f]{3}$/.test(hex) ? `#${[...hex.slice(1)].map((c) => c + c).join("")}` : hex;
+      }
     }
     return null;
   });

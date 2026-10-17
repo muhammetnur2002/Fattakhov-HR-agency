@@ -1,3 +1,4 @@
+import { TabbarDebugToggle } from "@/components/settings/tabbar-debug-toggle";
 import { ContractTemplateManager } from "@/components/clients/contract-template-manager";
 import { AlertCheck } from "@/components/settings/alert-check";
 import { VkEventsCard } from "@/components/settings/vk-events-card";
@@ -313,6 +314,9 @@ export default async function AgencySettingsPage() {
           )}
         </SettingsSection>
       )}
+
+      {/* Временная диагностика нижней панели на iPhone (lib/tabbar-debug.ts) */}
+      <TabbarDebugToggle />
     </div>
   );
 }

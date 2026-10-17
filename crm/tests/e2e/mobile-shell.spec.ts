@@ -159,70 +159,24 @@ test("пока идёт ввод, панель уезжает вниз и не �
   await page.waitForSelector("nav[data-bottom-tabs]");
 
   const bar = page.locator("nav[data-bottom-tabs]");
+  const viewportHeight = page.viewportSize()!.height;
+  const top = () => bar.evaluate((el) => el.getBoundingClientRect().top);
   await expect(bar).toHaveCSS("opacity", "1");
+  expect(await top(), "до ввода панель в окне").toBeLessThan(viewportHeight);
 
   await page.getByPlaceholder(/^Название, подразделение/).first().tap();
-  await expect(bar).toHaveCSS("opacity", "0");
+  // Прячет её только положение, прозрачность не участвует (в Safari она зависала на середине)
+  await expect.poll(top).toBeGreaterThanOrEqual(viewportHeight);
+  await expect(bar).toHaveCSS("opacity", "1");
   await expect(bar).toHaveCSS("pointer-events", "none");
 });
 
 /*
-  Панель вкладок прозрачнеет, когда не нужна (просьба заказчика 05.10.2026):
-  без касания дольше 3 секунд и пока листают; плашка активной вкладки почти
-  исчезает. Нажатия работают в любом виде, касание возвращает обычный.
-  Пропажа метки или правил в globals.css не ломает ни типы, ни отрисовку —
-  только этот тест.
+  Панель вкладок прячется при прокрутке вниз и возвращается (просьба владельца 17.10.2026) —
+  tests/e2e/bottom-tabs-hide.spec.ts и client-bottom-tabs-hide.spec.ts. Прежнее тускнение
+  (по просьбе 05.10.2026) убрано: панель почти исчезала и не появлялась обратно, люди нажимали
+  по памяти. Здесь остаются раскладка и размеры панели в покое.
 */
-test("панель прозрачнеет без касания и при прокрутке, нажимается и возвращается", async ({
-  page,
-}) => {
-  // networkidle — чтобы слушатели уже стояли (ставятся после гидратации)
-  await page.goto("/a/vacancies", { waitUntil: "networkidle" });
-  await page.waitForSelector("nav[data-bottom-tabs]");
-  const bar = page.locator("nav[data-bottom-tabs]");
-
-  // Прозрачность подложки — последнее число цвета фона («… / 0.1)»)
-  const tint = () =>
-    bar.evaluate((el) =>
-      Number(getComputedStyle(el).backgroundColor.match(/([\d.]+)\)$/)?.[1] ?? 1),
-    );
-  // Плашка активной вкладки: прозрачность её цвета, как у подложки
-  const lens = () =>
-    bar
-      .locator("[data-lens]")
-      .evaluate((el) =>
-        Number(getComputedStyle(el).backgroundColor.match(/([\d.]+)\)$/)?.[1] ?? 1),
-      );
-
-  // Касание самой панели (мимо вкладок) — обычный вид, отсчёт трёх секунд
-  // заново: так тест не зависит от того, сколько грузилась страница
-  await bar.dispatchEvent("pointerdown");
-  await expect(bar).not.toHaveAttribute("data-dim");
-  await page.waitForTimeout(300); // переход 200 мс
-  const restTint = await tint();
-
-  // Три секунды без касания — прозрачный вид, плашка почти исчезла
-  await expect(bar).toHaveAttribute("data-dim", { timeout: 6000 });
-  await expect.poll(tint).toBeLessThan(restTint / 2);
-  await expect.poll(lens).toBeLessThan(0.3);
-  await expect(bar).toHaveCSS("pointer-events", "auto");
-  // Фон за панелью не размыт — текст под ней чёткий; размыта сама панель
-  await expect(bar).toHaveCSS("backdrop-filter", /blur\(0px\)/);
-  await expect
-    .poll(() => bar.getByRole("link").first().evaluate((el) => getComputedStyle(el).filter))
-    .toContain("blur");
-
-  // Прозрачная панель нажимается, касание возвращает обычный вид
-  await bar.getByRole("link", { name: /Кандидаты/ }).tap();
-  await page.waitForURL(/\/a\/candidates/);
-  await expect(bar).not.toHaveAttribute("data-dim");
-
-  // Прокрутка делает прозрачной сразу, не дожидаясь трёх секунд
-  // (после касания — пауза 0,8 с на прокрутку новой страницы наверх)
-  await page.waitForTimeout(1000);
-  await page.evaluate(() => window.scrollBy(0, 400));
-  await expect(bar).toHaveAttribute("data-dim");
-});
 
 for (const width of [320, 360, 390]) {
   test(`подписи вкладок целы и не слипаются на ширине ${width}`, async ({ page }) => {
@@ -422,7 +376,10 @@ test.describe("переписка на телефоне и нижняя пане
     await page.waitForTimeout(300); // панель уезжает с переходом 200 мс
     const g = await geometry(page);
     expect(g.pageScroll, "страница вокруг переписки не прокручивается").toBeLessThanOrEqual(0);
-    expect(g.barOpacity).toBe("0");
+    // Панель убрана за нижний край окна целиком, а не погашена: прозрачность не участвует
+    // (в Safari на iPhone она зависала на середине, lib/hooks/use-tabbar-visibility.ts)
+    expect(g.barTop, "панель за нижним краем окна").toBeGreaterThanOrEqual(g.innerHeight);
+    expect(g.barOpacity).toBe("1");
     expect(g.barPointerEvents).toBe("none");
     expect(g.shellBottom).toBe(g.innerHeight);
     await expect(page.getByRole("link", { name: "К списку диалогов" })).toBeVisible();
