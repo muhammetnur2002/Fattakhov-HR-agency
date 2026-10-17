@@ -1,0 +1,163 @@
+#cloud-config
+# Подготовка сервера на обычном Ubuntu 24.04 (Selectel). Один шаблон на оба
+# сервера; различаются состав контейнеров, Caddyfile и файл окружения.
+#
+# Отличия от Яндекс-версии (infra/cloud-init*.yaml.tftpl): там образ
+# Container-Optimized сам читал метаданные docker-compose; здесь Docker ставится
+# пакетами Ubuntu (docker.io и docker-compose-v2 из зеркала Ubuntu, не из
+# download.docker.com, которое из России бывает недоступно), а состав
+# контейнеров поднимает systemd-служба fhr-stack.
+#
+# Файлы передаются сжатыми (gz+b64): так не страдают отступы YAML и не
+# превышается предел размера пользовательских данных.
+#
+# Cloud-init отрабатывает ОДИН РАЗ, при первой загрузке. Обновление состава и
+# окружения потом - скриптом deploy.sh (по SSH), а не пересозданием сервера.
+hostname: ${hostname}
+manage_etc_hosts: true
+ssh_pwauth: false
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - ca-certificates
+  - curl
+
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "50m", "max-file": "3" }
+      }
+
+  - path: /opt/fhr/docker-compose.yaml
+    permissions: "0600"
+    owner: root:root
+    encoding: gz+b64
+    content: ${compose_gz}
+
+  - path: /opt/fhr/Caddyfile
+    permissions: "0644"
+    owner: root:root
+    encoding: gz+b64
+    content: ${caddyfile_gz}
+
+  - path: /opt/fhr/${env_name}.env
+    permissions: "0600"
+    owner: root:root
+    encoding: gz+b64
+    content: ${env_gz}
+
+  # Токен чтения реестра образов: используется один раз в runcmd и удаляется
+  - path: /root/.fhr-registry-token
+    permissions: "0600"
+    owner: root:root
+    content: |
+      ${registry_token}
+
+  # Усиление SSH (аудит 17.10.2026). Файл с префиксом 10 читается раньше
+  # 50-cloud-init.conf: у sshd действует первое найденное значение.
+  - path: /etc/ssh/sshd_config.d/10-fhr-hardening.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+      MaxAuthTries 3
+      LoginGraceTime 30
+      MaxSessions 4
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+
+  # Метаданные облака (169.254.169.254) отдают user-data, а в нём пароль базы,
+  # ключи S3 и токен реестра. Контейнеры к ним ходить не должны: иначе уязвимость
+  # SSRF в приложении превращается в кражу всех секретов. Правило в DOCKER-USER
+  # касается только трафика контейнеров; сам сервер (cloud-init) метаданные читает.
+  - path: /etc/systemd/system/fhr-block-metadata.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: закрыть контейнерам доступ к метаданным облака
+      Requires=docker.service
+      After=docker.service
+      PartOf=docker.service
+      Before=fhr-stack.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.169.254 -j DROP 2>/dev/null || iptables -I DOCKER-USER -d 169.254.169.254 -j DROP'
+      ExecStop=/bin/sh -c 'iptables -D DOCKER-USER -d 169.254.169.254 -j DROP 2>/dev/null || true'
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/fhr-stack.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: контейнеры приложения (docker compose)
+      Requires=docker.service
+      After=docker.service network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      WorkingDirectory=/opt/fhr
+      Environment=DOCKER_CONFIG=/root/.docker
+      ExecStart=/usr/bin/docker compose -f /opt/fhr/docker-compose.yaml up -d --remove-orphans
+      ExecStop=/usr/bin/docker compose -f /opt/fhr/docker-compose.yaml down
+      # Образов в реестре может ещё не быть, а миграции - не пройти с первого
+      # раза: повторяем, пока не поднимется
+      Restart=on-failure
+      RestartSec=60
+      TimeoutStartSec=900
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Старые образы копятся на диске: раз в сутки ночью удаляются неиспользуемые
+  # образы старше недели. Время сервера - UTC: 21:30 UTC = 00:30 по Москве.
+  - path: /etc/systemd/system/fhr-image-prune.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: удалить неиспользуемые образы Docker старше недели
+      Requires=docker.service
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/env docker image prune --all --force --filter until=168h
+
+  - path: /etc/systemd/system/fhr-image-prune.timer
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=FHR: раз в сутки ночью удалять старые образы Docker
+
+      [Timer]
+      OnCalendar=*-*-* 21:30:00
+      RandomizedDelaySec=15min
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, restart, docker]
+  - [systemctl, enable, --now, docker]
+  - [sh, -c, "sshd -t && systemctl reload ssh"]
+  - [systemctl, enable, --now, fhr-block-metadata.service]
+  - [sh, -c, "DOCKER_CONFIG=/root/.docker docker login ${registry_host} --username '${registry_user}' --password-stdin < /root/.fhr-registry-token; rm -f /root/.fhr-registry-token"]
+  - [systemctl, enable, --now, fhr-image-prune.timer]
+  - [systemctl, enable, fhr-stack.service]
+  - [systemctl, start, --no-block, fhr-stack.service]

@@ -2063,6 +2063,37 @@ console.log('Регистрация: кнопка темы — в шапке м�
   });
 }
 
+console.log('Кнопка темы: прибита к окну, а не к содержимому');
+{
+  const layout = stripComments(src('app/layout.tsx'));
+  // без stripComments: он обрезает строку по «//» внутри классов и теряет хвост файла
+  const toggle = src('components/theme/ThemeToggle.tsx').replace(/\/\*[\s\S]*?\*\//g, '');
+  const landing = stripComments(src('components/screens/Landing.tsx'));
+  const css = stripComments(src('app/globals.css'));
+
+  test('плавающая кнопка стоит в корневом layout рядом с RouteCurtain, а не внутри него: ни PageTransition, ни AppShell, ни экран её не обёртывают', () => {
+    const curtain = layout.match(/<RouteCurtain>[\s\S]*?<\/RouteCurtain>/);
+    assert.ok(curtain, 'нет <RouteCurtain> в layout');
+    assert.equal(curtain[0].includes('ThemeToggle'), false, 'кнопка внутри RouteCurtain/children — у предков с transform fixed привяжется к ним');
+    assert.match(layout, /<\/ToastProvider>\s*<ThemeToggle \/>/);
+  });
+  test('ThemeToggle: у плавающей нет transform/filter/will-change/contain на самой кнопке и нет предков-обёрток в компоненте', () => {
+    assert.equal(/(?:^|[\s'"])(?:transform|will-change|contain|filter)(?:[\s'"]|$)/.test(toggle.replace(/backdrop-blur-glass/g, '')), false);
+  });
+  test('ThemeToggle: подпись aria-label и касание не меньше 44px (size-11)', () => {
+    assert.match(toggle, /aria-label="Переключить тему"/);
+    assert.match(toggle, /size-11/);
+  });
+  test('лендинг: корень обрезает выход колоды по горизонтали (overflow-x-clip), иначе улетающая карточка растягивает страницу вширь', () => {
+    assert.match(landing, /<div className="relative overflow-x-clip">/);
+  });
+  test('зерно .grain::before: фиксированный слой ровно по окну (inset: 0), без выхода за край', () => {
+    const rule = css.match(/\.grain::before\s*\{[^}]*\}/);
+    assert.ok(rule);
+    assert.match(rule[0], /inset:\s*0;/);
+  });
+}
+
 console.log('Инициалы аватара и подписи в несколько строк');
 {
   test('инициалы: кавычки и знаки не попадают в аватар («К«» у «Кофейни «Север»»)', () => {

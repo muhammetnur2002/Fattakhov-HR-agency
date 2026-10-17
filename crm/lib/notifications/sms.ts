@@ -1,5 +1,7 @@
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 
+import { maskPhone } from "@/lib/auth/phone";
+
 /**
  * SMS: пока только коды для входа по номеру телефона.
  *
@@ -82,7 +84,8 @@ class YandexCnsSmsTransport implements SmsTransport {
       );
     } catch (error) {
       // Подробности — в журнал, человеку — понятная фраза выше по стеку
-      console.error(`[sms] не отправлено на ${message.to}`, error);
+      // Номер — ПДн: в журнал только маска, а у ошибки AWS — имя без текста
+      console.error(`[sms] не отправлено на ${maskPhone(message.to)}`, error instanceof Error ? error.name : "");
       throw new SmsSendError("SMS не отправилось");
     }
   }

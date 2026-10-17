@@ -31,3 +31,15 @@ export function actionLoginResponse(loginPath: string): NextResponse {
     },
   });
 }
+
+/**
+ * Адрес возврата после входа: только внутренний путь. `//хост` и `/\хост` браузер читает как чужой сайт,
+ * управляющие символы в адресе недопустимы. Всё сомнительное — на корень.
+ */
+export function sanitizeCallbackUrl(url: string | null | undefined): string {
+  if (!url || !url.startsWith("/") || url.startsWith("//") || url.startsWith("/\\")) return "/";
+  for (let i = 0; i < url.length; i++) {
+    if (url.charCodeAt(i) < 0x20 || url.charCodeAt(i) === 0x5c) return "/";
+  }
+  return url;
+}

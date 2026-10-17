@@ -57,7 +57,11 @@ export function Landing({
   const employerRegisterUrl = agencyUrl ? `${agencyUrl}/register/company` : null;
 
   return (
-    <div className="relative">
+    // overflow-x-clip: карточки демо-колоды улетают за правый край (x = ширина окна × flyOut) и на
+    // доли секунды растягивают страницу вширь (scrollWidth 963–977 при окне 393). На iOS это сдвигает
+    // layout viewport, и «прибитые» к окну элементы (кнопка темы) уезжают от угла. clip, а не hidden:
+    // контейнер прокрутки не создаётся, sticky и якоря не страдают.
+    <div className="relative overflow-x-clip">
       <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-[2200px] items-center justify-between">
         <div className="rise-in" style={rise(0, -12)}>
           <Logo href={null} />

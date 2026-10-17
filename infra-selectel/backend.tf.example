@@ -1,0 +1,27 @@
+# Удалённое состояние в бакете Selectel S3 - по желанию, ПОСЛЕ первого apply
+# или с бакетом, созданным вручную в панели (бакет состояния не должен
+# управляться тем же состоянием). Переименовать в backend.tf и выполнить
+# terraform init -migrate-state. Ключи: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+# из отдельных S3-ключей. В состоянии лежат пароли и ключи - бакет приватный.
+#
+# TODO: блокировка use_lockfile требует условной записи (If-None-Match); поддержку
+# её S3 Selectel в документации не нашли - не проверено. Без блокировки
+# запускать Terraform должен один человек за раз.
+terraform {
+  backend "s3" {
+    bucket = "fhr-tfstate-CHANGE-ME"
+    key    = "selectel/terraform.tfstate"
+    region = "ru-6"
+
+    endpoints = {
+      s3 = "https://s3.ru-6.storage.selcloud.ru"
+    }
+
+    use_path_style              = true
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true
+    skip_metadata_api_check     = true
+    skip_s3_checksum            = true
+  }
+}

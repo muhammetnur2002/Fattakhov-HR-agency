@@ -127,8 +127,11 @@ export function buildStorageKey(params: {
   fileName: string;
 }): string {
   const random = crypto.randomUUID();
-  const ext = params.fileName.includes(".")
+  // Расширение приходит от отправителя: оставляем только точку и до 8 букв/цифр,
+  // иначе в ключ попадали бы «/», «..» и прочее
+  const rawExt = params.fileName.includes(".")
     ? params.fileName.slice(params.fileName.lastIndexOf("."))
     : "";
+  const ext = /^\.[A-Za-z0-9]{1,8}$/.test(rawExt) ? rawExt.toLowerCase() : "";
   return `${params.organizationId}/${params.scope}/${params.scopeId}/${random}${ext}`;
 }

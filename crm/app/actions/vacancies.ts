@@ -87,9 +87,11 @@ export async function saveDraftAction(
     // Правка возможна, только пока заявка не ушла в работу (BR-21)
     const existing = await prisma.vacancy.findFirst({
       where: { id: vacancyId, clientId },
-      select: { status: true },
+      select: { status: true, hiringManagerId: true },
     });
     if (!existing) return { error: "Заявка не найдена" };
+    // Нанимающий менеджер правит только вакансии, где он заказчик (или общие, без заказчика)
+    authorizeOrThrow(actor, "vacancy.editBrief", { clientId, hiringManagerId: existing.hiringManagerId });
     if (!clientCanEditBrief(existing.status)) {
       return { error: "Заявка уже в работе — изменения через обсуждение" };
     }

@@ -11,6 +11,12 @@ import {
   type VkTransport,
 } from "./transport";
 
+/** Адрес для журнала: первая буква и домен, остальное скрыто. */
+export function maskEmail(address: string): string {
+  const at = address.lastIndexOf("@");
+  return at < 1 ? "<адрес>" : `${address[0]}***${address.slice(at)}`;
+}
+
 /**
  * Отправка писем по SMTP.
  *
@@ -38,7 +44,8 @@ class SmtpEmailTransport implements EmailTransport {
         html: message.html,
       });
     } catch (error) {
-      console.error(`[письмо] не доставлено ${message.to}`, error);
+      // Адрес — ПДн: в журнал только маска; текст ошибки SMTP повторяет адрес, поэтому только её имя
+      console.error(`[письмо] не доставлено ${maskEmail(message.to)}`, error instanceof Error ? error.name : "");
       await reportMailFailure(message.to, error);
     }
   }

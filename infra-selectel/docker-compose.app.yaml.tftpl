@@ -1,0 +1,127 @@
+# Состав сервера «кабинет и сайт» (fhr-app). Подставляется templatefile из compute.tf.
+#
+# Взят из infra/docker-compose.yaml с изменениями под обычный Ubuntu:
+#   - нет агента Yandex Unified Agent (ua) и Cloud Logging;
+#   - переменные окружения - файлом /opt/fhr/app.env (права 600, root);
+#   - Caddyfile - файлом /opt/fhr/Caddyfile, смонтированным в контейнер
+#     (в Яндекс-версии он ехал переменной окружения ради метаданных COI);
+#   - Terraform не подставляет метки в compose поиском строки - только
+#     templatefile.
+# Лимиты контейнеров, cap_drop, no-new-privileges, healthcheck - как были.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  # Миграции накатываются до старта приложения и завершаются: два экземпляра,
+  # стартующие одновременно, мигрировали бы базу вдвоём.
+  migrate:
+    image: ${tools_image}
+    restart: "no"
+    logging: *logging
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/app.env
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  # Первый владелец на пустой базе: организация и приглашение, письмо со
+  # ссылкой - один раз (факт отправки записан в базе; см.
+  # crm/scripts/bootstrap-owner.ts). Повторные запуски ничего не повторяют.
+  # Нужна рабочая почта (SMTP_URL, SMTP_FROM в crm_env).
+  owner-bootstrap:
+    image: ${tools_image}
+    restart: "no"
+    logging: *logging
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/app.env
+    command: ["npx", "tsx", "scripts/bootstrap-owner.ts", "ensure"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: ${caddy_image}
+    restart: always
+    logging: *logging
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MAINTENANCE_MODE: ${maintenance_mode_json}
+      MAINTENANCE_BYPASS: ${maintenance_bypass_json}
+    volumes:
+      - /opt/fhr/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    image: ${app_image}
+    restart: always
+    logging: *logging
+    # Машина 2 ядра / 4 ГБ: app 1280 + worker 512 + caddy 128 = 1920 МБ,
+    # остальное - система и Docker.
+    mem_limit: 1280m
+    cpus: 1.5
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/app.env
+    expose:
+      - "3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Фоновые задачи: напоминания, контроль сроков, сводки.
+  worker:
+    image: ${tools_image}
+    restart: always
+    logging: *logging
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/app.env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  caddy_data:
+  caddy_config:

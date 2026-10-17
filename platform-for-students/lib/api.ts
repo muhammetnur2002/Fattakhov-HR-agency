@@ -41,6 +41,11 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
       }
       return fail(400, 'Проверьте заполнение полей', 'VALIDATION', fields);
     }
+    // Тело запроса не JSON (request.json() бросает SyntaxError) — ошибка клиента, а не сервера.
+    // Без этой ветки любой мусор в теле давал 500 и строку в журнале ошибок
+    if (err instanceof SyntaxError && /JSON/i.test(err.message)) {
+      return fail(400, 'Тело запроса должно быть корректным JSON', 'BAD_JSON');
+    }
     console.error('[api] необработанная ошибка:', err);
     return fail(500, 'Внутренняя ошибка сервера', 'INTERNAL');
   }

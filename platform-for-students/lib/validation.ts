@@ -409,7 +409,12 @@ export type UploadKind = keyof typeof UPLOAD_LIMITS;
 /** Форма «Написать в поддержку» на /help — доступна и без входа. */
 export const supportMessageSchema = z.object({
   email: emailSchema,
-  name: z.preprocess(emptyToNull, z.string().trim().max(120, 'Слишком длинное имя').nullable()),
+  // Имя уходит в тему письма: управляющие символы (перевод строки) заменяются пробелом,
+  // чтобы через него нельзя было дописать заголовок письма
+  name: z.preprocess(
+    (v) => emptyToNull(typeof v === 'string' ? v.replace(/[\x00-\x1f\x7f\u2028\u2029]+/g, ' ') : v),
+    z.string().trim().max(120, 'Слишком длинное имя').nullable(),
+  ),
   body: z
     .string()
     .trim()

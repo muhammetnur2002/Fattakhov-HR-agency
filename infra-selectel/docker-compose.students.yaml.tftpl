@@ -1,0 +1,110 @@
+# Состав сервера студенческой платформы (fhr-students). Подставляется templatefile.
+#
+# Взят из infra/docker-compose.students.yaml.tftpl: без агента ua и без
+# переключателей students_vm_caddy / students_vm_cron (переезд начисто,
+# переключать по этапам нечего). Переменные окружения - файлом
+# /opt/fhr/students.env (права 600): секреты CRM платформе не нужны и сюда
+# не попадают.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  # Миграции базы: идемпотентны, повторный запуск ничего не ломает.
+  students-migrate:
+    image: ${students_tools_image}
+    restart: "no"
+    logging: *logging
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/students.env
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  students:
+    image: ${students_app_image}
+    restart: always
+    logging: *logging
+    # Загрузки до 50 МБ платформа читает в память - потолок с запасом
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: /opt/fhr/students.env
+    expose:
+      - "3000"
+    depends_on:
+      students-migrate:
+        condition: service_completed_successfully
+    # Проверка здоровья уже есть в образе платформы, не переопределяем.
+
+  caddy:
+    image: ${caddy_image}
+    restart: always
+    logging: *logging
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MAINTENANCE_MODE: ${maintenance_mode_json}
+      MAINTENANCE_BYPASS: ${maintenance_bypass_json}
+    volumes:
+      - /opt/fhr/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - students
+
+  # Ежедневные напоминания, 09:00 по Москве (06:00 UTC).
+  students-cron:
+    image: ${cron_image}
+    restart: always
+    logging: *logging
+    # Лимиты, no-new-privileges и урезанные возможности root: для apk add и
+    # crond хватает пяти (проверено запуском alpine:3.20 с этими флагами,
+    # задание cron отработало).
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    env_file: /opt/fhr/students.env
+    depends_on:
+      - students
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache curl >/dev/null
+        echo "0 6 * * * curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://students:3000/api/cron/notify" > /etc/crontabs/root
+        crond -f -l 2
+
+volumes:
+  caddy_data:
+  caddy_config:

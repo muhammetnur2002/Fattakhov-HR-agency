@@ -5,6 +5,7 @@ import { getStore } from '@/lib/db';
 import { getSession } from '@/lib/security/guards';
 import { SESSION_COOKIE } from '@/lib/security/session';
 import { createStreamGuard } from '@/lib/security/stream-guard';
+import { acquireStream } from '@/lib/security/stream-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,12 @@ export async function GET(request: Request) {
   const viewer = viewerFromSession(await getSession());
   if (!viewer) {
     return new Response('Требуется вход в систему', { status: 401 });
+  }
+
+  // Предел потоков на участника: иначе один вошедший занимает все соединения к приложению
+  const release = acquireStream(`${viewer.role}:${viewer.profileId}`);
+  if (!release) {
+    return new Response('Слишком много открытых потоков', { status: 429, headers: { 'Retry-After': '30' } });
   }
 
   const cookieToken = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -44,7 +51,13 @@ export async function GET(request: Request) {
       const send = (payload: unknown) => push(`data: ${JSON.stringify(payload)}\n\n`);
 
       send({ kind: 'ready' });
-      unsubscribe = subscribeThreadEvents(viewer, send);
+      const stopListening = subscribeThreadEvents(viewer, send);
+      // Любое закрытие потока (обрыв, отзыв сессии, cancel) отпускает и слот
+      unsubscribe = () => {
+        stopListening();
+        release();
+      };
+      if (request.signal.aborted) unsubscribe();
 
       // Прокси и балансировщики рвут молчащее соединение примерно через
       // минуту; комментарий каждые 25 секунд держит канал живым

@@ -16,11 +16,31 @@
 
 ARG NODE_IMAGE=node:20-bookworm-slim
 
+# ============ Корневой сертификат управляемой базы ============
+# DB_CA выбирает, откуда берётся сертификат, которым подписан сервер БД:
+#   yandex (по умолчанию, как раньше) - скачивается с storage.yandexcloud.net;
+#   file   - certs/db-ca.pem из контекста сборки (Selectel: сертификат из панели
+#            кладётся в этот файл; infra-selectel/RUNBOOK.md);
+#   none   - свой сертификат не нужен (подключаемся без проверки цепочки или БД
+#            подписана публичным центром): в образ кладётся системный набор.
+# Стадии, которые не выбраны, BuildKit не выполняет: при DB_CA=file или none
+# обращения к Яндексу во время сборки нет.
+ARG DB_CA=yandex
+FROM alpine:3.20 AS db-ca-yandex
+ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
+    https://storage.yandexcloud.net/cloud-certs/CA.pem /out/ca.pem
+FROM alpine:3.20 AS db-ca-file
+COPY --chmod=644 certs/db-ca.pem /out/ca.pem
+FROM alpine:3.20 AS db-ca-none
+RUN mkdir /out && cp /etc/ssl/certs/ca-certificates.crt /out/ca.pem && chmod 644 /out/ca.pem
+FROM db-ca-${DB_CA} AS db-ca
+
 # ---------- База: общая для всех стадий ----------
 FROM ${NODE_IMAGE} AS base
 # OpenSSL нужен движку Prisma, сертификаты — исходящим HTTPS-запросам
 # (синхронизация с CRM)
 RUN apt-get update \
+  && apt-get -y upgrade \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 # Корневой сертификат Яндекс Облака — в системное хранилище: им подписан
@@ -28,8 +48,7 @@ RUN apt-get update \
 # системному набору (sslmode=require&sslaccept=strict). Без него остаётся
 # только шифрование без проверки, с кем говоришь. Сумма зафиксирована:
 # подмена файла в сети сорвёт сборку. Действует до 20.06.2027.
-ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
-    https://storage.yandexcloud.net/cloud-certs/CA.pem /usr/local/share/ca-certificates/yandex-cloud-ca.crt
+COPY --from=db-ca --chmod=644 /out/ca.pem /usr/local/share/ca-certificates/db-ca.crt
 RUN update-ca-certificates
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -84,6 +103,13 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
+
+# npm и yarn в рабочем образе не нужны (запуск и проверка здоровья — node), а
+# вшитые в npm пакеты (tar, minimatch, glob, cross-spawn и др.) давали 1 CRITICAL
+# и 22 HIGH в trivy (аудит 17.10.2026). Образ tools собирается из deps и npm
+# сохраняет.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+           /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 USER nextjs
 EXPOSE 3000

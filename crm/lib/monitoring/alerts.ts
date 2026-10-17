@@ -68,6 +68,19 @@ export function scrub(text: string): string {
 }
 
 /**
+ * Адрес запроса без токенов из пути: ссылки сброса пароля, приглашений, согласий, выбора времени
+ * и календаря несут токен самим сегментом (/reset/<токен>), а не строкой запроса.
+ */
+export function redactPath(path: string): string {
+  return scrub(
+    path.replace(
+      /^(\/(?:reset|invite|consent|schedule|disclosure|confirm-email|api\/calendar))\/[^/]+/,
+      "$1/<токен>",
+    ),
+  );
+}
+
+/**
  * Начало стека, очищенное и обрезанное.
  *
  * Полный стек в письме не нужен: первые строки показывают наш код,
@@ -152,7 +165,7 @@ export async function reportFailure(params: {
 
     const header = [
       `Где: ${params.where}`,
-      params.path ? `Адрес: ${params.path}` : null,
+      params.path ? `Адрес: ${redactPath(params.path)}` : null,
       title,
     ].filter(Boolean) as string[];
 

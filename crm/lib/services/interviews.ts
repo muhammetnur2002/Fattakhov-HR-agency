@@ -78,6 +78,16 @@ export async function proposeSlots(
     throw new InterviewError("Ссылка на встречу должна начинаться с http:// или https://");
   }
 
+  // Участники — сотрудники этой организации: их имена видит кандидат на публичной странице, им идут уведомления
+  const participants = [...new Set(params.participantUserIds)];
+  const known = await prisma.user.count({
+    where: { id: { in: participants }, organizationId: actor.organizationId, isActive: true },
+  });
+  if (known !== participants.length) throw new InterviewError("Участник встречи не найден");
+  if (!Number.isFinite(params.durationMinutes) || params.durationMinutes < 5 || params.durationMinutes > 480) {
+    throw new InterviewError("Длительность встречи — от 5 минут до 8 часов");
+  }
+
   const token = generateToken();
   const tokenExpiresAt = new Date();
   tokenExpiresAt.setDate(tokenExpiresAt.getDate() + SLOT_TOKEN_TTL_DAYS);
@@ -100,7 +110,7 @@ export async function proposeSlots(
         meetingUrl: params.meetingUrl ?? null,
         address: params.address ?? null,
         durationMinutes: params.durationMinutes,
-        participantUserIds: params.participantUserIds,
+        participantUserIds: participants,
         timezone: params.timezone,
         candidateToken: token,
         tokenExpiresAt,

@@ -30,7 +30,7 @@ import {
 
 const credentialsSchema = z.object({
   email: z.email(),
-  password: z.string().min(1),
+  password: z.string().min(1).max(200),
   /// Второй фактор. Приходит вторым шагом той же формы.
   code: z.string().optional(),
 });

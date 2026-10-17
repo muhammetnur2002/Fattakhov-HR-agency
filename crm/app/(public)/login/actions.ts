@@ -3,6 +3,7 @@
 import { AuthError, CredentialsSignin } from "next-auth";
 
 import { signIn } from "@/auth";
+import { sanitizeCallbackUrl } from "@/lib/auth/login-redirect";
 import { prisma } from "@/lib/db/prisma";
 import { homePathFor } from "@/lib/nav";
 import { guardRate, rateLimitMessage } from "@/lib/security/guard";
@@ -54,7 +55,8 @@ export async function login(
     return { error: rateLimitMessage(rate.retryAfter) };
   }
 
-  const requestedCallback = String(formData.get("callbackUrl") || "/");
+  // Поле скрытое и подделывается: проверка нужна здесь, а не только на странице входа
+  const requestedCallback = sanitizeCallbackUrl(String(formData.get("callbackUrl") || "/"));
   const code = String(formData.get("code") || "").trim();
 
   const callbackUrl =

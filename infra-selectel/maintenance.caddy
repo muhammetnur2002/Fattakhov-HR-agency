@@ -1,0 +1,141 @@
+# Страница «Мы проводим технические работы» — общие куски для обоих Caddyfile.
+#
+# Файл НЕ читается Caddy сам по себе: Terraform склеивает его с Caddyfile
+# (или Caddyfile.students) в один текст (maintenance.tf), а тот уезжает на
+# машину переменной окружения CADDYFILE в составе compose. Поэтому здесь нет
+# `import <файл>`: снипеты стоят В НАЧАЛЕ общего текста (Caddy понимает
+# `import <снипет>` только после его определения), далее идёт сам Caddyfile.
+# Проверка локально: cat maintenance.caddy Caddyfile > /tmp/Caddyfile,
+# затем `caddy validate` (команда — в infra/README.md, раздел «Страница работ»).
+#
+# Отступы только пробелами (текст попадает и в cloud-init). Слово, по которому
+# precondition в compute.tf ищет неподставленные метки состава, в этом файле
+# употреблять нельзя: проверка сочтёт его меткой и остановит план.
+#
+# Два режима:
+#   1. автоматический (maintenance_errors): приложение не отвечает — выкладка,
+#      перезапуск контейнера, сбой. reverse_proxy отдаёт 502/503/504, вместо серой
+#      «Bad Gateway» показываем страницу работ со статусом 503. 4xx не трогаем.
+#   2. плановый (maintenance_gate): MAINTENANCE_MODE=on — страница всем, кроме
+#      /api/health* и запросов с заголовком X-Maintenance-Bypass.
+#
+# В теле страницы Caddy подставляет только известные ему {плейсхолдеры}, прочие
+# фигурные скобки (CSS) остаются как есть — проверено на стенде.
+
+# Ответ «ведутся работы». Аргументы:
+#   0 — название бренда в шапке, 1 — подпись под ним,
+#   2 — Retry-After в секундах, 3 — режим (planned | auto): уходит в заголовок
+#   X-Maintenance, по нему внешняя проверка отличает плановые работы от сбоя.
+(maintenance_reply) {
+  header {
+    Retry-After {args[2]}
+    Cache-Control "no-store"
+    X-Maintenance {args[3]}
+    X-Robots-Tag "noindex"
+    # Те же заголовки безопасности, что в основном блоке сайта: handle_errors
+    # идёт своим маршрутом, и заголовки блока `header` на него не переносятся.
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "same-origin"
+    -Server
+  }
+
+  # Запросы к API (fetch, SSE-подключение) получают короткий JSON, а не HTML:
+  # страница вместо JSON ломала бы разбор ответа в браузере.
+  @maintenance_api path /api/*
+  handle @maintenance_api {
+    header Content-Type "application/json; charset=utf-8"
+    respond `{"error":"maintenance","message":"Ведутся технические работы, повторите запрос позже."}` 503
+  }
+
+  handle {
+    header Content-Type "text/html; charset=utf-8"
+    respond <<HTML
+      <!doctype html>
+      <html lang="ru">
+      <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <meta name="robots" content="noindex,nofollow">
+      <meta http-equiv="refresh" content="30">
+      <title>Технические работы — {args[0]}</title>
+      <style>
+      :root{color-scheme:light dark;--bg:#f3f5f9;--card:#fff;--ink:#1f2a44;--muted:#5a6479;--line:#dde2ec;--accent:#1f2a44;--onaccent:#fff;--dot:#1f2a44}
+      @media (prefers-color-scheme:dark){:root{--bg:#0e1424;--card:#171f35;--ink:#eef1f8;--muted:#a4aec4;--line:#2a3552;--accent:#8fa6e8;--onaccent:#0e1424;--dot:#8fa6e8}}
+      *{box-sizing:border-box}
+      html,body{margin:0;min-height:100%}
+      body{background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+      main{width:100%;max-width:520px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px 28px;box-shadow:0 8px 30px rgba(31,42,68,.08)}
+      .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+      .brand svg{flex:none;width:44px;height:44px}
+      .brand b{display:block;font-size:17px;line-height:1.2}
+      .brand span{display:block;font-size:13px;color:var(--muted)}
+      h1{font-size:26px;line-height:1.25;margin:0 0 12px;letter-spacing:-.01em}
+      p{margin:0 0 20px;color:var(--muted)}
+      .live{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted);padding:12px 14px;border-radius:12px;background:var(--bg);margin-bottom:24px}
+      .dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--dot);animation:pulse 2.4s ease-in-out infinite}
+      @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+      @media (prefers-reduced-motion:reduce){.dot{animation:none}}
+      .contact{border-top:1px solid var(--line);padding-top:18px;font-size:14px;color:var(--muted)}
+      .contact a{color:var(--accent);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor;overflow-wrap:anywhere}
+      .contact div+div{margin-top:4px}
+      @media (max-width:360px){main{padding:24px 18px;border-radius:16px}h1{font-size:22px}}
+      </style>
+      </head>
+      <body>
+      <main>
+      <div class="brand">
+      <svg viewBox="0 0 44 44" role="img" aria-label="{args[0]}"><rect width="44" height="44" rx="12" style="fill:var(--accent)"/><path d="M14 12h16v4.5H19.2v4.3h8.3v4.4h-8.3V32H14z" style="fill:var(--onaccent)"/><circle cx="32.5" cy="31.5" r="2.5" style="fill:var(--onaccent);opacity:.55"/></svg>
+      <div><b>{args[0]}</b><span>{args[1]}</span></div>
+      </div>
+      <h1>Мы проводим технические работы</h1>
+      <p>Приносим извинения за неудобства. Мы обновляем сервис и скоро вернёмся — обычно это занимает несколько минут.</p>
+      <div class="live"><i class="dot"></i><span>Эта страница обновится сама</span></div>
+      <div class="contact">
+      <div>Срочный вопрос? Напишите нам: <a href="mailto:info@fattakhovhr.ru">info@fattakhovhr.ru</a></div>
+      <div>Сайт агентства: <a href="https://fattakhovhr.ru">fattakhovhr.ru</a></div>
+      </div>
+      </main>
+      </body>
+      </html>
+      HTML 503
+  }
+}
+
+# Автоматический режим: приложение не ответило (выкладка, перезапуск, сбой).
+# Статусы ловим в handle_errors по {err.status_code}: 502 — отказ соединения,
+# 504 — приложение не ответило за response_header_timeout, 503 — нет ни одного
+# живого адреса. Остальные ошибки (в том числе все 4xx) Caddy отдаёт как раньше.
+# Аргументы те же, что у (maintenance_gate): бренд и подпись.
+(maintenance_errors) {
+  handle_errors {
+    @maintenance_upstream_down expression `{err.status_code} in [502, 503, 504]`
+    handle @maintenance_upstream_down {
+      import maintenance_reply {args[0]} {args[1]} 120 auto
+    }
+  }
+}
+
+# Плановый режим. MAINTENANCE_MODE и MAINTENANCE_BYPASS приходят из окружения
+# контейнера (Terraform: maintenance_mode, maintenance_bypass). Подстановка
+# {$ИМЯ} делается при чтении конфигурации, поэтому смена режима = пересоздание
+# контейнера caddy (секунды), перезагрузка машины не нужна.
+#
+# Пропускаются:
+#   - /api/health* — внешняя проверка «жив ли сайт» (monitoring.tf), проверка
+#     после выкатки (deploy.sh) и самопроверки видят настоящее состояние
+#     приложения, а не страницу работ; она бы там считалась сбоем;
+#   - запросы с заголовком X-Maintenance-Bypass: <MAINTENANCE_BYPASS> — чтобы
+#     проверить сайт до открытия. Пустой MAINTENANCE_BYPASS = обхода нет
+#     (без явной проверки пустое значение совпало бы с отсутствующим заголовком).
+(maintenance_gate) {
+  @maintenance_on {
+    expression `"{$MAINTENANCE_MODE:off}" == "on"`
+    not path /api/health*
+    not expression `"{$MAINTENANCE_BYPASS:}" != "" && {header.X-Maintenance-Bypass} == "{$MAINTENANCE_BYPASS:}"`
+  }
+  handle @maintenance_on {
+    import maintenance_reply {args[0]} {args[1]} 300 planned
+  }
+}

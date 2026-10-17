@@ -201,17 +201,28 @@ describe("добавление в воронку", () => {
 });
 
 describe("переходы по этапам", () => {
-  it("вперёд можно перепрыгнуть через этап", async () => {
+  it("вперёд можно перейти на внутренний этап", async () => {
     const { id } = await addToVacancy(recruiter, VACANCY, candidateId);
-    const final = stages.find((s) => s.code === "FINAL")!;
+    const screening = stages.find((s) => s.code === "SCREENING")!;
 
-    await moveStage(recruiter, id, final.id);
+    await moveStage(recruiter, id, screening.id);
 
     const app = await db.application.findUnique({
       where: { id },
       select: { stageId: true },
     });
-    expect(app?.stageId).toBe(final.id);
+    expect(app?.stageId).toBe(screening.id);
+  });
+
+  it("на этап, видимый клиенту, без представления не перепрыгнуть (BR-3)", async () => {
+    // Иначе согласие, подтверждение передачи работодателю, резюме и саммари обходились бы переводом карточки
+    const { id } = await addToVacancy(recruiter, VACANCY, candidateId);
+    for (const code of ["CLIENT_INTERVIEW", "FINAL", "OFFER", "HIRED"]) {
+      const target = stages.find((s) => s.code === code)!;
+      await expect(moveStage(recruiter, id, target.id)).rejects.toThrow(/представьте/i);
+    }
+    const app = await db.application.findUnique({ where: { id }, select: { stageId: true } });
+    expect(app?.stageId).toBe(stages[0].id);
   });
 
   it("назад — только с комментарием", async () => {
@@ -539,6 +550,15 @@ describe("решения клиента (BR-12, BR-13, BR-14)", () => {
     await expect(
       setClientDecision(clientAdmin, id, "INTERVIEW"),
     ).rejects.toThrow(/не представлен/);
+  });
+
+  it("нанятого решением клиента не «разнанять»", async () => {
+    const id = await present();
+    await db.application.update({ where: { id }, data: { outcome: "HIRED", hiredAt: new Date() } });
+
+    await expect(setClientDecision(clientAdmin, id, "REJECT")).rejects.toThrow(/уже нанят/);
+    const app = await db.application.findUnique({ where: { id }, select: { outcome: true } });
+    expect(app?.outcome).toBe("HIRED");
   });
 
   it("BR-13: приглашение на интервью заводит встречу для рекрутера", async () => {

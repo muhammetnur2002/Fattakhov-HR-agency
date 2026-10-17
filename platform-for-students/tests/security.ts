@@ -37,6 +37,10 @@ import { GET as staffStudentsList } from '../app/api/service/staff/students/rout
 import { GET as staffStudentProfile } from '../app/api/service/staff/students/[id]/route';
 import { searchStaffStudents, parseStaffSearch, MAX_PAGE_SIZE } from '../lib/staff-students';
 import { runPiiFixTests } from './pii-fixes';
+import { handle } from '../lib/api';
+import { describeMailError } from '../lib/mail/transport';
+import { acquireStream, openStreamsFor } from '../lib/security/stream-limit';
+import { supportMessageSchema } from '../lib/validation';
 
 let passed = 0;
 const failures: string[] = [];
@@ -1119,6 +1123,61 @@ async function main() {
   await test('чтение (GET, HEAD) без Origin не трогаем', () => {
     assertSameOrigin(req('GET', {}));
     assertSameOrigin(req('HEAD', {}));
+  });
+
+  // ---------- Аудит 17.10.2026: ошибки, письма, потоки ----------
+  await test('тело запроса не JSON: 400 BAD_JSON, а не 500; прочие сбои по-прежнему 500 без текста', async () => {
+    const bad = await handle(async () => {
+      await new Request('http://localhost/x', { method: 'POST', body: '{oops' }).json();
+      throw new Error('до сюда не дойти');
+    });
+    assert.equal(bad.status, 400);
+    assert.equal(((await bad.json()) as { code: string }).code, 'BAD_JSON');
+    const origError = console.error;
+    console.error = () => undefined;
+    try {
+      const crash = await handle(async () => {
+        throw new Error('секрет внутри текста ошибки');
+      });
+      assert.equal(crash.status, 500);
+      assert.equal(JSON.stringify(await crash.json()).includes('секрет'), false);
+    } finally {
+      console.error = origError;
+    }
+  });
+  await test('форма поддержки: перевод строки в имени не доезжает до темы письма', () => {
+    const parsed = supportMessageSchema.parse({ email: 'a@b.ru', name: 'Иван\r\nBcc: x@evil.ru', body: 'текст' });
+    assert.equal(/[\r\n]/.test(parsed.name ?? ''), false);
+    assert.equal(supportMessageSchema.parse({ email: 'a@b.ru', name: '\n\n', body: 'текст' }).name, null);
+  });
+  await test('сбой отправки письма в журнале: адреса получателей замаскированы', () => {
+    const text = describeMailError(Object.assign(new Error('550 5.1.1 <student.ivanov@mail.ru>: Recipient address rejected'), { code: 'EENVELOPE', responseCode: 550 }));
+    assert.equal(text.includes('student.ivanov'), false);
+    assert.equal(text.includes('s***@mail.ru'), true);
+    assert.equal(text.includes('EENVELOPE'), true);
+  });
+  await test('потоки чата: не больше предела на участника, слот возвращается один раз', () => {
+    const key = 'STUDENT:test-limit';
+    const releases = [1, 2, 3].map(() => acquireStream(key, 3));
+    assert.equal(releases.every(Boolean), true);
+    assert.equal(acquireStream(key, 3), null);
+    assert.equal(acquireStream('STUDENT:other', 3) !== null, true);
+    releases[0]!();
+    releases[0]!(); // повторный вызов не освобождает чужой слот
+    assert.equal(openStreamsFor(key), 2);
+    const again = acquireStream(key, 3);
+    assert.notEqual(again, null);
+    assert.equal(acquireStream(key, 3), null);
+    releases[1]!(); releases[2]!(); again!();
+    assert.equal(openStreamsFor(key), 0);
+  });
+  await test('правка страницы компании ограничена по числу запросов (перебор ИНН)', async () => {
+    const id = 'emp-inn-probe-' + Date.now();
+    let blocked = false;
+    for (let i = 0; i < RATE_LIMITS.companyProfile.limit + 1; i++) {
+      if (!(await rateLimit('companyProfile', id)).ok) blocked = true;
+    }
+    assert.equal(blocked, true);
   });
 
   // ---------- ПДн студентов: согласие, журнал, файлы ----------

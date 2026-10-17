@@ -8,6 +8,7 @@ import {
 import { ScrollRegion } from "@/components/ui/scroll-region";
 import { FAQ_ITEMS } from "@/lib/marketing/faq";
 import { SECTION_HEAD_GAP, SITE_CONTAINER, SPLIT_EVEN, SPLIT_MAIN } from "./layout";
+import { LogoAssembly } from "./logo-assembly";
 import { RibbedTexture } from "./texture";
 
 /**
@@ -229,6 +230,10 @@ export function WhenSubscription() {
  * Точек на линии нет намеренно. Линия уже показывает последовательность,
  * а точки добавляли ей собственный ритм — четыре отметки на пустой
  * вертикали читались как украшение, а не как часть шагов.
+ *
+ * Справа от шагов на широком экране (от 1024px) знак собирается из кусков
+ * по мере прокрутки раздела (`LogoAssembly`): пустая половина тёмного раздела
+ * работает на бренд, а не пропадает. На телефоне блока нет, шаги идут как были.
  */
 export function HowItWorks() {
   const steps = [
@@ -255,19 +260,22 @@ export function HowItWorks() {
   ];
 
   return (
-    <ol className="space-y-0 border-l border-white/15 pl-6 md:pl-8">
-      {steps.map((s) => (
-        <li key={s.name} className="pb-10 last:pb-0">
-          <div className="text-sm font-medium tracking-[0.12em] text-white/65 uppercase">
-            {s.name}
-          </div>
-          <div className="mt-2 text-2xl font-medium text-white">{s.title}</div>
-          <p className="mt-2 max-w-2xl text-base leading-relaxed text-white/65">
-            {s.body}
-          </p>
-        </li>
-      ))}
-    </ol>
+    <div className={SPLIT_EVEN}>
+      <ol className="space-y-0 border-l border-white/15 pl-6 md:pl-8">
+        {steps.map((s) => (
+          <li key={s.name} className="pb-10 last:pb-0">
+            <div className="text-sm font-medium tracking-[0.12em] text-white/65 uppercase">
+              {s.name}
+            </div>
+            <div className="mt-2 text-2xl font-medium text-white">{s.title}</div>
+            <p className="mt-2 max-w-2xl text-base leading-relaxed text-white/65">
+              {s.body}
+            </p>
+          </li>
+        ))}
+      </ol>
+      <LogoAssembly />
+    </div>
   );
 }
 

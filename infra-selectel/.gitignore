@@ -1,0 +1,17 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+# Любые файлы значений - кроме образца example.tfvars (в нём только заглушки)
+*.tfvars
+*.tfvars.json
+!example.tfvars
+secrets/
+*.tfplan
+# Файлы окружения серверов, ключи и сертификаты: содержат секреты
+*.env
+*.pem
+*.key
+id_ed25519*
+id_rsa*

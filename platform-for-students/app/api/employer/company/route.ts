@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers';
-import { fail, handle, ok } from '@/lib/api';
+import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import { companyProfileSchema } from '@/lib/company';
 import { isInnExistsError } from '@/lib/db';
 import type { EmployerRecord } from '@/lib/db/types';
 import { assertSameOrigin, audit, requireEmployer } from '@/lib/security/guards';
+import { rateLimit } from '@/lib/security/rate-limit';
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/security/session';
 import { verifyVideoIfChanged } from '@/lib/storage';
 import type { SessionUser } from '@/lib/types';
@@ -24,6 +25,9 @@ export async function PATCH(request: Request) {
   return handle(async () => {
     assertSameOrigin(request);
     const { session, employer, store } = await requireEmployer();
+
+    const limit = await rateLimit('companyProfile', employer.id);
+    if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
     const input = companyProfileSchema.parse(await request.json());
 

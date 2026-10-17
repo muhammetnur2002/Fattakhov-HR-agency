@@ -150,6 +150,7 @@ export async function moveStage(
       vacancyId: true,
       offerSalary: true,
       offerStartDate: true,
+      presentedAt: true,
       stage: { select: { order: true } },
       candidate: { select: { erasureState: true } },
       vacancy: { select: { clientId: true } },
@@ -181,10 +182,16 @@ export async function moveStage(
 
   const toStage = await prisma.pipelineStage.findFirst({
     where: { id: toStageId, vacancyId: application.vacancyId },
-    select: { id: true, order: true, code: true },
+    select: { id: true, order: true, code: true, visibleToClient: true },
   });
   if (!toStage) {
     throw new ApplicationError("Этап не принадлежит этой вакансии");
+  }
+
+  // Порог видимости (BR-3): этап, видимый клиенту, открывает ему кандидата. Без представления
+  // (согласие, подтверждение передачи этому работодателю, резюме, саммари) туда не переводят
+  if (toStage.visibleToClient && !application.presentedAt) {
+    throw new ApplicationError("Сначала представьте кандидата клиенту: нужны согласие, саммари и резюме");
   }
 
   const movingBack = toStage.order < application.stage.order;
@@ -585,6 +592,11 @@ export async function setClientDecision(
     throw new ApplicationError("Кандидат ещё не представлен клиенту");
   }
 
+  // Нанятого решением клиента не «разнанять»: найм выпал бы из очереди к выставлению счёта
+  if (application.outcome === "HIRED") {
+    throw new ApplicationError("Кандидат уже нанят: решение изменить нельзя");
+  }
+
   const now = new Date();
   const base = {
     clientDecision: decision,
@@ -966,6 +978,18 @@ export async function markConsentGiven(actor: Actor, candidateId: string) {
       consentStatus: "GIVEN",
       consentGivenAt: now,
       consentExpiresAt: expires,
+    },
+  });
+
+  // Ручная отметка заменяет согласие по ссылке, поэтому след обязателен: кто и когда подтвердил
+  await prisma.activityLog.create({
+    data: {
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      entityType: "Candidate",
+      entityId: candidateId,
+      action: "consent_marked_manually",
+      diff: { expiresAt: expires.toISOString() },
     },
   });
 

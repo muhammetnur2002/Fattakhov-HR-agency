@@ -5,6 +5,7 @@ import { LoginForm } from "./login-form";
 import { QuickLogin } from "./quick-login";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { sanitizeCallbackUrl } from "@/lib/auth/login-redirect";
 import { getActor } from "@/lib/auth/session";
 import { smsConfigured } from "@/lib/notifications/sms";
 import {
@@ -68,15 +69,4 @@ export default async function LoginPage({
       </CardFooter>
     </Card>
   );
-}
-
-/**
- * Разрешаем только внутренние относительные пути.
- * Без этой проверки ?callbackUrl=https://evil.example превращает форму входа
- * в открытый редирект.
- */
-function sanitizeCallbackUrl(url: string | undefined): string {
-  if (!url) return "/";
-  if (!url.startsWith("/") || url.startsWith("//")) return "/";
-  return url;
 }

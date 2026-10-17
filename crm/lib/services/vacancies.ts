@@ -1,4 +1,6 @@
 import {
+  AccessDeniedError,
+  AGENCY_ROLES,
   canDo,
   stripInternal,
   visibleVacanciesFilter,
@@ -65,6 +67,36 @@ async function nextVacancyNumber(
  * Достраиваем только пустое поле, и только этой роли: у CLIENT_ADMIN
  * пустое поле — валидное состояние «пока без ответственного».
  */
+/**
+ * Клиент и заказчик из формы обязаны быть теми, за кого себя выдают: клиент — из организации актора,
+ * заказчик — человеком этого клиента. Иначе чужой id делал вакансию невидимой нанимающим менеджерам
+ * или привязывал её к чужой компании.
+ */
+async function assertClientAndManager(
+  organizationId: string,
+  clientId: string,
+  hiringManagerId: string | null | undefined,
+): Promise<void> {
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organizationId },
+    select: { id: true },
+  });
+  if (!client) throw new AccessDeniedError("vacancy.create");
+  if (hiringManagerId) {
+    const manager = await prisma.user.findFirst({
+      where: {
+        id: hiringManagerId,
+        organizationId,
+        clientId,
+        isActive: true,
+        role: { in: ["CLIENT_HIRING", "CLIENT_ADMIN"] },
+      },
+      select: { id: true },
+    });
+    if (!manager) throw new AccessDeniedError("vacancy.editBrief");
+  }
+}
+
 export async function createVacancyDraft(
   actor: Actor,
   clientId: string,
@@ -74,6 +106,7 @@ export async function createVacancyDraft(
   if (actor.role === "CLIENT_HIRING" && !data.hiringManagerId) {
     data.hiringManagerId = actor.id;
   }
+  await assertClientAndManager(actor.organizationId, clientId, data.hiringManagerId);
 
   return prismaRaw.$transaction(async (tx) => {
     const number = await nextVacancyNumber(tx, actor.organizationId);
@@ -101,13 +134,16 @@ export async function updateVacancyBrief(
 ) {
   const vacancy = await prisma.vacancy.findFirst({
     where: { id: vacancyId, organizationId: actor.organizationId },
-    select: { id: true },
+    select: { id: true, clientId: true },
   });
   if (!vacancy) return null;
 
+  const data = toVacancyData(input);
+  await assertClientAndManager(actor.organizationId, vacancy.clientId, data.hiringManagerId);
+
   return prisma.vacancy.update({
     where: { id: vacancyId },
-    data: toVacancyData(input),
+    data,
     select: { id: true, updatedAt: true },
   });
 }
@@ -406,6 +442,20 @@ export async function assignRecruiters(
 
   const team = new Set(recruiterIds);
   if (leadRecruiterId) team.add(leadRecruiterId);
+
+  // В команду вакансии — только действующие сотрудники агентства этой организации: по этим id
+  // идут внутренние комментарии и уведомления, чужой или клиентский id открыл бы их постороннему
+  if (team.size > 0) {
+    const valid = await prisma.user.count({
+      where: {
+        id: { in: [...team] },
+        organizationId: actor.organizationId,
+        isActive: true,
+        role: { in: [...AGENCY_ROLES] },
+      },
+    });
+    if (valid !== team.size) throw new AccessDeniedError("vacancy.assignRecruiter");
+  }
 
   const updated = await prisma.vacancy.update({
     where: { id: vacancyId },

@@ -60,9 +60,22 @@ export async function sendMail(mail: OutgoingMail): Promise<boolean> {
     });
     return true;
   } catch (error) {
-    console.error(`[почта] письмо для ${maskEmail(mail.to)} не доставлено:`, error);
+    console.error(`[почта] письмо для ${maskEmail(mail.to)} не доставлено: ${describeMailError(error)}`);
     return false;
   }
+}
+
+/**
+ * Причина сбоя отправки для журнала — без объекта ошибки целиком. Ответ SMTP-сервера
+ * ("550 <user@mail.ru>: Recipient address rejected") и поля ошибки nodemailer содержат адрес
+ * получателя, а журнал контейнера — не место для адресов: адреса в тексте маскируются.
+ */
+export function describeMailError(error: unknown): string {
+  const info = error as { code?: unknown; responseCode?: unknown; message?: unknown } | null;
+  const parts = [info?.code, info?.responseCode, typeof info?.message === 'string' ? info.message : String(error)]
+    .filter((p) => p !== undefined && p !== null && p !== '')
+    .map(String);
+  return parts.join(' ').replace(/[^\s<>"'(),;:]+@[^\s<>"'(),;:]+/g, (address) => maskEmail(address)).slice(0, 300);
 }
 
 function remember(mail: OutgoingMail) {

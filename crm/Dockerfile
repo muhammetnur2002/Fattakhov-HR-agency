@@ -9,6 +9,25 @@
 # только в команде запуска. Держать два образа значит однажды
 # выкатить их разных версий и ловить необъяснимое расхождение.
 
+# ============ Корневой сертификат управляемой базы ============
+# DB_CA выбирает, откуда берётся сертификат, которым подписан сервер БД:
+#   yandex (по умолчанию, как раньше) - скачивается с storage.yandexcloud.net;
+#   file   - certs/db-ca.pem из контекста сборки (Selectel: сертификат из панели
+#            кладётся в этот файл; infra-selectel/RUNBOOK.md);
+#   none   - свой сертификат не нужен (подключаемся без проверки цепочки или БД
+#            подписана публичным центром): в образ кладётся системный набор.
+# Стадии, которые не выбраны, BuildKit не выполняет: при DB_CA=file или none
+# обращения к Яндексу во время сборки нет.
+ARG DB_CA=yandex
+FROM alpine:3.20 AS db-ca-yandex
+ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
+    https://storage.yandexcloud.net/cloud-certs/CA.pem /out/ca.pem
+FROM alpine:3.20 AS db-ca-file
+COPY --chmod=644 certs/db-ca.pem /out/ca.pem
+FROM alpine:3.20 AS db-ca-none
+RUN mkdir /out && cp /etc/ssl/certs/ca-certificates.crt /out/ca.pem && chmod 644 /out/ca.pem
+FROM db-ca-${DB_CA} AS db-ca
+
 # ============ Зависимости ============
 FROM node:24-alpine AS deps
 WORKDIR /app
@@ -105,9 +124,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # процесс от nextjs его бы не прочитал. Сумма зафиксирована: подмена файла
 # в сети сорвёт сборку. Сертификат действует до 20.06.2027 — меняя его,
 # обновить и сумму. Так же сделано в CRM агентства.
-ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
-    https://storage.yandexcloud.net/cloud-certs/CA.pem /etc/ssl/certs/yandex-cloud-ca.pem
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/yandex-cloud-ca.pem
+COPY --from=db-ca --chmod=644 /out/ca.pem /etc/ssl/certs/db-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/db-ca.pem
 
 # Не от root: если приложение скомпрометируют, злоумышленник
 # получит права обычного пользователя, а не хозяина контейнера
@@ -128,6 +146,13 @@ COPY --from=checked --chown=nextjs:nodejs /app/public ./public
 # проверяем, что он целый: десять тысяч строк, а не пустой файл
 COPY --from=checked --chown=nextjs:nodejs /app/lib/auth/common-passwords.txt ./lib/auth/common-passwords.txt
 RUN test "$(wc -l < lib/auth/common-passwords.txt)" -gt 9000
+
+# npm и yarn в рабочем образе не нужны (запуск — node server.js), зато их
+# вшитые пакеты (brace-expansion, undici, http-cache-semantics) давали HIGH в
+# сканере уязвимостей trivy (аудит 17.10.2026). Образ tools ниже их сохраняет:
+# ему нужен npx.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+           /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 USER nextjs
 
@@ -167,9 +192,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Тот же сертификат облака, что в runner: миграции и фоновые задачи
 # ходят в ту же управляемую базу.
-ADD --chmod=644 --checksum=sha256:6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef \
-    https://storage.yandexcloud.net/cloud-certs/CA.pem /etc/ssl/certs/yandex-cloud-ca.pem
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/yandex-cloud-ca.pem
+COPY --from=db-ca --chmod=644 /out/ca.pem /etc/ssl/certs/db-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/db-ca.pem
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 worker

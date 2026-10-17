@@ -18,7 +18,7 @@ services:
       # Русские имена в базе: сортировка и регистр должны работать
       LANG: ru_RU.utf8
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - fhr-students-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -35,7 +35,7 @@ services:
     # записи счётчика — лишняя нагрузка на диск
     command: redis-server --save '' --appendonly no
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s

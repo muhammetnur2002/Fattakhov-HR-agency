@@ -1,4 +1,6 @@
 import {
+  AccessDeniedError,
+  AGENCY_ROLES,
   assertCanDo,
   isAgency,
   CLIENT_ROLES,
@@ -284,11 +286,27 @@ export async function getClient(actor: Actor, clientId: string) {
   };
 }
 
+/** Аккаунт-менеджер — действующий сотрудник агентства этой же организации (по нему идут уведомления). */
+async function assertAccountManager(actor: Actor, accountManagerId: string | null | undefined): Promise<void> {
+  if (!accountManagerId) return;
+  const manager = await prisma.user.findFirst({
+    where: {
+      id: accountManagerId,
+      organizationId: actor.organizationId,
+      isActive: true,
+      role: { in: [...AGENCY_ROLES] },
+    },
+    select: { id: true },
+  });
+  if (!manager) throw new AccessDeniedError("client.manage");
+}
+
 export async function createClient(
   actor: Actor,
   input: ClientInput,
   options: { fromStudentsPlatform?: boolean } = {},
 ) {
+  await assertAccountManager(actor, input.accountManagerId);
   return prisma.client.create({
     data: {
       ...input,
@@ -322,6 +340,7 @@ export async function updateClient(
     select: { id: true },
   });
   if (!existing) return null;
+  await assertAccountManager(actor, input.accountManagerId);
 
   return prisma.client.update({
     where: { id: clientId },
