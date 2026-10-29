@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/Toast';
+import { apiErrorMessage } from '@/lib/api-client';
 import { motion } from 'framer-motion';
 import { ArrowRight, Clock3, MapPin } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { ButtonLink } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { Reveal, Stagger } from '@/components/motion/Reveal';
 import { VacancyDetail } from '@/components/swipe/VacancyDetail';
@@ -34,14 +37,38 @@ import {
  * со сроком: иначе студент считал бы, что работодатель их видит и молчит.
  */
 export function ApplicationsList({
-  applications,
-  pending,
+  applications: initialApplications,
+  pending: initialPending,
   study,
 }: {
   applications: ApplicationDTO[];
   pending: PendingApplicationDTO[];
   study: StudyStateDTO;
 }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const applications = initialApplications.filter((a) => !removed.has(a.vacancy.id));
+  const pending = initialPending.filter((a) => !removed.has(a.vacancy.id));
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const cancelLock = useRef(false);
+  async function cancel(vacancyId: string) {
+    if (cancelLock.current) return;
+    cancelLock.current = true;
+    setCancelling(vacancyId);
+    try {
+      const response = await fetch('/api/swipes', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacancyId }) });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'Попробуйте ещё раз'));
+      setRemoved((prev) => new Set(prev).add(vacancyId));
+      toast.success('Отклик отменён', 'На активную вакансию можно откликнуться снова в ленте.');
+      router.refresh();
+    } catch (error) {
+      toast.error('Не удалось отменить отклик', error instanceof Error ? error.message : 'Проверьте соединение');
+    } finally {
+      cancelLock.current = false;
+      setCancelling(null);
+    }
+  }
   const [detail, setDetail] = useState<VacancyDTO | null>(null);
 
   if (applications.length === 0 && pending.length === 0) {
@@ -88,7 +115,8 @@ export function ApplicationsList({
           </Link>
           <div className="mt-3 grid gap-3 [&>*]:min-w-0">
             {pending.map((item) => (
-              <PendingCard key={item.vacancy.id} item={item} onOpen={() => setDetail(item.vacancy)} />
+              <div key={item.vacancy.id}><PendingCard item={item} onOpen={() => setDetail(item.vacancy)} />
+                <CancelApplication busy={cancelling === item.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(item.vacancy.id)} /></div>
             ))}
           </div>
         </section>
@@ -99,6 +127,7 @@ export function ApplicationsList({
           {applications.map((application) => (
             <Reveal key={application.id} variants={fadeUp}>
               <ApplicationCard application={application} onOpen={() => setDetail(application.vacancy)} />
+              <CancelApplication busy={cancelling === application.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(application.vacancy.id)} />
             </Reveal>
           ))}
         </Stagger>
@@ -236,4 +265,15 @@ function Funnel({ status }: { status: ApplicationStatus }) {
       </p>
     </div>
   );
+}
+
+function CancelApplication({ busy, disabled, onCancel }: { busy: boolean; disabled: boolean; onCancel: () => Promise<void> }) {
+  const [confirm, setConfirm] = useState(false);
+  return <div className="px-5 py-3">
+    {confirm ? <div className="flex flex-wrap items-center gap-3">
+      <p className="text-small text-paper-dim">Отменить отклик? Переписка по нему тоже будет удалена.</p>
+      <Button size="sm" variant="danger" loading={busy} disabled={disabled} onClick={onCancel}>Да, отменить</Button>
+      <Button size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirm(false)}>Оставить отклик</Button>
+    </div> : <Button size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirm(true)}>Отменить отклик</Button>}
+  </div>;
 }

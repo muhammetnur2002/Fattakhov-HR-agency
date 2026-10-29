@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Clock, Filter, GraduationCap, MapPin, Search, Users } from 'lucide-react';
+import { Check, Clock, Layers, List, X, Filter, GraduationCap, MapPin, Search, Users } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip, Tag } from '@/components/ui/Chip';
@@ -10,8 +10,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SelectField, TextField } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Toast';
 import { CubeMark } from '@/components/brand/CubeMark';
-import { springSoft } from '@/lib/motion';
+import { springSoft, SWIPE } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { matchesCandidate } from '@/lib/candidate-search';
 import { apiErrorMessage } from '@/lib/api-client';
 import {
   GENDERS,
@@ -30,20 +31,13 @@ const GENDER_LABEL: Record<Gender, string> = {
   UNSPECIFIED: 'Не указан',
 };
 
-/**
- * Раздел «Кандидаты» — обратная сторона ленты студента.
- *
- * Там студент листает вакансии свайпом и решает сам; здесь работодатель
- * выбирает, кого позвать, — но списком, а не колодой. Свайп остаётся
- * только у студентов: у входа в кабинет компании нет телефона в руке
- * и настроения листать карточки одну за другой, а список с фильтром
- * читается и сравнивается быстрее, чем решение по одной карточке зараз.
- *
- * Решение привязано к вакансии: «пригласить» без вакансии в этом продукте
- * не бывает — отклик всегда на что-то конкретное.
- */
 export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[] }) {
   const toast = useToast();
+  const [view, setView] = useState<'list' | 'swipe'>('list');
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [city, setCity] = useState('');
+  const [university, setUniversity] = useState('');
+  const inviteLock = useRef(false);
   const [vacancyId, setVacancyId] = useState(vacancies[0]?.id ?? '');
   const [loading, setLoading] = useState(true);
   const [pool, setPool] = useState<StudentProfileDTO[]>([]);
@@ -67,6 +61,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     setLoading(true);
     setLoadError(null);
     setDecided(new Set());
+    setSkipped(new Set());
     setInvited(0);
     fetch(`/api/employer/candidates/${vacancyId}`)
       .then(async (r) => {
@@ -93,18 +88,13 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const query = search.trim().toLowerCase();
   const filtered = useMemo(
     () =>
-      pool.filter((s) => {
-        if (decided.has(s.id)) return false;
-        if (days.length > 0 && !s.workDays.some((d) => days.includes(d))) return false;
-        if (genders.length > 0 && !genders.includes(s.gender)) return false;
-        if (!query) return true;
-        const haystack = `${s.fullName} ${s.university} ${s.speciality} ${s.skills.join(' ')}`.toLowerCase();
-        return haystack.includes(query);
-      }),
-    [pool, decided, days, genders, query],
+      pool.filter((s) => !decided.has(s.id) && matchesCandidate(s, { query, days, genders, city, university })),
+    [pool, decided, days, genders, query, city, university],
   );
 
   async function invite(student: StudentProfileDTO) {
+    if (inviteLock.current) return;
+    inviteLock.current = true;
     setInviting((prev) => new Set(prev).add(student.id));
     try {
       const response = await fetch(`/api/employer/candidates/${vacancyId}`, {
@@ -129,6 +119,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     } catch {
       toast.error('Не удалось пригласить', 'Проверьте соединение и попробуйте ещё раз');
     } finally {
+      inviteLock.current = false;
       setInviting((prev) => {
         const next = new Set(prev);
         next.delete(student.id);
@@ -137,7 +128,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     }
   }
 
-  const activeFilters = days.length + genders.length;
+  const activeFilters = days.length + genders.length + Number(Boolean(city)) + Number(Boolean(university));
+  const swipeCandidates = filtered.filter((s) => !skipped.has(s.id));
 
   if (vacancies.length === 0) {
     return (
@@ -163,9 +155,14 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         </p>
       </header>
 
+      <div className="mt-5 flex gap-2" role="group" aria-label="Вид кандидатов">
+        <Button variant={view === 'list' ? 'primary' : 'outline'} aria-pressed={view === 'list'} icon={<List />} onClick={() => setView('list')}>Список</Button>
+        <Button variant={view === 'swipe' ? 'primary' : 'outline'} aria-pressed={view === 'swipe'} icon={<Layers />} onClick={() => setView('swipe')}>Свайпы</Button>
+      </div>
       <div className="mt-6 w-full">
         <SelectField
           label="Вакансия"
+          disabled={inviting.size > 0}
           value={vacancyId}
           onChange={(e) => setVacancyId(e.target.value)}
           options={vacancies.map((v) => ({ value: v.id, label: v.title }))}
@@ -174,7 +171,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
 
       <div className="mt-3 flex w-full items-center gap-2">
         <div className="relative flex-1">
-          <TextField label="Поиск: имя, вуз, навык" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <TextField label="Поиск: имя, город, вуз, навык" value={search} onChange={(e) => setSearch(e.target.value)} />
           <Search className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-paper-faint" aria-hidden />
         </div>
         <button
@@ -208,6 +205,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
             className="w-full overflow-hidden"
           >
             <div className="glass mt-3 space-y-4 rounded-3xl p-4">
+              <SelectField label="Город" value={city} onChange={(e) => setCity(e.target.value)} options={[{ value: '', label: 'Все города' }, ...Array.from(new Set(pool.map((s) => s.city).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
+              <SelectField label="Вуз" value={university} onChange={(e) => setUniversity(e.target.value)} options={[{ value: '', label: 'Все вузы' }, ...Array.from(new Set(pool.map((s) => s.university).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
               <div>
                 <p className="mb-2 text-caption uppercase tracking-[0.1em] text-paper-faint">День работы</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -248,6 +247,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
                 <button
                   type="button"
                   onClick={() => {
+                    setCity('');
+                    setUniversity('');
                     setDays([]);
                     setGenders([]);
                   }}
@@ -265,6 +266,22 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         <p className="mt-5 text-caption tabular-nums text-paper-faint">Приглашено сейчас: {invited}</p>
       )}
 
+      {!loading && !loadError && <p className="mt-4 text-small text-paper-dim" aria-live="polite">Найдено: {filtered.length}</p>}
+      {!loading && !loadError && view === 'swipe' && filtered.length > 0 && (
+        <div className="mt-5">
+          <p className="mb-4 text-small text-paper-dim">Вправо — пригласить. Влево — посмотреть позже.</p>
+          {swipeCandidates[0] ? (
+            <motion.div key={`${vacancyId}:${swipeCandidates[0].id}`} drag={inviting.size ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.7} style={{ touchAction: 'pan-y' }} onDragEnd={(_, info) => {
+              if (inviteLock.current) return;
+              if (info.offset.x > SWIPE.distanceThreshold) void invite(swipeCandidates[0]);
+              else if (info.offset.x < -SWIPE.distanceThreshold) setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id));
+            }}>
+              <CandidateRow student={swipeCandidates[0]} inviting={inviting.size > 0} onInvite={() => invite(swipeCandidates[0])} card />
+              <div className="mt-4 flex justify-center"><Button variant="outline" disabled={inviting.size > 0} icon={<X />} onClick={() => setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id))}>Позже</Button></div>
+            </motion.div>
+          ) : <EmptyState title="Все карточки просмотрены" description="Отложенные кандидаты остаются в списке." action={<Button onClick={() => setSkipped(new Set())}>Посмотреть снова</Button>} />}
+        </div>
+      )}
       <div className="mt-5 w-full space-y-2.5">
         {loading && (
           <div className="glass-card flex h-40 items-center justify-center rounded-3xl text-paper-faint">
@@ -284,7 +301,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
           <EmptyList hasFilters={activeFilters > 0 || query.length > 0} invited={invited} />
         )}
 
-        {!loading && !loadError && (
+        {!loading && !loadError && view === 'list' && (
           <AnimatePresence initial={false}>
             {filtered.map((student) => (
               <CandidateRow
@@ -305,10 +322,12 @@ function CandidateRow({
   student,
   inviting,
   onInvite,
+  card = false,
 }: {
   student: StudentProfileDTO;
   inviting: boolean;
   onInvite: () => void;
+  card?: boolean;
 }) {
   return (
     <motion.article
@@ -317,7 +336,7 @@ function CandidateRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 24, transition: { duration: 0.18 } }}
       transition={springSoft}
-      className="glass-card flex flex-col gap-4 rounded-3xl p-5 sm:flex-row sm:items-center"
+      className={cn('glass-card flex flex-col gap-4 rounded-3xl p-5', card ? 'mx-auto min-h-80 max-w-md justify-between' : 'sm:flex-row sm:items-center')}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3.5">
         <Avatar name={student.fullName} src={student.photoUrl} size={52} />
