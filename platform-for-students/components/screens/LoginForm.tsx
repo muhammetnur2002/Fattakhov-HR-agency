@@ -38,7 +38,6 @@ const CRM_LOGIN_MESSAGES: Record<string, string> = {
 
 export function LoginForm({
   demoHint,
-  agencyUrl,
 }: {
   demoHint?: DemoHint;
   /** Сайт агентства (CRM); null — адрес на проде не задан */
@@ -46,11 +45,8 @@ export function LoginForm({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  // Регистрация компании переехала в CRM — та же логика, что на витрине
-  // (см. components/screens/Landing.tsx): внешняя ссылка на другое
-  // приложение. Своего внутреннего /register/company больше нет, поэтому
-  // без адреса CRM ссылку просто не показываем.
-  const employerRegisterUrl = agencyUrl ? `${agencyUrl}/register/company` : null;
+  // Employer registration stays on the student platform.
+  const employerRegisterUrl = '/register/company';
   const toast = useToast();
 
   const [email, setEmail] = useState('');

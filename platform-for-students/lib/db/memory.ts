@@ -851,7 +851,7 @@ export async function createMemoryStore(): Promise<DataStore> {
         if (t.accounts.some((a) => a.emailHash === emailHash)) {
           throw new AccountExistsError();
         }
-        if (t.employers.some((e) => e.inn === input.inn)) {
+        if (input.inn && t.employers.some((e) => e.inn === input.inn)) {
           throw new InnExistsError();
         }
         const account: AccountRecord = {

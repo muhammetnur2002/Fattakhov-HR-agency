@@ -25,6 +25,7 @@
     "keys:rotate": "node --conditions=react-server --import tsx scripts/rotate-pii-key.ts",
     "smoke": "tsx tests/smoke.ts",
     "test:unit": "tsx tests/unit.ts",
+    "test:employer": "node --conditions=react-server --import tsx tests/employer-profile.ts",
     "test:push": "node --conditions=react-server --import tsx tests/push-store.ts",
     "test:agency": "node --conditions=react-server --import tsx tests/agency-chat.ts",
     "test:security": "node --conditions=react-server --import tsx tests/security.ts",

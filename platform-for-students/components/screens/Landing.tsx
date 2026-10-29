@@ -47,14 +47,8 @@ export function Landing({
 }) {
   const navigate = useCurtainNav();
 
-  // Самостоятельная регистрация компании переехала в CRM (кабинет клиента
-  // заводится там же, без второй анкеты внутри агентства) — поэтому это
-  // внешняя ссылка на другое приложение, как и «Сайт агентства» в подвале,
-  // а не navigate() и не next/link. Свой внутренний /register/company
-  // здесь больше не существует, поэтому без AGENCY_SITE_URL на проде
-  // кнопку «Я работодатель» просто не показываем — как и ссылку на сайт
-  // агентства ниже, вести её было бы некуда.
-  const employerRegisterUrl = agencyUrl ? `${agencyUrl}/register/company` : null;
+  // Employer registration stays on the student platform.
+  const employerRegisterUrl = '/register/company';
 
   return (
     // overflow-x-clip: карточки демо-колоды улетают за правый край (x = ширина окна × flyOut) и на

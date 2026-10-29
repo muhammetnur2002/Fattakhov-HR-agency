@@ -11,6 +11,7 @@ import {
 } from '@/lib/security/session';
 import { generateEmailCode, hashPendingCode } from '@/lib/security/tokens';
 import type { RegistrationInput } from '@/lib/validation';
+import type { CompanyRegistrationInput } from '@/lib/company';
 
 /**
  * Заявка на регистрацию: форма проверена и подписана, но учётной записи
@@ -23,6 +24,7 @@ import type { RegistrationInput } from '@/lib/validation';
 export type PendingKind = 'student' | 'employer';
 
 export type PendingStudentData = RegistrationInput & { consentIp: string };
+export type PendingEmployerData = CompanyRegistrationInput;
 
 export interface IssuedPending {
   token: string;

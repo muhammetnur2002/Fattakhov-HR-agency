@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { agencySiteUrl } from '@/lib/agency';
+import { employerDestination } from '@/lib/employer-destination';
 import { getStore } from '@/lib/db';
 import { hasCompanyProfile } from '@/lib/company';
 import type { Role, SessionUser } from '@/lib/types';
@@ -172,18 +173,11 @@ export async function requireStudentPage(next = '/feed') {
  * Куда вести работодателя, попавшего на страницу кабинета платформы.
  *
  * Вакансии, отклики, кандидатов и переписку клиент ведёт в своём кабинете
- * CRM, на платформе ему делать нечего — поэтому любой заход на /employer
- * заканчивается там же. Привязанный клиент попадает на соответствующий
- * раздел, непривязанная компания — на вход в CRM.
+ * CRM. Только профиль /employer/company открывается на платформе;
+ * маршруты остальных разделов сохраняются без изменений.
  */
 function crmDestination(next: string, crmClientId: string | null): string | null {
-  const agency = agencySiteUrl();
-  if (!agency) return null;
-  if (!crmClientId) return `${agency}/login`;
-  if (next.startsWith('/employer/messages')) return `${agency}/students/messages`;
-  if (next.startsWith('/employer/candidates')) return `${agency}/students/candidates`;
-  if (next.startsWith('/employer/vacancies') || next.startsWith('/employer/company')) return `${agency}/students`;
-  return `${agency}/students/applications`;
+  return employerDestination(next, crmClientId, agencySiteUrl());
 }
 
 export async function requireEmployerPage(next = '/employer') {

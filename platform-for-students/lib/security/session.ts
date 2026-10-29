@@ -132,6 +132,6 @@ export const sessionCookieOptions = {
 /** Куда отправлять роль после входа — одно место правды для всех редиректов. */
 export const HOME_BY_ROLE: Record<Role, string> = {
   STUDENT: '/feed',
-  EMPLOYER: '/employer',
+  EMPLOYER: '/employer/company',
   ADMIN: '/admin',
 };

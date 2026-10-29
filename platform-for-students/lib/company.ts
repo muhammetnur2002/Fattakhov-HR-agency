@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { httpUrlSchema, linkItemSchema } from '@/lib/portfolio';
 import { isValidInn, normalizeInn } from '@/lib/inn';
-import { phoneSchema } from '@/lib/validation';
+import { consentFields, emailSchema, passwordSchema, phoneSchema, requiredPhoneSchema } from '@/lib/validation';
 import type { CompanyProfile, LinkItem } from '@/lib/types';
 
 /**
@@ -11,9 +11,8 @@ import type { CompanyProfile, LinkItem } from '@/lib/types';
  * потому что хранилищу нужны правила чтения JSON, а мастеру регистрации
  * студента правила компании ни к чему.
  *
- * Регистрация компании отсюда переехала в CRM (app/(public)/register/company
- * там же) — этот модуль больше не отвечает за неё, только за профиль внутри
- * уже открытого кабинета.
+ * Регистрация и профиль работодателя используют одни правила платформы.
+ * Существующие компании из CRM сохраняют свою связь по crmClientId.
  */
 
 const emptyToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
@@ -87,6 +86,19 @@ export const companyProfileSchema = z.object({
 });
 
 export type CompanyProfileInput = z.infer<typeof companyProfileSchema>;
+
+/** Same account and consent rules as student registration; no duplicate CRM account. */
+export const companyRegistrationSchema = z.object({
+  companyName,
+  contactName,
+  email: emailSchema,
+  password: passwordSchema,
+  city: optionalText(80),
+  inn: z.preprocess((v) => (v === undefined ? null : emptyToNull(v)), innSchema.nullable()),
+  phone: requiredPhoneSchema,
+  ...consentFields(),
+});
+export type CompanyRegistrationInput = z.infer<typeof companyRegistrationSchema>;
 
 /**
  * Плейсхолдер названия/контакта компании до дозаполнения в кабинете.
