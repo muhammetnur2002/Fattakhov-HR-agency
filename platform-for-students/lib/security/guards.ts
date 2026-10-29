@@ -2,8 +2,6 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { agencySiteUrl } from '@/lib/agency';
-import { employerDestination } from '@/lib/employer-destination';
 import { getStore } from '@/lib/db';
 import { hasCompanyProfile } from '@/lib/company';
 import type { Role, SessionUser } from '@/lib/types';
@@ -169,17 +167,6 @@ export async function requireStudentPage(next = '/feed') {
   return { session, student, store };
 }
 
-/**
- * Куда вести работодателя, попавшего на страницу кабинета платформы.
- *
- * Вакансии, отклики, кандидатов и переписку клиент ведёт в своём кабинете
- * CRM. Только профиль /employer/company открывается на платформе;
- * маршруты остальных разделов сохраняются без изменений.
- */
-function crmDestination(next: string, crmClientId: string | null): string | null {
-  return employerDestination(next, crmClientId, agencySiteUrl());
-}
-
 export async function requireEmployerPage(next = '/employer') {
   await redirectIfRevoked(next);
   const session = await getSessionWithRole('EMPLOYER');
@@ -187,8 +174,6 @@ export async function requireEmployerPage(next = '/employer') {
   const store = await getStore();
   const employer = await store.employers.findByAccountId(session.accountId);
   if (!employer) redirect(`/logout?reason=stale&next=${encodeURIComponent(next)}`);
-  const destination = crmDestination(next, employer.crmClientId);
-  if (destination) redirect(destination);
   return { session, employer, store };
 }
 

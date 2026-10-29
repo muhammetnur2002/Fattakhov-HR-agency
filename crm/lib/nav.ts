@@ -95,13 +95,6 @@ export const CLIENT_NAV: NavItem[] = [
     icon: "FileText",
     requires: "invoice.view",
   },
-  {
-    href: "/students",
-    label: "Студенческая платформа",
-    railLabel: "Студенты",
-    icon: "GraduationCap",
-    requires: "students.enterAsClient",
-  },
   { href: "/settings", label: "Настройки", icon: "Settings" },
   // Без requires: помощь нужна всем ролям, и до договора — больше всего
   { href: "/help", label: "Помощь", icon: "CircleHelp" },

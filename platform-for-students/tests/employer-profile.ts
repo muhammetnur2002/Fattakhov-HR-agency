@@ -1,17 +1,8 @@
 import assert from 'node:assert/strict';
 import { companyRegistrationSchema } from '../lib/company';
-import { employerDestination } from '../lib/employer-destination';
 import { createMemoryStore, AccountExistsError } from '../lib/db/memory';
 
 async function main() {
-  const crm = 'https://crm.example.test';
-  for (const linked of [null, 'existing-crm-client']) {
-    assert.equal(employerDestination('/employer/company', linked, crm), null);
-  }
-  assert.equal(employerDestination('/employer/messages', 'client', crm), `${crm}/students/messages`);
-  assert.equal(employerDestination('/employer/candidates', 'client', crm), `${crm}/students/candidates`);
-  assert.equal(employerDestination('/employer/vacancies', 'client', crm), `${crm}/students`);
-
   const input = {
     companyName: 'Тестовая компания', contactName: 'Анна Иванова',
     email: 'employer-profile@example.test', password: 'Test-Company-927!',

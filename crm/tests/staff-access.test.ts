@@ -95,9 +95,9 @@ describe("команда агентства", () => {
     expect(canAssignStaff(actor("HEAD"), { role: "RECRUITER" }, [])).toBe(false);
   });
 
-  it("на студенческую платформу от имени компании входят администратор и нанимающий менеджер клиента, но не смотрящий", () => {
-    expect(canDo(actor("CLIENT_ADMIN"), "students.enterAsClient")).toBe(true);
-    expect(canDo(actor("CLIENT_HIRING"), "students.enterAsClient")).toBe(true);
+  it("клиентская сессия CRM не управляет кабинетом работодателя", () => {
+    expect(canDo(actor("CLIENT_ADMIN"), "students.enterAsClient")).toBe(false);
+    expect(canDo(actor("CLIENT_HIRING"), "students.enterAsClient")).toBe(false);
     expect(canDo(actor("CLIENT_VIEWER"), "students.enterAsClient")).toBe(false);
     expect(canDo(actor("HEAD", ["staff.manage"]), "students.enterAsClient")).toBe(false);
   });

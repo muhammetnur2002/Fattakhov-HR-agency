@@ -445,16 +445,9 @@ const PERMISSIONS: Record<Action, Partial<Record<UserRole, Rule>>> = {
     ACCOUNT: anyStudentsGrant,
   },
 
-  /*
-    Вход клиента на студенческую платформу — уже проверенный агентством
-    заказчик публикует вакансию сам, тем же паролем, что и в CRM. Только
-    администратор и нанимающий менеджер: смотрящему (CLIENT_VIEWER)
-    публиковать нечего.
-  */
-  "students.enterAsClient": {
-    CLIENT_ADMIN: true,
-    CLIENT_HIRING: true,
-  },
+  // Employer actions now require a student-platform employer session.
+  // Keep the retired action so old server actions fail closed.
+  "students.enterAsClient": {},
 };
 
 /** Может ли actor выполнить action над subject. */
