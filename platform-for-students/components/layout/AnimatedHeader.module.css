@@ -1,0 +1,15 @@
+.header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; height:var(--header-h); max-width:72rem; margin:auto; padding:0 20px; }
+.wide { max-width:100rem; }
+.logo { flex:none; opacity:0; }
+.panel { display:flex; align-items:center; min-width:0; gap:5px; padding:4px; border:1px solid var(--hairline); border-radius:999px; background:rgb(var(--color-graphite-900) / .5); opacity:0; transform-origin:center; }
+.navigation { min-width:0; overflow-x:auto; scrollbar-width:none; padding:3px 0; }
+.navigation::-webkit-scrollbar { display:none; }
+.tabs { width:max-content; padding:0; border:0; background:transparent; backdrop-filter:none; }
+.account { flex:none; padding-left:4px; border-left:1px solid var(--hairline); }
+.account [data-tour="profile"], .account [data-tour="bell"] { border-color:transparent; background:transparent; backdrop-filter:none; }
+.stage { position:absolute; inset:0; pointer-events:none; }
+.piece { position:absolute; width:38px; height:44px; background:currentColor; color:rgb(var(--color-paper)); mask:url('/brand/mark-dark.png') center/contain no-repeat; will-change:transform,opacity; }
+.header[data-ready="true"] .logo, .header[data-ready="true"] .panel { opacity:1; }
+@media(min-width:640px) { .header { padding:0 32px; gap:24px; } }
+@media(max-width:420px) { .header { padding:0 12px; gap:6px; } .panel { flex:1; gap:2px; } .navigation { flex:1; } .tabs > a { width:36px; height:40px; } .account { padding-left:2px; } }
+@media(prefers-reduced-motion:reduce) { .logo,.panel { opacity:1; } .stage { display:none; } }

@@ -4,6 +4,8 @@ import { PresencePulse } from '@/components/account/PresencePulse';
 import { PushPrompt } from '@/components/account/PushPrompt';
 import { NavTabs, type NavItem } from './NavTabs';
 import { UserMenu } from './UserMenu';
+import { AnimatedHeader } from './AnimatedHeader';
+import { EmployerNotifications } from './EmployerNotifications';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { maskEmail } from '@/lib/account-codes';
 import { agencySiteUrl } from '@/lib/agency';
@@ -52,7 +54,10 @@ export async function AppShell({
         студента и т.п.) просвечивало над шапкой при прокрутке.
       */}
       <header data-site-header className="sticky top-0 z-50 border-b border-[var(--hairline)] bg-ink/70 backdrop-blur-glass before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
-        <div
+        {nav && user && (session?.role === 'STUDENT' || session?.role === 'EMPLOYER') ? (
+          <AnimatedHeader nav={nav} user={user} wide={wide} backToCrmUrl={backToCrmUrl}
+            bell={bell ?? (session.role === 'EMPLOYER' ? <EmployerNotifications applications={nav.find(item => item.href === '/employer')?.badge ?? 0} unread={nav.find(item => item.href === '/employer/messages')?.badge ?? 0} /> : undefined)} />
+        ) : <div
           className={cn(
             'page-x mx-auto flex h-[var(--header-h)] items-center justify-between gap-2 sm:gap-4',
             wide ? 'max-w-[100rem]' : 'max-w-6xl',
@@ -67,7 +72,7 @@ export async function AppShell({
           ) : (
             <span className="text-caption text-paper-faint">Fattakhov HR Agency</span>
           )}
-        </div>
+        </div>}
 
       </header>
 

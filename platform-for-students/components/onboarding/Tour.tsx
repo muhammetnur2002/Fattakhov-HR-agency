@@ -54,11 +54,12 @@ export function TourController() {
   const [steps, setSteps] = useState<TourStep[] | null>(null);
 
   const open = useCallback((forRole: Role) => {
-    // Даём странице дорисоваться: колода и плашки появляются после гидратации
+    // При первом входе подсказки показываем после сборки панели.
+    const headerIsOpening = document.querySelector('[data-animated-header][data-ready="false"]');
     window.setTimeout(() => {
       const available = TOURS[forRole].steps.filter((step) => findTarget(step.target));
       if (available.length > 0) setSteps(available);
-    }, 450);
+    }, headerIsOpening ? 4600 : 450);
   }, []);
 
   const fetchState = useCallback(async (): Promise<{ seen: boolean; role: Role } | null> => {
