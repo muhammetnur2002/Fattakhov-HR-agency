@@ -195,7 +195,7 @@ export function CompanyRegistrationForm() {
           <div className="mt-6 space-y-1.5 text-center text-small text-paper-faint">
             <p>
               Уже есть кабинет?{' '}
-              <Link href="/login" className="text-paper underline-offset-4 hover:underline">
+              <Link href="/login?role=employer" className="text-paper underline-offset-4 hover:underline">
                 Войти
               </Link>
             </p>

@@ -13,6 +13,12 @@ async function main() {
   assert.equal(matchesCandidate(student, { ...filters, university: 'Другой вуз' }), false);
   assert.equal(matchesCandidate({ ...student, city: null }, filters), true);
 
+  const resume = { ...student, about: 'Разрабатываю сайты', goals: 'Frontend стажировка', projects: [{ title: 'Интернет-магазин', description: 'React и TypeScript', link: null }], achievements: [], activities: [], hobbies: 'Фотография' };
+  assert.equal(matchesCandidate(resume, { ...filters, query: 'react стажировка' }), true);
+  assert.equal(matchesCandidate(resume, { ...filters, query: 'фотография' }), true);
+  assert.equal(matchesCandidate(resume, { ...filters, query: 'React Python' }), false);
+  assert.equal(matchesCandidate(resume, { ...filters, query: 'React', city: 'Москва' }), false);
+
   // The UI reuses DELETE /api/swipes: remove the student's swipe and application.
   const store = await createMemoryStore();
   const [first, second] = await store.students.list();

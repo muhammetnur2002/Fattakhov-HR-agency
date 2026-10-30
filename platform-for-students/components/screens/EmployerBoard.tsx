@@ -147,7 +147,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
         vacancies={board.vacancies.length}
       />
 
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         <FilterChip active={vacancyFilter === 'ALL'} onClick={() => setVacancyFilter('ALL')}>
           Все вакансии
           <Count>{applications.length}</Count>
@@ -227,11 +227,11 @@ function BoardHeader({
   vacancies: number;
 }) {
   return (
-    <header className="mb-8">
-      <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
-      <h1 className="mt-3 text-headline text-paper">{company}</h1>
+    <header className="mb-4">
+      <h1 className="text-title text-paper sm:text-headline">Отклики</h1>
+      <p className="mt-1 truncate text-small text-paper-dim">{company}</p>
 
-      <div className="mt-7 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[var(--hairline)] bg-[var(--hairline)]">
+      <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[var(--hairline)] bg-[var(--hairline)]">
         <Stat value={total} label={plural(total, 'отклик', 'отклика', 'откликов')} />
         <Stat value={fresh} label="новых" accent />
         <Stat value={vacancies} label={plural(vacancies, 'вакансия', 'вакансии', 'вакансий')} />
@@ -242,7 +242,7 @@ function BoardHeader({
 
 function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
-    <div className="bg-ink px-5 py-5">
+    <div className="bg-ink px-3 py-2.5 sm:px-5 sm:py-4">
       <p
         className={cn(
           'text-title font-semibold leading-none tracking-[-0.03em]',
@@ -309,7 +309,7 @@ function CandidateRow({
 
   return (
     <motion.article layout transition={springSoft} className="surface min-w-0 overflow-hidden rounded-3xl">
-      <div className="flex items-start gap-4 p-5">
+      <div className="flex items-start gap-3 p-4 sm:p-5">
         <Avatar name={student.fullName} src={student.photoUrl} size={56} rounded="square" />
 
         <div className="min-w-0 flex-1">

@@ -42,7 +42,7 @@ export const TOURS: Record<Role, { home: string; steps: TourStep[] }> = {
         text: 'Первым пишет работодатель — его сообщение и ваш ответ будут здесь.',
       },
       {
-        target: 'nav:/profile',
+        target: 'profile',
         title: 'Профиль',
         text: 'Фото, график, навыки и портфолио. Чем полнее профиль, тем охотнее отвечают работодатели.',
       },
@@ -57,7 +57,7 @@ export const TOURS: Record<Role, { home: string; steps: TourStep[] }> = {
     home: '/employer',
     steps: [
       {
-        target: 'nav:/employer/company',
+        target: 'profile',
         title: 'Страница компании',
         text: 'Описание, фото и контакты. Студент видит страницу до отклика. Новую компанию сначала проверяет агентство.',
       },

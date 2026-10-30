@@ -1,3 +1,5 @@
+import { getSession } from '@/lib/security/guards';
+import { HOME_BY_ROLE } from '@/lib/security/session';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
@@ -108,13 +110,14 @@ const HR: Question[] = [
  * регистрации. Ответы — раскрывающимися пунктами: так страница читается
  * списком вопросов, а не простынёй текста.
  */
-export default function HelpPage() {
+export default async function HelpPage() {
+  const session = await getSession();
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
         <Logo />
-        <Link href="/login" className="text-small text-paper-faint transition-colors hover:text-paper">
-          Войти
+        <Link href={session ? HOME_BY_ROLE[session.role] : "/login"} className="text-small text-paper-faint transition-colors hover:text-paper">
+          {session ? 'В кабинет' : 'Войти'}
         </Link>
       </header>
 

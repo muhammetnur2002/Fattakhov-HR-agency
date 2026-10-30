@@ -7,7 +7,9 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip, Tag } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { SelectField, TextField } from '@/components/ui/Field';
+import { SelectField } from '@/components/ui/Field';
+import { Dialog } from '@/components/ui/Dialog';
+import { PortfolioView } from '@/components/student/PortfolioView';
 import { useToast } from '@/components/ui/Toast';
 import { CubeMark } from '@/components/brand/CubeMark';
 import { springSoft, SWIPE } from '@/lib/motion';
@@ -40,6 +42,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const inviteLock = useRef(false);
   const [vacancyId, setVacancyId] = useState('');
   const [inviteVacancyId, setInviteVacancyId] = useState('');
+  const [inviteStudent, setInviteStudent] = useState<StudentProfileDTO | null>(null);
+  const [detail, setDetail] = useState<StudentProfileDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [pool, setPool] = useState<StudentProfileDTO[]>([]);
   const [decided, setDecided] = useState<Set<string>>(new Set());
@@ -85,14 +89,15 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const query = search.trim().toLowerCase();
   const filtered = useMemo(
     () =>
-      pool.filter((s) => !decided.has(s.id) && matchesCandidate(s, { query, days, genders, city, university })),
-    [pool, decided, days, genders, query, city, university],
+      pool.filter((s) => (!vacancyId || !decided.has(s.id)) && matchesCandidate(s, { query, days, genders, city, university })),
+    [pool, decided, days, genders, query, city, university, vacancyId],
   );
 
-  async function invite(student: StudentProfileDTO) {
+  async function invite(student: StudentProfileDTO, selectedVacancy?: string) {
     if (inviteLock.current) return;
-    const targetVacancyId = vacancyId || inviteVacancyId;
-    if (!targetVacancyId) { toast.error('Выберите вакансию', 'Укажите, на какую вакансию пригласить кандидата.'); return; }
+    const targetVacancyId = selectedVacancy;
+    if (!targetVacancyId) { setInviteVacancyId(vacancyId); setInviteStudent(student); return; }
+
     inviteLock.current = true;
     setInviting((prev) => new Set(prev).add(student.id));
     try {
@@ -108,9 +113,10 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         return;
       }
       const data = (await response.json().catch(() => ({}))) as { invited?: boolean; reason?: string };
+      setInviteStudent(null);
       setDecided((prev) => new Set(prev).add(student.id));
       if (!data.invited && data.reason === 'ALREADY_DECIDED') {
-        toast.success('Уже не в списке', 'Студент уже откликнулся или приглашён на эту вакансию');
+        toast.success('Уже есть отклик', 'Студент уже откликнулся или приглашён на эту вакансию');
       } else {
         setInvited((n) => n + 1);
         toast.success('Приглашение отправлено', student.fullName);
@@ -127,7 +133,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
     }
   }
 
-  const activeFilters = days.length + genders.length + Number(Boolean(city)) + Number(Boolean(university));
+  const activeFilters = days.length + genders.length + Number(Boolean(city)) + Number(Boolean(university)) + Number(Boolean(vacancyId));
   const swipeCandidates = filtered.filter((s) => !skipped.has(s.id));
 
 
@@ -136,54 +142,28 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
       <header className="w-full">
         <h1 className="text-headline text-paper">Кандидаты</h1>
         <p className="mt-1.5 text-small text-paper-dim">
-          Подтверждённые студенты: смотрите весь каталог или выберите вакансию для приглашения.
+          Резюме и анкеты по всей базе подтверждённых студентов.
         </p>
       </header>
 
-      <div className="mt-5 flex gap-2" role="group" aria-label="Вид кандидатов">
-        <Button variant={view === 'list' ? 'primary' : 'outline'} aria-pressed={view === 'list'} icon={<List />} onClick={() => setView('list')}>Список</Button>
-        <Button variant={view === 'swipe' ? 'primary' : 'outline'} aria-pressed={view === 'swipe'} icon={<Layers />} onClick={() => setView('swipe')}>Свайпы</Button>
-      </div>
-      <div className="mt-6 w-full">
-        <SelectField
-          label="Показывать кандидатов"
-          disabled={inviting.size > 0}
-          value={vacancyId}
-          onChange={(e) => setVacancyId(e.target.value)}
-          options={[{ value: '', label: 'Все кандидаты' }, ...vacancies.map((v) => ({ value: v.id, label: v.title }))]}
-        />
-      </div>
-
-      {!vacancyId && <div className="mt-3">
-        <SelectField label="Приглашать на вакансию" value={inviteVacancyId} disabled={inviting.size > 0} onChange={(e) => setInviteVacancyId(e.target.value)} options={[{ value: '', label: 'Выберите вакансию для приглашения' }, ...vacancies.map((v) => ({ value: v.id, label: v.title }))]} />
-        {vacancies.length === 0 && <p className="mt-2 text-small text-paper-dim">Каталог доступен для просмотра. Чтобы приглашать, создайте вакансию.</p>}
-      </div>}
-      <div className="mt-3 flex w-full items-center gap-2">
-        <div className="relative flex-1">
-          <TextField label="Поиск: имя, город, вуз, навык" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Search className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-paper-faint" aria-hidden />
+      <div className="mt-4 flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-paper-faint" aria-hidden />
+          <input type="search" aria-label="Поиск кандидатов и резюме" placeholder="Имя, навык, опыт…" value={search} onChange={e => setSearch(e.target.value)} className="h-11 w-full rounded-xl border border-[var(--hairline)] bg-graphite-900/40 pl-9 pr-3 text-small text-paper focus:border-accent-400" />
         </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((v) => !v)}
-          aria-expanded={filtersOpen}
-          aria-label="Фильтр"
-          className={cn(
-            'relative grid size-[62px] shrink-0 place-items-center rounded-xl border transition-colors',
-            filtersOpen || activeFilters > 0
-              ? 'border-accent-400/70 bg-accent-500/15 text-accent-200'
-              : 'border-[var(--hairline)] bg-graphite-900/55 text-paper/70 hover:border-paper/25 hover:text-paper',
-          )}
-        >
-          <Filter className="size-[18px]" aria-hidden />
-          {activeFilters > 0 && (
-            <span className="absolute -right-1 -top-1 grid size-[18px] place-items-center rounded-full bg-accent-300 text-caption font-semibold text-ink">
-              {activeFilters}
-            </span>
-          )}
+        <button type="button" onClick={() => setFiltersOpen(v => !v)} aria-expanded={filtersOpen} aria-label="Фильтр" className={cn('relative grid size-11 shrink-0 place-items-center rounded-xl border border-[var(--hairline)]', filtersOpen || activeFilters ? 'bg-accent-500/15 text-accent-200' : 'text-paper-dim')}>
+          <Filter className="size-4" />
+          {activeFilters > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-accent-300 px-1.5 text-caption text-ink">{activeFilters}</span>}
         </button>
       </div>
-
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-caption text-paper-faint">{vacancyId ? vacancies.find(v => v.id === vacancyId)?.title : 'Вся база'}{!loading && !loadError ? ` · ${filtered.length}` : ''}</p>
+        <div className="flex shrink-0 gap-1 rounded-xl bg-paper/[0.04] p-1" role="group" aria-label="Вид кандидатов">
+          {(['list', 'swipe'] as const).map(mode => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={cn('flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-caption', view === mode ? 'bg-paper text-ink' : 'text-paper-dim')}>
+            {mode === 'list' ? <List className="size-3.5" /> : <Layers className="size-3.5" />}{mode === 'list' ? 'Список' : 'Свайпы'}
+          </button>)}
+        </div>
+      </div>
       <AnimatePresence initial={false}>
         {filtersOpen && (
           <motion.div
@@ -193,9 +173,10 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
             transition={springSoft}
             className="w-full overflow-hidden"
           >
-            <div className="glass mt-3 space-y-4 rounded-3xl p-4">
-              <SelectField label="Город" value={city} onChange={(e) => setCity(e.target.value)} options={[{ value: '', label: 'Все города' }, ...Array.from(new Set(pool.map((s) => s.city).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
-              <SelectField label="Вуз" value={university} onChange={(e) => setUniversity(e.target.value)} options={[{ value: '', label: 'Все вузы' }, ...Array.from(new Set(pool.map((s) => s.university).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
+            <div className="mt-3 space-y-3 rounded-2xl border border-[var(--hairline)] p-3">
+              <CompactSelect label="Показывать кандидатов" value={vacancyId} disabled={inviting.size > 0} onChange={setVacancyId} options={[{value: '', label: 'Вся база — все кандидаты'}, ...vacancies.map(v => ({value:v.id,label:v.title}))]} />
+              <CompactSelect label="Город" value={city} onChange={setCity} options={[{ value: '', label: 'Все города' }, ...Array.from(new Set(pool.map((s) => s.city).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
+              <CompactSelect label="Вуз" value={university} onChange={setUniversity} options={[{ value: '', label: 'Все вузы' }, ...Array.from(new Set(pool.map((s) => s.university).filter((value): value is string => Boolean(value)))).sort().map((value) => ({ value, label: value }))]} />
               <div>
                 <p className="mb-2 text-caption uppercase tracking-[0.1em] text-paper-faint">День работы</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -236,6 +217,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
                 <button
                   type="button"
                   onClick={() => {
+                    setVacancyId('');
                     setCity('');
                     setUniversity('');
                     setDays([]);
@@ -255,7 +237,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         <p className="mt-5 text-caption tabular-nums text-paper-faint">Приглашено сейчас: {invited}</p>
       )}
 
-      {!loading && !loadError && <p className="mt-4 text-small text-paper-dim" aria-live="polite">Найдено: {filtered.length}</p>}
+
       {!loading && !loadError && view === 'swipe' && filtered.length > 0 && (
         <div className="mt-5">
           <p className="mb-4 text-small text-paper-dim">Вправо — пригласить. Влево — посмотреть позже.</p>
@@ -265,7 +247,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
               if (info.offset.x > SWIPE.distanceThreshold) void invite(swipeCandidates[0]);
               else if (info.offset.x < -SWIPE.distanceThreshold) setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id));
             }}>
-              <CandidateRow student={swipeCandidates[0]} inviting={inviting.size > 0} onInvite={() => invite(swipeCandidates[0])} card />
+              <CandidateRow student={swipeCandidates[0]} inviting={inviting.size > 0} onInvite={() => invite(swipeCandidates[0])} onOpen={() => setDetail(swipeCandidates[0])} card />
               <div className="mt-4 flex justify-center"><Button variant="outline" disabled={inviting.size > 0} icon={<X />} onClick={() => setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id))}>Позже</Button></div>
             </motion.div>
           ) : <EmptyState title="Все карточки просмотрены" description="Отложенные кандидаты остаются в списке." action={<Button onClick={() => setSkipped(new Set())}>Посмотреть снова</Button>} />}
@@ -298,11 +280,32 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
                 student={student}
                 inviting={inviting.has(student.id)}
                 onInvite={() => invite(student)}
+                onOpen={() => setDetail(student)}
               />
             ))}
           </AnimatePresence>
         )}
       </div>
+      <Dialog open={detail !== null} title="Резюме кандидата" onClose={() => setDetail(null)}>
+        {detail && <div className="space-y-4">
+          <h2 className="text-title">{detail.fullName}</h2>
+          <p className="text-small text-paper-dim">{[detail.city, detail.university, detail.speciality].filter(Boolean).join(' · ')}</p>
+          <p className="text-small text-paper-dim">{detail.workDays.map(d => WEEKDAY_LABEL[d]).join(', ')}{detail.hoursPerWeek ? ` · до ${detail.hoursPerWeek} ч/нед` : ''}</p>
+          {detail.about && <p className="whitespace-pre-line text-small">{detail.about}</p>}
+          <div className="flex flex-wrap gap-1.5">{detail.skills.map(skill => <Tag key={skill}>{skill}</Tag>)}</div>
+          <PortfolioView portfolio={detail} />
+          <p className="text-caption text-paper-faint">Контакты и прикреплённое резюме доступны в отклике после приглашения или отклика студента.</p>
+          <Button size="sm" onClick={() => { setDetail(null); void invite(detail); }}>Пригласить</Button>
+        </div>}
+      </Dialog>
+      <Dialog open={inviteStudent !== null} title="Пригласить кандидата" onClose={() => { if (!inviteLock.current) setInviteStudent(null); }}>
+        <div className="space-y-4">
+          <p className="text-small">{inviteStudent?.fullName}</p>
+          <SelectField label="Вакансия для приглашения" value={inviteVacancyId} disabled={inviting.size > 0} onChange={e => setInviteVacancyId(e.target.value)} options={[{value:'',label:'Выберите вакансию'}, ...vacancies.map(v => ({value:v.id,label:v.title}))]} />
+          {vacancies.length === 0 && <p className="text-small text-paper-dim">Для приглашения сначала создайте вакансию. Просмотр резюме доступен без неё.</p>}
+          <Button disabled={!inviteVacancyId || inviting.size > 0} loading={inviting.size > 0} onClick={() => { if (inviteStudent) void invite(inviteStudent, inviteVacancyId); }}>Отправить приглашение</Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -311,11 +314,13 @@ function CandidateRow({
   student,
   inviting,
   onInvite,
+  onOpen,
   card = false,
 }: {
   student: StudentProfileDTO;
   inviting: boolean;
   onInvite: () => void;
+  onOpen: () => void;
   card?: boolean;
 }) {
   return (
@@ -325,7 +330,7 @@ function CandidateRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 24, transition: { duration: 0.18 } }}
       transition={springSoft}
-      className={cn('glass-card flex flex-col gap-4 rounded-3xl p-5', card ? 'mx-auto min-h-80 max-w-md justify-between' : 'sm:flex-row sm:items-center')}
+      className={cn('glass-card flex flex-col gap-3 rounded-2xl p-4', card ? 'mx-auto min-h-80 max-w-md justify-between' : 'sm:flex-row sm:items-center')}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3.5">
         <Avatar name={student.fullName} src={student.photoUrl} size={52} />
@@ -368,15 +373,15 @@ function CandidateRow({
         </div>
       </div>
 
-      <Button
-        size="md"
+      <div className="flex gap-2 sm:flex-col"><Button size="sm" variant="outline" onClick={onOpen} className="flex-1">Резюме</Button><Button
+        size="sm"
         loading={inviting}
         onClick={onInvite}
         icon={<Check />}
         className="shrink-0 sm:w-auto"
       >
         Пригласить
-      </Button>
+      </Button></div>
     </motion.article>
   );
 }
@@ -399,4 +404,8 @@ function EmptyList({ invited, hasFilters }: { invited: number; hasFilters: boole
       </div>
     </div>
   );
+}
+
+function CompactSelect({label,value,onChange,options,disabled=false}: {label:string;value:string;onChange:(value:string)=>void;options:{value:string;label:string}[];disabled?:boolean}) {
+  return <label className="block text-caption text-paper-dim">{label}<select value={value} disabled={disabled} onChange={e=>onChange(e.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[var(--hairline)] bg-ink px-2 text-small text-paper">{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></label>;
 }
