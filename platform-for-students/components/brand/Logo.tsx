@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 export function Logo({
   className,
   href = '/',
-  compact = false,
+  compact = true,
 }: {
   className?: string;
   href?: string | null;

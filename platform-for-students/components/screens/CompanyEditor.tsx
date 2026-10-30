@@ -1,7 +1,7 @@
 'use client';
 
 import { NotificationToggle } from '@/components/account/NotificationToggle';
-import { SessionsRevoke } from '@/components/account/SessionsRevoke';
+import { LogoutSection } from '@/components/account/LogoutSection';
 import { PushToggle } from '@/components/account/PushToggle';
 
 import { useState } from 'react';
@@ -357,9 +357,7 @@ export function CompanyEditor({
           <PushToggle audience="company" />
         </Section>
 
-        <Section title="Безопасность">
-          <SessionsRevoke />
-        </Section>
+        <LogoutSection />
       </div>
 
       <AnimatePresence>

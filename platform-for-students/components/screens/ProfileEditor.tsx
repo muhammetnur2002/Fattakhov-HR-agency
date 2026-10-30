@@ -2,14 +2,13 @@
 
 import { NotificationToggle } from '@/components/account/NotificationToggle';
 import { PushToggle } from '@/components/account/PushToggle';
-import { SessionsRevoke } from '@/components/account/SessionsRevoke';
-import { forgetThisDevice } from '@/lib/push/client';
+import { LogoutSection } from '@/components/account/LogoutSection';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, LogOut, Plus, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Check, Plus, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SelectField, TextAreaField, TextField } from '@/components/ui/Field';
@@ -790,40 +789,6 @@ function AddButton({
  * нажимают на том же движении, что и первую. Удаление необратимо и
  * уносит отклики и переписку, поэтому здесь нужна пауза, а не щелчок.
  */
-/**
- * Выход из аккаунта — в конце профиля, перед удалением. Из шапки его убрали:
- * там теперь колокольчик уведомлений, а выходят из аккаунта редко.
- */
-function LogoutSection() {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-
-  async function logout() {
-    setPending(true);
-    // Пока сессия жива: после выхода сервер уже не примет отписку
-    await forgetThisDevice();
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
-    router.push('/');
-    router.refresh();
-  }
-
-  return (
-    <section className="rounded-3xl border border-[var(--hairline)] bg-graphite-900/40 p-6 sm:p-7">
-      <h2 className="mb-2 flex items-center gap-2 text-caption uppercase tracking-[0.12em] text-paper-faint">
-        <LogOut className="size-3.5" aria-hidden />
-        Выход из аккаунта
-      </h2>
-      <p className="text-small leading-relaxed text-paper-dim">
-        Вы выйдете на этом устройстве. Вернуться можно в любой момент — по почте и паролю.
-      </p>
-      <Button variant="outline" size="sm" className="mt-5" loading={pending} onClick={() => void logout()} icon={<LogOut />}>
-        Выйти
-      </Button>
-      <SessionsRevoke className="mt-7 border-t border-[var(--hairline)] pt-6" />
-    </section>
-  );
-}
-
 function DangerZone() {
   const router = useRouter();
   const toast = useToast();

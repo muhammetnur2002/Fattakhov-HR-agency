@@ -17,9 +17,8 @@ import { cn } from '@/lib/utils';
  * Каркас внутренних экранов.
  *
  * Шапка приклеена и стеклянная: контент проезжает под ней, а не
- * упирается в непрозрачную полосу. На телефоне вкладки уезжают под
- * шапку отдельной строкой — впихнуть их в один ряд с логотипом можно,
- * но тогда всё съедет в нечитаемые 11 пикселей.
+ * упирается в непрозрачную полосу. Навигация стоит между знаком и профилем;
+ * на узких экранах её можно прокрутить, не сжимая кнопки.
  *
  * Плашка «подтвердите почту» живёт здесь, а не на каждой странице: каркас
  * есть у всех экранов кабинета, и забыть её на новой странице нельзя.
@@ -55,13 +54,13 @@ export async function AppShell({
       <header data-site-header className="sticky top-0 z-50 border-b border-[var(--hairline)] bg-ink/70 backdrop-blur-glass before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
         <div
           className={cn(
-            'page-x mx-auto flex h-[var(--header-h)] items-center justify-between gap-4',
+            'page-x mx-auto flex h-[var(--header-h)] items-center justify-between gap-2 sm:gap-4',
             wide ? 'max-w-[100rem]' : 'max-w-6xl',
           )}
         >
-          <Logo href="/" />
+          <Logo href="/" className="min-h-11 min-w-9 shrink-0 justify-center" />
 
-          {nav && <NavTabs items={nav} className="hidden md:flex" />}
+          {nav && <div className="min-w-0 overflow-x-auto no-scrollbar py-2"><NavTabs items={nav} className="w-max" /></div>}
 
           {user ? (
             <UserMenu name={user.name} photoUrl={user.photoUrl} subtitle={user.subtitle} href={user.href} backToCrmUrl={backToCrmUrl} bell={bell} />
@@ -70,11 +69,6 @@ export async function AppShell({
           )}
         </div>
 
-        {nav && (
-          <div className="page-x mx-auto max-w-6xl overflow-x-auto pb-3 no-scrollbar md:hidden">
-            <NavTabs items={nav} className="w-max" />
-          </div>
-        )}
       </header>
 
       <main className={cn('page-x mx-auto w-full flex-1 pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>

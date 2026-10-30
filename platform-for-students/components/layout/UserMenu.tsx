@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, BookOpen, Compass, HelpCircle, LogOut } from 'lucide-react';
+import { ArrowLeftRight, BookOpen, Compass, UserRound, LogOut } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TourController } from '@/components/onboarding/Tour';
 import { springSnappy } from '@/lib/motion';
@@ -12,20 +12,7 @@ import { TOUR_START_EVENT } from '@/lib/tour';
 import { forgetThisDevice } from '@/lib/push/client';
 import { cn } from '@/lib/utils';
 
-/**
- * Карточка пользователя, помощь и выход.
- *
- * Выход виден всегда, а не раскрывается по наведению: на телефоне
- * наведения нет вовсе, а прятать единственное действие за меню из
- * одного пункта — лишний слой ради лишнего слоя.
- *
- * «?» открывает два пункта: повторить инструкцию и страницу помощи. Здесь
- * же живёт сама инструкция — шапка есть на каждом экране кабинета.
- *
- * Карточка ведёт в профиль, только если профиль есть: `href` передаёт
- * лишь кабинет студента. У работодателя и администратора своей анкеты
- * нет, и кликабельное имя вело бы в никуда.
- */
+/** Меню профиля и помощи, доступное с клавиатуры и на телефоне. */
 export function UserMenu({
   name,
   photoUrl,
@@ -48,19 +35,21 @@ export function UserMenu({
   const [pending, setPending] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const helpRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
 
   useEffect(() => {
     if (!helpOpen) return;
-    function onDown(event: MouseEvent) {
+    function onDown(event: PointerEvent) {
       if (helpRef.current && !helpRef.current.contains(event.target as Node)) setHelpOpen(false);
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setHelpOpen(false);
+      if (event.key === 'Escape') { setHelpOpen(false); triggerRef.current?.focus(); }
     }
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     };
   }, [helpOpen]);
@@ -75,11 +64,11 @@ export function UserMenu({
   }
 
   const cardClass =
-    'flex items-center gap-2.5 rounded-full border border-[var(--hairline)] bg-graphite-900/50 py-1 pl-1 pr-3.5 backdrop-blur';
+    'flex items-center gap-2.5 rounded-full border border-[var(--hairline)] bg-graphite-900/50 p-1 lg:pr-3.5 backdrop-blur';
   const card = (
     <>
       <Avatar name={name} src={photoUrl} size={30} />
-      <span className="hidden min-w-0 sm:block">
+      <span className="hidden min-w-0 lg:block">
         <span className="block max-w-[11rem] truncate text-small font-medium leading-tight text-paper">
           {name}
         </span>
@@ -96,20 +85,7 @@ export function UserMenu({
     'grid size-10 shrink-0 place-items-center rounded-full border border-[var(--hairline)] bg-graphite-900/50 text-paper/55 backdrop-blur transition-colors';
 
   return (
-    <div className="flex items-center gap-1.5">
-      {href ? (
-        <Link
-          href={href}
-          title="Профиль"
-          data-tour="profile"
-          className={cn(cardClass, 'transition-colors hover:border-[var(--hairline-strong)] hover:bg-graphite-800/60')}
-        >
-          {card}
-        </Link>
-      ) : (
-        <div className={cardClass}>{card}</div>
-      )}
-
+    <div className="flex shrink-0 items-center gap-1.5">
       {backToCrmUrl && (
         <motion.a
           href={backToCrmUrl}
@@ -124,23 +100,29 @@ export function UserMenu({
         </motion.a>
       )}
 
-      <div ref={helpRef} className="relative">
+      <div ref={helpRef} data-tour="help" className="relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHelpOpen(false); }}>
         <motion.button
+          ref={triggerRef}
           type="button"
           onClick={() => setHelpOpen((value) => !value)}
           whileHover={{ y: -1.5 }}
           whileTap={{ scale: 0.92 }}
           transition={springSnappy}
-          aria-label="Помощь"
+          aria-label="Меню профиля"
+          aria-controls={menuId}
           aria-expanded={helpOpen}
-          title="Помощь"
-          data-tour="help"
-          className={cn(roundButton, 'hover:border-paper/30 hover:text-paper')}
+          title="Профиль и помощь"
+          data-tour="profile"
+          className={cn(cardClass, 'shrink-0 transition-colors hover:border-[var(--hairline-strong)]')}
         >
-          <HelpCircle className="size-4" />
+          {card}
         </motion.button>
         {helpOpen && (
-          <div className="absolute right-0 top-12 z-[60] w-60 rounded-2xl border border-[var(--hairline)] bg-graphite-900 p-1.5 shadow-2xl">
+          <div id={menuId} className="absolute right-0 top-12 z-[60] w-60 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--hairline)] bg-graphite-900 p-1.5 shadow-2xl">
+            {href && <Link href={href} onClick={() => setHelpOpen(false)} className="flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 text-small text-paper hover:bg-paper/[0.06]">
+              <UserRound className="size-4 shrink-0 text-accent-300" aria-hidden />
+              Профиль
+            </Link>}
             <button
               type="button"
               onClick={() => {
@@ -164,7 +146,7 @@ export function UserMenu({
         )}
       </div>
 
-      {bell ?? (
+      {bell ?? (!href && (
         <motion.button
           type="button"
           onClick={logout}
@@ -178,7 +160,7 @@ export function UserMenu({
         >
           <LogOut className="size-4" />
         </motion.button>
-      )}
+      ))}
 
       <TourController />
     </div>
