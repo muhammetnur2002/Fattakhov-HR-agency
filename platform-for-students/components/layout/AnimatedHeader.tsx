@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { NavTabs, type NavItem } from './NavTabs';
 import { UserMenu } from './UserMenu';
 import styles from './AnimatedHeader.module.css';
 
-/** One timeline per page, with no changes to the underlying navigation or session. */
+/** Play once per browser document; client-side navigation keeps the panel assembled. */
 export function AnimatedHeader({ nav, user, bell, backToCrmUrl, wide }: {
   nav: NavItem[];
   user: { name: string; photoUrl?: string | null; subtitle?: string; href?: string };
@@ -15,13 +14,12 @@ export function AnimatedHeader({ nav, user, bell, backToCrmUrl, wide }: {
   backToCrmUrl?: string | null;
   wide: boolean;
 }) {
-  const pathname = usePathname();
-  return <HeaderScene key={pathname} nav={nav} user={user} bell={bell} backToCrmUrl={backToCrmUrl} wide={wide} />;
+  return <HeaderScene nav={nav} user={user} bell={bell} backToCrmUrl={backToCrmUrl} wide={wide} />;
 }
 
 function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof AnimatedHeader>[0]) {
   const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
     const stage = el.querySelector<HTMLElement>('[data-header-stage]')!;
@@ -45,7 +43,11 @@ function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof 
     const animate = (node: HTMLElement, frames: Keyframe[], timing: KeyframeAnimationOptions) => {
       animations.push(node.animate(frames, { fill: 'both', ...timing }));
     };
-    if (media.matches || !el.animate) { finish(); return; }
+    // Employer pages can remount AppShell, unlike the shared student layout.
+    // A document marker survives both cases but resets on a real site reload.
+    const alreadyShown = document.documentElement.dataset.fhrHeaderIntro === 'shown';
+    document.documentElement.dataset.fhrHeaderIntro = 'shown';
+    if (alreadyShown || media.matches || !el.animate) { finish(); return; }
     el.dataset.ready = 'false';
     panel.inert = true;
     logo.inert = true;
