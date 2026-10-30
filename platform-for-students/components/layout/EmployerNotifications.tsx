@@ -12,11 +12,13 @@ export function EmployerNotifications({ applications, unread }: { applications: 
     if (!open) return;
     const outside = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
     const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); root.current?.querySelector('button')?.focus(); } };
+    const focusOutside = (e: FocusEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('focusin', focusOutside);
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', escape);
-    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+    return () => { document.removeEventListener('focusin', focusOutside); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
   }, [open]);
-  return <div ref={root} className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+  return <div ref={root} className="relative">
     <button type="button" data-tour="bell" aria-label="Уведомления" aria-expanded={open} onClick={() => setOpen(!open)} className="relative grid size-10 place-items-center rounded-full text-paper-dim hover:bg-paper/[0.06]">
       <Bell className="size-4" />
       {unread > 0 && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-accent-300" />}

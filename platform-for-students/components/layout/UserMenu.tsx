@@ -46,9 +46,16 @@ export function UserMenu({
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') { setHelpOpen(false); triggerRef.current?.focus(); }
     }
+    // Safari may blur a tapped control with relatedTarget=null before click.
+    // Close only when focus actually arrives outside, never on that transient blur.
+    function onFocus(event: FocusEvent) {
+      if (helpRef.current && !helpRef.current.contains(event.target as Node)) setHelpOpen(false);
+    }
+    document.addEventListener('focusin', onFocus);
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
+      document.removeEventListener('focusin', onFocus);
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     };
@@ -100,7 +107,7 @@ export function UserMenu({
         </motion.a>
       )}
 
-      <div ref={helpRef} data-tour="help" className="relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHelpOpen(false); }}>
+      <div ref={helpRef} data-tour="help" className="relative">
         <motion.button
           ref={triggerRef}
           type="button"
