@@ -57,7 +57,7 @@ export default async function CompanyPage(props: Props) {
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center">
-        <Logo href="/" />
+        <Logo />
       </header>
 
       <main className="page-x mx-auto max-w-3xl pb-24 pt-4">

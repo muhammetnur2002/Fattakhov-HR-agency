@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { HOME_BY_ROLE, SESSION_COOKIE, verifySession } from '@/lib/security/session';
 import { isNoindexPath } from '@/lib/seo-paths';
 import type { Role } from '@/lib/types';
+import { requestedEntryRole } from '@/lib/auth-entry';
 
 /**
  * Разграничение доступа по URL + заголовки безопасности.
@@ -26,6 +27,14 @@ export async function proxy(request: NextRequest) {
   const rule = RULES.find((r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`));
 
   const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+  const entryRole = requestedEntryRole(pathname, request.nextUrl.searchParams.get('role'));
+  if (session && entryRole && session.role !== entryRole) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/switch-account';
+    url.search = '';
+    url.searchParams.set('role', entryRole.toLowerCase());
+    return withSecurityHeaders(NextResponse.redirect(url), pathname);
+  }
 
   if (rule) {
     if (!session) {
@@ -33,6 +42,7 @@ export async function proxy(request: NextRequest) {
       url.pathname = '/login';
       // Куда вернуть после входа: иначе человек всегда попадает на витрину
       url.searchParams.set('next', pathname);
+      if (entryRole) url.searchParams.set('role', entryRole.toLowerCase());
       return withSecurityHeaders(NextResponse.redirect(url), pathname);
     }
     if (!rule.roles.includes(session.role)) {
@@ -43,10 +53,10 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Формы входа и регистрации ведут в кабинет. Лендинг остаётся
-  // доступен и после входа — на него ведёт логотип в шапке.
+  // Saved sessions open their own workspace instead of the landing page.
   if (
-    (pathname === '/login' ||
+    (pathname === '/' ||
+      pathname === '/login' ||
       pathname === '/register' ||
       pathname.startsWith('/register/')) &&
     session

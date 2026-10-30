@@ -14,6 +14,7 @@ export const NOINDEX_PREFIXES: string[] = [
   '/forgot',
   '/reset',
   '/logout',
+  '/switch-account',
   '/feed',
   '/jobs',
   '/applications',

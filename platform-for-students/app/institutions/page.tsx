@@ -35,7 +35,7 @@ export default async function InstitutionsPage() {
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
-        <Logo href="/" />
+        <Logo />
         <div className="flex items-center gap-4">
           <Link href="/institutions/rating" className="text-small text-paper-faint transition-colors hover:text-paper">
             Рейтинг

@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/screens/LoginForm';
 import { isDemoMode } from '@/lib/db';
 import { DEMO_CREDENTIALS } from '@/lib/db/seed-data';
@@ -9,12 +8,7 @@ import { NOINDEX_METADATA } from '@/lib/seo';
 
 export const metadata: Metadata = { title: 'Вход', ...NOINDEX_METADATA };
 
-export default async function LoginPage(props: { searchParams: Promise<{ role?: string }> }) {
-  const searchParams = await props.searchParams;
-  // Работодатель на платформе не входит: его кабинет — в CRM. Сюда его
-  // приводят закладки и старые письма со ссылкой на вход компании
-  const agency = agencySiteUrl();
-  if (searchParams.role === 'employer' && agency) redirect(`${agency}/login`);
+export default async function LoginPage() {
 
   // Подсказка с демо-доступами появляется только там, где база не
   // подключена, — то есть в демонстрационном режиме. На настоящих

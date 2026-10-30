@@ -58,7 +58,7 @@ export function Landing({
     <div className="relative overflow-x-clip">
       <header className="page-x absolute inset-x-0 top-0 z-40 mx-auto flex h-[var(--header-h)] max-w-[2200px] items-center justify-between">
         <div className="rise-in" style={rise(0, -12)}>
-          <Logo href="/" />
+          <Logo />
         </div>
 
         <div className="rise-in flex items-center gap-2" style={rise(0.08, -12)}>
@@ -240,7 +240,7 @@ export function Landing({
 
       <footer className="page-x mx-auto max-w-[2200px] border-t border-[var(--hairline)] py-10">
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-          <Logo href="/" />
+          <Logo />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-small text-paper-faint">
             {/* Сайт агентства — отдельное приложение, поэтому <a>, а не Link */}
             {agencyUrl && (
@@ -248,7 +248,7 @@ export function Landing({
                 Сайт агентства
               </a>
             )}
-            <Link href="/login" className="transition-colors hover:text-paper">
+            <Link href="/login?role=student" className="transition-colors hover:text-paper">
               Вход для студентов
             </Link>
             <Link href="/employer" className="transition-colors hover:text-paper">

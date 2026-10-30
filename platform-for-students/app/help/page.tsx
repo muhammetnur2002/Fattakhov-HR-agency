@@ -112,7 +112,7 @@ export default function HelpPage() {
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
-        <Logo href="/" />
+        <Logo />
         <Link href="/login" className="text-small text-paper-faint transition-colors hover:text-paper">
           Войти
         </Link>

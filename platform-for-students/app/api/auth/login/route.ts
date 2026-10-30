@@ -58,6 +58,13 @@ export async function POST(request: Request) {
       return fail(401, 'Неверная почта или пароль', 'BAD_CREDENTIALS');
     }
 
+    // Check role only after password verification; never issue a different-role session.
+    if (input.role && account.role !== input.role) {
+      return fail(409, input.role === 'EMPLOYER'
+        ? 'Это аккаунт студента. Введите почту и пароль работодателя или выберите вход студента.'
+        : 'Это аккаунт работодателя. Введите почту и пароль студента или выберите вход работодателя.', 'ROLE_MISMATCH');
+    }
+
     let profileId: string | null = null;
     let name = 'Администратор';
     if (account.role === 'EMPLOYER') {

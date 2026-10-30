@@ -1747,19 +1747,41 @@ console.log('Поиск: robots.txt, sitemap.xml, canonical, Open Graph, noindex
     assert.match(sitemap, /buildSitemap\(/);
     for (const code of [robots, sitemap]) assert.match(code, /export const dynamic = 'force-dynamic'/);
   });
-  testAsync('логотип открывает лендинг после входа, а закрытые разделы сохраняют защиту', async () => {
+  testAsync('сохранённый вход открывает кабинет, а закрытые разделы сохраняют защиту', async () => {
     for (const role of ['STUDENT', 'EMPLOYER'] as const) {
       const token = await signSession({ accountId: 'header-test', profileId: null, name: 'Demo', role });
       const headers = { cookie: `${SESSION_COOKIE}=${token}` };
       const landing = await proxy(new NextRequest('http://localhost:3400/', { headers }));
-      assert.equal(landing.headers.get('location'), null);
+      assert.equal(new URL(landing.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
+      const explicitLanding = await proxy(new NextRequest('http://localhost:3400/?landing=1', { headers }));
+      assert.equal(new URL(explicitLanding.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
       const login = await proxy(new NextRequest('http://localhost:3400/login', { headers }));
       assert.equal(new URL(login.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
       const wrongRole = await proxy(new NextRequest(`http://localhost:3400/${role === 'STUDENT' ? 'employer' : 'profile'}`, { headers }));
-      assert.equal(new URL(wrongRole.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
+      assert.equal(new URL(wrongRole.headers.get('location')!).pathname, '/switch-account');
+      assert.equal(new URL(wrongRole.headers.get('location')!).searchParams.get('role'), role === 'STUDENT' ? 'employer' : 'student');
     }
     const guest = await proxy(new NextRequest('http://localhost:3400/profile'));
     assert.equal(new URL(guest.headers.get('location')!).pathname, '/login');
+  });
+  testAsync('выбор другой роли требует подтверждения, своя роль открывает кабинет', async () => {
+    for (const role of ['STUDENT', 'EMPLOYER'] as const) {
+      const token = await signSession({ accountId: 'role-entry-test', profileId: null, name: 'Demo', role });
+      const headers = { cookie: `${SESSION_COOKIE}=${token}` };
+      for (const [path, target] of [['/register', 'STUDENT'], ['/register/company', 'EMPLOYER'], ['/login?role=student', 'STUDENT'], ['/login?role=employer', 'EMPLOYER']] as const) {
+        const response = await proxy(new NextRequest(`http://localhost:3400${path}`, { headers }));
+        const url = new URL(response.headers.get('location')!);
+        assert.equal(url.pathname, target === role ? HOME_BY_ROLE[role] : '/switch-account', path);
+        if (target !== role) assert.equal(url.searchParams.get('role'), target.toLowerCase());
+        assert.equal(response.cookies.get(SESSION_COOKIE), undefined, 'navigation must not sign out');
+      }
+      const admin = await proxy(new NextRequest('http://localhost:3400/admin', { headers }));
+      assert.equal(new URL(admin.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
+    }
+    for (const path of ['/', '/register', '/register/company', '/login?role=employer']) {
+      const response = await proxy(new NextRequest(`http://localhost:3400${path}`));
+      assert.equal(response.headers.get('location'), null, path);
+    }
   });
   testAsync('закрытые разделы закрыты и заголовком X-Robots-Tag из proxy; публичные страницы и карта сайта — нет', async () => {
     for (const prefix of NOINDEX_PREFIXES) {

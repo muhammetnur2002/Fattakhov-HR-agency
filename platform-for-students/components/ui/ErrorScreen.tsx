@@ -76,7 +76,7 @@ export function ErrorScreen({
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="page-x mx-auto flex h-[var(--header-h)] w-full max-w-6xl items-center">
-        <Logo href="/" />
+        <Logo />
       </header>
       {body}
     </div>

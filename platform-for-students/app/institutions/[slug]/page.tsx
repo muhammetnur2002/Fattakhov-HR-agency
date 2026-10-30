@@ -48,7 +48,7 @@ export default async function InstitutionPage(props: Props) {
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
-        <Logo href="/" />
+        <Logo />
         <Link href="/institutions" className="text-small text-paper-faint transition-colors hover:text-paper">
           Все вузы
         </Link>

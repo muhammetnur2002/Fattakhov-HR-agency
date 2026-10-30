@@ -104,7 +104,7 @@ function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof 
   }, []);
 
   return <div ref={root} data-ready="false" data-animated-header className={`${styles.header} ${wide ? styles.wide : ''}`}>
-    <div data-header-logo className={styles.logo}><Logo href="/" className="min-h-11 min-w-9 justify-center" /></div>
+    <div data-header-logo className={styles.logo}><Logo className="min-h-11 min-w-9 justify-center" /></div>
     <div data-header-panel className={styles.panel}>
       <div className={styles.navigation}><NavTabs items={nav} className={styles.tabs} /></div>
       <div className={styles.account}><UserMenu name={user.name} photoUrl={user.photoUrl} subtitle={user.subtitle} href={user.href} backToCrmUrl={backToCrmUrl} bell={bell} /></div>

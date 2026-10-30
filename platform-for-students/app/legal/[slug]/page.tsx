@@ -50,7 +50,7 @@ export default async function LegalPage(props: Props) {
   return (
     <div className="min-h-dvh">
       <header className="page-x mx-auto flex h-[var(--header-h)] max-w-3xl items-center justify-between gap-4">
-        <Logo href="/" />
+        <Logo />
       </header>
 
       <main className="page-x mx-auto max-w-3xl pb-24 pt-4">

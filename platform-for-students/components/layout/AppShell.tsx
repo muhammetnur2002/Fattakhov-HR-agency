@@ -63,7 +63,7 @@ export async function AppShell({
             wide ? 'max-w-[100rem]' : 'max-w-6xl',
           )}
         >
-          <Logo href="/" className="min-h-11 min-w-9 shrink-0 justify-center" />
+          <Logo className="min-h-11 min-w-9 shrink-0 justify-center" />
 
           {nav && <div className="min-w-0 overflow-x-auto no-scrollbar py-2"><NavTabs items={nav} className="w-max" /></div>}
 

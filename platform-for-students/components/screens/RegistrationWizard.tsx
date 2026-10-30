@@ -287,7 +287,7 @@ export function RegistrationWizard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="page-x mx-auto flex h-[var(--header-h)] w-full max-w-2xl items-center justify-between">
-        <Logo href="/" />
+        <Logo />
         <div className="flex items-center gap-3">
           <span className="text-caption tabular-nums text-paper-faint">
             Шаг {step + 1} из {STEP_META.length}

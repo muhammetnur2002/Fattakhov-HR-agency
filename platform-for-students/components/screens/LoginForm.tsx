@@ -1,6 +1,7 @@
 'use client';
 
 import { safeNext } from '@/lib/security/safe-next';
+import { requestedEntryRole } from '@/lib/auth-entry';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -45,6 +46,7 @@ export function LoginForm({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const entryRole = requestedEntryRole('/login', params.get('role'));
   // Employer registration stays on the student platform.
   const employerRegisterUrl = '/register/company';
   const toast = useToast();
@@ -62,7 +64,7 @@ export function LoginForm({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, ...(entryRole && endpoint === '/api/auth/login' ? { role: entryRole } : {}) }),
       });
       const data = (await response.json()) as { redirectTo?: string; error?: string };
 
@@ -101,7 +103,7 @@ export function LoginForm({
         {/* Заголовка на экране нет — его роль играет логотип. Экранному
             диктору без h1 не за что зацепиться: страница звучит как набор
             полей без названия. */}
-        <h1 className="sr-only">Вход в Fattakhov HR Agency</h1>
+        <h1 className={entryRole ? 'mb-6 text-center text-title' : 'sr-only'}>{entryRole === 'EMPLOYER' ? 'Вход работодателя' : entryRole === 'STUDENT' ? 'Вход студента' : 'Вход в Fattakhov HR Agency'}</h1>
 
         {/* Пришли с /logout?reason=stale: сессия ссылалась на аккаунт,
             которого больше нет. Без пояснения человек видит форму входа
@@ -219,11 +221,12 @@ export function LoginForm({
 
         <p className="mt-6 text-center text-small text-paper-faint">
           Ещё нет профиля?{' '}
-          <Link href="/register" className="text-paper underline-offset-4 transition-colors hover:underline">
-            Регистрация студента
+          <Link href={entryRole === 'EMPLOYER' ? employerRegisterUrl : '/register'} className="text-paper underline-offset-4 transition-colors hover:underline">
+            {entryRole === 'EMPLOYER' ? 'Зарегистрировать компанию' : 'Регистрация студента'}
           </Link>
         </p>
-        {employerRegisterUrl && (
+        {entryRole && <p className="mt-3 text-center text-small"><Link href={entryRole === 'EMPLOYER' ? '/login?role=student' : '/login?role=employer'} className="text-paper underline underline-offset-4">{entryRole === 'EMPLOYER' ? 'Войти как студент' : 'Войти как работодатель'}</Link></p>}
+        {entryRole !== 'EMPLOYER' && employerRegisterUrl && (
           <p className="mt-1.5 text-center text-small text-paper-faint">
             Вы работодатель?{' '}
             <a href={employerRegisterUrl} className="text-paper underline-offset-4 transition-colors hover:underline">

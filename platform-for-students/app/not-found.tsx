@@ -6,7 +6,7 @@ export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="page-x mx-auto flex h-[var(--header-h)] w-full max-w-6xl items-center">
-        <Logo href="/" />
+        <Logo />
       </header>
 
       <main className="page-x mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center pb-24 text-center">

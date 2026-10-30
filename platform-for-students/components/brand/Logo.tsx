@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 /**
@@ -17,11 +16,9 @@ import { cn } from '@/lib/utils';
  */
 export function Logo({
   className,
-  href = '/',
   compact = true,
 }: {
   className?: string;
-  href?: string | null;
   compact?: boolean;
 }) {
   const content = compact ? (
@@ -65,15 +62,9 @@ export function Logo({
   );
 
   const classes = cn(
-    'inline-flex items-center transition-opacity duration-300 hover:opacity-75',
+    'inline-flex items-center',
     className,
   );
 
-  if (!href) return <span className={classes}>{content}</span>;
-
-  return (
-    <Link href={href} className={classes} aria-label="Fattakhov HR Agency — на главную">
-      {content}
-    </Link>
-  );
+  return <span className={classes}>{content}</span>;
 }

@@ -275,6 +275,7 @@ export const consentRenewalSchema = z.object({ version: z.string().min(1).max(32
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Введите пароль'),
+  role: z.enum(['STUDENT', 'EMPLOYER']).optional(),
 });
 
 /** Код из письма: пробелы и дефисы, которые люди ставят сами, не мешают. */
