@@ -55,6 +55,7 @@ import { endpointHash, isPublicAddress, pushServiceName } from '../lib/push/guar
 import { PRIVACY, STUDENT_CONSENT, STUDENT_CONSENT_VERSION, needsConsentRenewal } from '../lib/legal';
 import { base64UrlByteLength, isAcceptablePushEndpoint, pushSubscriptionSchema } from '../lib/push/validation';
 import { proxy } from '../proxy';
+import { signSession, SESSION_COOKIE, HOME_BY_ROLE } from '../lib/security/session';
 import { ACCENT_STEP, FONT_BREAKPOINTS, FONT_STEPS, FONT_STEP_CLASSES } from '../lib/type-scale';
 import { cn, initials } from '../lib/utils';
 import {
@@ -1745,6 +1746,20 @@ console.log('Поиск: robots.txt, sitemap.xml, canonical, Open Graph, noindex
     assert.match(robots, /buildRobots\(\)/);
     assert.match(sitemap, /buildSitemap\(/);
     for (const code of [robots, sitemap]) assert.match(code, /export const dynamic = 'force-dynamic'/);
+  });
+  testAsync('логотип открывает лендинг после входа, а закрытые разделы сохраняют защиту', async () => {
+    for (const role of ['STUDENT', 'EMPLOYER'] as const) {
+      const token = await signSession({ accountId: 'header-test', profileId: null, name: 'Demo', role });
+      const headers = { cookie: `${SESSION_COOKIE}=${token}` };
+      const landing = await proxy(new NextRequest('http://localhost:3400/', { headers }));
+      assert.equal(landing.headers.get('location'), null);
+      const login = await proxy(new NextRequest('http://localhost:3400/login', { headers }));
+      assert.equal(new URL(login.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
+      const wrongRole = await proxy(new NextRequest(`http://localhost:3400/${role === 'STUDENT' ? 'employer' : 'profile'}`, { headers }));
+      assert.equal(new URL(wrongRole.headers.get('location')!).pathname, HOME_BY_ROLE[role]);
+    }
+    const guest = await proxy(new NextRequest('http://localhost:3400/profile'));
+    assert.equal(new URL(guest.headers.get('location')!).pathname, '/login');
   });
   testAsync('закрытые разделы закрыты и заголовком X-Robots-Tag из proxy; публичные страницы и карта сайта — нет', async () => {
     for (const prefix of NOINDEX_PREFIXES) {
