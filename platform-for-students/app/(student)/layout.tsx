@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { History, Inbox, Layers, MessageCircle } from 'lucide-react';
+import { History, Inbox, Layers, MessageCircle, Search } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { ConsentRenewalBanner } from '@/components/student/ConsentRenewalBanner';
@@ -64,6 +64,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         // Все вкладки — иконками: с текстом разной длины подложка активной
         // вкладки при переезде между ними меняла ширину, дёргаясь. «Профиль»
         // здесь нет — в него ведёт аватар в шапке.
+        { href: '/jobs', label: 'Поиск работы', icon: <Search className="size-[18px]" aria-hidden />, hideLabel: true },
         { href: '/feed', label: 'Лента', icon: <Layers className="size-[18px]" aria-hidden />, hideLabel: true },
         {
           href: '/applications',

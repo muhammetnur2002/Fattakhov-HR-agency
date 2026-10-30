@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Clock, Layers, List, X, Filter, GraduationCap, MapPin, Search, Users } from 'lucide-react';
+import { Check, Clock, Layers, List, X, Filter, GraduationCap, MapPin, Search } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip, Tag } from '@/components/ui/Chip';
@@ -38,7 +38,8 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const [city, setCity] = useState('');
   const [university, setUniversity] = useState('');
   const inviteLock = useRef(false);
-  const [vacancyId, setVacancyId] = useState(vacancies[0]?.id ?? '');
+  const [vacancyId, setVacancyId] = useState('');
+  const [inviteVacancyId, setInviteVacancyId] = useState('');
   const [loading, setLoading] = useState(true);
   const [pool, setPool] = useState<StudentProfileDTO[]>([]);
   const [decided, setDecided] = useState<Set<string>>(new Set());
@@ -53,17 +54,13 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!vacancyId) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
     setDecided(new Set());
     setSkipped(new Set());
     setInvited(0);
-    fetch(`/api/employer/candidates/${vacancyId}`)
+    fetch(vacancyId ? `/api/employer/candidates/${vacancyId}` : '/api/employer/candidates')
       .then(async (r) => {
         // Статус смотрим до разбора: 401/403/500 раньше превращались в «Кандидаты закончились»
         if (!r.ok) throw new Error(await apiErrorMessage(r, 'Не удалось загрузить кандидатов'));
@@ -94,10 +91,12 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
 
   async function invite(student: StudentProfileDTO) {
     if (inviteLock.current) return;
+    const targetVacancyId = vacancyId || inviteVacancyId;
+    if (!targetVacancyId) { toast.error('Выберите вакансию', 'Укажите, на какую вакансию пригласить кандидата.'); return; }
     inviteLock.current = true;
     setInviting((prev) => new Set(prev).add(student.id));
     try {
-      const response = await fetch(`/api/employer/candidates/${vacancyId}`, {
+      const response = await fetch(`/api/employer/candidates/${targetVacancyId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: student.id }),
@@ -131,27 +130,13 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
   const activeFilters = days.length + genders.length + Number(Boolean(city)) + Number(Boolean(university));
   const swipeCandidates = filtered.filter((s) => !skipped.has(s.id));
 
-  if (vacancies.length === 0) {
-    return (
-      <div className="glass mx-auto flex max-w-[26rem] flex-col items-center gap-4 rounded-4xl p-10 text-center">
-        <Users className="size-10 text-paper-faint" aria-hidden />
-        <div>
-          <h1 className="text-title text-paper">Пока нет вакансий</h1>
-          <p className="mt-2 text-small leading-relaxed text-paper-dim">
-            Кандидатов подбираем под конкретную вакансию — создайте её в разделе «Вакансии», и здесь
-            появится список студентов.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col pb-16">
       <header className="w-full">
         <h1 className="text-headline text-paper">Кандидаты</h1>
         <p className="mt-1.5 text-small text-paper-dim">
-          Студенты, подтверждённые агентством и подходящие на выбранную вакансию.
+          Подтверждённые студенты: смотрите весь каталог или выберите вакансию для приглашения.
         </p>
       </header>
 
@@ -161,14 +146,18 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
       </div>
       <div className="mt-6 w-full">
         <SelectField
-          label="Вакансия"
+          label="Показывать кандидатов"
           disabled={inviting.size > 0}
           value={vacancyId}
           onChange={(e) => setVacancyId(e.target.value)}
-          options={vacancies.map((v) => ({ value: v.id, label: v.title }))}
+          options={[{ value: '', label: 'Все кандидаты' }, ...vacancies.map((v) => ({ value: v.id, label: v.title }))]}
         />
       </div>
 
+      {!vacancyId && <div className="mt-3">
+        <SelectField label="Приглашать на вакансию" value={inviteVacancyId} disabled={inviting.size > 0} onChange={(e) => setInviteVacancyId(e.target.value)} options={[{ value: '', label: 'Выберите вакансию для приглашения' }, ...vacancies.map((v) => ({ value: v.id, label: v.title }))]} />
+        {vacancies.length === 0 && <p className="mt-2 text-small text-paper-dim">Каталог доступен для просмотра. Чтобы приглашать, создайте вакансию.</p>}
+      </div>}
       <div className="mt-3 flex w-full items-center gap-2">
         <div className="relative flex-1">
           <TextField label="Поиск: имя, город, вуз, навык" value={search} onChange={(e) => setSearch(e.target.value)} />

@@ -24,6 +24,7 @@ export default async function FeedPage() {
     // её можно открыть снова кнопкой «?» в шапке
     <FeedViewport>
       <h1 className="sr-only">Лента вакансий</h1>
+      <Link href="/jobs" className="mb-3 text-small text-accent-200 underline underline-offset-4">Поиск вакансий и фильтры</Link>
       {/* Подтверждение учёбы — выше подсказки о профиле: от него зависит,
           дойдут ли отклики до работодателя вообще */}
       {study.status !== 'VERIFIED' && <StudyBanner study={study} />}

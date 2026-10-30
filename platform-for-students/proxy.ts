@@ -13,6 +13,7 @@ import type { Role } from '@/lib/types';
 
 const RULES: Array<{ prefix: string; roles: Role[] }> = [
   { prefix: '/feed', roles: ['STUDENT'] },
+  { prefix: '/jobs', roles: ['STUDENT'] },
   { prefix: '/applications', roles: ['STUDENT'] },
   { prefix: '/skipped', roles: ['STUDENT'] },
   { prefix: '/profile', roles: ['STUDENT'] },

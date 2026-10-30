@@ -546,6 +546,21 @@ function assertCandidateAccess(employer: EmployerRecord | null): asserts employe
   }
 }
 
+/** Общий каталог сохраняет те же правила допуска и скрытия контактов. */
+export async function listAllCandidates(employerId: string): Promise<StudentProfileDTO[]> {
+  const store = await getStore();
+  assertCandidateAccess(await store.employers.findById(employerId));
+  const students = await store.students.list();
+  return students.filter((s) => s.studyVerified && s.status !== 'PAUSED' && s.status !== 'PLACED')
+    .map((s) => ({ ...toStudentDTO(s, '', { includeContacts: false }), photoUrl: null, resumeUrl: null }));
+}
+
+export async function buildJobCatalogue(studentId: string): Promise<VacancyDTO[]> {
+  const store = await getStore();
+  const [student, vacancies, employers] = await Promise.all([store.students.findById(studentId), store.vacancies.listActive(), employerIndex()]);
+  return vacancies.map((v) => toVacancyDTO(v, employers.get(v.employerId) ?? null, scoreMatch(student, v)));
+}
+
 export async function listCandidatesForVacancy(
   employerId: string,
   vacancyId: string,
@@ -563,7 +578,7 @@ export async function listCandidatesForVacancy(
 
   const eligible = students.filter(
     (s) => s.studyVerified && s.status !== 'PAUSED' && s.status !== 'PLACED' && !decided.has(s.id),
-  );
+  ).sort((a, b) => scoreMatch(b, vacancy).score - scoreMatch(a, vacancy).score);
 
   return {
     vacancy: { id: vacancy.id, title: vacancy.title },
