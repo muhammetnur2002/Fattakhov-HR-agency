@@ -122,7 +122,7 @@ export default function HelpPage() {
         <h1 className="text-headline text-paper">Помощь</h1>
         <p className="mt-2.5 max-w-[56ch] text-body leading-relaxed text-paper-dim">
           Как устроена платформа для студентов, компаний и HR-менеджера агентства. Внутри кабинета эта
-          страница и короткая инструкция — под кнопкой «?» в шапке.
+          страница и короткая инструкция — в меню профиля в шапке.
         </p>
         <div className="mt-5">
           <ShowTourButton />
