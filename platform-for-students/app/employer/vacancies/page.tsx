@@ -19,7 +19,7 @@ export default async function EmployerVacanciesPage() {
   ]);
 
   return (
-    <AppShell
+    <AppShell panel
       user={{ name: employer.companyName, subtitle: employer.contactName, href: '/employer/company' }}
       nav={employerNav(board.applications.length, unread)}
     >

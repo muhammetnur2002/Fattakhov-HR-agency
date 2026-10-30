@@ -1,5 +1,6 @@
 'use client';
 
+import { ListPanel } from '@/components/layout/ListPanel';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock3, Pencil, Plus, Send, Trash2, TriangleAlert } from 'lucide-react';
@@ -113,8 +114,8 @@ export function EmployerVacancies({
   );
 
   return (
-    <div className="mx-auto w-full max-w-[52rem]">
-      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <ListPanel className="mx-auto w-full max-w-[52rem]" toolbar={<>
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
           <h1 className="mt-3 text-headline text-paper">Вакансии</h1>
@@ -126,6 +127,7 @@ export function EmployerVacancies({
         </div>
         {vacancies.length > 0 && newButton}
       </header>
+      </>}>
 
       {companyStatus !== 'APPROVED' && (
         <div className="mb-6 rounded-2xl border border-warn/35 bg-warn/[0.08] p-4 text-small leading-relaxed">
@@ -259,6 +261,6 @@ export function EmployerVacancies({
           })}
         </ul>
       )}
-    </div>
+    </ListPanel>
   );
 }

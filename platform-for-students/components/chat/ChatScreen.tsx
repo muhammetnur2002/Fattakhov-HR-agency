@@ -1,5 +1,6 @@
 'use client';
 
+import { ListPanel } from '@/components/layout/ListPanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessagesSquare, Search } from 'lucide-react';
@@ -174,7 +175,7 @@ export function ChatScreen({
       // На телефоне — экран приложения: без рамки и скруглений, на всю ширину
       // и весь остаток высоты (см. useAppViewport). Карточка с двумя колонками —
       // только на широком экране.
-      className="-mx-[var(--page-gutter)] grid grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem] lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl"
+      className={cn("-mx-[var(--page-gutter)] grid min-h-0 grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl", viewerRole === 'EMPLOYER' ? 'h-full' : 'lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem]')}
     >
       {/* ---------- список ---------- */}
       <aside
@@ -183,6 +184,7 @@ export function ChatScreen({
           activeId ? 'hidden lg:flex' : 'flex',
         )}
       >
+        <ListPanel toolbar={<>
         <div className="flex items-baseline justify-between px-4 pb-3 pt-4">
           {/* Единственный заголовок раздела — страница сама его не
               дублирует (см. app/(student)/messages/page.tsx) */}
@@ -248,7 +250,8 @@ export function ChatScreen({
           </>
         )}
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+        </>}>
+        <div className="space-y-2 px-3 pb-3">
           {threads.length === 0 ? (
             <p className="px-3 py-10 text-center text-small leading-relaxed text-paper-faint">
               Диалогов пока нет. Они появятся, когда вы откликнетесь на вакансию и работодатель
@@ -270,6 +273,7 @@ export function ChatScreen({
             ))
           )}
         </div>
+        </ListPanel>
       </aside>
 
       {/* ---------- диалог ---------- */}

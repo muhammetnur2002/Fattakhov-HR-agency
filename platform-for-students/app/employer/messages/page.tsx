@@ -31,7 +31,7 @@ export default async function EmployerMessagesPage(
   const thread = valid ? await getThread(valid, viewer) : null;
 
   return (
-    <AppShell
+    <AppShell panel
       user={{ name: employer.companyName, subtitle: employer.contactName, href: '/employer/company' }}
       nav={nav}
     >

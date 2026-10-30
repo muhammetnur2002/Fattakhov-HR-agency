@@ -30,6 +30,7 @@ export async function AppShell({
   user,
   children,
   wide = false,
+  panel = false,
   bell,
   notice,
 }: {
@@ -37,6 +38,7 @@ export async function AppShell({
   user?: { name: string; photoUrl?: string | null; subtitle?: string; href?: string };
   children: React.ReactNode;
   wide?: boolean;
+  panel?: boolean;
   /** Кнопка справа в шапке вместо «Выйти» (колокольчик студента) */
   bell?: React.ReactNode;
   /** Плашка над содержимым, которая не пропадает при переходах между разделами (обновлённое согласие) */
@@ -47,13 +49,13 @@ export async function AppShell({
   const backToCrmUrl = await backToCrm(session);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div data-panel-shell={panel || undefined} className={cn("flex flex-col", panel ? "h-dvh overflow-hidden" : "min-h-dvh")}>
       {/*
         before: сплошная полоса над шапкой. В iOS Safari страница рисуется и под
         статус-баром, а липкая шапка встаёт ниже него — без полосы содержимое (фото
         студента и т.п.) просвечивало над шапкой при прокрутке.
       */}
-      <header data-site-header className="sticky top-0 z-50 border-b border-[var(--hairline)] bg-ink/70 backdrop-blur-glass before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
+      <header data-site-header className="sticky top-0 z-50 shrink-0 border-b border-[var(--hairline)] bg-ink before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
         {nav && user && (session?.role === 'STUDENT' || session?.role === 'EMPLOYER') ? (
           <AnimatedHeader nav={nav} user={user} wide={wide} backToCrmUrl={backToCrmUrl}
             bell={bell ?? (session.role === 'EMPLOYER' ? <EmployerNotifications applications={nav.find(item => item.href === '/employer')?.badge ?? 0} unread={nav.find(item => item.href === '/employer/messages')?.badge ?? 0} /> : undefined)} />
@@ -76,7 +78,7 @@ export async function AppShell({
 
       </header>
 
-      <main className={cn('page-x mx-auto w-full flex-1 pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
+      <main className={cn('page-x mx-auto w-full flex-1', panel ? 'flex min-h-0 flex-col overflow-hidden' : 'pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
         {unverifiedEmail && <EmailVerifyBanner email={unverifiedEmail} />}
         {notice}
         {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && (
@@ -86,7 +88,7 @@ export async function AppShell({
             человек может сидеть в ленте, пока собеседник смотрит на его
             статус в диалоге. Ничего не рисует */}
         {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && <PresencePulse />}
-        <PageTransition>{children}</PageTransition>
+        {panel ? <div className="min-h-0 flex-1 overflow-hidden">{children}</div> : <PageTransition>{children}</PageTransition>}
       </main>
     </div>
   );

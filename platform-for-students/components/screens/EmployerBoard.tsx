@@ -1,5 +1,6 @@
 'use client';
 
+import { ListPanel } from '@/components/layout/ListPanel';
 import { PortfolioView } from '@/components/student/PortfolioView';
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -123,8 +124,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
 
   if (applications.length === 0) {
     return (
-      <>
-        <BoardHeader company={board.company} total={0} fresh={0} vacancies={board.vacancies.length} />
+      <ListPanel toolbar={<BoardHeader company={board.company} total={0} fresh={0} vacancies={board.vacancies.length} />}>
         <EmptyState
           title="Откликов пока нет"
           description="Как только студент смахнёт вашу вакансию вправо, его профиль появится здесь — с фото, контактами и резюме."
@@ -134,12 +134,12 @@ export function EmployerBoard({ board }: { board: BoardData }) {
             </ButtonLink>
           }
         />
-      </>
+      </ListPanel>
     );
   }
 
   return (
-    <>
+    <ListPanel toolbar={<>
       <BoardHeader
         company={board.company}
         total={applications.length}
@@ -164,6 +164,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
         ))}
       </div>
 
+      </>}>
       <Stagger className="grid gap-3 [&>*]:min-w-0" each={0.05} inView={false}>
         {visible.map((application) => (
           <Reveal key={application.id} variants={fadeUp}>
@@ -211,7 +212,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
           Уведомление отозвать нельзя; сам статус при необходимости можно будет поменять.
         </p>
       </Dialog>
-    </>
+    </ListPanel>
   );
 }
 

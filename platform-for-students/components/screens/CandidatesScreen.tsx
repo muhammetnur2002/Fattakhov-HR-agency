@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Clock, Layers, List, X, Filter, GraduationCap, MapPin, Search } from 'lucide-react';
+import { ListPanel } from '@/components/layout/ListPanel';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip, Tag } from '@/components/ui/Chip';
@@ -138,7 +139,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
 
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col pb-16">
+    <ListPanel key={view} fixed={view === 'swipe'} className="mx-auto w-full max-w-2xl" toolbar={<>
       <header className="w-full">
         <h1 className="text-headline text-paper">Кандидаты</h1>
         <p className="mt-1.5 text-small text-paper-dim">
@@ -233,27 +234,28 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
         )}
       </AnimatePresence>
 
+      </>}>
       {invited > 0 && (
         <p className="mt-5 text-caption tabular-nums text-paper-faint">Приглашено сейчас: {invited}</p>
       )}
 
 
       {!loading && !loadError && view === 'swipe' && filtered.length > 0 && (
-        <div className="mt-5">
-          <p className="mb-4 text-small text-paper-dim">Вправо — пригласить. Влево — посмотреть позже.</p>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <p className="mb-2 text-small text-paper-dim">Вправо — пригласить. Влево — посмотреть позже.</p>
           {swipeCandidates[0] ? (
-            <motion.div key={`${vacancyId}:${swipeCandidates[0].id}`} drag={inviting.size ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.7} style={{ touchAction: 'pan-y' }} onDragEnd={(_, info) => {
+            <motion.div className="flex min-h-0 flex-1 flex-col" key={`${vacancyId}:${swipeCandidates[0].id}`} drag={inviting.size ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.7} style={{ touchAction: 'pan-y' }} onDragEnd={(_, info) => {
               if (inviteLock.current) return;
               if (info.offset.x > SWIPE.distanceThreshold) void invite(swipeCandidates[0]);
               else if (info.offset.x < -SWIPE.distanceThreshold) setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id));
             }}>
               <CandidateRow student={swipeCandidates[0]} inviting={inviting.size > 0} onInvite={() => invite(swipeCandidates[0])} onOpen={() => setDetail(swipeCandidates[0])} card />
-              <div className="mt-4 flex justify-center"><Button variant="outline" disabled={inviting.size > 0} icon={<X />} onClick={() => setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id))}>Позже</Button></div>
+              <div className="mt-2 flex shrink-0 justify-center"><Button size="sm" variant="outline" disabled={inviting.size > 0} icon={<X />} onClick={() => setSkipped((prev) => new Set(prev).add(swipeCandidates[0].id))}>Позже</Button></div>
             </motion.div>
           ) : <EmptyState title="Все карточки просмотрены" description="Отложенные кандидаты остаются в списке." action={<Button onClick={() => setSkipped(new Set())}>Посмотреть снова</Button>} />}
         </div>
       )}
-      <div className="mt-5 w-full space-y-2.5">
+      <div className={view === 'swipe' ? 'contents' : 'w-full space-y-2.5'}>
         {loading && (
           <div className="glass-card flex h-40 items-center justify-center rounded-3xl text-paper-faint">
             Загружаем кандидатов…
@@ -306,7 +308,7 @@ export function CandidatesScreen({ vacancies }: { vacancies: EmployerVacancyDTO[
           <Button disabled={!inviteVacancyId || inviting.size > 0} loading={inviting.size > 0} onClick={() => { if (inviteStudent) void invite(inviteStudent, inviteVacancyId); }}>Отправить приглашение</Button>
         </div>
       </Dialog>
-    </div>
+    </ListPanel>
   );
 }
 
@@ -330,7 +332,7 @@ function CandidateRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 24, transition: { duration: 0.18 } }}
       transition={springSoft}
-      className={cn('glass-card flex flex-col gap-3 rounded-2xl p-4', card ? 'mx-auto min-h-80 max-w-md justify-between' : 'sm:flex-row sm:items-center')}
+      className={cn('glass-card flex flex-col gap-3 rounded-2xl p-4', card ? 'mx-auto min-h-0 w-full max-w-md flex-1 justify-between overflow-y-auto' : 'sm:flex-row sm:items-center')}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3.5">
         <Avatar name={student.fullName} src={student.photoUrl} size={52} />
