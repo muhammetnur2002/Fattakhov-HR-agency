@@ -19,6 +19,8 @@ export function SwipeApplication({ children, open, onToggle, busy, disabled, onC
   const [confirm, setConfirm] = useState(false);
   const gesture = useRef<{ x: number; y: number; start: number; axis: 'x' | 'y' | null } | null>(null);
   const suppressClick = useRef(false);
+  const translateX = offset ?? (open ? -ACTION_WIDTH : 0);
+  const transitionDuration = offset === null ? undefined : '0ms';
 
   function end(event: PointerEvent<HTMLDivElement>, cancelled = false) {
     if (gesture.current?.axis === 'x') {
@@ -33,12 +35,12 @@ export function SwipeApplication({ children, open, onToggle, busy, disabled, onC
     <div className="relative isolate min-w-0 overflow-hidden rounded-3xl" data-swipe-application data-open={open}>
       <button type="button" aria-label="Отменить отклик" disabled={disabled} tabIndex={open ? 0 : -1}
         aria-hidden={!open} onClick={() => setConfirm(true)}
-        className="absolute inset-y-0 right-0 flex w-[104px] flex-col items-center justify-center gap-2 rounded-r-3xl bg-red-700 px-3 text-center text-caption font-medium text-white disabled:opacity-50"
-        style={{ visibility: open || (offset !== null && offset < 0) ? 'visible' : 'hidden' }}>
+        className="absolute inset-y-0 right-0 flex w-[104px] flex-col items-center justify-center gap-2 rounded-3xl bg-red-700 px-3 text-center text-caption font-medium text-white transition-transform duration-200 motion-reduce:transition-none disabled:opacity-50"
+        style={{ transform: `translateX(${ACTION_WIDTH + translateX}px)`, transitionDuration, pointerEvents: open ? 'auto' : 'none' }}>
         <Trash2 className="size-5" aria-hidden />Отменить отклик
       </button>
       <div className="relative touch-pan-y select-none transition-transform duration-200 motion-reduce:transition-none"
-        style={{ transform: `translateX(${offset ?? (open ? -ACTION_WIDTH : 0)}px)`, transitionDuration: offset === null ? undefined : '0ms' }}
+        style={{ transform: `translateX(${translateX}px)`, transitionDuration }}
         onPointerDown={(event) => {
           suppressClick.current = false;
           if (disabled || !event.isPrimary || event.button !== 0) return;
