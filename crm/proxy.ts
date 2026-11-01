@@ -61,6 +61,8 @@ const PUBLIC_PREFIXES = [
   // редирект на вход вместо карты сайта означает, что сайта
   // в выдаче не будет вовсе
   "/robots.txt",
+  // Public copyright and license notice for the bundled Inter font.
+  "/fonts/OFL.txt",
   "/sitemap.xml",
   "/api/auth",
   // Календарные ссылки открываются без сессии намеренно: за ними ходит
