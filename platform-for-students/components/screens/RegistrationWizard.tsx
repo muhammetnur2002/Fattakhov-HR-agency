@@ -277,6 +277,7 @@ export function RegistrationWizard() {
   }
 
   function onVerified(data: { redirectTo?: string }) {
+    delete document.documentElement.dataset.fhrHeaderIntro;
     setPending(null);
     setDone(true);
     // Пауза ради галочки: она подтверждает, что данные приняты,

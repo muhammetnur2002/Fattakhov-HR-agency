@@ -30,9 +30,11 @@ function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof 
     const timers: ReturnType<typeof setTimeout>[] = [];
     const media = matchMedia('(prefers-reduced-motion: reduce)');
     let finished = false;
+    let disposed = false;
     function finish() {
       if (finished) return;
       finished = true;
+      if (!disposed) document.documentElement.dataset.fhrHeaderIntro = 'shown';
       timers.forEach(clearTimeout);
       animations.forEach(a => a.cancel());
       stage.replaceChildren();
@@ -46,7 +48,6 @@ function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof 
     // Employer pages can remount AppShell, unlike the shared student layout.
     // A document marker survives both cases but resets on a real site reload.
     const alreadyShown = document.documentElement.dataset.fhrHeaderIntro === 'shown';
-    document.documentElement.dataset.fhrHeaderIntro = 'shown';
     if (alreadyShown || media.matches || !el.animate) { finish(); return; }
     el.dataset.ready = 'false';
     panel.inert = true;
@@ -97,6 +98,7 @@ function HeaderScene({ nav, user, bell, backToCrmUrl, wide }: Parameters<typeof 
     window.addEventListener('resize', finish);
     media.addEventListener('change', finish);
     return () => {
+      disposed = true;
       finish();
       window.removeEventListener('resize', finish);
       media.removeEventListener('change', finish);

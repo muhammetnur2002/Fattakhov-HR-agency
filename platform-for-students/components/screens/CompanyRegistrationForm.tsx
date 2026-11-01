@@ -108,6 +108,7 @@ export function CompanyRegistrationForm() {
   }
 
   function onVerified(data: { redirectTo?: string }) {
+    delete document.documentElement.dataset.fhrHeaderIntro;
     router.push(data.redirectTo ?? '/employer/company');
     router.refresh();
   }

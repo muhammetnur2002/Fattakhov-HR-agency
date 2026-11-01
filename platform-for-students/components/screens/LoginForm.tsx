@@ -74,6 +74,7 @@ export function LoginForm({
       }
 
       // «next» из middleware: вернуть человека туда, куда он шёл
+      delete document.documentElement.dataset.fhrHeaderIntro;
       const next = params.get('next');
       router.push(safeNext(next) ?? safeNext(data.redirectTo) ?? '/');
       router.refresh();
