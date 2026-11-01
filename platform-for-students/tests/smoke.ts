@@ -573,13 +573,13 @@ async function main() {
   // ---------- Переписка ----------
   console.log('\nПереписка');
 
-  // Свежий отклик: работодатель ещё не отреагировал, писать нельзя
+  // Свежий отклик: студент может начать разговор после отправки отклика
   const freshThreads = await student.request('/api/messages');
   const freshThread = freshThreads.body.threads?.[0];
   check('диалог заведён на отклик', !!freshThread, freshThreads.body);
   check(
-    'по новому отклику студенту писать нельзя',
-    freshThread?.canWrite === false && typeof freshThread?.lockedReason === 'string',
+    'по новому отклику студент может написать',
+    freshThread?.canWrite === true && freshThread?.lockedReason === null,
     freshThread,
   );
 
@@ -587,7 +587,7 @@ async function main() {
     const blocked = await student.post(`/api/messages/${freshThread.applicationId}`, {
       body: 'Здравствуйте, очень хочу у вас работать!',
     });
-    check('блокировка держится на сервере, а не только в вёрстке', blocked.status === 403, blocked.body);
+    check('сервер принимает первое сообщение студента', blocked.status === 201, blocked.body);
   }
 
   // Работодатель открывает диалог первым

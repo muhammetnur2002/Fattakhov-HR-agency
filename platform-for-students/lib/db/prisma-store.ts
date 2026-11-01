@@ -627,13 +627,17 @@ export function createPrismaStore(): DataStore {
         prisma.swipe.upsert({
           where: { studentId_vacancyId: { studentId, vacancyId } },
           create: { studentId, vacancyId, direction },
-          update: { direction, createdAt: new Date() },
+          update: { direction, dismissed: false, createdAt: new Date() },
         }),
       listByStudent: (studentId, direction) =>
         prisma.swipe.findMany({
-          where: { studentId, ...(direction ? { direction } : {}) },
+          where: { studentId, ...(direction ? { direction } : {}), ...(direction === 'LEFT' ? { dismissed: false } : {}) },
           orderBy: { createdAt: 'desc' },
         }),
+      async dismiss(studentId, vacancyId) {
+        const result = await prisma.swipe.updateMany({ where: { studentId, vacancyId, direction: 'LEFT' }, data: { dismissed: true } });
+        return result.count > 0;
+      },
       async remove(studentId, vacancyId) {
         await prisma.swipe.deleteMany({ where: { studentId, vacancyId } });
       },

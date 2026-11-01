@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, MapPin, Undo2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { SwipeApplication } from './SwipeApplication';
+import { Dialog } from '@/components/ui/Dialog';
+import { apiErrorMessage } from '@/lib/api-client';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -26,8 +29,45 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
   const [list, setList] = useState(items);
   const [detail, setDetail] = useState<VacancyDTO | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const lock = useRef(false);
+  const [opened, setOpened] = useState<{ id: string; action: 'cancel' | 'chat' } | null>(null);
+  const [chatItem, setChatItem] = useState<SkippedDTO | null>(null);
+
+  async function dismiss(item: SkippedDTO) {
+    if (lock.current) return;
+    lock.current = true; setPending(item.id);
+    try {
+      const response = await fetch('/api/skipped', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacancyId: item.vacancy.id }) });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'Попробуйте ещё раз'));
+      setList((current) => current.filter((i) => i.id !== item.id));
+      toast.success('Вакансия удалена из пропущенных', 'В ленте она больше не появится.');
+      router.refresh();
+    } catch (error) { toast.error('Не удалось удалить вакансию', error instanceof Error ? error.message : 'Попробуйте ещё раз'); }
+    finally { lock.current = false; setPending(null); }
+  }
+
+  async function applyAndChat() {
+    if (!chatItem || lock.current) return;
+    lock.current = true; setPending(chatItem.id);
+    try {
+      const response = await fetch('/api/swipes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vacancyId: chatItem.vacancy.id, direction: 'RIGHT' }) });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'Попробуйте ещё раз'));
+      const data = await response.json();
+      setChatItem(null);
+      if (data.pending) {
+        toast.success('Отклик сохранён', 'Чат появится после подтверждения учёбы, почты и профиля.');
+        router.push('/applications');
+      } else if (data.applicationId) {
+        router.push(`/messages?thread=${encodeURIComponent(data.applicationId)}`);
+      }
+      router.refresh();
+    } catch (error) { toast.error('Не удалось открыть чат', error instanceof Error ? error.message : 'Попробуйте ещё раз'); }
+    finally { lock.current = false; setPending(null); }
+  }
 
   async function restore(item: SkippedDTO) {
+    if (lock.current) return;
+    lock.current = true;
     setPending(item.id);
     // Убираем сразу: карточка уезжает, пока летит запрос
     setList((current) => current.filter((i) => i.id !== item.id));
@@ -45,6 +85,7 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
       setList((current) => [item, ...current]);
       toast.error('Не удалось вернуть вакансию', 'Попробуйте ещё раз');
     } finally {
+      lock.current = false;
       setPending(null);
     }
   }
@@ -76,7 +117,7 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
       <motion.div layout className="grid gap-3">
         <AnimatePresence initial={false} mode="popLayout">
           {list.map((item) => (
-            <motion.article
+            <motion.div
               key={item.id}
               layout
               initial={{ opacity: 0, y: 14 }}
@@ -86,8 +127,10 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
               // min-w-0 обязателен: у элемента грида ширина по умолчанию не
               // может стать меньше содержимого, и строка распирает страницу
               // по горизонтали на узком экране
-              className="surface flex min-w-0 items-center gap-4 rounded-3xl p-4 pr-3 sm:p-5 sm:pr-4"
+              className="min-w-0"
             >
+              <SwipeApplication open={opened?.id === item.id ? opened.action : null} onToggle={(action) => setOpened(action ? { id: item.id, action } : null)} busy={pending === item.id} disabled={pending !== null} onCancel={() => dismiss(item)} onChat={() => setChatItem(item)} deleteLabel="Удалить" deleteDescription="Вакансия исчезнет из пропущенных и больше не появится в ленте. Отклик не отправляется.">
+              <div className="surface flex min-w-0 items-center gap-4 rounded-3xl p-4 pr-3 sm:p-5 sm:pr-4">
               <button
                 type="button"
                 onClick={() => setDetail(item.vacancy)}
@@ -121,16 +164,24 @@ export function SkippedList({ items }: { items: SkippedDTO[] }) {
                 size="sm"
                 icon={<Undo2 />}
                 loading={pending === item.id}
+                disabled={pending !== null}
+                aria-label="Вернуть вакансию в ленту"
                 onClick={() => void restore(item)}
                 className="shrink-0"
               >
                 <span className="hidden sm:inline">Вернуть</span>
               </Button>
-            </motion.article>
+            </div>
+              </SwipeApplication>
+            </motion.div>
           ))}
         </AnimatePresence>
       </motion.div>
 
+      <Dialog open={chatItem !== null} title="Откликнуться и открыть чат?" onClose={() => { if (!pending) setChatItem(null); }}
+        footer={<><Button variant="ghost" disabled={pending !== null} onClick={() => setChatItem(null)}>Остаться</Button><Button loading={pending !== null} disabled={pending !== null} onClick={applyAndChat}>Откликнуться и в чат</Button></>}>
+        <p className="text-small text-paper-dim">Работодатель получит ваш отклик на «{chatItem?.vacancy.title}» и доступ к профилю. Вакансия переместится из пропущенных в «Мои отклики».</p>
+      </Dialog>
       <VacancyDetail vacancy={detail} onClose={() => setDetail(null)} />
     </>
   );

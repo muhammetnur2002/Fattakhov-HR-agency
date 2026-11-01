@@ -237,6 +237,7 @@ export interface SwipeRecord {
   studentId: string;
   vacancyId: string;
   direction: SwipeDirection;
+  dismissed?: boolean;
   createdAt: Date;
 }
 
@@ -782,6 +783,7 @@ export interface DataStore {
   swipes: {
     create(input: { studentId: string; vacancyId: string; direction: SwipeDirection }): Promise<SwipeRecord>;
     listByStudent(studentId: string, direction?: SwipeDirection): Promise<SwipeRecord[]>;
+    dismiss(studentId: string, vacancyId: string): Promise<boolean>;
     remove(studentId: string, vacancyId: string): Promise<void>;
     swipedVacancyIds(studentId: string): Promise<string[]>;
     countByDirection(): Promise<{ right: number; left: number }>;

@@ -1162,6 +1162,7 @@ export async function createMemoryStore(): Promise<DataStore> {
         const existing = t.swipes.find((s) => s.studentId === studentId && s.vacancyId === vacancyId);
         if (existing) {
           existing.direction = direction as SwipeDirection;
+          existing.dismissed = false;
           existing.createdAt = now();
           return clone(existing);
         }
@@ -1178,9 +1179,15 @@ export async function createMemoryStore(): Promise<DataStore> {
       async listByStudent(studentId, direction) {
         return clone(
           t.swipes
-            .filter((s) => s.studentId === studentId && (!direction || s.direction === direction))
+            .filter((s) => s.studentId === studentId && (!direction || s.direction === direction) && (direction !== 'LEFT' || !s.dismissed))
             .sort((a, b) => +b.createdAt - +a.createdAt),
         );
+      },
+      async dismiss(studentId, vacancyId) {
+        const swipe = t.swipes.find((s) => s.studentId === studentId && s.vacancyId === vacancyId && s.direction === 'LEFT');
+        if (!swipe) return false;
+        swipe.dismissed = true;
+        return true;
       },
       async remove(studentId, vacancyId) {
         const idx = t.swipes.findIndex((s) => s.studentId === studentId && s.vacancyId === vacancyId);

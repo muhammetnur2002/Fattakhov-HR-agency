@@ -490,6 +490,7 @@ model Swipe {
   vacancy   Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
 
   direction SwipeDirection
+  dismissed Boolean        @default(false)
   createdAt DateTime       @default(now())
 
   @@unique([studentId, vacancyId])

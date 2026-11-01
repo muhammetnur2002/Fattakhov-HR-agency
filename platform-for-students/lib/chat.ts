@@ -46,25 +46,16 @@ export function viewerFromSession(session: SessionUser | null): Viewer | null {
 /**
  * Можно ли писать прямо сейчас.
  *
- * Диалог открывает работодатель. Пока он не отреагировал на отклик,
- * письмо студента было бы монологом в пустоту, а у компании с сотней
- * откликов — потоком спама. После отказа переписка со стороны студента
- * закрывается: решение принято, и спорить с ним в чате незачем.
+ * После отправки отклика студент может начать разговор сам.
+ * После отказа переписка со стороны студента остаётся только для чтения.
  */
 function writePermission(
   status: ApplicationStatus,
   role: MessageAuthor,
-  employerWrote: boolean,
 ): { canWrite: boolean; lockedReason: string | null } {
   if (role === 'EMPLOYER') return { canWrite: true, lockedReason: null };
   if (status === 'REJECTED') {
     return { canWrite: false, lockedReason: 'Работодатель закрыл отклик — переписка в архиве' };
-  }
-  if (status === 'NEW' && !employerWrote) {
-    return {
-      canWrite: false,
-      lockedReason: 'Работодатель ещё не открыл отклик. Написать можно, когда он ответит',
-    };
   }
   return { canWrite: true, lockedReason: null };
 }
@@ -124,10 +115,9 @@ function buildSummary(
   viewer: Viewer,
   last: MessageRecord | undefined,
   unread: number,
-  employerWrote: boolean,
 ): ThreadSummaryDTO {
   const { application, vacancy, student, employer } = ctx;
-  const permission = writePermission(application.status, viewer.role, employerWrote);
+  const permission = writePermission(application.status, viewer.role);
 
   // Собеседник — всегда противоположная сторона: студент видит компанию,
   // компания видит человека
@@ -191,13 +181,7 @@ export async function listThreads(viewer: Viewer): Promise<ThreadSummaryDTO[]> {
     const ctx = await loadContext(application.id, viewer);
     if (!ctx) continue;
     const last = lastByApp[application.id];
-    // Достаточно знать, что работодатель писал хоть раз: подтягивать всю
-    // ветку ради одного флага на каждый диалог — лишние запросы
-    const employerWrote = last
-      ? last.author === 'EMPLOYER' ||
-        (await store.messages.listByApplication(application.id)).some((m) => m.author === 'EMPLOYER')
-      : false;
-    out.push(buildSummary(ctx, viewer, last, unread[application.id] ?? 0, employerWrote));
+    out.push(buildSummary(ctx, viewer, last, unread[application.id] ?? 0));
   }
 
   return out.sort((a, b) => {
@@ -212,9 +196,8 @@ export async function getThread(applicationId: string, viewer: Viewer): Promise<
   if (!ctx) return null;
 
   const messages = await ctx.store.messages.listByApplication(applicationId);
-  const employerWrote = messages.some((m) => m.author === 'EMPLOYER');
   const unread = messages.filter((m) => m.author !== viewer.role && !m.readAt).length;
-  const summary = buildSummary(ctx, viewer, messages[messages.length - 1], unread, employerWrote);
+  const summary = buildSummary(ctx, viewer, messages[messages.length - 1], unread);
 
   return { ...summary, messages: messages.map((m) => toMessageDTO(m, viewer.role)) };
 }
@@ -247,12 +230,7 @@ export async function postMessage(
   const ctx = await loadContext(applicationId, viewer);
   if (!ctx) return null;
 
-  const messages = await ctx.store.messages.listByApplication(applicationId);
-  const permission = writePermission(
-    ctx.application.status,
-    viewer.role,
-    messages.some((m) => m.author === 'EMPLOYER'),
-  );
+  const permission = writePermission(ctx.application.status, viewer.role);
   // Право писать проверяется здесь, а не только кнопкой в интерфейсе:
   // заблокированную кнопку обходит любой, кто откроет консоль
   if (!permission.canWrite) {
