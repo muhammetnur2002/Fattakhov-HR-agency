@@ -51,6 +51,8 @@ export interface AccountRecord {
    * null — пароль не менялся с момента заведения (метка для старых записей не нужна).
    */
   passwordChangedAt: Date | null;
+  /** Strict security revocation, independent of password-change clock tolerance. */
+  sessionsRevokedAt?: Date | null;
 }
 
 export interface StudentRecord extends StudentPortfolio {

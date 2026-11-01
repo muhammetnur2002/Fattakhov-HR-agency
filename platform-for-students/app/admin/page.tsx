@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { securityAccess } from '@/lib/security/incidents';
 import { AppShell } from '@/components/layout/AppShell';
 import { adminNav } from '@/lib/admin-nav';
 import { AdminDashboard } from '@/components/screens/AdminDashboard';
@@ -11,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminPage() {
   const session = await requireAdminPage('/admin');
+  const canSeeSecurity = !!(await securityAccess()).access;
   // Журнал и выгрузки из CRM — тем, кому выданы метрики пилота
   const canSeeLog = staffCan(session, 'pilot');
   const [stats, runs, audit, pendingStudy] = await Promise.all([
@@ -27,6 +30,7 @@ export default async function AdminPage() {
       wide
     >
       <AdminDashboard stats={stats} runs={runs} audit={audit} />
+      {canSeeSecurity && <Link href="/admin/security" className="mt-6 inline-block rounded-xl border border-[var(--hairline)] px-4 py-3 text-small">Безопасность чатов и журнал событий →</Link>}
     </AppShell>
   );
 }

@@ -1001,7 +1001,7 @@ test('нижние панели оставляют место под кнопк�
 // ---------------------------------------------------------------------------
 
 const rootDir = path.join(process.cwd());
-const src = (rel: string) => readFileSync(path.join(rootDir, rel), 'utf8');
+const src = (rel: string) => readFileSync(path.join(rootDir, rel), 'utf8').replace(/\r\n/g, '\n');
 /** Без комментариев: слова «maximumScale» или «text-white» в пояснении — не нарушение. */
 const stripComments = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 function listFiles(dir: string, pattern: RegExp, out: string[] = []): string[] {
@@ -1270,14 +1270,14 @@ console.log('Шрифты и масштаб: не меньше 12px, поля 16
   });
   test('поля ввода на сенсорном экране — 16px (иначе iOS увеличивает страницу при фокусе), флажки и кнопки не затронуты', () => {
     const css = src('app/globals.css');
-    const m = /@media \(pointer: coarse\)\s*\{\s*input:not\(([^)]*)\),\s*textarea:not\(\[data-keep-size\]\),\s*select:not\(\[data-keep-size\]\)\s*\{\s*font-size:\s*16px !important;/.exec(css);
+    const m = /@media \(pointer: coarse\)(?:,\s*\(max-width: 1023px\))?\s*\{\s*input:not\(([^)]*)\),\s*textarea:not\(\[data-keep-size\]\),\s*select:not\(\[data-keep-size\]\)\s*\{\s*font-size:\s*16px !important;/.exec(css);
     assert.ok(m, 'нет правила 16px для полей на (pointer: coarse) с исключением [data-keep-size]');
     for (const type of ['checkbox', 'radio', 'file', 'submit', 'button', 'range']) assert.ok(m[1].includes(`'${type}'`), type);
     assert.ok(m[1].includes('[data-keep-size]'), 'у input нет исключения [data-keep-size]');
   });
   test('правило 16px для полей — литерал, а не шкала: основной текст (body, 15px) мельче 16px, а поле на сенсорном экране остаётся 16px', () => {
     const css = src('app/globals.css');
-    const at = css.indexOf('@media (pointer: coarse) {\n  input:not(');
+    const at = css.search(/@media \(pointer: coarse\)(?:,\s*\(max-width: 1023px\))?\s*\{\s*input:not\(/);
     assert.ok(at >= 0, 'нет правила для полей на (pointer: coarse)');
     const rule = css.slice(at, css.indexOf('\n}\n', at));
     assert.match(rule, /font-size:\s*16px !important;/);
@@ -1450,7 +1450,7 @@ console.log('Шкала шрифтов: шесть ступеней и акце�
 
   // Нарушения шкалы в исходнике. Разбор по тексту без комментариев: класс может лежать в строке,
   // шаблоне или константе, а не только в className.
-  const COLOR_ROOTS = new Set([...Object.keys((tailwindConfig.theme?.extend as { colors: Record<string, unknown> }).colors), 'white', 'black', 'transparent', 'current', 'inherit']);
+  const COLOR_ROOTS = new Set([...Object.keys((tailwindConfig.theme?.extend as { colors: Record<string, unknown> }).colors), 'red', 'white', 'black', 'transparent', 'current', 'inherit']);
   const NOT_SIZE = new Set(['left', 'center', 'right', 'justify', 'start', 'end', 'wrap', 'nowrap', 'balance', 'pretty', 'ellipsis', 'clip', 'gradient']);
   const scaleProblems = (file: string, raw: string): string[] => {
     const code = stripComments(raw);

@@ -1,6 +1,7 @@
 import { fail, handle, ok } from '@/lib/api';
 import { runNotificationJobs } from '@/lib/notify';
 import { safeEqual } from '@/lib/security/crypto';
+import { deliverSecurityAlerts } from '@/lib/security/incidents';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
     }
 
     const result = await runNotificationJobs();
-    return ok(result);
+    const security = await deliverSecurityAlerts();
+    return ok({ ...result, security });
   });
 }

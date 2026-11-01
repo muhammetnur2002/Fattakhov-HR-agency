@@ -58,8 +58,12 @@ export async function resolveSession(
 
   const { issuedAt, ...user } = verified;
   const account = await accounts.findById(user.accountId);
-  if (!account || !account.isActive || isIssuedBeforePasswordChange(issuedAt, account.passwordChangedAt)) {
+  if (!account || !account.isActive || isSecuritySessionRevoked(issuedAt, account.sessionsRevokedAt) || isIssuedBeforePasswordChange(issuedAt, account.passwordChangedAt)) {
     return { user: null, account: null, revoked: true };
   }
   return { user, account, revoked: false };
+}
+
+export function isSecuritySessionRevoked(issuedAt: number | undefined, revokedAt?: Date | null): boolean {
+  return !!revokedAt && (issuedAt === undefined || issuedAt <= Math.floor(revokedAt.getTime() / 1000));
 }

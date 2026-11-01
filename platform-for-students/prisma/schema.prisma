@@ -167,6 +167,7 @@ model Account {
   // Сессия, выпущенная до этой метки, недействительна — см. lib/security/session-resolve.ts.
   // Пусто — пароль не менялся, и ограничения на выданные сессии нет
   passwordChangedAt  DateTime?
+  sessionsRevokedAt  DateTime?
   createdAt          DateTime  @default(now())
 
   student           Student?
@@ -179,6 +180,40 @@ model Account {
   pushSubscriptions PushSubscription[]
 
   @@index([role])
+}
+
+/// Restricted security evidence. No foreign-key cascade: evidence survives account deletion.
+model SecurityIncident {
+  id           String   @id @default(cuid())
+  dedupeKey    String   @unique
+  kind         String
+  accountId    String
+  evidenceEnc  String
+  createdAt    DateTime @default(now())
+  actions      SecurityDecision[]
+  mail         SecurityMail?
+  @@index([createdAt])
+}
+
+model SecurityDecision {
+  id           String @id @default(cuid())
+  incidentId   String
+  incident     SecurityIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  operatorId   String
+  action       String
+  reasonEnc    String
+  createdAt    DateTime @default(now())
+}
+
+model SecurityMail {
+  id           String @id @default(cuid())
+  incidentId   String @unique
+  incident     SecurityIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  attempts     Int @default(0)
+  availableAt  DateTime @default(now())
+  leaseToken   String?
+  sentAt       DateTime?
+  @@index([sentAt, availableAt])
 }
 
 enum AuthTokenKind {

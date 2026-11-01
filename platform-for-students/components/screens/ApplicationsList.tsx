@@ -16,10 +16,10 @@ import { VacancyDetail } from '@/components/swipe/VacancyDetail';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { fadeUp, springSoft } from '@/lib/motion';
 import { daysUntil } from '@/lib/study';
+import { APPLICATION_GUIDANCE } from '@/lib/application-guidance';
 import { cn, formatSalary, plural, timeAgo } from '@/lib/utils';
 import {
   APPLICATION_FUNNEL,
-  APPLICATION_STATUS_LABEL,
   type ApplicationDTO,
   type ApplicationStatus,
   type PendingApplicationDTO,
@@ -263,9 +263,7 @@ function Funnel({ status }: { status: ApplicationStatus }) {
         })}
       </div>
       <p className="mt-2 text-caption text-paper-faint">
-        {rejected
-          ? 'Работодатель отказал — вакансия закрыта для вас'
-          : `Этап: ${APPLICATION_STATUS_LABEL[status]}`}
+        {APPLICATION_GUIDANCE[status]}
       </p>
     </div>
   );
