@@ -40,8 +40,8 @@ export function UniversityInput({
 
   const selected = institutionId ? (institutions.find((i) => i.id === institutionId) ?? null) : null;
   const matches = useMemo(
-    () => (selected ? [] : searchInstitutions(institutions, value).slice(0, 7)),
-    [institutions, value, selected],
+    () => searchInstitutions(institutions, value),
+    [institutions, value],
   );
   const showList = open && matches.length > 0;
 
@@ -67,7 +67,7 @@ export function UniversityInput({
           selected
             ? `${selected.name} · ${selected.city}`
             : institutions.length > 0
-              ? 'Начните вводить — подскажем из списка. Нет вашего вуза — впишите как есть.'
+              ? 'Выберите вуз из списка — так он попадёт в статистику. Нет вашего вуза — впишите как есть.'
               : 'Например, КФУ'
         }
         onChange={(e) => {
@@ -103,7 +103,7 @@ export function UniversityInput({
           aria-label="Вузы из справочника"
           // Фон непрозрачный: сквозь полупрозрачный просвечивала подсказка
           // под полем и читалась поверх вариантов
-          className="absolute inset-x-0 top-[66px] z-30 max-h-72 overflow-y-auto rounded-xl border border-[var(--hairline-strong)] bg-graphite-900 p-1 shadow-2xl"
+          className="absolute inset-x-0 top-[66px] z-30 max-h-72 overflow-y-auto overscroll-contain rounded-xl border border-[var(--hairline-strong)] bg-graphite-900 p-1 shadow-2xl"
         >
           {matches.map((option, i) => (
             <li
@@ -124,7 +124,7 @@ export function UniversityInput({
               <span className="min-w-0">
                 <span className="block text-small text-paper">{institutionLabel(option)}</span>
                 {option.shortName && (
-                  <span className="block truncate text-caption text-paper-faint">{option.name}</span>
+                  <span className="block whitespace-normal text-caption leading-relaxed text-paper-dim">{option.name}</span>
                 )}
               </span>
               <span className="flex shrink-0 items-center gap-1 pt-0.5 text-caption text-paper-faint">

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { INSTITUTIONS } from '../lib/db/seed-data';
+import { exactInstitution, institutionLabel, searchInstitutions } from '../lib/institutions';
+const list = INSTITUTIONS.filter(i => i.city === 'Казань').map(i => ({ ...i, id: i.slug }));
+assert.equal(searchInstitutions(list, '').length, 0);
+assert.ok(searchInstitutions(list, 'К').length > 7, 'one letter must show the full matching directory');
+assert.deepEqual(searchInstitutions(list, 'КН').map(i => i.slug).sort(), ['kai', 'knitu']);
+assert.deepEqual(searchInstitutions(list, 'кн').map(i => i.slug).sort(), ['kai', 'knitu']);
+assert.equal(searchInstitutions(list, 'КФУ')[0].slug, 'kpfu');
+assert.equal(searchInstitutions(list, 'технологический')[0].slug, 'knitu');
+assert.equal(exactInstitution(list, 'КАИ')?.id, exactInstitution(list, 'КНИТУ-КАИ')?.id);
+assert.equal(institutionLabel(list.find(i => i.slug === 'kai')!), 'КНИТУ-КАИ');
+assert.equal(exactInstitution(list, 'КНИТУ')?.id, 'knitu');
+assert.equal(exactInstitution(list, 'КФУ')?.id, exactInstitution(list, 'Казанский (Приволжский) федеральный университет')?.id);
+assert.equal(exactInstitution(list, 'Несуществующий вуз'), null);
+console.log('Institution suggestions: prefix filtering, full list, and shared IDs passed');
