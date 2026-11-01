@@ -47,7 +47,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // Новое во «Откликах» с прошлого захода — не общее число, оно иначе
   // никогда не убывало бы после просмотра (студент один раз откроет
   // вкладку, а счётчик так и будет висеть с тем же числом годами).
-  const viewedAt = student.applicationsViewedAt;
+  const markers = await store.markers.list(session.accountId);
+  const viewedAt = markers.applications ?? student.applicationsViewedAt;
   const newApplications = viewedAt
     ? applications.filter((a) => a.createdAt > viewedAt || a.statusChangedAt > viewedAt).length
     : applications.length;
@@ -85,7 +86,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         {
           href: '/skipped',
           label: 'Пропущенные',
-          badge: skipped.length,
+          badge: skipped.filter(s => !markers.skipped || s.createdAt > markers.skipped).length,
           icon: <History className="size-[18px]" aria-hidden />,
           hideLabel: true,
         },

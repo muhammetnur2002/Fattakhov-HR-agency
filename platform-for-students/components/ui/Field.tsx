@@ -254,7 +254,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         <label
           htmlFor={id}
           className={cn(
-            'pointer-events-none absolute top-2.5 text-caption uppercase tracking-[0.12em] text-paper-faint',
+            'pointer-events-none absolute top-2.5 right-10 truncate text-caption uppercase tracking-[0.12em] text-paper-faint',
             compact ? 'left-3 sm:left-4' : 'left-4',
           )}
         >

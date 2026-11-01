@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, Building2 } from 'lucide-react';
-import { ChatEmpty, ChatScreen } from '@/components/chat/ChatScreen';
-import { ButtonLink } from '@/components/ui/Button';
+import { Building2 } from 'lucide-react';
+import { ChatScreen } from '@/components/chat/ChatScreen';
 import { getStudentThread } from '@/lib/agency-chat';
 import { getThread, listThreads } from '@/lib/chat';
 import { requireStudentPage } from '@/lib/security/guards';
@@ -24,27 +23,11 @@ export default async function MessagesPage(
   const lastAgencyMessage = agency.messages[agency.messages.length - 1];
   const agencyLink = lastAgencyMessage ? <AgencyLink unread={agency.unread} last={lastAgencyMessage.body} /> : null;
 
-  if (threads.length === 0 && agencyLink) {
-    return <div className="mx-auto max-w-lg">{agencyLink}</div>;
-  }
-
-  if (threads.length === 0) {
-    return (
-      <ChatEmpty
-        action={
-          <ButtonLink href="/feed" size="lg" iconRight={<ArrowRight />}>
-            В ленту вакансий
-          </ButtonLink>
-        }
-      />
-    );
-  }
-
   // Диалог открывается только по явной ссылке. Автовыбор первого удобен
   // на широком экране, но на телефоне выбросил бы человека сразу внутрь
   // переписки, мимо списка.
   const requested = searchParams.thread;
-  const valid = requested && threads.some((t) => t.applicationId === requested) ? requested : null;
+  const valid = requested ?? null;
   const thread = valid ? await getThread(valid, viewer) : null;
 
   // Заголовок и подсказка живут внутри ChatScreen (шапка списка диалогов) —

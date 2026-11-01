@@ -564,6 +564,10 @@ export interface SyncOutcome {
  * посмотреть продукт без поднятой инфраструктуры.
  */
 export interface DataStore {
+  markers: {
+    list(accountId: string): Promise<Record<string, Date>>;
+    set(accountId: string, key: string, at: Date): Promise<void>;
+  };
   readonly kind: 'prisma' | 'memory';
 
   accounts: {
@@ -790,6 +794,7 @@ export interface DataStore {
   };
 
   applications: {
+    markViewed(id: string): Promise<boolean>;
     upsert(input: { studentId: string; vacancyId: string }): Promise<ApplicationRecord>;
     /**
      * Приглашение по инициативе работодателя — из раздела «Кандидаты».

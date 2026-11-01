@@ -167,6 +167,8 @@ async function applicationsFor(viewer: Viewer): Promise<ApplicationRecord[]> {
  */
 export async function listThreads(viewer: Viewer): Promise<ThreadSummaryDTO[]> {
   const store = await getStore();
+  const profile = viewer.role === 'STUDENT' ? await store.students.findById(viewer.profileId) : await store.employers.findById(viewer.profileId);
+  const markers = profile ? await store.markers.list(profile.accountId) : {};
   const applications = await applicationsFor(viewer);
   if (applications.length === 0) return [];
 
@@ -181,7 +183,12 @@ export async function listThreads(viewer: Viewer): Promise<ThreadSummaryDTO[]> {
     const ctx = await loadContext(application.id, viewer);
     if (!ctx) continue;
     const last = lastByApp[application.id];
-    out.push(buildSummary(ctx, viewer, last, unread[application.id] ?? 0));
+    const hiddenAt = markers[`chat:${application.id}`];
+    if (hiddenAt && (!last || last.createdAt <= hiddenAt)) continue;
+    const unreadCount = hiddenAt
+      ? (await store.messages.listByApplication(application.id)).filter(m => m.author !== viewer.role && !m.readAt && m.createdAt > hiddenAt).length
+      : unread[application.id] ?? 0;
+    out.push(buildSummary(ctx, viewer, last, unreadCount));
   }
 
   return out.sort((a, b) => {
@@ -200,6 +207,19 @@ export async function getThread(applicationId: string, viewer: Viewer): Promise<
   const summary = buildSummary(ctx, viewer, messages[messages.length - 1], unread);
 
   return { ...summary, messages: messages.map((m) => toMessageDTO(m, viewer.role)) };
+}
+
+/** Hide only in the current participant's list. A subsequent message brings the thread back. */
+export async function hideThread(applicationId: string, viewer: Viewer): Promise<boolean> {
+  const hiddenAt = new Date();
+  const ctx = await loadContext(applicationId, viewer);
+  if (!ctx) return false;
+  const profile = viewer.role === 'STUDENT'
+    ? await ctx.store.students.findById(viewer.profileId)
+    : await ctx.store.employers.findById(viewer.profileId);
+  if (!profile) return false;
+  await ctx.store.markers.set(profile.accountId, `chat:${applicationId}`, hiddenAt);
+  return true;
 }
 
 export class ThreadLockedError extends Error {
@@ -242,7 +262,7 @@ export async function postMessage(
   // Первое сообщение работодателя двигает отклик из «нового»: он уже не
   // новый, раз с человеком заговорили
   if (viewer.role === 'EMPLOYER' && ctx.application.status === 'NEW') {
-    await ctx.store.applications.setStatus(applicationId, 'VIEWED');
+    await ctx.store.applications.markViewed(applicationId);
   }
 
   return { message: toMessageDTO(record, viewer.role), recipient: counterpartOf(ctx, viewer) };
@@ -269,8 +289,5 @@ export async function countUnread(viewer: Viewer): Promise<number> {
   const store = await getStore();
   // Студенту к непрочитанному по откликам добавляется переписка с агентством
   const agency = viewer.role === 'STUDENT' ? await store.agencyMessages.unreadFor(viewer.profileId, 'STUDENT') : 0;
-  const ids = (await applicationsFor(viewer)).map((a) => a.id);
-  if (ids.length === 0) return agency;
-  const unread = await store.messages.unreadFor(ids, viewer.role);
-  return agency + Object.values(unread).reduce((sum, n) => sum + n, 0);
+  return agency + (await listThreads(viewer)).reduce((sum, thread) => sum + thread.unread, 0);
 }

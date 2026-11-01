@@ -8,7 +8,7 @@ import { Dialog } from '@/components/ui/Dialog';
 
 const ACTION_WIDTH = 104;
 
-export function SwipeApplication({ children, open, onToggle, busy, disabled, onCancel, chatHref, onChat, deleteLabel = 'Отменить отклик', deleteDescription = 'Переписка по этому отклику тоже будет удалена.' }: {
+export function SwipeApplication({ children, open, onToggle, busy, disabled, onCancel, chatHref, onChat, actionsLabel = 'Действия с откликом', deleteLabel = 'Отменить отклик', deleteDescription = 'Переписка по этому отклику тоже будет удалена.' }: {
   children: ReactNode;
   open: 'cancel' | 'chat' | null;
   onToggle: (open: 'cancel' | 'chat' | null) => void;
@@ -16,6 +16,7 @@ export function SwipeApplication({ children, open, onToggle, busy, disabled, onC
   onChat?: () => void;
   deleteLabel?: string;
   deleteDescription?: string;
+  actionsLabel?: string;
   busy: boolean;
   disabled: boolean;
   onCancel: () => Promise<void>;
@@ -93,7 +94,7 @@ export function SwipeApplication({ children, open, onToggle, busy, disabled, onC
         {children}
       </div>
       <button type="button" className="sr-only focus:not-sr-only focus:absolute focus:bottom-2 focus:left-2 focus:z-10 focus:rounded-xl focus:bg-ink focus:p-3"
-        onClick={() => onToggle(open ? null : 'cancel')} aria-expanded={open !== null}>Действия с откликом</button>
+        onClick={() => onToggle(open ? null : 'cancel')} aria-expanded={open !== null}>{actionsLabel}</button>
     </div>
     <Dialog open={confirm} title={`${deleteLabel}?`} onClose={() => { if (!busy) setConfirm(false); }}
       footer={<><Button size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirm(false)}>Оставить</Button>

@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { createMemoryStore } from '../lib/db/memory';
+import type { DataStore } from '../lib/db/types';
+import { hideThread, listThreads, getThread, postMessage, countUnread } from '../lib/chat';
+
+async function main() {
+  const store = await createMemoryStore();
+  (globalThis as unknown as { fhrStore: Promise<DataStore> }).fhrStore = Promise.resolve(store);
+  const [student, other] = await store.students.list();
+  const [vacancy] = await store.vacancies.listActive();
+  const application = await store.applications.upsert({ studentId: student.id, vacancyId: vacancy.id });
+  const viewer = { role: 'STUDENT' as const, profileId: student.id };
+  const employer = { role: 'EMPLOYER' as const, profileId: vacancy.employerId };
+  assert.equal(await hideThread(application.id, { role: 'STUDENT', profileId: other.id }), false);
+  const original = await getThread(application.id, viewer);
+  assert.ok(original);
+  assert.equal(await hideThread(application.id, viewer), true);
+  assert.equal((await listThreads(viewer)).some(t => t.applicationId === application.id), false);
+  assert.equal((await listThreads(employer)).some(t => t.applicationId === application.id), true);
+  assert.deepEqual((await getThread(application.id, viewer))?.messages, original.messages);
+  assert.ok(await store.applications.findById(application.id), 'hiding chat does not withdraw application');
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.ok(await postMessage(application.id, employer, 'A new message restores the hidden thread'));
+  const restored = (await listThreads(viewer)).find(t => t.applicationId === application.id);
+  assert.ok(restored);
+  assert.equal(restored.unread, 1);
+  assert.ok(await countUnread(viewer) >= 1);
+  await store.applications.setStatus(application.id, 'NEW');
+  assert.equal(await store.applications.markViewed(application.id), true);
+  assert.equal(await store.applications.markViewed(application.id), false);
+  await store.applications.setStatus(application.id, 'INVITED');
+  assert.equal(await store.applications.markViewed(application.id), false, 'viewing cannot regress a later stage');
+  assert.equal((await store.applications.findById(application.id))?.status, 'INVITED');
+  const first = new Date('2026-01-01T00:00:00Z');
+  const latest = new Date('2026-01-02T00:00:00Z');
+  await store.markers.set(student.accountId, 'skipped', latest);
+  await store.markers.set(student.accountId, 'skipped', first);
+  assert.equal((await store.markers.list(student.accountId)).skipped.getTime(), latest.getTime());
+  assert.equal((await store.markers.list(other.accountId)).skipped, undefined);
+  console.log('Chat state: participant isolation, preserved history/application, restoration on message, unread count, monotonic visit markers and conditional NEW→VIEWED passed.');
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

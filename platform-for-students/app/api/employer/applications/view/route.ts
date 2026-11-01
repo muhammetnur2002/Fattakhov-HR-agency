@@ -29,7 +29,8 @@ export async function POST(request: Request) {
 
     if (application.status !== 'NEW') return ok({ id: application.id, status: application.status });
 
-    const updated = await store.applications.setStatus(applicationId, 'VIEWED');
+    const changed = await store.applications.markViewed(applicationId);
+    if (!changed) return ok({ id: applicationId, status: (await store.applications.findById(applicationId))?.status ?? application.status });
     await audit(
       session,
       {
@@ -49,6 +50,6 @@ export async function POST(request: Request) {
 
     await notifyApplicationStatus(application, 'VIEWED');
 
-    return ok({ id: applicationId, status: updated?.status ?? 'VIEWED' });
+    return ok({ id: applicationId, status: 'VIEWED' });
   });
 }

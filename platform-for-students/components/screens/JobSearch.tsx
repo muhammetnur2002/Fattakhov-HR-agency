@@ -56,7 +56,7 @@ export function JobSearch({ vacancies, appliedIds }: { vacancies: VacancyDTO[]; 
         <SelectField label="Формат работы" value={filters.format} onChange={(e) => update('format', e.target.value)} options={[{ value: '', label: 'Любой формат' }, ...WORK_FORMATS.map((value) => ({ value, label: WORK_FORMAT_LABEL[value] }))]} />
         <SelectField label="Занятость" value={filters.employment} onChange={(e) => update('employment', e.target.value)} options={[{ value: '', label: 'Любая занятость' }, ...EMPLOYMENT_TYPES.map((value) => ({ value, label: EMPLOYMENT_TYPE_LABEL[value] }))]} />
         <TextField label="Доход от, ₽" type="number" min="0" value={filters.salary} onChange={(e) => update('salary', e.target.value)} />
-        <SelectField label="Период оплаты для фильтра дохода" value={filters.period} onChange={(e) => update('period', e.target.value)} options={Object.entries(periodLabels).map(([value, label]) => ({ value, label }))} />
+        <SelectField label="Период оплаты" value={filters.period} onChange={(e) => update('period', e.target.value)} options={Object.entries(periodLabels).map(([value, label]) => ({ value, label }))} />
       </div>
       <div><p className="mb-2 text-small text-paper-dim">Дни работы — хотя бы один из выбранных</p><div className="flex flex-wrap gap-2">{WEEKDAYS.map((day) => <Chip key={day} selected={filters.days.includes(day)} onToggle={() => update('days', filters.days.includes(day) ? filters.days.filter((d) => d !== day) : [...filters.days, day])}>{WEEKDAY_LABEL[day]}</Chip>)}</div></div>
       <Button variant="ghost" size="sm" onClick={() => { setFilters(initialFilters); setLimit(20); }}>Сбросить поиск и фильтры</Button>

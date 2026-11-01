@@ -1,5 +1,6 @@
 'use client';
 
+import { SwipeApplication } from '@/components/screens/SwipeApplication';
 import { ListPanel } from '@/components/layout/ListPanel';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -37,6 +38,8 @@ export function ChatScreen({
   const [pending, setPending] = useState<PendingMessageDTO[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   useAppViewport(rootRef);
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const sequence = useRef(0);
@@ -64,9 +67,18 @@ export function ChatScreen({
   }, []);
 
   /** Отметка о прочтении шлётся молча: результат виден собеседнику, не нам */
-  const markRead = useCallback((id: string) => {
-    void fetch(`/api/messages/${id}`, { method: 'PATCH' }).catch(() => null);
-  }, []);
+  const markRead = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/messages/${id}`, { method: 'PATCH' });
+      if (!response.ok) return;
+      if (viewerRole === 'EMPLOYER') {
+        await fetch('/api/employer/applications/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ applicationId: id }) });
+        await refreshThread(id);
+      }
+      await refreshThreads();
+      window.dispatchEvent(new Event('activity-changed'));
+    } catch { /* Retry when the visible thread is refreshed. */ }
+  }, [viewerRole, refreshThread, refreshThreads]);
 
   const open = useCallback(
     async (id: string) => {
@@ -74,7 +86,6 @@ export function ChatScreen({
       // Неотправленные сообщения других веток не сбрасываем: у каждого свой applicationId,
       // а набранный текст терять нельзя
       await refreshThread(id);
-      markRead(id);
       // Счётчик непрочитанного меняется сразу после открытия
       void refreshThreads();
       // Ссылку на конкретный диалог можно скинуть коллеге; полноценная
@@ -83,17 +94,16 @@ export function ChatScreen({
       // /employer/messages — жёсткая строка увела бы его не туда
       window.history.replaceState(null, '', `${window.location.pathname}?thread=${id}`);
     },
-    [markRead, refreshThread, refreshThreads],
+    [refreshThread, refreshThreads],
   );
 
-  // Открыли экран с уже выбранной веткой — сразу гасим непрочитанное
+  // A background tab must not consume new messages. Reconcile when it becomes visible.
   useEffect(() => {
-    if (initialThread && initialThread.unread > 0) {
-      markRead(initialThread.applicationId);
-      void refreshThreads();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const readVisible = () => { if (activeId && document.visibilityState === 'visible') void markRead(activeId); };
+    const frame = requestAnimationFrame(readVisible);
+    document.addEventListener('visibilitychange', readVisible);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', readVisible); };
+  }, [activeId, markRead]);
 
   useLiveThreads((event) => {
     if (event.kind === 'ready') return;
@@ -103,7 +113,7 @@ export function ChatScreen({
       void refreshThread(activeId).then(() => {
         // Пришедшее в открытый диалог считается прочитанным сразу:
         // человек его физически видит
-        if (event.kind === 'message') markRead(activeId);
+        if (document.visibilityState === 'visible' && (event.kind === 'message' || event.kind === 'poll')) void markRead(activeId);
       });
     }
   });
@@ -158,6 +168,19 @@ export function ChatScreen({
     setPending((current) => current.filter((m) => m.id !== id));
   }
 
+  async function removeThread(id: string) {
+    setDeletingId(id);
+    try {
+      const response = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'Не удалось удалить чат'));
+      setThreads(current => current.filter(t => t.applicationId !== id));
+      setSwipedId(null);
+      if (activeId === id) { setActiveId(null); setThread(null); window.history.replaceState(null, '', window.location.pathname); }
+      window.dispatchEvent(new Event('activity-changed'));
+    } catch (error) { toast.error('Чат не удалён', error instanceof Error ? error.message : undefined); }
+    finally { setDeletingId(null); }
+  }
+
   const totalUnread = threads.reduce((sum, t) => sum + t.unread, 0);
   const visibleThreads = threads.filter((t) => {
     if (unreadOnly && t.unread === 0) return false;
@@ -175,7 +198,7 @@ export function ChatScreen({
       // На телефоне — экран приложения: без рамки и скруглений, на всю ширину
       // и весь остаток высоты (см. useAppViewport). Карточка с двумя колонками —
       // только на широком экране.
-      className={cn("grid min-h-0 min-w-0 grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl", viewerRole === 'EMPLOYER' ? 'h-full w-full' : '-mx-[var(--page-gutter)] lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem]')}
+      className={cn("grid min-h-0 min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden lg:surface lg:mx-0 lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl", viewerRole === 'EMPLOYER' ? 'h-full w-full' : '-mx-[var(--page-gutter)] lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem]')}
     >
       {/* ---------- список ---------- */}
       <aside
@@ -184,8 +207,8 @@ export function ChatScreen({
           activeId ? 'hidden lg:flex' : 'flex',
         )}
       >
-        <ListPanel toolbar={<>
-        <div className="flex items-baseline justify-between px-4 pb-3 pt-4">
+        <ListPanel compact toolbar={<>
+        <div className="flex items-baseline justify-between px-4 pb-2 pt-2">
           {/* Единственный заголовок раздела — страница сама его не
               дублирует (см. app/(student)/messages/page.tsx) */}
           <h1 className="text-sub font-semibold tracking-[-0.015em] text-paper">Сообщения</h1>
@@ -254,8 +277,7 @@ export function ChatScreen({
         <div className="space-y-2 px-3 pb-3">
           {threads.length === 0 ? (
             <p className="px-3 py-10 text-center text-small leading-relaxed text-paper-faint">
-              Диалогов пока нет. Они появятся, когда вы откликнетесь на вакансию и работодатель
-              ответит.
+              {viewerRole === 'STUDENT' ? 'В списке пока нет чатов. Открыть переписку можно из своих откликов.' : 'В списке пока нет чатов. Открыть переписку можно из отклика кандидата.'}
             </p>
           ) : visibleThreads.length === 0 ? (
             <p className="px-3 py-10 text-center text-small leading-relaxed text-paper-faint">
@@ -263,13 +285,18 @@ export function ChatScreen({
             </p>
           ) : (
             visibleThreads.map((t) => (
+              <SwipeApplication key={t.applicationId} open={swipedId === t.applicationId ? 'cancel' : null}
+                onToggle={value => setSwipedId(value ? t.applicationId : null)}
+                busy={deletingId === t.applicationId} disabled={deletingId !== null}
+                onCancel={() => removeThread(t.applicationId)} deleteLabel="Удалить чат" actionsLabel="Действия с чатом"
+                deleteDescription="Чат исчезнет только из вашего списка. Отклик и переписка собеседника сохранятся. При новом сообщении чат появится снова.">
               <ThreadRow
-                key={t.applicationId}
                 thread={t}
                 active={t.applicationId === activeId}
                 viewerRole={viewerRole}
                 onClick={() => void open(t.applicationId)}
               />
+              </SwipeApplication>
             ))
           )}
         </div>

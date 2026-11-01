@@ -1,6 +1,7 @@
 import { fail, handle, ok, tooManyRequests } from '@/lib/api';
 import {
   getThread,
+  hideThread,
   markThreadRead,
   postMessage,
   ThreadLockedError,
@@ -16,6 +17,19 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ applicationId: string }> };
+
+export async function DELETE(request: Request, props: Params) {
+  return handle(async () => {
+    assertSameOrigin(request);
+    const session = await getSession();
+    const viewer = viewerFromSession(session);
+    if (!viewer) return fail(401, 'Требуется вход в систему', 'UNAUTHORIZED');
+    const { applicationId } = await props.params;
+    if (!await hideThread(applicationId, viewer)) return fail(404, 'Переписка не найдена', 'NOT_FOUND');
+    await audit(session, { action: 'chat.hidden', entity: 'Application', entityId: applicationId }, request.headers);
+    return ok({ hidden: true });
+  });
+}
 
 /** Ветка целиком. 404 и «чужая ветка» намеренно неразличимы. */
 export async function GET(_request: Request, props: Params) {

@@ -2,3 +2,5 @@
 .toolbar { flex:none; min-width:0; max-height:50%; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; background:rgb(var(--color-ink)); padding:16px 0 12px; }
 .content { flex:1; min-height:0; min-width:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding-bottom:max(24px,env(safe-area-inset-bottom)); }
 .panel[data-fixed="true"] .content { display:flex; flex-direction:column; overflow:hidden; padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+
+.panel[data-compact="true"] .toolbar { padding:0; max-height:none; overflow:visible; }

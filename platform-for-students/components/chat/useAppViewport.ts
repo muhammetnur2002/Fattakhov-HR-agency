@@ -30,6 +30,7 @@ export function useAppViewport(ref: RefObject<HTMLElement | null>) {
       for (const prop of ['height', 'position', 'top', 'left', 'right', 'z-index']) el.style.removeProperty(prop);
       html.style.removeProperty('overflow');
       html.style.removeProperty('overscroll-behavior');
+      main?.style.removeProperty('overflow');
       main?.style.removeProperty('padding-top');
       main?.style.removeProperty('padding-bottom');
     }
@@ -51,6 +52,8 @@ export function useAppViewport(ref: RefObject<HTMLElement | null>) {
       if (window.innerHeight - visible > 120) html.setAttribute('data-app-keyboard', '');
       else html.removeAttribute('data-app-keyboard');
       if (main) {
+        main.scrollTop = 0;
+        main.style.overflow = 'hidden';
         main.style.paddingTop = '0px';
         main.style.paddingBottom = '0px';
       }

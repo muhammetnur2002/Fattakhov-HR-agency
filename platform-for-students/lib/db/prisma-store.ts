@@ -96,6 +96,16 @@ const VISIBLE_VACANCY: Prisma.VacancyWhereInput = {
 export function createPrismaStore(): DataStore {
   return {
     kind: 'prisma',
+    markers: {
+      async list(accountId) {
+        const rows = await prisma.accountMarker.findMany({ where: { accountId } });
+        return Object.fromEntries(rows.map(row => [row.key, row.at]));
+      },
+      async set(accountId, key, at) {
+        await prisma.$executeRaw`INSERT INTO "AccountMarker" ("accountId", "key", "at") VALUES (${accountId}, ${key}, ${at})
+          ON CONFLICT ("accountId", "key") DO UPDATE SET "at" = GREATEST("AccountMarker"."at", EXCLUDED."at")`;
+      },
+    },
 
     accounts: {
       findByEmailHash: (emailHash) => prisma.account.findUnique({ where: { emailHash } }),
@@ -655,6 +665,10 @@ export function createPrismaStore(): DataStore {
     },
 
     applications: {
+      async markViewed(id) {
+        const result = await prisma.application.updateMany({ where: { id, status: 'NEW' }, data: { status: 'VIEWED', statusChangedAt: new Date() } });
+        return result.count > 0;
+      },
       upsert: ({ studentId, vacancyId }) =>
         prisma.application.upsert({
           where: { studentId_vacancyId: { studentId, vacancyId } },

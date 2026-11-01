@@ -2,7 +2,7 @@
 
 import { ListPanel } from '@/components/layout/ListPanel';
 import { PortfolioView } from '@/components/student/PortfolioView';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Download, GraduationCap, Mail, MessageSquare, Phone, ShieldCheck, Sparkles } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
@@ -62,7 +62,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
     if (opening && application.status === 'NEW') void markViewed(application);
   }
 
-  async function markViewed(application: EmployerApplicationDTO) {
+  const markViewed = useCallback(async (application: EmployerApplicationDTO) => {
     setApplications((current) =>
       current.map((a) =>
         a.id === application.id ? { ...a, status: 'VIEWED', statusChangedAt: new Date().toISOString() } : a,
@@ -75,6 +75,9 @@ export function EmployerBoard({ board }: { board: BoardData }) {
         body: JSON.stringify({ applicationId: application.id }),
       });
       if (!response.ok) throw new Error();
+      const result = await response.json() as { status: ApplicationStatus };
+      setApplications(current => current.map(a => a.id === application.id ? { ...a, status: result.status } : a));
+      window.dispatchEvent(new Event('activity-changed'));
     } catch {
       // Без тоста: просмотр — побочное действие. Статус возвращается, и
       // следующее открытие карточки повторит попытку
@@ -82,7 +85,24 @@ export function EmployerBoard({ board }: { board: BoardData }) {
         current.map((a) => (a.id === application.id ? { ...a, status: application.status } : a)),
       );
     }
-  }
+  }, []);
+
+  const observed = useRef(new Set<string>());
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      if (document.visibilityState !== 'visible') return;
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.applicationView;
+        if (!entry.isIntersecting || !id || observed.current.has(id)) continue;
+        const application = applications.find(a => a.id === id && a.status === 'NEW');
+        if (!application) continue;
+        observed.current.add(id);
+        void markViewed(application);
+      }
+    }, { threshold: 0.35 });
+    document.querySelectorAll('[data-application-view]').forEach(node => observer.observe(node));
+    return () => observer.disconnect();
+  }, [applications, vacancyFilter, markViewed]);
 
   function requestStatus(application: EmployerApplicationDTO, status: ApplicationStatus) {
     if (status === application.status) return;
@@ -163,13 +183,13 @@ export function EmployerBoard({ board }: { board: BoardData }) {
       <Stagger className="grid gap-3 [&>*]:min-w-0" each={0.05} inView={false}>
         {visible.map((application) => (
           <Reveal key={application.id} variants={fadeUp}>
-            <CandidateRow
+            <div data-application-view={application.id}><CandidateRow
               application={application}
               expanded={expanded === application.id}
               pending={pending === application.id}
               onToggle={() => toggle(application)}
               onStatus={(status) => requestStatus(application, status)}
-            />
+            /></div>
           </Reveal>
         ))}
       </Stagger>

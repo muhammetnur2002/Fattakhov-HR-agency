@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/layout/AppShell';
-import { ChatEmpty, ChatScreen } from '@/components/chat/ChatScreen';
+import { ChatScreen } from '@/components/chat/ChatScreen';
 import { countUnread, getThread, listThreads } from '@/lib/chat';
 import { requireEmployerPage } from '@/lib/security/guards';
 import { employerNav } from '@/lib/employer-nav';
@@ -27,7 +27,7 @@ export default async function EmployerMessagesPage(
   const nav = employerNav(board.applications.length, unread);
 
   const requested = searchParams.thread;
-  const valid = requested && threads.some((t) => t.applicationId === requested) ? requested : null;
+  const valid = requested ?? null;
   const thread = valid ? await getThread(valid, viewer) : null;
 
   return (
@@ -35,14 +35,7 @@ export default async function EmployerMessagesPage(
       user={{ name: employer.companyName, subtitle: employer.contactName, href: '/employer/company' }}
       nav={nav}
     >
-      {threads.length === 0 ? (
-        <ChatEmpty viewerRole="EMPLOYER" />
-      ) : (
-        // Заголовок и подсказка живут внутри ChatScreen (шапка списка
-        // диалогов) — отдельный заголовок страницы поверх был бы вторым
-        // «Сообщения» подряд
-        <ChatScreen initialThreads={threads} initialThread={thread} viewerRole="EMPLOYER" />
-      )}
+      <ChatScreen initialThreads={threads} initialThread={thread} viewerRole="EMPLOYER" />
     </AppShell>
   );
 }

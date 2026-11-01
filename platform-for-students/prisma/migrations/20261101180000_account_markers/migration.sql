@@ -1,0 +1,1 @@
+CREATE TABLE "AccountMarker" ("accountId" TEXT NOT NULL, "key" TEXT NOT NULL, "at" TIMESTAMP(3) NOT NULL, CONSTRAINT "AccountMarker_pkey" PRIMARY KEY ("accountId", "key"), CONSTRAINT "AccountMarker_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE ON UPDATE CASCADE);

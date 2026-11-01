@@ -57,6 +57,7 @@ import type {
  */
 
 interface Tables {
+  markers: Array<{ accountId: string; key: string; at: Date }>;
   accounts: AccountRecord[];
   institutions: InstitutionRecord[];
   students: StudentRecord[];
@@ -106,6 +107,7 @@ const EMPTY_COMPANY = {
 
 async function seed(): Promise<Tables> {
   const t: Tables = {
+    markers: [],
     accounts: [],
     institutions: [],
     students: [],
@@ -475,6 +477,14 @@ export async function createMemoryStore(): Promise<DataStore> {
 
   const store: DataStore = {
     kind: 'memory',
+    markers: {
+      async list(accountId) { return Object.fromEntries(t.markers.filter(m => m.accountId === accountId).map(m => [m.key, new Date(m.at)])); },
+      async set(accountId, key, at) {
+        const marker = t.markers.find(m => m.accountId === accountId && m.key === key);
+        if (marker) { if (at > marker.at) marker.at = new Date(at); }
+        else t.markers.push({ accountId, key, at: new Date(at) });
+      },
+    },
 
     accounts: {
       async markTourSeen(id) {
@@ -1205,6 +1215,11 @@ export async function createMemoryStore(): Promise<DataStore> {
     },
 
     applications: {
+      async markViewed(id) {
+        const application = t.applications.find(a => a.id === id);
+        if (!application || application.status !== 'NEW') return false;
+        application.status = 'VIEWED'; application.statusChangedAt = now(); return true;
+      },
       async upsert({ studentId, vacancyId }) {
         const existing = t.applications.find(
           (a) => a.studentId === studentId && a.vacancyId === vacancyId,

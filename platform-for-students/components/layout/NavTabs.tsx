@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useActivityBadges } from '@/lib/hooks/useActivityBadges';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { springSoft } from '@/lib/motion';
 
@@ -30,7 +30,7 @@ export interface NavItem {
  */
 export function NavTabs({ items, className }: { items: NavItem[]; className?: string }) {
   const pathname = usePathname();
-  const liveUnread = useLiveMessagesBadge(items);
+  const activity = useActivityBadges(items.some(item => item.href === '/feed' || item.href === '/employer'));
 
   return (
     <nav className={cn('flex items-center gap-0.5 rounded-full border border-[var(--hairline)] bg-graphite-900/50 p-1 backdrop-blur-glass', className)}>
@@ -41,7 +41,7 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
         // Значок сообщений досчитывается вживую (см. useLiveMessagesBadge):
         // иначе новый ответ работодателя был виден только после перехода
         // на другую страницу — сервер считал его один раз при заходе.
-        const badge = item.href.endsWith('/messages') && liveUnread !== null ? liveUnread : item.badge;
+        const badge = activity[item.href] ?? (item.href === '/employer' ? 0 : item.badge);
         // Пока открыт сам раздел «Отклики», значок на нём не нужен: человек уже
         // смотрит на то, о чём он сообщает (сервер снимет отметку при показе страницы)
         const seenHere = active && item.href === '/applications';
@@ -97,84 +97,4 @@ export function NavTabs({ items, className }: { items: NavItem[]; className?: st
       })}
     </nav>
   );
-}
-
-/**
- * Непрочитанные сообщения — вживую, а не один раз при заходе.
- *
- * Раньше значок считал сервер при рендере страницы и больше не трогал
- * его: пришло сообщение, пока человек сидит в «Ленте», — значок так и
- * висел со старым числом, пока не откроешь другую страницу. Тот же
- * поток, что двигает список диалогов на экране переписки (см.
- * useLiveThreads) — здесь просто досчитывает сумму по всем диалогам.
- *
- * null, пока не пришло первое обновление, — тогда рендер берёт число
- * с сервера (item.badge), а не мигает нулём до первого ответа.
- */
-function useLiveMessagesBadge(items: NavItem[]): number | null {
-  const hasMessagesTab = items.some((item) => item.href.endsWith('/messages'));
-  const [unread, setUnread] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!hasMessagesTab) return;
-    let cancelled = false;
-
-    async function refresh() {
-      try {
-        const response = await fetch('/api/messages');
-        if (!response.ok || cancelled) return;
-        const data = (await response.json()) as { threads: { unread: number }[]; agencyUnread?: number };
-        if (!cancelled) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0) + (data.agencyUnread ?? 0));
-      } catch {
-        /* сеть моргнула — следующее событие сверит заново */
-      }
-    }
-
-    void refresh();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMessagesTab]);
-
-  useLiveMessagesEvents(hasMessagesTab, () => {
-    fetch('/api/messages')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { threads: { unread: number }[]; agencyUnread?: number } | null) => {
-        if (data) setUnread(data.threads.reduce((sum, t) => sum + t.unread, 0) + (data.agencyUnread ?? 0));
-      })
-      .catch(() => {});
-  });
-
-  return unread;
-}
-
-/** Тонкая обёртка над useLiveThreads: не подключаемся, если нет вкладки сообщений. */
-function useLiveMessagesEvents(enabled: boolean, onEvent: () => void): void {
-  const handler = useRef(onEvent);
-  handler.current = onEvent;
-
-  useEffect(() => {
-    if (!enabled) return;
-    let source: EventSource | null = null;
-    try {
-      source = new EventSource('/api/messages/stream');
-      source.onmessage = () => handler.current();
-      source.onerror = () => {};
-    } catch {
-      /* браузер без SSE — обновится по visibilitychange/интервалу ниже */
-    }
-
-    const reconcile = setInterval(() => handler.current(), 20_000);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') handler.current();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => {
-      source?.close();
-      clearInterval(reconcile);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [enabled]);
 }
