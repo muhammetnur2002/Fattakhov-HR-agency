@@ -53,7 +53,7 @@ export function ApplicationsList({
   const pending = initialPending.filter((a) => !removed.has(a.vacancy.id));
   const [cancelling, setCancelling] = useState<string | null>(null);
   const cancelLock = useRef(false);
-  const [openedSwipe, setOpenedSwipe] = useState<string | null>(null);
+  const [openedSwipe, setOpenedSwipe] = useState<{ id: string; action: 'cancel' | 'chat' } | null>(null);
   async function cancel(vacancyId: string) {
     if (cancelLock.current) return;
     cancelLock.current = true;
@@ -117,7 +117,7 @@ export function ApplicationsList({
           </Link>
           <div className="mt-3 grid gap-3 [&>*]:min-w-0">
             {pending.map((item) => (
-              <SwipeApplication key={item.vacancy.id} open={openedSwipe === item.vacancy.id} onToggle={(open) => setOpenedSwipe(open ? item.vacancy.id : null)} busy={cancelling === item.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(item.vacancy.id)}>
+              <SwipeApplication key={item.vacancy.id} open={openedSwipe?.id === item.vacancy.id ? openedSwipe.action : null} onToggle={(action) => setOpenedSwipe(action ? { id: item.vacancy.id, action } : null)} busy={cancelling === item.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(item.vacancy.id)}>
                 <PendingCard item={item} onOpen={() => setDetail(item.vacancy)} />
               </SwipeApplication>
             ))}
@@ -129,7 +129,7 @@ export function ApplicationsList({
         <Stagger className="grid gap-3 [&>*]:min-w-0" each={0.06} inView={false}>
           {applications.map((application) => (
             <Reveal key={application.id} variants={fadeUp}>
-              <SwipeApplication open={openedSwipe === application.vacancy.id} onToggle={(open) => setOpenedSwipe(open ? application.vacancy.id : null)} busy={cancelling === application.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(application.vacancy.id)}>
+              <SwipeApplication chatHref={`/messages?thread=${encodeURIComponent(application.id)}`} open={openedSwipe?.id === application.vacancy.id ? openedSwipe.action : null} onToggle={(action) => setOpenedSwipe(action ? { id: application.vacancy.id, action } : null)} busy={cancelling === application.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(application.vacancy.id)}>
                 <ApplicationCard application={application} onOpen={() => setDetail(application.vacancy)} />
               </SwipeApplication>
             </Reveal>
