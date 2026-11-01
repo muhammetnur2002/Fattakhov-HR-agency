@@ -569,3 +569,6 @@ body:has([data-theme-toggle-inline]) [data-theme-toggle]:not([data-theme-toggle-
     outline-color: Highlight;
   }
 }
+
+/* Lock document scrolling only while a bounded employer panel is mounted. */
+html:has([data-panel-shell]), body:has([data-panel-shell]) { overflow: hidden; overscroll-behavior: none; }

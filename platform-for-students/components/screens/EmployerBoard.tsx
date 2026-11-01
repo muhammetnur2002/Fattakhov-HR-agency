@@ -13,7 +13,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { useToast } from '@/components/ui/Toast';
 import { Reveal, Stagger } from '@/components/motion/Reveal';
-import { CountUp } from '@/components/motion/CountUp';
 import { durations, easeOutExpo, fadeUp, springSoft, springSnappy } from '@/lib/motion';
 import { cn, plural, timeAgo } from '@/lib/utils';
 import {
@@ -55,7 +54,6 @@ export function EmployerBoard({ board }: { board: BoardData }) {
     [applications, vacancyFilter],
   );
 
-  const fresh = applications.filter((a) => a.status === 'NEW').length;
 
   function toggle(application: EmployerApplicationDTO) {
     const opening = expanded !== application.id;
@@ -124,7 +122,7 @@ export function EmployerBoard({ board }: { board: BoardData }) {
 
   if (applications.length === 0) {
     return (
-      <ListPanel toolbar={<BoardHeader company={board.company} total={0} fresh={0} vacancies={board.vacancies.length} />}>
+      <ListPanel toolbar={<BoardHeader company={board.company} />}>
         <EmptyState
           title="Откликов пока нет"
           description="Как только студент смахнёт вашу вакансию вправо, его профиль появится здесь — с фото, контактами и резюме."
@@ -142,9 +140,6 @@ export function EmployerBoard({ board }: { board: BoardData }) {
     <ListPanel toolbar={<>
       <BoardHeader
         company={board.company}
-        total={applications.length}
-        fresh={fresh}
-        vacancies={board.vacancies.length}
       />
 
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -216,45 +211,11 @@ export function EmployerBoard({ board }: { board: BoardData }) {
   );
 }
 
-function BoardHeader({
-  company,
-  total,
-  fresh,
-  vacancies,
-}: {
-  company: string;
-  total: number;
-  fresh: number;
-  vacancies: number;
-}) {
-  return (
-    <header className="mb-4">
-      <h1 className="text-title text-paper sm:text-headline">Отклики</h1>
-      <p className="mt-1 truncate text-small text-paper-dim">{company}</p>
-
-      <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[var(--hairline)] bg-[var(--hairline)]">
-        <Stat value={total} label={plural(total, 'отклик', 'отклика', 'откликов')} />
-        <Stat value={fresh} label="новых" accent />
-        <Stat value={vacancies} label={plural(vacancies, 'вакансия', 'вакансии', 'вакансий')} />
-      </div>
-    </header>
-  );
-}
-
-function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
-  return (
-    <div className="bg-ink px-3 py-2.5 sm:px-5 sm:py-4">
-      <p
-        className={cn(
-          'text-title font-semibold leading-none tracking-[-0.03em]',
-          accent && value > 0 ? 'text-accent-200' : 'text-paper',
-        )}
-      >
-        <CountUp to={value} />
-      </p>
-      <p className="mt-2 text-caption text-paper-faint">{label}</p>
-    </div>
-  );
+function BoardHeader({ company }: { company: string }) {
+  return <header className="mb-4">
+    <h1 className="text-title text-paper sm:text-headline">Отклики</h1>
+    <p className="mt-1 truncate text-small text-paper-dim">{company}</p>
+  </header>;
 }
 
 function Count({ children }: { children: React.ReactNode }) {

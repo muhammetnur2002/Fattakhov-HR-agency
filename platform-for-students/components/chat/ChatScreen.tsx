@@ -175,7 +175,7 @@ export function ChatScreen({
       // На телефоне — экран приложения: без рамки и скруглений, на всю ширину
       // и весь остаток высоты (см. useAppViewport). Карточка с двумя колонками —
       // только на широком экране.
-      className={cn("-mx-[var(--page-gutter)] grid min-h-0 grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl", viewerRole === 'EMPLOYER' ? 'h-full' : 'lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem]')}
+      className={cn("grid min-h-0 min-w-0 grid-cols-1 overflow-hidden lg:surface lg:mx-0 lg:grid-cols-[22rem_minmax(0,1fr)] lg:rounded-3xl", viewerRole === 'EMPLOYER' ? 'h-full w-full' : '-mx-[var(--page-gutter)] lg:h-[calc(100dvh-var(--header-h)-7rem)] lg:min-h-[30rem]')}
     >
       {/* ---------- список ---------- */}
       <aside

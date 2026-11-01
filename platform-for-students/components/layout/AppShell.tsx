@@ -49,7 +49,7 @@ export async function AppShell({
   const backToCrmUrl = await backToCrm(session);
 
   return (
-    <div data-panel-shell={panel || undefined} className={cn("flex flex-col", panel ? "h-dvh overflow-hidden" : "min-h-dvh")}>
+    <div data-panel-shell={panel || undefined} className={cn("flex flex-col", panel ? "fixed inset-0 overflow-hidden pt-[env(safe-area-inset-top)]" : "min-h-dvh")}>
       {/*
         before: сплошная полоса над шапкой. В iOS Safari страница рисуется и под
         статус-баром, а липкая шапка встаёт ниже него — без полосы содержимое (фото

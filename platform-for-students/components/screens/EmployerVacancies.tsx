@@ -108,24 +108,16 @@ export function EmployerVacancies({
   }
 
   const newButton = (
-    <ButtonLink href="/employer/vacancies/new" variant="accent" icon={<Plus />}>
+    <ButtonLink href="/employer/vacancies/new" variant="accent" size="sm" className="shrink-0 px-3 text-caption" icon={<Plus />}>
       Новая вакансия
     </ButtonLink>
   );
 
   return (
     <ListPanel className="mx-auto w-full max-w-[52rem]" toolbar={<>
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-eyebrow uppercase text-accent-300">Кабинет работодателя</p>
-          <h1 className="mt-3 text-headline text-paper">Вакансии</h1>
-          <p className="mt-2.5 max-w-[52ch] text-small leading-relaxed text-paper-dim">
-            {skipsModeration
-              ? 'По вашему договору вакансии публикуются сразу, без проверки агентством.'
-              : 'Агентство проверяет каждую вакансию перед публикацией в ленте студентов.'}
-          </p>
-        </div>
-        {vacancies.length > 0 && newButton}
+      <header className="flex items-center justify-between gap-2">
+        <h1 className="min-w-0 text-title text-paper sm:text-headline">Вакансии</h1>
+        {newButton}
       </header>
       </>}>
 

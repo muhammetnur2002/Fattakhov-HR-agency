@@ -1,4 +1,4 @@
-import { Briefcase, Inbox, MessageCircle, Users } from 'lucide-react';
+import { ChartNoAxesCombined, Briefcase, Inbox, MessageCircle, Users } from 'lucide-react';
 import type { NavItem } from '@/components/layout/NavTabs';
 
 /**
@@ -18,6 +18,10 @@ import type { NavItem } from '@/components/layout/NavTabs';
  */
 export function employerNav(applications: number, unread: number): NavItem[] {
   return [
+    {
+      href: '/employer/statistics', label: 'Статистика',
+      icon: <ChartNoAxesCombined className="size-[18px]" aria-hidden />, hideLabel: true,
+    },
     {
       href: '/employer',
       label: 'Отклики',
