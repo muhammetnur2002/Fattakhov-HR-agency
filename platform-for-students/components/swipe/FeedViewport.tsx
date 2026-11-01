@@ -70,7 +70,7 @@ export function FeedViewport({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div ref={ref} className="flex min-h-0 w-full flex-col items-center overflow-hidden">
+    <div ref={ref} data-feed-viewport className="flex min-h-0 w-full flex-col items-center overflow-hidden">
       {children}
     </div>
   );
