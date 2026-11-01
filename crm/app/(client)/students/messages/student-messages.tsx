@@ -8,6 +8,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { AttachmentMenu } from "@/components/messages/attachment-menu";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import type { StudentThreadMessage } from "@/lib/students-service";
 import { draftPreview, threadActivityAt, withDraft } from "@/lib/students-threads";
@@ -441,6 +442,7 @@ function Conversation({
           className="shrink-0 border-t p-3"
         >
           <div className="flex items-end gap-2">
+            <AttachmentMenu />
             <AutoGrowTextarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}

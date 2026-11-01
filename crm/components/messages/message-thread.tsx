@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/messages";
 import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { AttachmentMenu } from "@/components/messages/attachment-menu";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { useScrollToLatestOnKeyboard } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
@@ -175,6 +176,7 @@ export function MessageThread({
       <form ref={formRef} action={handleSubmit} className="shrink-0 border-t p-3">
         <input type="hidden" name="recipientId" value={recipientId} />
         <div className="flex items-end gap-2">
+          <AttachmentMenu />
           <AutoGrowTextarea
             name="body"
             value={text}

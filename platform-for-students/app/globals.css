@@ -428,10 +428,6 @@
   html[data-app-screen] [data-theme-toggle] {
     display: none;
   }
-  /* Клавиатура открыта: шапка сайта уступает место переписке, как в мессенджерах */
-  html[data-app-keyboard] [data-site-header] {
-    display: none;
-  }
 }
 
 /*
@@ -555,7 +551,7 @@ body:has([data-theme-toggle-inline]) [data-theme-toggle]:not([data-theme-toggle-
   выше любой утилиты. Ставить атрибут можно только полю не мельче 16px — следит tests/unit.ts
   (мельче 16px iOS снова увеличит страницу при фокусе).
 */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 1023px) {
   input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='color'], [type='hidden'], [data-keep-size]),
   textarea:not([data-keep-size]),
   select:not([data-keep-size]) {
