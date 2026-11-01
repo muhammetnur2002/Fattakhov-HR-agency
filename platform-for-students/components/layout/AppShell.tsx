@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
  *
  * Шапка приклеена ниже безопасной области экрана и закрывает контент.
  * Навигация стоит между знаком и профилем;
- * на узких экранах её можно прокрутить, не сжимая кнопки.
+ * на узких экранах кнопки остаются на своих местах без боковой прокрутки.
  *
  * Плашка «подтвердите почту» живёт здесь, а не на каждой странице: каркас
  * есть у всех экранов кабинета, и забыть её на новой странице нельзя.
@@ -49,7 +49,7 @@ export async function AppShell({
   const backToCrmUrl = await backToCrm(session);
 
   return (
-    <div data-panel-shell={panel || undefined} className={cn("flex flex-col", panel ? "fixed inset-0 overflow-hidden pt-[env(safe-area-inset-top)]" : "min-h-dvh")}>
+    <div data-app-shell data-panel-shell={panel || undefined} className="fixed inset-0 flex flex-col overflow-hidden bg-ink pt-[env(safe-area-inset-top)]">
       <header data-site-header className="sticky z-50 shrink-0 border-b border-[var(--hairline)] bg-ink">
         {nav && user && (session?.role === 'STUDENT' || session?.role === 'EMPLOYER') ? (
           <AnimatedHeader nav={nav} user={user} wide={wide} backToCrmUrl={backToCrmUrl}
@@ -73,7 +73,7 @@ export async function AppShell({
 
       </header>
 
-      <main className={cn('page-x mx-auto w-full flex-1', panel ? 'flex min-h-0 flex-col overflow-hidden' : 'pb-24 pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
+      <main className={cn('page-x mx-auto w-full flex-1', panel ? 'flex min-h-0 flex-col overflow-hidden' : 'min-h-0 overflow-y-auto overscroll-contain pb-24 pt-5 sm:pt-8', wide ? 'max-w-[100rem]' : 'max-w-6xl')}>
         {unverifiedEmail && <EmailVerifyBanner email={unverifiedEmail} />}
         {notice}
         {session && (session.role === 'STUDENT' || session.role === 'EMPLOYER') && (

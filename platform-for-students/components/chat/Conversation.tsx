@@ -118,7 +118,7 @@ export function Conversation({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-[var(--hairline)] bg-ink/70 px-4 py-3 backdrop-blur-glass sm:px-5">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--hairline)] bg-ink px-3 py-2 sm:px-5">
         {onBack && (
           <button
             type="button"
@@ -129,18 +129,18 @@ export function Conversation({
             <ArrowLeft className="size-4.5" />
           </button>
         )}
-        <Avatar name={thread.counterpartName} src={thread.counterpartPhotoUrl} size={40} rounded="square" />
+        <Avatar name={thread.counterpartName} src={thread.counterpartPhotoUrl} size={32} rounded="square" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-body font-medium text-paper">{thread.counterpartName}</p>
+          <p className="truncate text-small font-medium text-paper">{thread.counterpartName}</p>
           <p className="truncate text-caption text-paper-faint">
             {thread.vacancyTitle} · {thread.counterpartSubtitle}
           </p>
           {/* Отдельной строкой, а не в хвосте предыдущей: там уже две
               склеенные подписи, и на узком экране статус терялся бы
               первым. Строки нет вовсе, когда статус показывать нечего */}
-          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="text-caption text-paper-faint" />
+          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="max-w-full text-[11px] leading-4 text-paper-faint" />
         </div>
-        {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0" />}
+        {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0 !px-2 !py-0.5 !text-[10px]" />}
       </header>
 
       <div
@@ -149,7 +149,7 @@ export function Conversation({
           const el = e.currentTarget;
           stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        className="flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5"
       >
         {all.length === 0 ? (
           <motion.p

@@ -585,3 +585,10 @@ html:has([data-panel-shell]), body:has([data-panel-shell]) { overflow: hidden; o
   pointer-events: none;
 }
 [data-site-header] { top: env(safe-area-inset-top, 0px); }
+
+/* Clip scrolling content below the opaque safe area on every signed-in screen. */
+html:has([data-app-shell]), body:has([data-app-shell]) {
+  height:100%; overflow:hidden; overscroll-behavior:none;
+}
+[data-app-shell] > [data-site-header] { position:relative; top:0; }
+@media (max-width:639px) { :root { --header-h:60px; } }

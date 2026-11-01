@@ -35,10 +35,9 @@ export default async function FeedPage() {
       {completeness.percent < COMPLETE_PROFILE_PERCENT && (
         <Link
           href="/profile"
-          className="mb-2 block w-full max-w-[26rem] shrink-0 rounded-2xl border border-accent-500/30 bg-accent-500/[0.08] px-4 py-3 text-small leading-snug text-paper-dim transition-colors hover:bg-accent-500/[0.14]"
+          className="mb-2 block w-fit max-w-full shrink-0 rounded-xl border border-accent-500/30 bg-accent-500/[0.08] px-3 py-2 text-caption leading-snug text-paper-dim transition-colors hover:bg-accent-500/[0.14]"
         >
-          <span className="font-medium text-paper">Профиль заполнен на {completeness.percent}%.</span>{' '}
-          Добавьте проекты и достижения — работодатель увидит больше, чем резюме.
+          <span className="font-medium text-paper">Профиль заполнен на {completeness.percent}%</span>
         </Link>
       )}
 

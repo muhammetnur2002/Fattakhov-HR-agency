@@ -6,6 +6,7 @@ import { ArrowUp, Lock } from 'lucide-react';
 import { springSnappy } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { MESSAGE_MAX_LENGTH } from '@/lib/types';
+import { AttachmentMenu } from './AttachmentMenu';
 
 /**
  * Поле ввода реплики.
@@ -57,6 +58,7 @@ export function Composer({
             : 'border-[var(--hairline)] focus-within:border-accent-300 focus-within:bg-graphite-850/70',
         )}
       >
+        <AttachmentMenu />
         <textarea
           ref={ref}
           rows={1}
@@ -71,7 +73,7 @@ export function Composer({
               send();
             }
           }}
-          className="max-h-[132px] flex-1 resize-none bg-transparent py-2 text-body leading-relaxed text-paper outline-0 placeholder:text-paper-faint disabled:opacity-50"
+          className="max-h-[132px] min-w-0 flex-1 resize-none bg-transparent py-2 text-body leading-relaxed text-paper outline-0 placeholder:text-paper-faint disabled:opacity-50"
         />
 
         <motion.button
