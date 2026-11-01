@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils';
 /**
  * Каркас внутренних экранов.
  *
- * Шапка приклеена и стеклянная: контент проезжает под ней, а не
- * упирается в непрозрачную полосу. Навигация стоит между знаком и профилем;
+ * Шапка приклеена ниже безопасной области экрана и закрывает контент.
+ * Навигация стоит между знаком и профилем;
  * на узких экранах её можно прокрутить, не сжимая кнопки.
  *
  * Плашка «подтвердите почту» живёт здесь, а не на каждой странице: каркас
@@ -50,12 +50,7 @@ export async function AppShell({
 
   return (
     <div data-panel-shell={panel || undefined} className={cn("flex flex-col", panel ? "fixed inset-0 overflow-hidden pt-[env(safe-area-inset-top)]" : "min-h-dvh")}>
-      {/*
-        before: сплошная полоса над шапкой. В iOS Safari страница рисуется и под
-        статус-баром, а липкая шапка встаёт ниже него — без полосы содержимое (фото
-        студента и т.п.) просвечивало над шапкой при прокрутке.
-      */}
-      <header data-site-header className="sticky top-0 z-50 shrink-0 border-b border-[var(--hairline)] bg-ink before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-40 before:bg-ink">
+      <header data-site-header className="sticky z-50 shrink-0 border-b border-[var(--hairline)] bg-ink">
         {nav && user && (session?.role === 'STUDENT' || session?.role === 'EMPLOYER') ? (
           <AnimatedHeader nav={nav} user={user} wide={wide} backToCrmUrl={backToCrmUrl}
             bell={bell ?? (session.role === 'EMPLOYER' ? <EmployerNotifications applications={nav.find(item => item.href === '/employer')?.badge ?? 0} unread={nav.find(item => item.href === '/employer/messages')?.badge ?? 0} /> : undefined)} />

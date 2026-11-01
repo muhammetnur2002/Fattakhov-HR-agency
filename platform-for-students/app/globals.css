@@ -248,6 +248,7 @@
   }
 
   body {
+    padding-top: env(safe-area-inset-top, 0px);
     /* text-body: текст без своей ступени берёт основной размер шкалы (15px), а не 16px браузера по умолчанию */
     @apply bg-ink text-paper text-body font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
@@ -572,3 +573,15 @@ body:has([data-theme-toggle-inline]) [data-theme-toggle]:not([data-theme-toggle-
 
 /* Lock document scrolling only while a bounded employer panel is mounted. */
 html:has([data-panel-shell]), body:has([data-panel-shell]) { overflow: hidden; overscroll-behavior: none; }
+
+/* Keep scrolling content out of the iOS status area, including pages and
+   portalled dialogs outside AppShell. This layer must not scroll with a header. */
+[data-safe-area-cover] {
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  background: rgb(var(--color-ink));
+  z-index: 1000;
+  pointer-events: none;
+}
+[data-site-header] { top: env(safe-area-inset-top, 0px); }

@@ -41,6 +41,7 @@ export const viewport: Viewport = {
   colorScheme: 'light dark',
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
   // Масштаб страницы разрешён: maximumScale/userScalable запрещали его людям, которым нужен
   // крупный текст (WCAG 1.4.4). Свайп по карточке в зум не превращается и без запрета:
   // у карточки touch-action: pan-y (.touch-pan-y-only), щипок на ней браузер не перехватывает.
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </noscript>
       </head>
       <body className="grain min-h-dvh bg-ink text-paper" suppressHydrationWarning>
+        <div data-safe-area-cover aria-hidden="true" />
         <noscript>
           <p className="relative z-[80] bg-graphite-900 px-4 py-3 text-center text-small text-paper">
             Платформе нужен JavaScript: включите его в настройках браузера, чтобы войти и откликаться на вакансии.

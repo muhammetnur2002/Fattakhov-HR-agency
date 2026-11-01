@@ -42,10 +42,16 @@ export function JobSearch({ vacancies, appliedIds }: { vacancies: VacancyDTO[]; 
   }
   return <div className="mx-auto w-full max-w-4xl pb-16">
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-headline text-paper">Поиск работы</h1><ButtonLink href="/feed" variant="outline" icon={<Layers />}>Свайпы</ButtonLink></div>
-    <p className="mt-2 text-small text-paper-dim">Все активные вакансии. Ищите по названию, компании или навыкам.</p>
-    <div className="mt-6 flex items-center gap-2"><div className="relative flex-1"><TextField label="Поиск вакансий" value={filters.query} onChange={(e) => update('query', e.target.value)} /><Search className="pointer-events-none absolute right-4 top-5 size-5 text-paper-faint" aria-hidden /></div><Button variant="outline" icon={<Filter />} aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>Фильтры</Button></div>
-    {filtersOpen && <div className="glass mt-3 space-y-4 rounded-3xl p-5">
+    <div className="mt-4 flex items-center gap-2">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-paper-faint" aria-hidden />
+        <input type="search" aria-label="Поиск вакансий" placeholder="Поиск вакансий" value={filters.query} onChange={(e) => update('query', e.target.value)} className="h-11 w-full rounded-xl border border-[var(--hairline)] bg-graphite-900/40 pl-9 pr-3 text-small text-paper focus:border-accent-400" />
+      </div>
+      <button type="button" aria-label="Фильтры" aria-controls="job-search-filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)} className="grid size-11 shrink-0 place-items-center rounded-xl border border-[var(--hairline)] text-paper-dim aria-expanded:bg-accent-500/15"><Filter className="size-5" aria-hidden /></button>
+    </div>
+    {filtersOpen && <div id="job-search-filters" className="glass mt-3 space-y-4 rounded-3xl p-5">
       <div className="grid gap-3 sm:grid-cols-2">
+        <SelectField label="Сортировка" value={sort} onChange={(e) => { setSort(e.target.value); setLimit(20); }} options={[{ value: 'new', label: 'Сначала новые' }, { value: 'match', label: 'По совпадению с профилем' }]} />
         <SelectField label="Город" value={filters.city} onChange={(e) => update('city', e.target.value)} options={[{ value: '', label: 'Все города' }, ...Array.from(new Set(vacancies.map((v) => v.city))).sort().map((value) => ({ value, label: value }))]} />
         <SelectField label="Формат работы" value={filters.format} onChange={(e) => update('format', e.target.value)} options={[{ value: '', label: 'Любой формат' }, ...WORK_FORMATS.map((value) => ({ value, label: WORK_FORMAT_LABEL[value] }))]} />
         <SelectField label="Занятость" value={filters.employment} onChange={(e) => update('employment', e.target.value)} options={[{ value: '', label: 'Любая занятость' }, ...EMPLOYMENT_TYPES.map((value) => ({ value, label: EMPLOYMENT_TYPE_LABEL[value] }))]} />
@@ -55,7 +61,7 @@ export function JobSearch({ vacancies, appliedIds }: { vacancies: VacancyDTO[]; 
       <div><p className="mb-2 text-small text-paper-dim">Дни работы — хотя бы один из выбранных</p><div className="flex flex-wrap gap-2">{WEEKDAYS.map((day) => <Chip key={day} selected={filters.days.includes(day)} onToggle={() => update('days', filters.days.includes(day) ? filters.days.filter((d) => d !== day) : [...filters.days, day])}>{WEEKDAY_LABEL[day]}</Chip>)}</div></div>
       <Button variant="ghost" size="sm" onClick={() => { setFilters(initialFilters); setLimit(20); }}>Сбросить поиск и фильтры</Button>
     </div>}
-    <div className="my-5 flex flex-wrap items-center justify-between gap-3"><p className="text-small text-paper-dim" aria-live="polite">Найдено вакансий: {found.length}</p><div className="w-64"><SelectField label="Сортировка" value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: 'new', label: 'Сначала новые' }, { value: 'match', label: 'По совпадению с профилем' }]} /></div></div>
+    <p className="my-3 text-small text-paper-dim" aria-live="polite">Найдено вакансий: {found.length}</p>
     {found.length === 0 && <EmptyState title="Вакансии не найдены" description="Измените запрос или сбросьте фильтры." action={<Button onClick={() => setFilters(initialFilters)}>Сбросить</Button>} />}
     <div className="space-y-4">{found.slice(0, limit).map((v) => <article key={v.id} className="glass-card rounded-3xl p-5 sm:p-6">
       <button className="text-left" onClick={() => setDetail(v)}><h2 className="text-title text-paper">{v.title}</h2><p className="mt-2 text-body text-accent-200">{formatSalary(v.salaryFrom, v.salaryTo)} <span className="text-small text-paper-dim">{periodLabels[v.salaryPeriod]}</span></p><p className="mt-1 text-small text-paper-dim">{v.company} · {v.city}</p></button>
