@@ -7,8 +7,9 @@ import { useToast } from '@/components/ui/Toast';
 import { apiErrorMessage } from '@/lib/api-client';
 import { motion } from 'framer-motion';
 import { ArrowRight, Clock3, MapPin } from 'lucide-react';
+import { SwipeApplication } from './SwipeApplication';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button, ButtonLink } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/Button';
 import { ApplicationStatusPill } from '@/components/ui/StatusPill';
 import { Reveal, Stagger } from '@/components/motion/Reveal';
 import { VacancyDetail } from '@/components/swipe/VacancyDetail';
@@ -52,6 +53,7 @@ export function ApplicationsList({
   const pending = initialPending.filter((a) => !removed.has(a.vacancy.id));
   const [cancelling, setCancelling] = useState<string | null>(null);
   const cancelLock = useRef(false);
+  const [openedSwipe, setOpenedSwipe] = useState<string | null>(null);
   async function cancel(vacancyId: string) {
     if (cancelLock.current) return;
     cancelLock.current = true;
@@ -115,8 +117,9 @@ export function ApplicationsList({
           </Link>
           <div className="mt-3 grid gap-3 [&>*]:min-w-0">
             {pending.map((item) => (
-              <div key={item.vacancy.id}><PendingCard item={item} onOpen={() => setDetail(item.vacancy)} />
-                <CancelApplication busy={cancelling === item.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(item.vacancy.id)} /></div>
+              <SwipeApplication key={item.vacancy.id} open={openedSwipe === item.vacancy.id} onToggle={(open) => setOpenedSwipe(open ? item.vacancy.id : null)} busy={cancelling === item.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(item.vacancy.id)}>
+                <PendingCard item={item} onOpen={() => setDetail(item.vacancy)} />
+              </SwipeApplication>
             ))}
           </div>
         </section>
@@ -126,8 +129,9 @@ export function ApplicationsList({
         <Stagger className="grid gap-3 [&>*]:min-w-0" each={0.06} inView={false}>
           {applications.map((application) => (
             <Reveal key={application.id} variants={fadeUp}>
-              <ApplicationCard application={application} onOpen={() => setDetail(application.vacancy)} />
-              <CancelApplication busy={cancelling === application.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(application.vacancy.id)} />
+              <SwipeApplication open={openedSwipe === application.vacancy.id} onToggle={(open) => setOpenedSwipe(open ? application.vacancy.id : null)} busy={cancelling === application.vacancy.id} disabled={cancelling !== null} onCancel={() => cancel(application.vacancy.id)}>
+                <ApplicationCard application={application} onOpen={() => setDetail(application.vacancy)} />
+              </SwipeApplication>
             </Reveal>
           ))}
         </Stagger>
@@ -267,13 +271,3 @@ function Funnel({ status }: { status: ApplicationStatus }) {
   );
 }
 
-function CancelApplication({ busy, disabled, onCancel }: { busy: boolean; disabled: boolean; onCancel: () => Promise<void> }) {
-  const [confirm, setConfirm] = useState(false);
-  return <div className="px-5 py-3">
-    {confirm ? <div className="flex flex-wrap items-center gap-3">
-      <p className="text-small text-paper-dim">Отменить отклик? Переписка по нему тоже будет удалена.</p>
-      <Button size="sm" variant="danger" loading={busy} disabled={disabled} onClick={onCancel}>Да, отменить</Button>
-      <Button size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirm(false)}>Оставить отклик</Button>
-    </div> : <Button size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirm(true)}>Отменить отклик</Button>}
-  </div>;
-}
