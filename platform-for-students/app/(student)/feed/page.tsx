@@ -24,7 +24,6 @@ export default async function FeedPage() {
     // её можно открыть снова кнопкой «?» в шапке
     <FeedViewport>
       <h1 className="sr-only">Лента вакансий</h1>
-      <Link href="/jobs" className="mb-3 text-small text-accent-200 underline underline-offset-4">Поиск вакансий и фильтры</Link>
       {/* Подтверждение учёбы — выше подсказки о профиле: от него зависит,
           дойдут ли отклики до работодателя вообще */}
       {study.status !== 'VERIFIED' && <StudyBanner study={study} />}
@@ -34,10 +33,10 @@ export default async function FeedPage() {
           смотреть вакансии, и мешать ему ради анкеты значит потерять его */}
       {completeness.percent < COMPLETE_PROFILE_PERCENT && (
         <Link
-          href="/profile"
-          className="mb-2 block w-fit max-w-full shrink-0 rounded-xl border border-accent-500/30 bg-accent-500/[0.08] px-3 py-2 text-caption leading-snug text-paper-dim transition-colors hover:bg-accent-500/[0.14]"
+          href="/help#usage-rules"
+          className="mb-2 block w-fit max-w-full shrink-0 py-1 text-caption font-medium leading-snug text-red-600 underline underline-offset-4 dark:text-red-400"
         >
-          <span className="font-medium text-paper">Профиль заполнен на {completeness.percent}%</span>
+          Профиль заполнен на {completeness.percent}%
         </Link>
       )}
 

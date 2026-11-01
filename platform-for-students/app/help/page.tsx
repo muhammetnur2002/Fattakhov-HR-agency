@@ -9,6 +9,7 @@ import { ShowTourButton } from '@/components/onboarding/ShowTourButton';
 import { SectionTitle } from '@/components/ui/SectionTitle';
 import { pageMetadata } from '@/lib/seo';
 import { PENDING_APPLICATION_DAYS, STUDY_DOC_WORKDAYS } from '@/lib/study';
+import { COMPLETE_PROFILE_PERCENT } from '@/lib/portfolio';
 
 // Адрес в canonical и og:url — из APP_URL на запрос (см. lib/seo.ts)
 export const dynamic = 'force-dynamic';
@@ -130,6 +131,15 @@ export default async function HelpPage() {
         <div className="mt-5">
           <ShowTourButton />
         </div>
+
+        <section id="usage-rules" className="mt-8 scroll-mt-4">
+          <SectionTitle>Правила использования</SectionTitle>
+          <div className="mt-3 space-y-3 text-small leading-relaxed text-paper-dim">
+            <p>Рекомендуем заполнить профиль минимум на {COMPLETE_PROFILE_PERCENT}% — так работодателю будет проще оценить ваши навыки и опыт. Процент учитывает фото, рассказ о себе, пожелания к работе, цели, навыки, проекты, достижения, активность, хобби, резюме или ссылки.</p>
+            <p>В каталоге работодателей профиль виден после подтверждения учёбы агентством, если поиск работы не на паузе и вы не отмечены как трудоустроенный. Заполненность ниже {COMPLETE_PROFILE_PERCENT}% сама по себе не скрывает профиль. До подтверждения учёбы отклики ожидают проверки.</p>
+            <Link href="/profile" className="inline-block text-accent-200 underline underline-offset-4">Заполнить профиль</Link>
+          </div>
+        </section>
 
         <Group title="Студентам" items={STUDENTS} />
         <Group title="Компаниям" items={COMPANIES} />
