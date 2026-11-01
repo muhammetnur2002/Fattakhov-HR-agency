@@ -138,9 +138,9 @@ export function Conversation({
           {/* Отдельной строкой, а не в хвосте предыдущей: там уже две
               склеенные подписи, и на узком экране статус терялся бы
               первым. Строки нет вовсе, когда статус показывать нечего */}
-          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="max-w-full text-[11px] leading-4 text-paper-faint" />
+          <PresenceLine lastSeenAt={thread.counterpartLastSeen} className="max-w-full text-caption leading-4 text-paper-faint" />
         </div>
-        {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0 !px-2 !py-0.5 !text-[10px]" />}
+        {!hideStatus && <ApplicationStatusPill status={thread.status} className="shrink-0 !px-2 !py-0.5 !text-caption" />}
       </header>
 
       <div
